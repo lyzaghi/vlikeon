@@ -1,0 +1,29 @@
+{
+  "schema_version": 1,
+  "batch_id": "vlikeon-009",
+  "executor": "antigravity",
+  "reviewer": "codex",
+  "source_commit": "e4eef6101edc9fbbb83308de50a4dcf34ee6dc8e",
+  "source_unchanged": true,
+  "build": "Direct MSVC x64 C++20 /MD contract builds",
+  "setup_version": "Visual Studio Developer Command Prompt 17.14.37",
+  "exit_codes": [
+    0,
+    0,
+    0,
+    0
+  ],
+  "memory_contract_groups": 4,
+  "audio_contract_groups": 4,
+  "compiler_warnings_present": true,
+  "accepted_scope": [
+    "Production MemoryFiles and four existing contract groups",
+    "Production audio ring and four existing contract groups"
+  ],
+  "not_established": [
+    "New Rust scratch grant decision",
+    "Actual core ABI/package behavior",
+    "SDL device output",
+    "Whole disk/RAM quota or Windows item 2 completion"
+  ]
+}

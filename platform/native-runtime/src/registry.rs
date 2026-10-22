@@ -52,6 +52,9 @@ pub struct RuntimePackage {
     #[serde(default)]pub portable_in_game_format:Option<String>,
 }
 impl RuntimePackage{
+    pub(crate) fn legacy_os_writes(&self)->bool{
+        self.writable_files_protocol==0&&(self.filesystem_save_directory.is_some()||self.use_scratch_system_directory)
+    }
     pub fn staging_budget(&self,game:&GameManifest)->Result<(u64,u32)>{
         game.validate()?;self.manifest.validate()?;if !self.manifest.systems.contains(&game.system)||game.byte_length>self.maximum_rom_bytes{return Err(PlatformError::new(ErrorCode::UnsupportedCapability,"The selected native runtime does not admit this game"));}
         let firmware=self.firmware_requirements.iter().try_fold(0u64,|total,requirement|total.checked_add(*requirement.allowed_bytes.iter().max().ok_or_else(||unavailable("Firmware staging shape is absent"))?).ok_or_else(||unavailable("Firmware staging size overflow")))?;

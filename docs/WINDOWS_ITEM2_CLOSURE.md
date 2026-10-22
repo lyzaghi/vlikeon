@@ -33,6 +33,11 @@ limits are not measurements of whole-machine memory or storage.
    for those routes. Include permitted helper/driver cache behavior and distinguish
    copy reservations from actual physical writable storage. Do not enable the
    N64 candidate or call its source-copy receipt an approved package.
+   Protocol-zero packages with no declared filesystem save or scratch-system
+   storage now withhold OS scratch write grants in source, with a distinct
+   opaque-state policy identity. Actual access/compatibility case 28 is pending;
+   explicit legacy writers and helper/cache quotas remain open. Batch 009's
+   passing memory-store/audio contracts do not establish that OS decision.
 2. **Finish retained legacy-work handling.** Schema 15 preserves old debt as
    protocol zero; new prelaunch and confirmed-retirement recovery are authored.
    Missing container ownership or process acknowledgement cannot authorize

@@ -227,6 +227,18 @@ the required OS/process/filesystem evidence.
     TLS teardown. Status must not join it; no second collector may start until
     the original held thread object ended and its owner was joined.
 
+28. Prepare an actual protocol-zero package declaring no filesystem save or
+    scratch-system route. Require its suspended actor's private scratch to
+    remain readonly, including create/replace/stream/write attempts. In-game
+    progress stays compatible; opaque state identity includes scratch policy 1
+    with no automatic conversion from the older policy. Exercise repeated
+    prepare/failure/retry without a broader grant. Separately admit explicit
+    legacy disk routes and protocol-one memory routes; their existing save/
+    scratch permissions and state identities must not accidentally change.
+    Exercise real cores that previously wrote undeclared cache/temp files:
+    document failure/adaptation and do not count source flags as compatibility
+    or OS access proof. Complete remaining legacy writer quotas separately.
+
 Record target OS/build, toolchain/SDK, source/artifact hashes, exact failure
 injection point, observed process/job/profile state, disk/ledger/proof state,
 expected outcome and evidence location for every case. No item-2 completion is

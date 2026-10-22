@@ -100,6 +100,25 @@ remain. See `PS1_MEMORY_CARDS.md`; its C bridge cases also remain unexecuted.
 
 ## Remaining work and final evidence
 
+The Windows broker now withholds the former unconditional scratch write grant
+from protocol-zero packages that declare neither filesystem saves nor a scratch
+system directory. Placeholders remain readable; no failed launch can retry with
+a broader grant. A single package-policy function selects the actual grant and
+the changed route's opaque-state identity (`os_scratch_policy=1`). In-game
+progress identity is unchanged, and no implicit opaque-state conversion is
+added. Existing explicitly declared legacy disk routes still receive their
+earlier grants and remain unfinished bounded-storage work; protocol-one routes
+continue to use the bounded store. Cores relying on undeclared scratch writes
+must be adapted and qualified, not silently granted extra access. This is source
+policy, not actual-token or whole-filesystem quota evidence.
+
+Antigravity batch 009 directly compiled the production MemoryFiles source with
+its four existing contract groups on Windows MSVC, then executed successfully.
+The production audio ring's four contract groups also compiled/executed. Source
+hashes remained unchanged; actual core/ABI/store admission, allocation-fault,
+device and OS-denial cases remain required. These fixtures do not exercise the
+new broker scratch-grant decision or prove all cores' writer closure.
+
 Other native cores still use their previous OS writable routes and require
 separate adapters and exact packaging/ABI admission. Trusted helper/driver
 caches, physical whole-profile accounting, broader Windows access qualification,
@@ -110,6 +129,6 @@ The standalone source cases under `qa/native-memory/` cover actual store
 operations, sparse/zeroing behavior, open-unlinked debt, aliases, moved handles,
 revision-bound lists, replacement failure preservation, empty directories,
 unchanged archive identity, integer/transfer bounds and handle/file caps.
-They have not run. Configure/build/run them only in item 16, using the qualified
-target toolchain. Run both allocation-fault and real worker/core/OS matrix cases;
+The direct MSVC batch above ran the existing groups; full acceptance remains
+in item 16. Run both allocation-fault and real worker/core/OS matrix cases;
 the standalone store cases do not prove ABI, save recovery or access isolation.

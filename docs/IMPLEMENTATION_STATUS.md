@@ -1,5 +1,18 @@
 # Implementation status
 
+Antigravity batch 009 on e4eef61 directly compiled and executed the production
+MemoryFiles and AudioRing contract executables with MSVC x64 C++20 /MD. All four
+steps returned zero; all four memory and four audio groups ran successfully.
+Codex inspected raw logs/source hashes; evidence is under
+`qa/evidence/antigravity/batch-009/`. This does not qualify core/ABI/SDL output.
+
+Current source removes unconditional OS scratch write grants for protocol-zero
+packages declaring neither filesystem saves nor scratch-system storage. One
+package policy selects grants and namespaces opaque state for the changed route;
+in-game identity and existing explicitly declared legacy/protocol-one routes
+are preserved. The new OS grant decision is unexecuted and requires actual
+actor access/compatibility case 28; legacy writer quotas and item 2 remain open.
+
 Antigravity batch 008 compiled/linked the broker test harness and executed the
 new recovery diagnostic projection case on 351639d: one passed, zero failed or
 ignored, source unchanged. Codex inspected the actual assertion output; evidence

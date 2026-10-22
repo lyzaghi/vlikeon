@@ -100,9 +100,13 @@ impl RuntimeAdapter for NativeAdapter {
         crate::work::created(&work,self.profile_id,work_id)?;
         let identity=self.container.as_ref().ok_or_else(||unavailable("The session container identity is absent"))?;
         identity.grant_game_read(&work)?;
+        // A memory-only declaration is not authority to write arbitrary OS
+        // scratch files. Keep the legacy grant only for explicitly declared
+        // disk-backed save/system routes; protocol 1 uses the bounded store.
+        let legacy_os_writes=self.package.legacy_os_writes();
         let scratch=work.join("scratch");std::fs::create_dir(&scratch).map_err(storage_error)?;
-        if self.package.writable_files_protocol==0{identity.grant_private_write(&scratch)?;}
-        if self.package.filesystem_save_directory.is_some(){let saves=work.join("save");std::fs::create_dir(&saves).map_err(storage_error)?;if self.package.writable_files_protocol==0{identity.grant_private_write(&saves)?;}}
+        if legacy_os_writes{identity.grant_private_write(&scratch)?;}
+        if self.package.filesystem_save_directory.is_some(){let saves=work.join("save");std::fs::create_dir(&saves).map_err(storage_error)?;if legacy_os_writes{identity.grant_private_write(&saves)?;}}
         let worker=self.root.join(&self.package.worker);let runtime_directory=worker.parent().ok_or_else(||unavailable("Native worker has no package directory"))?;
         omniplay_sandbox::grant_public_runtime_read(runtime_directory)?;
         crate::work::launch_intent(&work,work_id)?;
@@ -163,6 +167,9 @@ impl RuntimeAdapter for NativeAdapter {
         if self.package.file_io_protocol!=0||self.package.filesystem_save_memory||self.package.core_save_directory.is_some(){effective_config["persistent_file_policy"]=json!({"io":self.package.file_io_protocol,"memory":self.package.filesystem_save_memory,"core_directory":self.package.core_save_directory});}
         if self.package.pause_barrier_protocol!=0{effective_config["pause_barrier_protocol"]=json!(self.package.pause_barrier_protocol);}
         if self.package.writable_files_protocol!=0{effective_config["writable_files_protocol"]=json!(self.package.writable_files_protocol);}
+        // Only opaque state identity changes for the newly readonly legacy
+        // route. Do not invent a state conversion or invalidate in-game bytes.
+        if kind==SaveKind::EmulatorState&&self.package.writable_files_protocol==0&&!self.package.legacy_os_writes(){effective_config["os_scratch_policy"]=json!(1);}
         let config_hash=digest(&serde_json::to_vec(&effective_config).map_err(storage_error)?);
         Ok(SaveCompatibility{game_content_hash:game.content_hash.clone(),core_id:self.package.manifest.id.clone(),core_version:self.package.manifest.version.clone(),state_format_version:if kind==SaveKind::InGame{self.package.in_game_format_version.clone()}else{self.package.manifest.state_format_version.clone().ok_or_else(||unavailable("Native state format is undeclared"))?},platform:self.package.manifest.platform.clone(),core_config_hash:config_hash,portable_in_game_format:if kind==SaveKind::InGame{self.package.portable_in_game_format.clone()}else{None}})
     }

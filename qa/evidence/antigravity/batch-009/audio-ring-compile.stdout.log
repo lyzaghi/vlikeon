@@ -1,0 +1,23 @@
+**********************************************************************
+** Visual Studio 2022 Developer Command Prompt v17.14.37
+** Copyright (c) 2025 Microsoft Corporation
+**********************************************************************
+[vcvarsall.bat] Environment initialized for: 'x64'
+audio_ring_cases.cpp
+E:\MUONLINE\_BuildTools\VS2022\VC\Tools\MSVC\14.44.35207\include\xutility(5310): warning C4244: '=': conversion from 'const _Ty' to '_Ty', possible loss of data
+        with
+        [
+            _Ty=int
+        ]
+E:\MUONLINE\_BuildTools\VS2022\VC\Tools\MSVC\14.44.35207\include\xutility(5310): note: the template instantiation context (the oldest one first) is
+E:\V10\work\vlikeon-qa-20261023\source-e4eef61\qa\native-audio\audio_ring_cases.cpp(28): note: see reference to function template instantiation 'omni::AudioRing::ReadReceipt omni::AudioRing::deliver<rejection_and_trim::<lambda_1>>(std::span<int16_t,18446744073709551615>,uint64_t,uint64_t,float,Sink &&)' being compiled
+        with
+        [
+            Sink=rejection_and_trim::<lambda_1>
+        ]
+E:\V10\work\vlikeon-qa-20261023\source-e4eef61\engines\native\src\audio_ring.hpp(63): note: see reference to function template instantiation 'void std::fill<std::_Span_iterator<_Ty>,int>(const _FwdIt,const _FwdIt,const int &)' being compiled
+        with
+        [
+            _Ty=int16_t,
+            _FwdIt=std::_Span_iterator<int16_t>
+        ]
