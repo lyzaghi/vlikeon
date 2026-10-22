@@ -1,0 +1,13 @@
+
+running 8 tests
+test control_workers::tests::a_single_slot_pool_retains_a_dropped_owner_until_its_thread_ends ... ok
+test control_workers::tests::dropping_a_live_worker_never_joins_or_refunds_it ... ok
+test control_workers::tests::independent_pools_do_not_borrow_each_others_capacity ... ok
+test control_workers::tests::losing_the_pool_record_cannot_guess_a_refund_from_later_external_join ... ok
+test control_workers::tests::recovery_owner_replacement_cannot_detach_and_replace_a_live_collector ... ok
+test control_workers::tests::reservations_are_finite_and_unused_prelaunch_capacity_is_returned ... ok
+test control_workers::tests::windows_tls_cleanup_must_end_before_admission_can_reclaim_a_slot ... ok
+test control_workers::tests::worker_panic_is_joined_before_its_slot_is_refunded ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 19 filtered out; finished in 0.01s
+

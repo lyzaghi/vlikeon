@@ -1,0 +1,13 @@
+
+running 8 tests
+test channel::tests::cancellation_latches_channel_without_admitting_a_future_command ... ok
+test channel::tests::exhausted_sequence_cannot_wrap_or_queue_another_call ... ok
+test channel::tests::local_encoding_is_bounded_before_send ... ok
+test channel::tests::local_rejection_preserves_sequence_but_timeout_is_terminal ... ok
+test channel::tests::malformed_envelopes_do_not_read_a_body_length ... ok
+test channel::tests::method_bounds_and_exact_binary_round_trip ... ok
+test channel::tests::only_fully_framed_empty_error_payload_is_recoverable ... ok
+test channel::tests::queue_refusal_invalidates_without_consuming_the_identity ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 19 filtered out; finished in 0.01s
+

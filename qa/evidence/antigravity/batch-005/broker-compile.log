@@ -1,0 +1,217 @@
+ Downloading crates ...
+  Downloaded byteorder v1.5.0
+  Downloaded futures-macro v0.3.31
+  Downloaded windows-interface v0.59.3
+  Downloaded aead v0.5.2
+  Downloaded windows-strings v0.4.2
+  Downloaded windows-result v0.3.4
+  Downloaded windows-collections v0.2.0
+  Downloaded inout v0.1.4
+  Downloaded windows-targets v0.53.5
+  Downloaded block-padding v0.3.3
+  Downloaded windows-threading v0.1.0
+  Downloaded windows-numerics v0.2.0
+  Downloaded windows-link v0.1.3
+  Downloaded cipher v0.4.4
+  Downloaded windows-future v0.2.1
+  Downloaded windows-core v0.61.2
+  Downloaded rfd v0.17.2
+  Downloaded keyring v3.6.3
+  Downloaded hmac v0.12.1
+  Downloaded chacha20poly1305 v0.10.1
+  Downloaded tracing-attributes v0.1.31
+  Downloaded poly1305 v0.8.0
+  Downloaded chacha20 v0.9.1
+  Downloaded raw-window-handle v0.6.2
+  Downloaded hkdf v0.12.4
+  Downloaded windows-implement v0.60.2
+  Downloaded universal-hash v0.5.1
+  Downloaded opaque-debug v0.3.1
+  Downloaded windows_x86_64_msvc v0.53.1
+  Downloaded windows-sys v0.60.2
+  Downloaded windows v0.61.3
+    Checking cfg-if v1.0.5
+    Checking typenum v1.20.1
+    Checking subtle v2.6.1
+    Checking itoa v1.0.18
+    Checking stable_deref_trait v1.2.1
+    Checking windows-link v0.2.1
+    Checking memchr v2.8.3
+    Checking cpufeatures v0.2.17
+    Checking smallvec v1.16.3
+    Checking bytes v1.12.1
+    Checking pin-project-lite v0.2.17
+    Checking serde_core v1.0.229
+    Checking zeroize v1.8.2
+    Checking zerofrom v0.1.8
+    Checking futures-core v0.3.34
+    Checking litemap v0.8.3
+    Checking getrandom v0.2.17
+    Checking windows-sys v0.61.2
+    Checking writeable v0.6.4
+    Checking zmij v1.0.23
+    Checking utf8_iter v1.0.4
+    Checking getrandom v0.4.3
+    Checking percent-encoding v2.3.2
+    Checking thiserror v2.0.20
+    Checking yoke v0.8.3
+    Checking icu_properties_data v2.3.0
+    Checking rand_core v0.6.4
+    Checking icu_normalizer_data v2.3.0
+    Checking futures-sink v0.3.34
+    Checking once_cell v1.21.4
+    Checking rustls-pki-types v1.15.1
+    Checking windows-link v0.1.3
+    Checking untrusted v0.9.0
+    Checking futures-io v0.3.34
+    Checking futures-task v0.3.34
+    Checking pin-utils v0.1.1
+    Checking slab v0.4.12
+    Checking form_urlencoded v1.2.2
+    Checking signature v2.2.0
+    Checking zerovec v0.11.8
+    Checking zerotrie v0.2.5
+    Checking try-lock v0.2.5
+    Checking ring v0.17.14
+    Checking tower-service v0.3.3
+    Checking tracing-core v0.1.36
+    Checking httparse v1.10.1
+    Checking ed25519 v2.2.3
+    Checking bitflags v2.13.2
+    Checking http v1.5.0
+    Checking want v0.3.2
+    Checking atomic-waker v1.1.2
+    Checking foldhash v0.2.0
+    Checking futures-util v0.3.31
+    Checking base64 v0.22.1
+    Checking libc v0.2.191
+    Checking windows-strings v0.4.2
+    Checking windows-result v0.3.4
+    Checking futures-channel v0.3.34
+    Checking sync_wrapper v1.0.2
+    Checking generic-array v0.14.7
+    Checking hashbrown v0.17.1
+   Compiling windows-implement v0.60.2
+   Compiling windows-interface v0.59.3
+    Checking tracing v0.1.44
+   Compiling windows_x86_64_msvc v0.53.1
+    Checking log v0.4.34
+    Checking ipnet v2.12.2
+    Checking base64 v0.23.1
+    Checking tinystr v0.8.4
+    Checking potential_utf v0.1.6
+    Checking tower-layer v0.3.3
+    Checking libsqlite3-sys v0.38.2
+    Checking icu_collections v2.3.0
+    Checking webpki-roots v1.0.9
+    Checking icu_locale_core v2.3.0
+    Checking ryu v1.0.23
+    Checking http-body v1.1.0
+    Checking fallible-streaming-iterator v0.1.9
+    Checking fallible-iterator v0.3.0
+    Checking crypto-common v0.1.7
+    Checking block-buffer v0.10.4
+    Checking hashlink v0.12.2
+    Checking inout v0.1.4
+    Checking http-body-util v0.1.5
+    Checking encoding_rs v0.8.35
+    Checking opaque-debug v0.3.1
+    Checking universal-hash v0.5.1
+    Checking digest v0.10.7
+    Checking aead v0.5.2
+    Checking cipher v0.4.4
+    Checking windows-targets v0.53.5
+    Checking poly1305 v0.8.0
+    Checking windows-threading v0.1.0
+    Checking rusqlite v0.40.2
+    Checking byteorder v1.5.0
+    Checking rustls-webpki v0.103.15
+    Checking windows-sys v0.60.2
+   Compiling rfd v0.17.2
+    Checking raw-window-handle v0.6.2
+    Checking windows-core v0.61.2
+    Checking sha2 v0.10.9
+    Checking curve25519-dalek v4.1.3
+    Checking chacha20 v0.9.1
+    Checking hmac v0.12.1
+    Checking icu_provider v2.3.1
+    Checking hkdf v0.12.4
+    Checking chacha20poly1305 v0.10.1
+    Checking serde v1.0.229
+    Checking serde_json v1.0.151
+    Checking semver v1.0.28
+    Checking uuid v1.25.0
+    Checking rustls v0.23.46
+    Checking icu_normalizer v2.3.0
+    Checking icu_properties v2.3.0
+    Checking windows-collections v0.2.0
+    Checking windows-numerics v0.2.0
+    Checking windows-future v0.2.1
+    Checking serde_urlencoded v0.7.1
+    Checking windows v0.61.3
+    Checking ed25519-dalek v2.2.0
+    Checking omniplay-contracts v0.1.0 (E:\V10\work\vlikeon-qa-20261023\source-edebf6d\platform\contracts)
+    Checking keyring v3.6.3
+    Checking idna_adapter v1.2.2
+    Checking idna v1.1.0
+    Checking url v2.5.8
+    Checking omniplay-core v0.1.0 (E:\V10\work\vlikeon-qa-20261023\source-edebf6d\platform\core)
+    Checking omniplay-sync v0.1.0 (E:\V10\work\vlikeon-qa-20261023\source-edebf6d\platform\sync)
+    Checking omniplay-streaming v0.1.0 (E:\V10\work\vlikeon-qa-20261023\source-edebf6d\platform\streaming)
+warning: unused import: `Signer`
+ --> platform\sync\src\account.rs:3:32
+  |
+3 | use ed25519_dalek::{SigningKey,Signer};
+  |                                ^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` on by default
+
+    Checking socket2 v0.6.5
+    Checking mio v1.2.4
+    Checking omniplay-device-info v0.1.0 (E:\V10\work\vlikeon-qa-20261023\source-edebf6d\platform\device-info)
+    Checking omniplay-sandbox v0.1.0 (E:\V10\work\vlikeon-qa-20261023\source-edebf6d\platform\sandbox)
+    Checking omniplay-stream-input v0.1.0 (E:\V10\work\vlikeon-qa-20261023\source-edebf6d\platform\stream-input)
+error: float literals must have an integer part
+  --> platform\stream-input\src\windows.rs:74:80
+   |
+74 |         if frame.pads.iter().any(|p|p.buttons!=0||p.axes.iter().any(|a|a.abs()>.05)){self.revoke("gamepad_unavailable");return Ok(());}
+   |                                                                                ^^^
+   |
+help: must have an integer part
+   |
+74 |         if frame.pads.iter().any(|p|p.buttons!=0||p.axes.iter().any(|a|a.abs()>0.05)){self.revoke("gamepad_unavailable");return Ok(());}
+   |                                                                                +
+
+    Checking tokio v1.53.1
+warning: variable does not need to be mutable
+  --> platform\sync\src\transfer_files.rs:29:36
+   |
+29 |     let path=parent.join(name);let mut builder=std::fs::DirBuilder::new();
+   |                                    ----^^^^^^^
+   |                                    |
+   |                                    help: remove this `mut`
+   |
+   = note: `#[warn(unused_mut)]` on by default
+
+error: could not compile `omniplay-stream-input` (lib) due to 1 previous error
+warning: build failed, waiting for other jobs to finish...
+warning: `omniplay-sync` (lib) generated 2 warnings (run `cargo fix --lib -p omniplay-sync` to apply 2 suggestions)
+warning: unused import: `io::Write`
+ --> platform\core\src\firmware.rs:5:34
+  |
+5 | use std::{fs::{File,OpenOptions},io::Write};
+  |                                  ^^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` on by default
+
+warning: variable does not need to be mutable
+  --> platform\core\src\save_payloads.rs:35:19
+   |
+35 |     if create{let mut builder=fs::DirBuilder::new();
+   |                   ----^^^^^^^
+   |                   |
+   |                   help: remove this `mut`
+   |
+   = note: `#[warn(unused_mut)]` on by default
+
+warning: `omniplay-core` (lib) generated 2 warnings (run `cargo fix --lib -p omniplay-core` to apply 1 suggestion)

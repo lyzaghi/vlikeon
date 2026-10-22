@@ -1,0 +1,16 @@
+
+running 11 tests
+test work::windows_tests::conflicting_journal_or_foreign_profile_cannot_use_prelaunch_authority ... ok
+test work::windows_tests::creation_protocol_is_immutable_and_old_rows_default_to_zero ... ok
+test work::windows_tests::legacy_missing_and_unleased_partial_debts_are_never_upgraded ... ok
+test work::windows_tests::live_creator_blocks_releasing_a_directory_not_yet_created ... ok
+test work::windows_tests::live_owner_blocks_partial_creation_recovery_after_creation_handoff ... ok
+test work::windows_tests::protocol_one_partial_creation_without_owner_lease_is_recoverable ... ok
+test work::windows_tests::recovery_distinguishes_locked_work_from_missing_ownership ... ok
+test work::windows_tests::recovery_inventory_reaches_debt_without_any_work_directory ... ok
+test work::windows_tests::recovery_keeps_other_platform_and_invalid_owner_data_distinct ... ok
+test work::windows_tests::recovery_reports_legacy_retention_without_promoting_or_erasing_originals ... ok
+test work::windows_tests::staged_debt_without_work_or_owner_lease_stays_retained ... ok
+
+test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 16 filtered out; finished in 0.68s
+
