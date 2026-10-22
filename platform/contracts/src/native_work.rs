@@ -20,10 +20,22 @@ pub struct NativeWorkStorageStatus {
 
 #[derive(Clone,Debug,Default,Serialize,Deserialize)]
 #[serde(deny_unknown_fields)]
+pub struct NativeWorkRetentionSummary {
+    pub locked:u32,
+    pub legacy_ownership:u32,
+    pub incomplete_ownership:u32,
+    pub other_platform:u32,
+    pub unconfirmed:u32,
+}
+
+#[derive(Clone,Debug,Default,Serialize,Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct NativeWorkRecoverySummary {
     pub attempted:u32,
     pub recovered:u32,
     pub retained:u32,
+    /// Diagnostic counts only, never authority to delete, adopt or signal work.
+    #[serde(default)]pub retention:NativeWorkRetentionSummary,
     pub unknown_entries:u32,
     pub cancelled:bool,
     pub more_available:bool,

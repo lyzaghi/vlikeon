@@ -91,7 +91,15 @@ fn resume_retirement(profile:&Path,profile_id:Uuid,id:Uuid)->Result<()>{
     fs::remove_file(proof).map_err(storage_error)
 }
 fn reclaim(profile:&Path,profile_id:Uuid,work:&Path)->Result<()>{
-    #[cfg(windows)]let _creator=creation_guard(profile)?;
+    let mut retained=RetainedReason::Unconfirmed;
+    reclaim_reported(profile,profile_id,work,&mut retained)
+}
+#[derive(Clone,Copy)]
+enum RetainedReason{Locked,LegacyOwnership,IncompleteOwnership,OtherPlatform,Unconfirmed}
+fn reclaim_reported(profile:&Path,profile_id:Uuid,work:&Path,retained:&mut RetainedReason)->Result<()>{
+    // Classification only follows an existing refusal. It never changes the
+    // ownership, lease, process, ledger or deletion admission below.
+    #[cfg(windows)]let _creator=creation_guard(profile).map_err(|error|{if error.code==ErrorCode::Busy{*retained=RetainedReason::Locked;}error})?;
     #[cfg(windows)]{
         let name=work.file_name().and_then(|value|value.to_str()).ok_or_else(||storage_error("native recovery name is invalid"))?;
         let id=Uuid::parse_str(name).map_err(storage_error)?;
@@ -107,23 +115,23 @@ fn reclaim(profile:&Path,profile_id:Uuid,work:&Path)->Result<()>{
             return match reservation{
                 Some(row)if row.phase==RecoveryPhase::Reserved&&row.windows_creation_protocol==1=>omniplay_core::native_work_storage::release_uncreated(&database,profile_id,id),
                 Some(row)if row.phase==RecoveryPhase::Retiring=>omniplay_core::native_work_storage::release_removed(&database,profile_id,id),
-                _=>Err(storage_error("missing native work has no confirmed pre-launch or retirement authority")),
+                row=>{*retained=if row.is_some_and(|row|row.windows_creation_protocol==0){RetainedReason::LegacyOwnership}else{RetainedReason::IncompleteOwnership};Err(storage_error("missing native work has no confirmed pre-launch or retirement authority"))},
             };
         }
     }
     let(root,id)=confined(profile,work)?;
-    if root.join("linux-work-owned.json").try_exists().map_err(storage_error)?||root.join("linux-work-intent.json").try_exists().map_err(storage_error)?{return Err(PlatformError::new(ErrorCode::UnsupportedCapability,"Linux native work requires its own confirmed process and resource recovery"));}
+    if root.join("linux-work-owned.json").try_exists().map_err(storage_error)?||root.join("linux-work-intent.json").try_exists().map_err(storage_error)?{*retained=RetainedReason::OtherPlatform;return Err(PlatformError::new(ErrorCode::UnsupportedCapability,"Linux native work requires its own confirmed process and resource recovery"));}
     #[cfg(windows)]let lease={
         use std::os::windows::fs::OpenOptionsExt;
-        if ordinary(&root.join("owner.lease"),false)?{Some(OpenOptions::new().read(true).write(true).share_mode(0).open(root.join("owner.lease")).map_err(storage_error)?)}
+        if ordinary(&root.join("owner.lease"),false)?{Some(OpenOptions::new().read(true).write(true).share_mode(0).open(root.join("owner.lease")).map_err(|error|{if matches!(error.raw_os_error(),Some(32)|Some(33)){*retained=RetainedReason::Locked;}storage_error(error)})?)}
         else{
             let database=omniplay_core::Database::open(profile)?;
             let reservation=omniplay_core::native_work_storage::windows_recovery_reservation(&database,profile_id,id)?;
-            if !reservation.is_some_and(|row|row.phase==omniplay_core::native_work_storage::RecoveryPhase::Reserved&&row.windows_creation_protocol==1){return Err(storage_error("owner lease is absent without gated pre-launch authority"));}
+            if !reservation.is_some_and(|row|row.phase==omniplay_core::native_work_storage::RecoveryPhase::Reserved&&row.windows_creation_protocol==1){*retained=if reservation.is_some_and(|row|row.windows_creation_protocol==0){RetainedReason::LegacyOwnership}else{RetainedReason::IncompleteOwnership};return Err(storage_error("owner lease is absent without gated pre-launch authority"));}
             // A protocol-1 reserved work cannot have launched. Still reject any
             // conflicting OS journal instead of upgrading a damaged/legacy tree.
             for name in["container-intent.json","container-owned.json","launch-intent.json","container-process.json","presentation-launch-intent.json","presentation-process.json"]{
-                if root.join(name).try_exists().map_err(storage_error)?{return Err(storage_error("pre-launch recovery conflicts with a container or process journal"));}
+                if root.join(name).try_exists().map_err(storage_error)?{*retained=RetainedReason::IncompleteOwnership;return Err(storage_error("pre-launch recovery conflicts with a container or process journal"));}
             }
             None
         }
@@ -141,17 +149,18 @@ fn reclaim(profile:&Path,profile_id:Uuid,work:&Path)->Result<()>{
             if presentation_path.try_exists().map_err(storage_error)?{
                 let observed:Worker=read(&presentation_path)?;if observed.schema_version!=1||observed.work_id!=id||observed.process_id==0||observed.creation_time==0{return Err(storage_error("presentation identity is invalid"));}
                 omniplay_sandbox::confirmed_process_ended(omniplay_sandbox::ProcessIdentity{process_id:observed.process_id,creation_time:observed.creation_time})?;
-            }else if root.join("presentation-launch-intent.json").try_exists().map_err(storage_error)?{return Err(storage_error("interrupted presentation launch has no confirmed process identity"));}
+            }else if root.join("presentation-launch-intent.json").try_exists().map_err(storage_error)?{*retained=RetainedReason::IncompleteOwnership;return Err(storage_error("interrupted presentation launch has no confirmed process identity"));}
             let process_path=root.join("container-process.json");
             let observed=if process_path.try_exists().map_err(storage_error)?{let observed:Worker=read(&process_path)?;if observed.schema_version!=1||observed.work_id!=id||observed.process_id==0||observed.creation_time==0{return Err(storage_error("worker identity is invalid"));}Some(omniplay_sandbox::ProcessIdentity{process_id:observed.process_id,creation_time:observed.creation_time})}
-            else{if root.join("launch-intent.json").try_exists().map_err(storage_error)?{return Err(storage_error("interrupted launch has no confirmed process identity"));}None};
+            else{if root.join("launch-intent.json").try_exists().map_err(storage_error)?{*retained=RetainedReason::IncompleteOwnership;return Err(storage_error("interrupted launch has no confirmed process identity"));}None};
             // Never kill a PID from disk. The OS query must establish that the
             // recorded process ended or that its PID belongs to a later process.
             omniplay_sandbox::retire_abandoned_profile(&owner.container_name,observed)?;
         }else if root.join("container-intent.json").try_exists().map_err(storage_error)?{
+            *retained=RetainedReason::IncompleteOwnership;
             return Err(storage_error("interrupted profile creation has no ownership acknowledgement"));
         }else{
-            for name in["launch-intent.json","container-process.json","presentation-launch-intent.json","presentation-process.json"]{if root.join(name).try_exists().map_err(storage_error)?{return Err(storage_error("interrupted native work has no complete container ownership chain"));}}
+            for name in["launch-intent.json","container-process.json","presentation-launch-intent.json","presentation-process.json"]{if root.join(name).try_exists().map_err(storage_error)?{*retained=RetainedReason::IncompleteOwnership;return Err(storage_error("interrupted native work has no complete container ownership chain"));}}
         }
         // Publish the confirmed retirement outside the tree being removed. A
         // failed recursive removal may erase the internal lease/journal first;
@@ -198,7 +207,20 @@ pub fn recover_windows_work(profile:&Path,profile_id:Uuid,cancel:&std::sync::ato
         // Advance even when one work is live, unknown or malformed so it cannot
         // indefinitely starve a later acknowledged retirement in this profile.
         summary.attempted+=1;
-        match reclaim(profile,profile_id,&work_root.join(id.to_string())){Ok(())=>summary.recovered+=1,Err(_)=>summary.retained+=1}
+        let mut reason=RetainedReason::Unconfirmed;
+        match reclaim_reported(profile,profile_id,&work_root.join(id.to_string()),&mut reason){
+            Ok(())=>summary.recovered+=1,
+            Err(_)=>{
+                summary.retained+=1;
+                match reason{
+                    RetainedReason::Locked=>summary.retention.locked+=1,
+                    RetainedReason::LegacyOwnership=>summary.retention.legacy_ownership+=1,
+                    RetainedReason::IncompleteOwnership=>summary.retention.incomplete_ownership+=1,
+                    RetainedReason::OtherPlatform=>summary.retention.other_platform+=1,
+                    RetainedReason::Unconfirmed=>summary.retention.unconfirmed+=1,
+                }
+            },
+        }
         omniplay_core::native_work_storage::set_windows_recovery_cursor(&database,*id)?;
         summary.more_available=(summary.attempted as usize)<ordered.len();progress(&summary);
     }

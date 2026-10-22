@@ -1,5 +1,24 @@
 # Implementation status
 
+The owner now requests concurrent work: Codex authors the complete application
+and reviews results/fixes; Antigravity executes only exact assigned test batches
+against frozen copies, without source review, diagnosis or code changes. The
+first browser-context/document-ownership batch was denied by Antigravity CLI's
+RunCommand gate before execution. No test result is inferred from CLI SUCCESS.
+No permission change or substitute execution occurred. See `QA_EXECUTION_POLICY.md`.
+
+Windows maintenance now authors five bounded retention reason counters with
+exact-sum UI admission and localized retry/preservation guidance. Existing
+lease/process/ownership/debt/deletion admission stays separate. Three real
+Windows work/ledger regression fixture cases are authored, not run. This
+completes explanatory maintenance source, not ambiguous legacy migration or
+all Windows storage/core obligations. Item 2 remains open before item 3.
+The local `out/presentation/item2-v45-retained-work-guidance-source` checkpoint
+contains 1,938 files / 35,717,191 bytes, with configuration/compiler not started
+and verification not run. It supersedes the v44 source copy made before the
+last wrapper/text refinement. The iOS resource materializer also copied the
+shared panel and regenerated its resource inventory without building/running.
+
 The user confirmed that the goal includes the complete product source, not only the planning documents. No platform or epic in the original v1 scope has been removed. Research-only later-generation consoles remain research scope as stated in the source plan.
 
 Current overall completion has no measured percentage. The earlier 88% was an

@@ -23,6 +23,15 @@ function jobStatus(value,expected=null){
     !summary||!integer(summary.attempted,32)||!integer(summary.recovered,32)||!integer(summary.retained,32)||
     summary.recovered+summary.retained!==summary.attempted||!integer(summary.unknown_entries,512)||
     typeof summary.cancelled!=='boolean'||typeof summary.more_available!=='boolean')throw new Error('invalid_native_recovery_status');
+  // Older brokers omit this additive diagnostic. Never infer deletion rights
+  // or ownership from it, and reject inconsistent/unbounded newer responses.
+  const retention=summary.retention;
+  if(retention!==undefined){
+    const keys=['locked','legacy_ownership','incomplete_ownership','other_platform','unconfirmed'];
+    if(!retention||typeof retention!=='object'||Array.isArray(retention)||Object.keys(retention).length!==keys.length||
+      keys.some(key=>!Object.hasOwn(retention,key)||!integer(retention[key],32))||
+      keys.reduce((total,key)=>total+retention[key],0)!==summary.retained)throw new Error('invalid_native_retention_status');
+  }
   return value;
 }
 
@@ -123,6 +132,14 @@ export class NativeWorkMaintenancePanel {
     if(this.#job?.state==='cancelled')message+=' '+text('Đã dừng lượt kiểm tra.','Recovery stopped.');
     if(this.#job?.state==='failed'||this.#failure)message+=' '+text('Chưa hoàn tất; hãy làm mới để kiểm tra lại.','Not finished; refresh to inspect again.');
     if(summary?.unknown_entries)message+=' '+text(`${summary.unknown_entries} mục chưa nhận diện được vẫn được giữ lại.`,`${summary.unknown_entries} unrecognized entries remain retained.`);
+    const retention=summary?.retention;
+    if(retention?.locked)message+=' '+text(`${retention.locked} mục đang bị khóa bởi thao tác khác; đóng phiên chơi hoặc chờ thao tác đó kết thúc rồi thử lại.`,`${retention.locked} entries are locked by another operation; close the game or wait for that operation to finish before retrying.`);
+    if(retention?.legacy_ownership||retention?.incomplete_ownership){
+      const legacy=retention.legacy_ownership,incomplete=retention.incomplete_ownership;
+      message+=' '+text(`${legacy} mục cũ và ${incomplete} mục thiếu xác nhận sở hữu chưa đủ bằng chứng để thu hồi. Giữ bản sao lưu hồ sơ khi cần hỗ trợ phục hồi; chạy lại không tự bổ sung bằng chứng còn thiếu.`,`${legacy} legacy entries and ${incomplete} entries with incomplete ownership lack the evidence required for recovery. Keep a profile backup when seeking recovery support; rerunning does not supply the missing evidence.`);
+    }
+    if(retention?.other_platform)message+=' '+text(`${retention.other_platform} mục cần công cụ phục hồi của hệ điều hành tương ứng.`,`${retention.other_platform} entries require recovery on their corresponding operating system.`);
+    if(retention?.unconfirmed)message+=' '+text(`${retention.unconfirmed} mục chưa thể xác minh; dữ liệu vẫn được giữ lại.`,`${retention.unconfirmed} entries could not be confirmed; their data remains retained.`);
     if(summary?.more_available&&!this.#running())message+=' '+text('Còn mục chưa kiểm tra; bạn có thể chạy tiếp một lượt.','More entries remain; you can run another pass.');
     if(this.#progress.textContent!==message)this.#progress.textContent=message;
     this.#start.textContent=summary?.more_available?text('Tiếp tục kiểm tra','Continue inspection'):text('Kiểm tra và thu hồi','Inspect and recover');

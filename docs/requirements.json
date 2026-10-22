@@ -1,8 +1,11 @@
 {
   "schema_version": 1,
   "source_plan": "OmniPlay_Master_Plan_Chromium_First_2026.docx",
-  "objective": "Implement the complete OmniPlay product source and verify it once after implementation is complete",
-  "verification_policy": "author_all_then_one_consolidated_pass",
+  "objective": "Complete the original OmniPlay product source in items 1 through 16; Antigravity executes assigned tests while Codex reviews evidence and decides fixes",
+  "verification_policy": "parallel_explicit_antigravity_batches_then_consolidated_final_acceptance",
+  "test_executor": "antigravity",
+  "result_review_and_fix_owner": "human_and_codex",
+  "qa_execution_policy": "docs/QA_EXECUTION_POLICY.md",
   "progress_policy": "Follow numbered items 1 through 16 in order and report completed items; distinguish authored source from verified completion",
   "completion_sequence": "docs/COMPLETION_SEQUENCE.md",
   "requirements": [

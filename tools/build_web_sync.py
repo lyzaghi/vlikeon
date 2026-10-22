@@ -95,6 +95,7 @@ def prepare(project):
     extras+=['engines/native/src/protocol.hpp','engines/native/src/protocol.cpp','docs/NATIVE_CONTROL_BOUNDARY.md','qa/native-lifecycle/wire_cases.py']
     extras+=['docs/NATIVE_CONTROL_WORKERS.md','qa/native-lifecycle/CONTROL_WORKERS.md']
     extras+=['docs/WINDOWS_ITEM2_CLOSURE.md']
+    extras+=['docs/QA_EXECUTION_POLICY.md']
     paths.extend(ROOT/name for name in extras);total=0
     for path in paths:
         regular(path,ROOT);total+=path.stat().st_size

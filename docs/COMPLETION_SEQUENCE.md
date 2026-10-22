@@ -1,17 +1,26 @@
 # User-ordered completion sequence
 
 The user requested sequential work on items 1 through 16 and a report when each
-item is finished. The source-authoring-first and single final verification
-instruction remains in force. Source work, executed verification and release
+item is finished. Source authoring and the final comprehensive qualification
+remain separate; the newer concurrent-test instruction below supersedes the
+earlier deferral for explicitly released batches. Source work, executed verification and release
 approval are tracked separately. A source snapshot alone cannot close an item.
 
+The owner assigns Antigravity test execution only. Codex and the owner retain
+result review, diagnosis, fix decisions and source edits. The owner now requests
+concurrent work: Antigravity may run exact released test batches on frozen
+copies while Codex writes source; full acceptance remains item 16. See
+`QA_EXECUTION_POLICY.md`.
+
 Current source item: **2 — Windows native runtime lifecycle and containment**.
-The current substep adds bounded ownership of active/reserved/retiring broker
-IPC workers, after native framing and terminal-channel admission work. Actual
+The current substep adds explicit retained-work reasons and localized operator
+guidance after bounded ownership of broker IPC and recovery workers. Actual
 broker/process/pipe/core/save qualification is still deferred to item 16.
 The recovery worker also retains a process-wide single slot across broker
 replacement. `WINDOWS_ITEM2_CLOSURE.md` is the remaining source-closure list;
 no item-2 completion or transition to item 3 has been recorded.
+The five reason counters do not grant deletion authority or complete legacy
+migration. Three real Windows fixture cases are authored, not executed.
 Earlier N64 source work adds bounded snapshot event queues, PIF pointer
 preflight, format-selected DD ID reads, TLB field/lookup admission and finite
 last-page map/unmap walks with an interpreter random-index guard.

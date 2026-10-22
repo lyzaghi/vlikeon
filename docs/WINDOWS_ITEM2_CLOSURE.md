@@ -2,7 +2,9 @@
 
 The owner requested finishing item 2 before moving to item 3. Item 2 is still
 open. This checklist distinguishes implementation gaps from the execution
-deferred by the owner's author-all-then-verify instruction. No compiler, test,
+reserved for full final acceptance. The owner now also permits exact test
+batches by Antigravity concurrently with Codex source authoring; see
+`QA_EXECUTION_POLICY.md`. No compiler, test,
 runtime, Windows API or fixture was executed for this audit or source change.
 There is no measured completion percentage.
 
@@ -38,6 +40,9 @@ limits are not measurements of whole-machine memory or storage.
    migration/maintenance path with explicit retained/unsupported outcomes and
    bounded operator recovery, preserving uncertain originals. Existing retained
    counters do not by themselves establish a complete migration workflow.
+   Five fixed retention counters and localized retry/preservation guidance are
+   now authored, including explicit legacy/incomplete/other-platform outcomes.
+   These complete the explanatory subpart, not the full operator recovery path.
 3. **Close the remaining core-dependent Windows save/lifetime paths.** The
    selected N64 source still has unresolved semantic snapshot admission,
    producer/writer/resource and package closure. Keep these dependencies visible
@@ -45,8 +50,8 @@ limits are not measurements of whole-machine memory or storage.
    Finish the required source contracts before claiming that Windows can admit
    every original v1 route. Package exclusion is not completion of the route.
 
-These are implementation obligations, not reasons to run the final test pass
-early. The historical detailed notes in `WINDOWS_NATIVE_COMPLETION.md` remain
+These are implementation obligations; a selected parallel test batch does not
+close them or replace the final acceptance pass. The historical detailed notes in `WINDOWS_NATIVE_COMPLETION.md` remain
 the supporting record. This list does not remove any original system/platform
 or claim that dependencies assigned another number have been completed.
 

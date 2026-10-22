@@ -6,6 +6,16 @@ deletion, filesystem cleanup or test has been executed during this work.
 
 ## Source changes in this pass
 
+The retained-work source now distinguishes locked, legacy-ownership,
+incomplete-ownership, other-platform and unconfirmed refusals without returning
+raw paths/PIDs/errors or changing any cleanup authority. Settings admits exact
+bounded counter totals and explains retry versus preserved incomplete evidence.
+Three real Windows work/ledger cases are authored, not executed. See
+`WINDOWS_NATIVE_MAINTENANCE.md`; full legacy operator recovery, storage/core
+closure and final Windows qualification remain open. Antigravity's selected
+concurrent Node test batch was blocked by its CLI command gate before running;
+it is not Windows evidence and no permission bypass was attempted.
+
 Native IPC worker ownership now has 16 process-wide reserved/active/retiring
 slots. Windows preparation reserves before work/process staging; closing a
 channel transfers its thread handle into fixed retirement storage without

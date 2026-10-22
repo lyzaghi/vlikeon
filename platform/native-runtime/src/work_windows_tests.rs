@@ -98,3 +98,43 @@ fn creation_protocol_is_immutable_and_old_rows_default_to_zero(){
     assert!(database.connection.execute("UPDATE native_work_storage SET windows_creation_protocol=1 WHERE work_id=?1",[legacy.to_string()]).is_err());
     assert!(database.connection.execute("UPDATE native_work_storage SET windows_creation_protocol=0 WHERE work_id=?1",[current.to_string()]).is_err());
 }
+
+#[test]
+fn recovery_reports_legacy_retention_without_promoting_or_erasing_originals(){
+    let case=Case::new();let missing=Uuid::new_v4();let partial=Uuid::new_v4();let fresh=Uuid::new_v4();
+    case.reserve(missing,true);case.reserve(partial,true);let work=case.partial(partial);case.reserve(fresh,false);
+    let summary=recover_windows_work(&case.root,case.profile,&AtomicBool::new(false),|_|{}).unwrap();
+    assert_eq!((summary.attempted,summary.recovered,summary.retained),(3,1,2));
+    assert_eq!((summary.retention.legacy_ownership,summary.retention.incomplete_ownership,summary.retention.locked,summary.retention.other_platform,summary.retention.unconfirmed),(2,0,0,0,0));
+    assert_eq!(case.works(),2);assert_eq!(fs::read(work.join("game.bin")).unwrap(),b"test-game");
+    for id in[missing,partial]{assert_eq!(storage::windows_recovery_reservation(&case.database(),case.profile,id).unwrap().unwrap().windows_creation_protocol,0);}
+}
+
+#[test]
+fn recovery_distinguishes_locked_work_from_missing_ownership(){
+    use std::os::windows::fs::OpenOptionsExt;
+    let case=Case::new();let locked=Uuid::new_v4();let incomplete=Uuid::new_v4();
+    case.reserve(locked,false);let work=case.partial(locked);
+    let owner=OpenOptions::new().read(true).write(true).create_new(true).share_mode(1).open(work.join("owner.lease")).unwrap();
+    case.reserve(incomplete,false);let other=case.partial(incomplete);creation_intent(&other,case.profile,incomplete).unwrap();
+    let summary=recover_windows_work(&case.root,case.profile,&AtomicBool::new(false),|_|{}).unwrap();
+    assert_eq!((summary.recovered,summary.retained,summary.retention.locked,summary.retention.incomplete_ownership),(0,2,1,1));
+    assert_eq!(summary.retention.legacy_ownership+summary.retention.other_platform+summary.retention.unconfirmed,0);
+    assert_eq!(fs::read(work.join("game.bin")).unwrap(),b"test-game");assert_eq!(case.works(),2);
+    drop(owner);let retry=recover_windows_work(&case.root,case.profile,&AtomicBool::new(false),|_|{}).unwrap();
+    assert_eq!((retry.recovered,retry.retained,retry.retention.locked,retry.retention.incomplete_ownership),(1,1,0,1));
+    assert_eq!(fs::read(other.join("game.bin")).unwrap(),b"test-game");
+}
+
+#[test]
+fn recovery_keeps_other_platform_and_invalid_owner_data_distinct(){
+    let case=Case::new();let linux=Uuid::new_v4();let damaged=Uuid::new_v4();
+    case.reserve(linux,false);let linux_work=case.partial(linux);fs::write(linux_work.join("linux-work-intent.json"),b"{}").unwrap();
+    case.reserve(damaged,false);let damaged_work=case.partial(damaged);fs::write(damaged_work.join("owner.lease"),b"").unwrap();
+    created(&damaged_work,Uuid::new_v4(),damaged).unwrap();
+    let summary=recover_windows_work(&case.root,case.profile,&AtomicBool::new(false),|_|{}).unwrap();
+    assert_eq!((summary.recovered,summary.retained,summary.retention.other_platform,summary.retention.unconfirmed),(0,2,1,1));
+    assert_eq!(summary.retention.locked+summary.retention.legacy_ownership+summary.retention.incomplete_ownership,0);
+    for work in[linux_work,damaged_work]{assert_eq!(fs::read(work.join("game.bin")).unwrap(),b"test-game");}
+    assert_eq!(case.works(),2);
+}

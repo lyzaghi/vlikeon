@@ -48,10 +48,16 @@ live readiness claims.
 [`IMPLEMENTATION_STATUS.md`](IMPLEMENTATION_STATUS.md) records source authoring.
 References to `out/` describe local ignored snapshots, not release downloads.
 Materialization and hashing do not execute or qualify the product. The local
-`out/presentation/item2-v43-control-worker-ownership-source` snapshot records
-reserved/active/retiring IPC and recovery-worker ownership and Windows thread completion,
-following the v41 framing, v40 checked pause and v38 audio delivery work. It is a
+`out/presentation/item2-v45-retained-work-guidance-source` snapshot records
+explicit retained-work explanations and localized operator guidance, following
+IPC/recovery-worker ownership, v41 framing, v40 checked pause and v38 audio delivery work. It is a
 source-only copy, not a compiled or executed product.
+
+The owner now assigns Antigravity exact test batches in parallel with Codex
+source development. Codex and the owner review evidence and decide fixes.
+The initial concurrent Node batch was denied by the CLI's command gate before
+execution; no test pass or product qualification is inferred. No permission
+settings were changed. Full platform/device/release acceptance remains pending.
 
 [`COMPLETION_SEQUENCE.md`](COMPLETION_SEQUENCE.md) records current source work
 and the remaining verification requirements for every numbered item.

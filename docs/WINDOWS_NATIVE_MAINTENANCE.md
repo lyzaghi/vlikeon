@@ -84,6 +84,35 @@ Untrusted response data is strictly bounded and inserted as text. The panel
 describes reserved bytes separately from actual disk usage and does not equate
 a successful pass with complete physical reclamation.
 
+## Retained-work explanations
+
+Recovery now returns a fixed five-counter diagnostic in `summary.retention`:
+`locked`, `legacy_ownership`, `incomplete_ownership`, `other_platform` and
+`unconfirmed`. Each failed candidate contributes exactly once; their sum equals
+`retained`, with at most 32 attempts. Unrecognized inventory entries remain a
+separate bounded count. No path, PID, game name or raw exception is included.
+
+The existing refusal branch selects the category. A sharing/creation-lease
+conflict is locked; a protocol-zero row without the required prelaunch/owner
+authority is legacy; missing launch/profile acknowledgement is incomplete.
+Linux journals require their own platform; malformed/inaccessible/unproven
+state remains unconfirmed. These diagnostics do not change deletion, profile
+adoption, process signalling, retirement-proof or debt-release authority.
+
+Settings validates the closed counter shape, finite values and exact sum before
+showing localized guidance. Older brokers without this additive diagnostic
+remain readable. Locked work may be retried after the owning operation ends;
+legacy/incomplete work explicitly remains preserved for recovery with a profile
+backup, and rerunning is not presented as manufacturing missing proof. No
+force-delete, guessed migration or automatic retry is added. This completes
+the explanatory part of maintenance; a complete operator recovery/migration
+workflow and remaining item-2 storage/core work are still open.
+
+Three real Windows work/ledger fixture cases are authored for mixed legacy/new
+rows, live leases and later retry, incomplete intent, foreign ownership and
+other-platform preservation. They are not executed; Antigravity execution must
+use a separately released disposable-profile batch with the required toolchain.
+
 ## Required final evidence
 
 Item 16 must build the complete broker/shared contracts and exercise handshake
