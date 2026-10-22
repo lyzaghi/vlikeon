@@ -1,8 +1,10 @@
 # Bounded native writable files and Windows core routes
 
-Source only. No compiler, file-store operation, core/worker, sandbox/OS API,
-application or test has executed. No core binary or installed catalog entry has
-been produced or approved. Item 2 and the full original objective remain open.
+Source plus scoped contract evidence: Antigravity batch 009 compiled and ran
+the production MemoryFiles contract groups on Windows. Actual core/worker/ABI,
+sandbox access, application and allocation-fault qualification remain pending.
+No core binary or installed catalog entry has been produced or approved.
+Item 2 and the full original objective remain open.
 
 ## Memory store and ABI
 

@@ -1,5 +1,11 @@
 # Implementation status
 
+Antigravity batch 010 on 99bf44a passed broker cargo check --locked after the
+scratch-grant/state-identity change. Codex reviewed actual compiler completion
+and unchanged source hashes. Evidence is under `qa/evidence/antigravity/batch-010/`.
+This is compilation only: actual actor denial/legacy core compatibility and
+whole-profile write quotas remain open, including Windows acceptance case 28.
+
 Antigravity batch 009 on e4eef61 directly compiled and executed the production
 MemoryFiles and AudioRing contract executables with MSVC x64 C++20 /MD. All four
 steps returned zero; all four memory and four audio groups ran successfully.

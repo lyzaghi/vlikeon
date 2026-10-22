@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "batch_id": "vlikeon-010",
+  "executor": "antigravity",
+  "reviewer": "codex",
+  "source_commit": "99bf44ac4b1f465c383d18327cca10d397706e28",
+  "exit_code": 0,
+  "source_unchanged": true,
+  "warnings_present": true,
+  "log": "broker-check.log",
+  "accepted_scope": "Compile-check broker after scratch grant and opaque-state identity change",
+  "not_established": [
+    "Actual actor OS write denial",
+    "Game or save compatibility",
+    "Whole-profile disk quota",
+    "Complete Windows item 2"
+  ]
+}
