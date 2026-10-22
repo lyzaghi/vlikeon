@@ -1492,6 +1492,7 @@ version = "0.1.0"
 dependencies = [
  "libc",
  "omniplay-contracts",
+ "serde_json",
  "sha2",
  "windows-sys 0.61.2",
 ]

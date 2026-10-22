@@ -16,6 +16,9 @@
 
 namespace {
 retro_environment_t environment=nullptr;
+retro_video_refresh_t video_refresh=nullptr;
+retro_audio_sample_batch_t audio_output=nullptr;
+retro_input_state_t read_input=nullptr;
 std::thread producer;
 std::atomic<bool> stop_producer{false};
 bool initialized=false,loaded=false,ran=false,unknown=false,producer_owned=false;
@@ -53,6 +56,24 @@ int checked_pause(){
   join_producer();return 1;
 }
 void publish_memory(){const std::array<unsigned,4> words{pauses,unloads,deinits,runs};for(std::size_t i=0;i<words.size();++i)for(unsigned byte=0;byte<4;++byte)memory[i*4+byte]=static_cast<unsigned char>(words[i]>>(byte*8));}
+void prepare_brokered_media(){
+  if(!mode("brokered-media"))return;
+#ifdef _WIN32
+  PROCESS_MITIGATION_SYSTEM_CALL_DISABLE_POLICY policy{};
+  if(!GetProcessMitigationPolicy(GetCurrentProcess(),ProcessSystemCallDisablePolicy,&policy,sizeof(policy))||!policy.DisallowWin32kSystemCalls)std::_Exit(88);
+#endif
+  retro_pixel_format format=RETRO_PIXEL_FORMAT_XRGB8888;
+  if(!environment||!environment(RETRO_ENVIRONMENT_SET_PIXEL_FORMAT,&format))std::_Exit(87);
+}
+void publish_brokered_media(){
+  if(!mode("brokered-media"))return;
+  if(!video_refresh||!audio_output||!read_input||read_input(0,RETRO_DEVICE_JOYPAD,0,RETRO_DEVICE_ID_JOYPAD_B)!=1)std::_Exit(87);
+  std::array<std::uint32_t,16*16> pixels{};pixels.fill(0x12345678u);
+  video_refresh(pixels.data(),16,16,16*sizeof(std::uint32_t));
+  std::array<std::int16_t,128> samples{};
+  for(unsigned i=0;i<64;++i){samples[i*2]=123;samples[i*2+1]=-123;}
+  if(audio_output(samples.data(),64)>64)std::_Exit(87);
+}
 }
 #ifdef _WIN32
 BOOL WINAPI DllMain(HINSTANCE,DWORD reason,LPVOID){
@@ -62,20 +83,20 @@ BOOL WINAPI DllMain(HINSTANCE,DWORD reason,LPVOID){
 #endif
 extern "C" {
 RETRO_API void retro_set_environment(retro_environment_t callback){environment=callback;}
-RETRO_API void retro_set_video_refresh(retro_video_refresh_t){}
+RETRO_API void retro_set_video_refresh(retro_video_refresh_t callback){video_refresh=callback;}
 RETRO_API void retro_set_audio_sample(retro_audio_sample_t){}
-RETRO_API void retro_set_audio_sample_batch(retro_audio_sample_batch_t){}
+RETRO_API void retro_set_audio_sample_batch(retro_audio_sample_batch_t callback){audio_output=callback;}
 RETRO_API void retro_set_input_poll(retro_input_poll_t){}
-RETRO_API void retro_set_input_state(retro_input_state_t){}
+RETRO_API void retro_set_input_state(retro_input_state_t callback){read_input=callback;}
 RETRO_API unsigned retro_api_version(){return RETRO_API_VERSION;}
-RETRO_API void retro_init(){initialized=true;retro_variable option{"fixture_scenario",nullptr};if(environment&&environment(RETRO_ENVIRONMENT_GET_VARIABLE,&option)&&option.value){if(std::strlen(option.value)>=sizeof(scenario))std::_Exit(86);std::strcpy(scenario,option.value);}if(mode("init-throw")){unknown=true;throw 74;}}
+RETRO_API void retro_init(){initialized=true;retro_variable option{"fixture_scenario",nullptr};if(environment&&environment(RETRO_ENVIRONMENT_GET_VARIABLE,&option)&&option.value){if(std::strlen(option.value)>=sizeof(scenario))std::_Exit(86);std::strcpy(scenario,option.value);}prepare_brokered_media();if(mode("init-throw")){unknown=true;throw 74;}}
 RETRO_API void retro_deinit(){forbid_unknown();if(++deinits!=1)std::_Exit(86);if(mode("deinit-throw")){unknown=true;throw 72;}join_producer();initialized=false;}
 RETRO_API void retro_get_system_info(retro_system_info* info){*info={};info->library_name="OmniPlay lifecycle qualification";info->library_version=private_temporary_environment_matches()?"1.0.0":"private-temp-mismatch";info->valid_extensions="bin";}
 RETRO_API void retro_get_system_av_info(retro_system_av_info* info){*info={};info->geometry.base_width=16;info->geometry.base_height=16;info->geometry.max_width=16;info->geometry.max_height=16;info->timing.fps=60;info->timing.sample_rate=48000;}
 RETRO_API void retro_set_controller_port_device(unsigned,unsigned){}
 RETRO_API bool retro_load_game(const retro_game_info* game){loaded=game&&game->data&&game->size==64;if(mode("load-throw")){start_producer();unknown=true;throw 75;}return loaded;}
 RETRO_API void retro_unload_game(){forbid_unknown();if(++unloads!=1)std::_Exit(86);if(mode("unload-throw")){unknown=true;throw 73;}join_producer();loaded=false;}
-RETRO_API void retro_run(){forbid_unknown();if(!loaded)std::_Exit(86);ran=true;++runs;start_producer();if(mode("run-throw")){unknown=true;throw 76;}}
+RETRO_API void retro_run(){forbid_unknown();if(!loaded)std::_Exit(86);ran=true;++runs;start_producer();publish_brokered_media();if(mode("run-throw")){unknown=true;throw 76;}}
 RETRO_API void retro_reset(){}
 RETRO_API std::size_t retro_serialize_size(){return memory.size();}
 RETRO_API bool retro_serialize(void* data,std::size_t size){if(!data||size!=memory.size())return false;if(mode("serialize-throw")){unknown=true;throw 77;}publish_memory();std::memcpy(data,memory.data(),size);return true;}

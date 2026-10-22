@@ -37,6 +37,8 @@ impl Prepared{
     pub(super) fn finish(self)->PresentationHost{self.host}
 }
 impl PresentationHost{
+    #[cfg(test)]
+    pub(super) fn observed_exit_code(&self)->Option<u32>{let mut code=0;if unsafe{GetExitCodeProcess(self.process.as_raw_handle(),&mut code)}==0{None}else{Some(code)}}
     pub fn terminate(&self){unsafe{TerminateJobObject(self.job.as_raw_handle(),1);if WaitForSingleObject(self.process.as_raw_handle(),0)!=WAIT_OBJECT_0{TerminateProcess(self.process.as_raw_handle(),1);}WaitForSingleObject(self.process.as_raw_handle(),5000);}}
     pub fn has_exited(&self)->bool{unsafe{WaitForSingleObject(self.process.as_raw_handle(),0)==WAIT_OBJECT_0}}
     pub fn activate(&self)->Result<()>{

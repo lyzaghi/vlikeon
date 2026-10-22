@@ -715,7 +715,10 @@ void Engine::shutdown(){
 #endif
   // Core DLL static destructors also run while their graphics context is alive.
   // No retained callback may outlive the library containing its function body.
-  if(object_){unload_core_module(object_);object_=nullptr;}
+  if(object_){
+    try{unload_core_module(object_);}catch(...){omni_owned_actor_exit(1);}
+    object_=nullptr;
+  }
 #ifndef OMNIPLAY_DEVICE_FREE_ACTOR
   gl_video_.destroy();
 #endif

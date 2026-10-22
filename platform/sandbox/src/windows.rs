@@ -6,6 +6,7 @@ mod presentation;
 mod storage;
 mod registry_storage;
 #[cfg(test)]mod storage_tests;
+#[cfg(test)]mod device_free_tests;
 pub use presentation::PresentationHost;
 pub(crate) fn owned_thread_ended(thread:&std::thread::JoinHandle<()>)->bool{
     // Poll the held OS thread object, including its TLS/destructor lifetime;
