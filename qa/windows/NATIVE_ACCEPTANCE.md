@@ -1,9 +1,12 @@
 # Item 2 Windows native qualification matrix
 
-Authored cases only. No case has executed. Run in the single final consolidated
-phase with approved disposable test content, isolated test profiles, exact built
-artifacts and retained observations. A passing source/unit case does not replace
-the required OS/process/filesystem evidence.
+Full matrix acceptance remains pending. Selected concurrent Antigravity batches
+now have scoped evidence: batch028 actual storage probes and batch034 contained
+software-actor media exchange. Neither completes all variants of any numbered
+requirement below. Run the full final consolidated phase with approved disposable
+test content, isolated test profiles, exact built artifacts and retained
+observations. A passing source/unit case does not replace the required
+OS/process/filesystem evidence. See `../evidence/antigravity/` for reviews and logs.
 
 1. Build and admit the exact worker, selected core and optional presentation
    helper from their pinned source/SDK recipes. Check PE architecture, package

@@ -91,7 +91,8 @@ def main():
     for path in sorted((ROOT/'platform/broker/src').rglob('*.rs')):
         if path.name in {'main.rs','linux_host_main.rs'}:continue
         inputs.append((ordinary(path,ROOT,True),PurePosixPath('broker')/path.relative_to(ROOT).as_posix(),{}))
-    inputs.append((ordinary(ROOT/'tools/build_native_runtime.py',ROOT,True),PurePosixPath('tools/build_native_runtime.py'),{}))
+    for name in ['build_native_runtime.py','windows_actor_imports.py']:
+        inputs.append((ordinary(ROOT/'tools'/name,ROOT,True),PurePosixPath('tools')/name,{}))
     for name in ['platform/updater/Cargo.toml','platform/updater/src/package.rs','platform/updater/src/launcher.rs']:
         inputs.append((ordinary(ROOT/name,ROOT,True),PurePosixPath('broker')/name,{}))
     for name in ['platform/core/Cargo.toml','platform/core/src/lib.rs','platform/core/src/database.rs','platform/core/src/native_work_storage.rs','platform/core/src/diagnostics.rs']:
@@ -103,7 +104,7 @@ def main():
     for name in ['WINDOWS_NATIVE_COMPLETION.md','WINDOWS_NATIVE_MAINTENANCE.md','WINDOWS_PRELAUNCH_RECOVERY.md','WINDOWS_DEFAULT_STORAGE.md','WINDOWS_REGISTRY_STORAGE.md','NATIVE_MEMORY_FILES.md','PS1_MEMORY_CARDS.md','NATIVE_PS1_SAVES.md','NATIVE_CONTAINER_RETIREMENT.md']:
         inputs.append((ordinary(ROOT/'docs'/name,ROOT,True),PurePosixPath('docs')/name,{}))
     inputs.append((ordinary(ROOT/'qa/windows/NATIVE_ACCEPTANCE.md',ROOT,True),PurePosixPath('qa/windows/NATIVE_ACCEPTANCE.md'),{}))
-    for name in ['qa/windows/storage-probe.cpp','qa/windows/STORAGE_PROBE.md']:
+    for name in ['qa/windows/storage-probe.cpp','qa/windows/STORAGE_PROBE.md','qa/windows/CMakeLists.txt','qa/windows/presentation-fixture.cpp']:
         inputs.append((ordinary(ROOT/name,ROOT,True),PurePosixPath(name),{}))
     for name in ['qa/native-audio/CMakeLists.txt','qa/native-audio/audio_ring_cases.cpp','qa/native-audio/ACCEPTANCE.md']:
         inputs.append((ordinary(ROOT/name,ROOT,True),PurePosixPath(name),{}))

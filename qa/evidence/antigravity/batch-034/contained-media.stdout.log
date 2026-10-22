@@ -1,0 +1,6 @@
+
+running 1 test
+test windows::device_free_tests::actual_device_free_actor_exchanges_media_under_win32k_lockdown ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3 filtered out; finished in 0.56s
+

@@ -1,0 +1,4 @@
+   Compiling omniplay-contracts v0.1.0 (E:\V10\work\vlikeon-qa-20261023\source-04cbd74\platform\contracts)
+   Compiling omniplay-sandbox v0.1.0 (E:\V10\work\vlikeon-qa-20261023\source-04cbd74\platform\sandbox)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 8.74s
+     Running unittests src\lib.rs (E:\V10\work\vlikeon-qa-20261023\target-batch-004\x86_64-pc-windows-msvc\debug\deps\omniplay_sandbox-d3bc9f2042b9f414.exe)

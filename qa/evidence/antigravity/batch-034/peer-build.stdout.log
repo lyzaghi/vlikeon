@@ -1,0 +1,11 @@
+MSBuild version 17.14.51+25f168cee for .NET Framework
+
+  1>Checking Build System
+  Building Custom Rule E:/V10/work/vlikeon-qa-20261023/source-04cbd74/qa/windows/CMakeLists.txt
+  presentation-fixture.cpp
+E:\V10\work\vlikeon-qa-20261023\source-04cbd74\qa\windows\presentation-fixture.cpp(49,24): warning C4996: 'fopen': This function or variable may be unsafe. Consider using fopen_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details. [E:\V10\work\vlikeon-qa-20261023\build-batch-034\peer\omniplay-presentation-fixture.vcxproj]
+  wire.cpp
+E:\V10\work\vlikeon-qa-20261023\source-04cbd74\engines\presentation\src\wire.cpp(48,464): warning C4996: 'freopen': This function or variable may be unsafe. Consider using freopen_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details. [E:\V10\work\vlikeon-qa-20261023\build-batch-034\peer\omniplay-presentation-fixture.vcxproj]
+  Generating Code...
+  omniplay-presentation-fixture.vcxproj -> E:\V10\work\vlikeon-qa-20261023\build-batch-034\peer\Release\omniplay-presentation-fixture.exe
+  Building Custom Rule E:/V10/work/vlikeon-qa-20261023/source-04cbd74/qa/windows/CMakeLists.txt

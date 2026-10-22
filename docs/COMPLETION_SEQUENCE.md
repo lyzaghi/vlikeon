@@ -24,7 +24,8 @@ replacement. `WINDOWS_ITEM2_CLOSURE.md` is the remaining source-closure list;
 no item-2 completion or transition to item 3 has been recorded.
 The five reason counters do not grant deletion authority or complete legacy
 migration. The three retained-work regression fixtures passed in batch 005;
-actual storage probes remain failing and cannot establish denial/compatibility.
+actual batch028 now passes the two assigned storage probes; this establishes
+only their explicit observations, not whole-core storage compatibility.
 Earlier N64 source work adds bounded snapshot event queues, PIF pointer
 preflight, format-selected DD ID reads, TLB field/lookup admission and finite
 last-page map/unmap walks with an interpreter random-index guard.

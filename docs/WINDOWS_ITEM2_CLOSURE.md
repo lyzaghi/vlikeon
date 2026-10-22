@@ -56,10 +56,15 @@ limits are not measurements of whole-machine memory or storage.
    every original v1 route. Package exclusion is not completion of the route.
 
 4. **Finish contained worker dependency closure.** Actual batch022 staged loading
-   reached ADVAPI32, COMBASE and USERENV but failed USER32 initialization. The
-   currently built SDL worker imports USER32/GDI32/OLE32 and other desktop DLLs.
-   Complete the device-free software actor and trusted presentation dependency
-   separation in `engines/native`, SDL build selection and package receipts;
+   reached ADVAPI32, COMBASE and USERENV but failed USER32 initialization in the
+   earlier SDL worker. Source04cbd74 now builds a separate software actor without
+   SDL implementation linkage; batch034 inventories only KERNEL32 imports and
+   passes actual contained input/video/audio/pause/save/stop with a fixture core
+   and private headless presentation peer. Both processes exit zero and the fresh
+   profile retires. Desktop-worker and truncated-PE negative controls also pass.
+   This is one scoped integration case, not production core/device acceptance.
+   Complete production-core dependencies and trusted SDL presentation deployment,
+   retain the separation in `engines/native`, SDL build selection and receipts;
    retain the required actor syscall/token/job boundaries. A successful direct
    worker with dummy SDL drivers, a passing standalone storage probe, or excluding
    an original route from the catalog does not complete this implementation.

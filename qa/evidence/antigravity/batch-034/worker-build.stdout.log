@@ -1,0 +1,54 @@
+MSBuild version 17.14.51+25f168cee for .NET Framework
+
+  1>Checking Build System
+  Building Custom Rule E:/V10/work/vlikeon-qa-20261023/source-04cbd74/engines/presentation/CMakeLists.txt
+  wire.cpp
+E:\V10\work\vlikeon-qa-20261023\source-04cbd74\engines\presentation\src\wire.cpp(48,464): warning C4996: 'freopen': This function or variable may be unsafe. Consider using freopen_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details. [E:\V10\work\vlikeon-qa-20261023\build-batch-034\worker\presentation\omniplay-presentation-wire.vcxproj]
+  omniplay-presentation-wire.vcxproj -> E:\V10\work\vlikeon-qa-20261023\build-batch-034\worker\presentation\Release\omniplay-presentation-wire.lib
+  Building Custom Rule E:/V10/work/vlikeon-qa-20261023/source-04cbd74/engines/presentation/CMakeLists.txt
+  client.cpp
+  omniplay-presentation-client.vcxproj -> E:\V10\work\vlikeon-qa-20261023\build-batch-034\worker\presentation\Release\omniplay-presentation-client.lib
+  Building Custom Rule E:/V10/work/vlikeon-qa-20261023/source-04cbd74/engines/native/CMakeLists.txt
+  main.cpp
+E:\V10\work\vlikeon-qa-20261023\source-04cbd74\engines\native\src\input_profile.hpp(45,132): warning C4458: declaration of 'buttons' hides class member [E:\V10\work\vlikeon-qa-20261023\build-batch-034\worker\omniplay-native-worker.vcxproj]
+  (compiling source file '../../source-04cbd74/engines/native/src/main.cpp')
+      E:\V10\work\vlikeon-qa-20261023\source-04cbd74\engines\native\src\input_profile.hpp(17,27):
+      see declaration of 'omni::InputProfile::buttons'
+  
+  engine.cpp
+E:\V10\work\vlikeon-qa-20261023\source-04cbd74\engines\native\src\input_profile.hpp(45,132): warning C4458: declaration of 'buttons' hides class member [E:\V10\work\vlikeon-qa-20261023\build-batch-034\worker\omniplay-native-worker.vcxproj]
+  (compiling source file '../../source-04cbd74/engines/native/src/engine.cpp')
+      E:\V10\work\vlikeon-qa-20261023\source-04cbd74\engines\native\src\input_profile.hpp(17,27):
+      see declaration of 'omni::InputProfile::buttons'
+  
+  core_module.cpp
+E:\V10\work\vlikeon-qa-20261023\source-04cbd74\engines\native\src\core_module.cpp(23,38): warning C4996: 'std::filesystem::u8path': warning STL4021: The std::filesystem::u8path() overloads are deprecated in C++20. The constructors of std::filesystem::path provide equivalent functionality via construction from u8string, u8string_view, or iterators with value_type char8_t. You can define _SILENCE_CXX20_U8PATH_DEPRECATION_WARNING or _SILENCE_ALL_CXX20_DEPRECATION_WARNINGS to suppress this warning. [E:\V10\work\vlikeon-qa-20261023\build-batch-034\worker\omniplay-native-worker.vcxproj]
+  protocol.cpp
+E:\V10\work\vlikeon-qa-20261023\source-04cbd74\engines\native\src\protocol.cpp(26,45): warning C4996: 'freopen': This function or variable may be unsafe. Consider using freopen_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details. [E:\V10\work\vlikeon-qa-20261023\build-batch-034\worker\omniplay-native-worker.vcxproj]
+  saved_files.cpp
+E:\V10\work\vlikeon-qa-20261023\source-04cbd74\engines\native\src\input_profile.hpp(45,132): warning C4458: declaration of 'buttons' hides class member [E:\V10\work\vlikeon-qa-20261023\build-batch-034\worker\omniplay-native-worker.vcxproj]
+  (compiling source file '../../source-04cbd74/engines/native/src/saved_files.cpp')
+      E:\V10\work\vlikeon-qa-20261023\source-04cbd74\engines\native\src\input_profile.hpp(17,27):
+      see declaration of 'omni::InputProfile::buttons'
+  
+E:\V10\work\vlikeon-qa-20261023\source-04cbd74\engines\native\src\saved_files.cpp(145,123): warning C4996: 'std::filesystem::u8path': warning STL4021: The std::filesystem::u8path() overloads are deprecated in C++20. The constructors of std::filesystem::path provide equivalent functionality via construction from u8string, u8string_view, or iterators with value_type char8_t. You can define _SILENCE_CXX20_U8PATH_DEPRECATION_WARNING or _SILENCE_ALL_CXX20_DEPRECATION_WARNINGS to suppress this warning. [E:\V10\work\vlikeon-qa-20261023\build-batch-034\worker\omniplay-native-worker.vcxproj]
+E:\V10\work\vlikeon-qa-20261023\source-04cbd74\engines\native\src\saved_files.cpp(189,73): warning C4996: 'std::filesystem::u8path': warning STL4021: The std::filesystem::u8path() overloads are deprecated in C++20. The constructors of std::filesystem::path provide equivalent functionality via construction from u8string, u8string_view, or iterators with value_type char8_t. You can define _SILENCE_CXX20_U8PATH_DEPRECATION_WARNING or _SILENCE_ALL_CXX20_DEPRECATION_WARNINGS to suppress this warning. [E:\V10\work\vlikeon-qa-20261023\build-batch-034\worker\omniplay-native-worker.vcxproj]
+  memory_files.cpp
+E:\V10\work\vlikeon-qa-20261023\source-04cbd74\engines\native\src\memory_files.cpp(162,83): warning C4456: declaration of 'name' hides previous local declaration [E:\V10\work\vlikeon-qa-20261023\build-batch-034\worker\omniplay-native-worker.vcxproj]
+      E:\V10\work\vlikeon-qa-20261023\source-04cbd74\engines\native\src\memory_files.cpp(157,125):
+      see declaration of 'name'
+  
+  md_portable.cpp
+E:\V10\work\vlikeon-qa-20261023\source-04cbd74\engines\native\src\input_profile.hpp(45,132): warning C4458: declaration of 'buttons' hides class member [E:\V10\work\vlikeon-qa-20261023\build-batch-034\worker\omniplay-native-worker.vcxproj]
+  (compiling source file '../../source-04cbd74/engines/native/src/md_portable.cpp')
+      E:\V10\work\vlikeon-qa-20261023\source-04cbd74\engines\native\src\input_profile.hpp(17,27):
+      see declaration of 'omni::InputProfile::buttons'
+  
+  measurement.cpp
+E:\V10\work\vlikeon-qa-20261023\source-04cbd74\engines\native\src\input_profile.hpp(45,132): warning C4458: declaration of 'buttons' hides class member [E:\V10\work\vlikeon-qa-20261023\build-batch-034\worker\omniplay-native-worker.vcxproj]
+  (compiling source file '../../source-04cbd74/engines/native/src/measurement.cpp')
+      E:\V10\work\vlikeon-qa-20261023\source-04cbd74\engines\native\src\input_profile.hpp(17,27):
+      see declaration of 'omni::InputProfile::buttons'
+  
+  Generating Code...
+  omniplay-native-worker.vcxproj -> E:\V10\work\vlikeon-qa-20261023\build-batch-034\worker\Release\omniplay-native-worker.exe
