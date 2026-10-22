@@ -16,6 +16,13 @@ pub(crate) fn owned_thread_ended(thread:&std::thread::JoinHandle<()>)->bool{
 fn wide(value:&OsStr)->Result<Vec<u16>> {let mut out=value.encode_wide().collect::<Vec<_>>();if out.contains(&0){return Err(unavailable());}out.push(0);Ok(out)}
 fn handle(value:HANDLE)->Result<OwnedHandle>{if value.is_null()||value==INVALID_HANDLE_VALUE{return Err(unavailable());}Ok(unsafe{OwnedHandle::from_raw_handle(value)})}
 
+// Local test diagnostics name only the failed boundary. Production errors keep
+// their closed public contract and never disclose profile/path/token details.
+fn launch_checkpoint<T>(_stage:&'static str,result:Result<T>)->Result<T>{
+    #[cfg(test)]if result.is_err(){eprintln!("Windows launch checkpoint: {_stage}");}
+    result
+}
+
 struct ProfileIdentity{sid:PSID,name:Vec<u16>,lifecycle:std::sync::Mutex<()>,active:std::sync::atomic::AtomicU32,uncertain:std::sync::atomic::AtomicBool,deleted:std::sync::atomic::AtomicBool,launched:std::sync::atomic::AtomicBool}
 pub struct ContainerIdentity {profile:std::sync::Arc<ProfileIdentity>}
 // The SID is immutable, heap-owned and only inspected by Windows APIs. Its allocation
@@ -84,9 +91,9 @@ impl ContainerIdentity {
         if unsafe{SetHandleInformation(error_file.as_raw_handle(),HANDLE_FLAG_INHERIT,HANDLE_FLAG_INHERIT)}==0{return Err(unavailable());}
         let mut inherited=vec![child_input.as_raw_handle(),child_output.as_raw_handle(),error_file.as_raw_handle()];if let Some(value)=presentation{inherited.push(value.actor_input.as_raw_handle());inherited.push(value.actor_output.as_raw_handle());}
         let mut capabilities=SECURITY_CAPABILITIES{AppContainerSid:self.profile.sid,Capabilities:null_mut(),CapabilityCount:0,Reserved:0};
-        let mut attributes=Attributes::new(4)?;
-        attributes.set(PROC_THREAD_ATTRIBUTE_SECURITY_CAPABILITIES,&mut capabilities)?;
-        attributes.set_slice(PROC_THREAD_ATTRIBUTE_HANDLE_LIST,&inherited)?;
+        let mut attributes=launch_checkpoint("attribute-list",Attributes::new(4))?;
+        launch_checkpoint("security-capabilities",attributes.set(PROC_THREAD_ATTRIBUTE_SECURITY_CAPABILITIES,&mut capabilities))?;
+        launch_checkpoint("inherited-handles",attributes.set_slice(PROC_THREAD_ATTRIBUTE_HANDLE_LIST,&inherited))?;
         // SDK WinBase.h policy bits: heap termination, disabled extension points,
         // prohibited dynamic code, local medium-integrity images, System32 preference.
         // The software-core build uses Windows fibers, never executable heap trampolines.
@@ -95,7 +102,7 @@ impl ContainerIdentity {
         // the syscall boundary; a cooperating SDL_Init(0) branch alone is not
         // confinement. Never retry this mode with Win32k lockdown removed.
         if presentation.is_some(){mitigations|=1<<28;}
-        attributes.set(PROC_THREAD_ATTRIBUTE_MITIGATION_POLICY,&mut mitigations)?;
+        launch_checkpoint("mitigation-policy",attributes.set(PROC_THREAD_ATTRIBUTE_MITIGATION_POLICY,&mut mitigations))?;
         let job=handle(unsafe{CreateJobObjectW(null(),null())})?;
         let mut job_limits=JOBOBJECT_EXTENDED_LIMIT_INFORMATION::default();
         job_limits.BasicLimitInformation.LimitFlags=JOB_OBJECT_LIMIT_ACTIVE_PROCESS|JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE|JOB_OBJECT_LIMIT_PROCESS_MEMORY|JOB_OBJECT_LIMIT_DIE_ON_UNHANDLED_EXCEPTION;
@@ -108,12 +115,15 @@ impl ContainerIdentity {
         // Associate the kill-on-close job inside CreateProcess itself. Creating
         // suspended and assigning afterwards leaves an orphan window if the
         // broker dies between those two calls. No assign-after-create fallback.
-        let jobs=[job.as_raw_handle()];attributes.set_slice(PROC_THREAD_ATTRIBUTE_JOB_LIST,&jobs)?;
+        let jobs=[job.as_raw_handle()];launch_checkpoint("creation-time-job",attributes.set_slice(PROC_THREAD_ATTRIBUTE_JOB_LIST,&jobs))?;
         let mut startup=STARTUPINFOEXW::default();startup.StartupInfo.cb=size_of::<STARTUPINFOEXW>()as u32;startup.StartupInfo.dwFlags=STARTF_USESTDHANDLES;
         startup.StartupInfo.hStdInput=child_input.as_raw_handle();startup.StartupInfo.hStdOutput=child_output.as_raw_handle();startup.StartupInfo.hStdError=error_file.as_raw_handle();startup.lpAttributeList=attributes.pointer;
         let mut environment=environment(working_directory)?;let mut information=PROCESS_INFORMATION::default();
         let created=unsafe{CreateProcessW(application.as_ptr(),command.as_mut_ptr(),null(),null(),1,CREATE_SUSPENDED|CREATE_NO_WINDOW|CREATE_UNICODE_ENVIRONMENT|EXTENDED_STARTUPINFO_PRESENT,environment.as_mut_ptr().cast(),directory.as_ptr(),&startup.StartupInfo,&mut information)};
-        if created==0{return Err(unavailable());}
+        if created==0{
+            #[cfg(test)]eprintln!("Windows launch checkpoint: CreateProcessW error {}",unsafe{GetLastError()});
+            return Err(unavailable());
+        }
         let process=handle(information.hProcess)?;
         self.profile.active.fetch_add(1,Ordering::AcqRel);let guard=ContainedProcess{process,job,profile:self.profile.clone()};
         let thread=handle(information.hThread)?;
@@ -121,16 +131,16 @@ impl ContainerIdentity {
         // the first worker instruction to run.
         let mut associated=0;
         if unsafe{IsProcessInJob(guard.process.as_raw_handle(),guard.job.as_raw_handle(),&mut associated)}==0||associated==0{return Err(unavailable());}
-        storage::verify_actor_token(&guard.process,self.profile.sid)?;
-        registry_storage::seal(&guard.process,self.profile.sid)?;
+        launch_checkpoint("verify-actor-token",storage::verify_actor_token(&guard.process,self.profile.sid))?;
+        launch_checkpoint("seal-private-registry",registry_storage::seal(&guard.process,self.profile.sid))?;
         // Resolve/materialize the registry namespace before sealing its backing
         // filesystem tree. Both fallible policies remain inside the suspended,
         // job-owned interval; no actor instruction or process record precedes
         // them, and failure never retries with a weaker policy.
         let name=self.profile.name.strip_suffix(&[0u16][..]).ok_or_else(unavailable)?;
         let name=String::from_utf16(name).map_err(|_|unavailable())?;
-        storage::seal_default_files(self.profile.sid,&name)?;
-        before_resume(process_identity(&guard.process)?)?;
+        launch_checkpoint("seal-default-files",storage::seal_default_files(self.profile.sid,&name))?;
+        launch_checkpoint("pre-resume-admission",before_resume(process_identity(&guard.process)?))?;
         if unsafe{ResumeThread(thread.as_raw_handle())}==u32::MAX{return Err(unavailable());}
         drop(thread);drop(child_input);drop(child_output);drop(error_file);
         Ok(Launched{process:guard,input:File::from(parent_input),output:File::from(parent_output)})

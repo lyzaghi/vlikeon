@@ -12,7 +12,10 @@ and dummy SDL drivers, not production cores or broker/AppContainer/device proof.
 The Windows storage fixture now includes a distinct readonly-scratch actor.
 Its real file-creation attempt must be denied on an existing readable directory.
 The harness retains uncertain trees and requires actual Windows thread completion
-before joining a reader. Both storage cases still require explicit OS execution.
+before joining a reader. Batch 014 compiled both probes, but both real OS cases
+failed during contained launch before actor observations. They are not passing
+denial evidence. Test-only launch checkpoints now identify the failing boundary;
+production error contracts and all isolation requirements remain unchanged.
 
 Native worker build batch 011 reached MSVC/compiler configuration but CMake
 generation failed because the source materializer omitted the pinned JSON
