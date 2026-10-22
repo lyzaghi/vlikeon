@@ -191,11 +191,37 @@ impl Attributes {
 }
 impl Drop for Attributes {fn drop(&mut self){unsafe{DeleteProcThreadAttributeList(self.pointer);}let _=&self.storage;}}
 
+fn local_app_data()->Result<String>{
+    use windows_sys::Win32::{UI::Shell::{SHGetKnownFolderPath,FOLDERID_LocalAppData},System::Com::CoTaskMemFree};
+    let mut raw=null_mut();
+    let status=unsafe{SHGetKnownFolderPath(&FOLDERID_LocalAppData,0,null_mut(),&mut raw)};
+    let value=(||{
+        if status<0||raw.is_null(){return Err(unavailable());}
+        let mut units=Vec::new();
+        for index in 0..32768{
+            let unit=unsafe{*raw.add(index)};
+            if unit==0{
+                let value=String::from_utf16(&units).map_err(|_|unavailable())?;
+                if !Path::new(&value).is_absolute(){return Err(unavailable());}
+                return Ok(value);
+            }
+            units.push(unit);
+        }
+        Err(unavailable())
+    })();
+    if !raw.is_null(){unsafe{CoTaskMemFree(raw.cast());}}
+    value
+}
+
 fn environment(working_directory:&Path)->Result<Vec<u16>> {
     let mut system=vec![0u16;32768];let length=unsafe{GetWindowsDirectoryW(system.as_mut_ptr(),system.len()as u32)}as usize;
     if length==0||length>=system.len(){return Err(unavailable());}
     let system=String::from_utf16(&system[..length]).map_err(|_|unavailable())?;let work=working_directory.to_str().ok_or_else(unavailable)?;
-    let mut entries=vec![format!("PATH={system}\\System32"),format!("SystemRoot={system}"),format!("TEMP={work}\\scratch"),format!("TMP={work}\\scratch"),format!("WINDIR={system}")];entries.sort_by_key(|v|v.to_ascii_lowercase());
+    // Windows resolves fresh AppContainer profile storage during CreateProcess.
+    // Supply its required known-folder location without inheriting arbitrary
+    // parent variables/credentials or granting any additional filesystem access.
+    let local=local_app_data()?;
+    let mut entries=vec![format!("LOCALAPPDATA={local}"),format!("PATH={system}\\System32"),format!("SystemRoot={system}"),format!("TEMP={work}\\scratch"),format!("TMP={work}\\scratch"),format!("WINDIR={system}")];entries.sort_by_key(|v|v.to_ascii_lowercase());
     let mut block=Vec::new();for entry in entries{block.extend(wide(OsStr::new(&entry))?);}block.push(0);Ok(block)
 }
 

@@ -16,6 +16,13 @@ before joining a reader. Batch 014 compiled both probes, but both real OS cases
 failed during contained launch before actor observations. They are not passing
 denial evidence. Test-only launch checkpoints now identify the failing boundary;
 production error contracts and all isolation requirements remain unchanged.
+Batch 015 localized both launch failures to CreateProcessW error 203. The
+explicit environment omitted LOCALAPPDATA. Source now obtains that one location
+from SHGetKnownFolderPath for the current user and includes it in the allowlist;
+no arbitrary parent environment, ACL grant, token or mitigation fallback is added.
+This proposed fix requires a fresh exact OS batch before acceptance. References:
+[Microsoft AppContainer launch](https://learn.microsoft.com/en-us/windows/win32/secauthz/implementing-an-appcontainer)
+and [known-folder API](https://learn.microsoft.com/en-us/windows/win32/api/shlobj_core/nf-shlobj_core-shgetknownfolderpath).
 
 Native worker build batch 011 reached MSVC/compiler configuration but CMake
 generation failed because the source materializer omitted the pinned JSON

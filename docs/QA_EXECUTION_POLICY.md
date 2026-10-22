@@ -58,6 +58,12 @@ before execution. No test artifacts or passing result exist. That command is
 not retried, rephrased or executed through another transport. Further execution
 requires an actual supported permission-state change; source work continues.
 
+Subsequent owner-confirmed permission changes allowed the exact bridge batches
+to execute through the normal CLI. Codex did not alter permission settings or
+bypass the gate. Recorded build/test evidence begins with the assigned batches;
+the historical denied attempt remains unexecuted. Tool availability does not
+expand Antigravity's test-only decision authority defined above.
+
 Later reports must bind the exact batch/source/artifact, environment, command,
 exit status and raw evidence. A source copy, an agent's assertion or a CLI
 success marker alone cannot establish application correctness or 100% readiness.
