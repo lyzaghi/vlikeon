@@ -8,6 +8,7 @@
 #include "measurement.hpp"
 #include "input_profile.hpp"
 #include "audio_ring.hpp"
+#include "owned_actor_exit.h"
 #include "client.hpp"
 #include <SDL3/SDL.h>
 #include <libretro.h>
@@ -19,6 +20,8 @@
 #include <optional>
 #include <stdexcept>
 #include <string>
+#include <type_traits>
+#include <utility>
 
 namespace omni {
 struct Failure:std::runtime_error {const char* code;explicit Failure(const char* value):std::runtime_error(value),code(value){}};
@@ -36,6 +39,7 @@ class Engine {
   std::vector<std::uint8_t> rom_;std::string filename_,title_,core_path_;
   std::vector<std::uint32_t> pixels_;unsigned texture_width_=0,texture_height_=0,pixel_format_=RETRO_PIXEL_FORMAT_0RGB1555;
   bool initialized_=false,loaded_=false,close_requested_=false,quit_=false,battery_=false,core_paused_=true;
+  bool guest_pause_active_=false,guest_pause_failed_=false,core_call_active_=false,core_call_failed_=false;
   std::atomic<bool> running_{false},started_{false},fault_{false},shutdown_requested_{false};
   enum class CorePhase{Created,Loading,Ready,Stopping};std::atomic<CorePhase> core_phase_{CorePhase::Created};
   std::atomic<bool> audio_running_{false};
@@ -66,17 +70,28 @@ class Engine {
     OmniInstallWritableFilesV1 install_files=nullptr;
     int (*flush_io_checked)()=nullptr;
     void (*describe_md_save)(std::uint32_t*)=nullptr;
-    bool (*finish_prepare)()=nullptr;void (*pause_guest)()=nullptr;
+    bool (*finish_prepare)()=nullptr;int (*pause_guest)()=nullptr;
   } api_{};
   retro_system_info info_{};
   retro_disk_control_callback discs_{};double aspect_ratio_=0;
   SDL_FingerID finger_=0;bool finger_down_=false,pointer_down_=false,pointer_inside_=false;
   std::int16_t pointer_x_=0,pointer_y_=0;float finger_x_=0,finger_y_=0;
   template<class T>T symbol(const char* name);
+  template<class Function,class... Args>auto call_core(Function callback,Args&&... args){
+    if(core_call_active_||core_call_failed_||guest_pause_active_||guest_pause_failed_)throw Failure("runtime_crashed");
+    core_call_active_=true;
+    try{
+      if constexpr(std::is_void_v<std::invoke_result_t<Function,Args...>>){
+        callback(std::forward<Args>(args)...);core_call_active_=false;
+      }else{
+        auto result=callback(std::forward<Args>(args)...);core_call_active_=false;return result;
+      }
+    }catch(...){core_call_active_=false;core_call_failed_=true;fault_=true;throw Failure("runtime_crashed");}
+  }
   void prepare(const Json& params);void pause();void resume();void reset_audio();void read_av();
   bool restart_content();
-  void stop_content();void flush_files();
-  std::vector<std::uint8_t> save_memory(bool allow_empty);void validate_memory(std::span<const std::uint8_t> data)const;void load_memory(std::span<const std::uint8_t> data);
+  void pause_core();void retire_guest();void stop_content();void flush_files();
+  std::vector<std::uint8_t> save_memory(bool allow_empty);void validate_memory(std::span<const std::uint8_t> data);void load_memory(std::span<const std::uint8_t> data);
   void complete_preparation();bool consume_av_changes();bool valid_av(const retro_system_av_info& av)const;
   Json disc_status();bool switch_disc(unsigned index,bool ejected);void apply_av(const retro_system_av_info& av);
   std::vector<std::uint8_t> save(const std::string& kind);void load(const std::string& kind,const std::vector<std::uint8_t>& payload);

@@ -77,6 +77,13 @@ Device-control receipts, deliberately discarded paused producer flushes,
 atomic presentation batch admission and same-epoch media-clear generations are
 now source-authored. Actual production-ring cases and full device/core/transport
 failure acceptance remain unexecuted in `qa/native-audio` and Windows case 24.
+Checked guest-pause protocol 1 is now authored across worker, selected native
+adapters, build receipts, catalog admission and Windows/Linux caller identity.
+Unconfirmed pause and unload/deinit callbacks prevent replay or DLL destruction.
+Windows fatal actor termination now bypasses DLL detach through the dedicated
+owned-process primitive; actual worker/DLL/pipe/producer and detach-witness
+fixture source is in `qa/native-lifecycle`. Case 25 and all real process/core/
+save/driver qualification remain unexecuted. Legacy barrier packages need rebuild.
 Complete semantic snapshot/resource
 admission, remaining writer closure and actual Windows qualification are open.
 Item 1's authored integration is retained for actual item-16 qualification;

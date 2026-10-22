@@ -6,6 +6,20 @@ deletion, filesystem cleanup or test has been executed during this work.
 
 ## Source changes in this pass
 
+Guest pause now requires a declared numeric protocol and checked core export;
+void return alone no longer publishes quiescence. MD/PS1/PSP and the unadmitted
+N64 candidate author their actual owner/writer/thread receipts. Initial prepare,
+resume and AV transitions honor that barrier, including a prior pre-entry GL
+failure. Unknown pause/unload/deinit lifetime cannot be replayed during restore
+or shutdown. Fatal command failures now keep a nonzero actor exit status.
+All core API invocations now share an entry/unknown-exception guard, and public
+content commands require Ready instead of accepting a partially prepared load.
+The Windows owned-actor primitive uses self-termination without DLL detach,
+with retained ownership on refusal. Actual worker/DLL/pipe and live-producer
+fixture source and detach witnesses are authored, not executed. See
+`NATIVE_GUEST_PAUSE.md`, `qa/native-lifecycle/ACCEPTANCE.md` and Windows case 25.
+Original package rebuild, source, driver and whole Windows requirements remain.
+
 Native audio enqueue receipts now report only frames actually copied into the
 bounded worker ring and reject impossible counter occupancy before subtraction.
 N64 pending output offers are capped to the worker's 16384-frame admission and

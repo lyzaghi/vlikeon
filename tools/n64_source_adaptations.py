@@ -504,7 +504,7 @@ def capture_owner(source,adapters):
         '    if (om_n64_owner_thread() && retro_thread && co_active()==retro_thread && om_n64_owner_ready(retro_thread)) CoreDoCommand(M64CMD_RESET,0,NULL);')
     exports=source/'libretro/link.T'
     replace(exports,'omniplay_install_writable_files_v1;',
-        'omniplay_install_writable_files_v1; omniplay_finish_prepare; omniplay_pause_guest; omniplay_flush_io_checked;')
+        'omniplay_install_writable_files_v1; omniplay_finish_prepare; omniplay_pause_guest; omniplay_pause_guest_checked_v1; omniplay_flush_io_checked;')
     header=base/'backends/file_storage.h'
     replace(header,'void close_file_storage(struct file_storage* storage);',
         'int close_file_storage(struct file_storage* storage);\nint om_n64_file_storage_flush(struct file_storage* storage);\nvoid om_n64_file_storage_discard_unstarted(struct file_storage* storage);')
@@ -1109,6 +1109,8 @@ def event_insertion_acknowledgement(source,adapters):
 
 def integrate(source,adapters):
     configuration(source);rom_database(source);shader_storage(source,adapters);fiber_lifecycle(source,adapters);texture_memory(source,adapters);texture_pool(source,adapters);texture_png_and_logs(source,adapters);persistent_storage(source,adapters);dd_storage(source,adapters);capture_owner(source,adapters);snapshot_pointer_bounds(source,adapters);tlb_snapshot_bounds(source,adapters);transferpak_snapshot_bounds(source,adapters);mbc3_rtc_snapshot(source,adapters);rtc_battery_storage(source,adapters);peripheral_memory_bounds(source,adapters);pi_framebuffer_memory(source,adapters);cartridge_dma_memory(source,adapters);color_buffer_memory(source,adapters);rom_image_memory(source,adapters);content_load_lifecycle(source,adapters);audio_lifecycle(source,adapters);audio_output_queue(source,adapters);audio_callback_retirement(source,adapters);ai_memory_source(source,adapters);ai_timing_admission(source,adapters);sinc_output_admission(source,adapters);ai_fifo_publication(source,adapters);event_insertion_acknowledgement(source,adapters)
+    core=source/'libretro/libretro.c';raw=core.read_text(encoding='utf-8')
+    core.write_text('#include "owned_actor_exit.h"\n'+raw.replace('_Exit(1)','omni_owned_actor_exit(1)'),encoding='utf-8',newline='\n')
     make=source/'Makefile.common'
     with make.open('a',encoding='utf-8',newline='\n')as out:
         out.write('\n# OmniPlay owned memory I/O: no general OS stdio interception.\nINCFLAGS += -I$(ROOT_DIR)\nSOURCES_C += $(ROOT_DIR)/n64-memory-png.c $(ROOT_DIR)/n64-dd-storage.c $(ROOT_DIR)/n64-rtc-storage.c\nSOURCES_CXX += $(ROOT_DIR)/n64-memory-io.cpp $(ROOT_DIR)/n64-memory-gzip.cpp $(ROOT_DIR)/n64-texture-pool.cpp $(ROOT_DIR)/n64-save-files.cpp $(ROOT_DIR)/n64-core-owner.cpp\n')

@@ -44,6 +44,7 @@ def main():
     adapters=ROOT/'engines/native/adapters'
     for name in ADAPTERS:shutil.copy2(owned(adapters/name),source/name)
     shutil.copy2(owned(ROOT/'engines/native/src/writable_files_v1.h'),source/'writable_files_v1.h')
+    shutil.copy2(owned(ROOT/'engines/native/src/owned_actor_exit.h'),source/'owned_actor_exit.h')
     changes+=integrate(source,adapters)
     adaptations=source/'OMNIPLAY_ADAPTATIONS.json';metadata=json.loads(adaptations.read_text(encoding='utf-8'))
     metadata.update({'core_version':VERSION,'changes':changes,'memory_io_integration_complete':False,'product_enabled':False})
@@ -60,6 +61,8 @@ def main():
         'source_bytes':sum((source/name).stat().st_size for name in inventory),
         'recipe_inputs_sha256':recipe_hashes,'adapter_inputs_sha256':{name:file_hash(adapters/name)for name in ADAPTERS},
         'writable_files_header_sha256':file_hash(ROOT/'engines/native/src/writable_files_v1.h'),
+        'owned_actor_exit_header_sha256':file_hash(ROOT/'engines/native/src/owned_actor_exit.h'),
+        'pause_barrier_protocol_source':1,'checked_guest_pause_verified':False,
         'configuration_database_and_shader_source_integrated':True,'texture_gzip_and_file_storage_source_integrated':True,'bounded_texture_pool_source_integrated':True,'target_writable_files_protocol':1,
         'scratch_texture_png_and_diagnostics_source_integrated':True,'n64_png_dump_verified':False,
         'persistent_file_storage_and_transferpak_ram_source_integrated':True,'n64_persistent_storage_verified':False,

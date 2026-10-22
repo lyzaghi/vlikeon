@@ -180,6 +180,19 @@ the required OS/process/filesystem evidence.
     before atomic presentation admission. Test GL procedure names of lengths 0/127/128 and invalid
     characters with exact accessible buffers, before any dynamic lookup.
 
+25. Execute `qa/native-lifecycle/ACCEPTANCE.md` with the exact common worker and
+    qualification DLLs, then real selected cores and the owning broker/job.
+    Exercise checked pause success/refusal/invalid result/exception, same-core
+    retry refusal after callback entry, pre-entry GL retry, unknown unload/
+    deinit and callback reentry. No unconfirmed lifetime may reach DLL/static
+    or detach callbacks, save replacement, successful resume/stop or exit 0.
+    Verify numeric catalog/build/hello/prepare agreement, void-only export
+    rejection and configuration identity. Preserve the N64 failed-stopped
+    peripheral recovery route. Refuse self-termination through explicit
+    qualification injection and observe retained ownership until actual broker
+    process/job retirement. Dummy-driver fixtures do not prove real core,
+    AppContainer, device, final-save or physical-accounting behavior.
+
 Record target OS/build, toolchain/SDK, source/artifact hashes, exact failure
 injection point, observed process/job/profile state, disk/ledger/proof state,
 expected outcome and evidence location for every case. No item-2 completion is

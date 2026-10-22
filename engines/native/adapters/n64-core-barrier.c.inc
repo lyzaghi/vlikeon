@@ -63,10 +63,12 @@ RETRO_API bool omniplay_finish_prepare(void)
     if(om_n64_owner_ready(retro_thread))return true;
     return om_n64_drive(OM_N64_PREPARE,NULL,0)==1 && om_n64_owner_ready(retro_thread);
 }
-RETRO_API void omniplay_pause_guest(void)
+RETRO_API int omniplay_pause_guest_checked_v1(void)
 {
-    if(!om_n64_at_root() || !om_n64_owner_ready(retro_thread))om_n64_core_failure();
+    return om_n64_at_root() && om_n64_audio_callback_idle() &&
+        (om_n64_owner_ready(retro_thread) || om_n64_owner_stopped(retro_thread));
 }
+RETRO_API void omniplay_pause_guest(void){if(!omniplay_pause_guest_checked_v1())om_n64_core_failure();}
 RETRO_API int omniplay_flush_io_checked(void)
 {
     int result;

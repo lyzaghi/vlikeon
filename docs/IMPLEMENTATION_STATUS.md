@@ -7,6 +7,15 @@ authoring estimate and is retained only as historical metadata, not a live
 progress or release-readiness claim. Numbered source work and actual final
 verification evidence are tracked in `COMPLETION_SEQUENCE.md`.
 
+The next item-2 source pass introduces checked guest-pause protocol 1, exact
+builder/catalog/worker agreement and configuration identity. MD/PS1/PSP plus
+the unadmitted N64 candidate now author explicit owner/writer/thread receipts.
+Unconfirmed pause/unload/deinit callbacks prevent replay, restore and DLL/static
+destruction. Windows fatal actor termination bypasses DLL detach; failure to
+terminate retains ownership for the broker. Actual worker/DLL/pipe/live-producer
+qualification and detach-witness sources are authored, not built or executed.
+See `NATIVE_GUEST_PAUSE.md` and Windows case 25. This does not close item 2.
+
 The resumed item-2 source work now extracts the production native audio ring
 with sink-acknowledged cursor/trim/priming publication. SDL rejection latches
 failure and clears its potentially partial queue; device-control failures no

@@ -32,7 +32,7 @@ Engine::Engine(std::unique_ptr<presentation::Client> presentation):presentation_
   api_.controller=symbol<decltype(api_.controller)>("retro_set_controller_port_device");api_.load_game=symbol<decltype(api_.load_game)>("retro_load_game");api_.unload_game=symbol<decltype(api_.unload_game)>("retro_unload_game");api_.run=symbol<decltype(api_.run)>("retro_run");
   api_.reset=symbol<decltype(api_.reset)>("retro_reset");
   api_.serialize_size=symbol<decltype(api_.serialize_size)>("retro_serialize_size");api_.serialize=symbol<decltype(api_.serialize)>("retro_serialize");api_.unserialize=symbol<decltype(api_.unserialize)>("retro_unserialize");api_.memory_data=symbol<decltype(api_.memory_data)>("retro_get_memory_data");api_.memory_size=symbol<decltype(api_.memory_size)>("retro_get_memory_size");
-  if(api_.api_version()!=1)throw Failure("runtime_crashed");api_.system_info(&info_);
+  if(call_core(api_.api_version)!=1)throw Failure("runtime_crashed");call_core(api_.system_info,&info_);
   if(!info_.library_name||!info_.library_version||std::strlen(info_.library_name)>128||std::strlen(info_.library_version)>128)throw Failure("runtime_crashed");
   latest_metrics_={{"window_duration_ms",1000},{"frames_presented",0},{"dropped_frames",0},{"audio_underruns",0},{"frame_time_p50_ms",0.0},{"frame_time_p95_ms",0.0},{"frame_time_p99_ms",0.0}};
 }
@@ -41,11 +41,11 @@ Engine::~Engine(){shutdown();}
 bool Engine::process(const Packet& packet){
   const auto id=packet.header.at("id").get<std::uint64_t>();const auto method=packet.header.at("method").get<std::string>();const auto& params=packet.header.at("params");
   if(method!="load"&&!packet.payload.empty())throw Failure("invalid_state");
-  if(method=="hello")reply(id,{{"runtime_id",OMNIPLAY_RUNTIME_ID},{"library_name",info_.library_name},{"library_version",info_.library_version},{"video_backend",OMNIPLAY_VIDEO_BACKEND},{"presentation_protocol",presentation::kProtocol},{"presentation_mode",presentation_?"brokered_rgba":"direct"},{"measurement_protocol",presentation_?0:1},{"input_profile_protocol",3},{"haptics_protocol",1},{"persistent_files_protocol",2},{"checked_file_io_protocol",1},{"combined_in_game_protocol",1},{"portable_file_protocol",1},{"writable_files_protocol",1}});
+  if(method=="hello")reply(id,{{"runtime_id",OMNIPLAY_RUNTIME_ID},{"library_name",info_.library_name},{"library_version",info_.library_version},{"video_backend",OMNIPLAY_VIDEO_BACKEND},{"presentation_protocol",presentation::kProtocol},{"presentation_mode",presentation_?"brokered_rgba":"direct"},{"measurement_protocol",presentation_?0:1},{"input_profile_protocol",3},{"haptics_protocol",1},{"persistent_files_protocol",2},{"checked_file_io_protocol",1},{"combined_in_game_protocol",1},{"portable_file_protocol",1},{"writable_files_protocol",1},{"pause_barrier_protocol",1}});
   else if(method=="prepare"){
-    prepare(params);reply(id,{{"nominal_refresh_hz",nominal_hz_},{"sample_rate",sample_rate_},{"save_ram_bytes",api_.memory_size(RETRO_MEMORY_SAVE_RAM)},{"save_rtc_bytes",api_.memory_size(RETRO_MEMORY_RTC)},{"save_files_supported",saved_files_.enabled()},{"save_memory_files",filesystem_save_memory_},{"writable_files_protocol",memory_files_installed_?1:0},{"save_state_bytes",api_.serialize_size()},{"portable_files_profile",md_portable_?"ares_md_v1":""},{"portable_progress_available",md_contract_&&(md_contract_->words[2]||md_contract_->words[3])},{"disc",disc_status()}});
-  }else if(method=="start"||method=="resume"){if(!loaded_)throw Failure("invalid_state");resume();reply(id,Json::object());}
-  else if(method=="pause"){if(!loaded_)throw Failure("invalid_state");pause();reply(id,Json::object());}
+    prepare(params);reply(id,{{"nominal_refresh_hz",nominal_hz_},{"sample_rate",sample_rate_},{"save_ram_bytes",call_core(api_.memory_size,RETRO_MEMORY_SAVE_RAM)},{"save_rtc_bytes",call_core(api_.memory_size,RETRO_MEMORY_RTC)},{"save_files_supported",saved_files_.enabled()},{"save_memory_files",filesystem_save_memory_},{"writable_files_protocol",memory_files_installed_?1:0},{"save_state_bytes",call_core(api_.serialize_size)},{"portable_files_profile",md_portable_?"ares_md_v1":""},{"portable_progress_available",md_contract_&&(md_contract_->words[2]||md_contract_->words[3])},{"disc",disc_status()}});
+  }else if(method=="start"||method=="resume"){if(!loaded_||core_phase_.load()!=CorePhase::Ready)throw Failure("invalid_state");resume();reply(id,Json::object());}
+  else if(method=="pause"){if(!loaded_||core_phase_.load()!=CorePhase::Ready)throw Failure("invalid_state");pause();reply(id,Json::object());}
   else if(method=="cancel_close"){close_requested_=false;pause();reply(id,Json::object());}
   else if(method=="status")reply(id,{{"state",!loaded_?"created":!started_?"ready":running_?"running":"paused"},{"close_requested",close_requested_},{"active_playtime_ms",static_cast<std::uint64_t>(active_time_ms_)}});
   else if(method=="metrics"){update_metrics();reply(id,latest_metrics_);}
@@ -53,25 +53,25 @@ bool Engine::process(const Packet& packet){
   else if(method=="measurement_status")reply(id,measurement_.status());
   else if(method=="measurement_cancel"){measurement_.cancel("user_cancelled");reply(id,measurement_.status());}
   else if(method=="measurement_read")reply(id,measurement_.result(),measurement_.payload());
-  else if(method=="disc_status"){if(!loaded_)throw Failure("invalid_state");reply(id,disc_status());}
+  else if(method=="disc_status"){if(!loaded_||core_phase_.load()!=CorePhase::Ready)throw Failure("invalid_state");reply(id,disc_status());}
   else if(method=="disc_select"){
-    if(!loaded_)throw Failure("invalid_state");const auto index=params.at("index").get<unsigned>();const auto before=disc_status();
+    if(!loaded_||core_phase_.load()!=CorePhase::Ready)throw Failure("invalid_state");const auto index=params.at("index").get<unsigned>();const auto before=disc_status();
     if(!before.at("supported").get<bool>()||index>=before.at("count").get<unsigned>())throw Failure("unsupported_capability");
     const bool playing=running_;pause();if(!switch_disc(index,false)){if(!switch_disc(before.at("index").get<unsigned>(),before.at("ejected").get<bool>()))throw Failure("runtime_crashed");if(playing)resume();throw Failure("invalid_state");}if(playing)resume();reply(id,disc_status());
   }
   else if(method=="save"){
-    if(!loaded_)throw Failure("invalid_state");const bool playing=running_;pause();
+    if(!loaded_||core_phase_.load()!=CorePhase::Ready)throw Failure("invalid_state");const bool playing=running_;pause();
     try{auto payload=save(params.at("kind").get<std::string>());if(playing)resume();reply(id,Json::object(),payload);}
     catch(const std::bad_alloc&){if(playing&&!fault_)resume();throw Failure("resource_limit");}
     catch(const std::filesystem::filesystem_error&){if(playing&&!fault_)resume();throw Failure("storage_failure");}
     catch(...){if(playing&&!fault_)resume();throw;}
   }
   else if(method=="load"){
-    if(!loaded_)throw Failure("invalid_state");const bool playing=running_;
+    if(!loaded_||core_phase_.load()!=CorePhase::Ready)throw Failure("invalid_state");const bool playing=running_;
     try{load(params.at("kind").get<std::string>(),packet.payload);reply(id,Json::object());}
     catch(const Failure& error){if(playing&&!fault_&&loaded_&&(std::strcmp(error.code,"incompatible_save")==0||std::strcmp(error.code,"unsupported_capability")==0||std::strcmp(error.code,"resource_limit")==0||std::strcmp(error.code,"storage_failure")==0))resume();throw;}
   }
-  else if(method=="stop"){pause();shutdown();reply(id,Json::object());quit_=true;}
+  else if(method=="stop"){pause();shutdown();if(fault_)throw Failure(fault_code_.load());reply(id,Json::object());quit_=true;}
   else throw Failure("unsupported_capability");
   return !quit_;
 }
@@ -89,7 +89,7 @@ void Engine::prepare(const Json& params){
   if(writable){
     api_.install_files=symbol<OmniInstallWritableFilesV1>("omniplay_install_writable_files_v1");
     memory_files_interface_=memory_files_.interface();
-    if(api_.install_files(&memory_files_interface_)!=1)throw Failure("unsupported_capability");
+    if(call_core(api_.install_files,&memory_files_interface_)!=1)throw Failure("unsupported_capability");
     memory_files_installed_=true;
   }
   reset_after_ram_load_=params.value("reset_after_ram_load",false);
@@ -101,7 +101,11 @@ void Engine::prepare(const Json& params){
   if(filesystem_save_memory_&&(core_save==params.end()||core_save->is_null()))throw Failure("runtime_crashed");
   if(saved_files_.enabled()){if(file_io==1)api_.flush_io_checked=symbol<decltype(api_.flush_io_checked)>("omniplay_flush_io_checked");else api_.flush_io=symbol<decltype(api_.flush_io)>("omniplay_flush_io");}
   if(params.value("prepare_completion",false))api_.finish_prepare=symbol<decltype(api_.finish_prepare)>("omniplay_finish_prepare");
-  if(params.value("pause_barrier",false))api_.pause_guest=symbol<decltype(api_.pause_guest)>("omniplay_pause_guest");
+  const bool pause_barrier=params.value("pause_barrier",false);
+  if(params.contains("pause_barrier_protocol")&&!params.at("pause_barrier_protocol").is_number_unsigned())throw Failure("unsupported_capability");
+  const auto pause_protocol=params.value("pause_barrier_protocol",0u);
+  if(pause_protocol!=(pause_barrier?1u:0u))throw Failure("unsupported_capability");
+  if(pause_barrier)api_.pause_guest=symbol<decltype(api_.pause_guest)>("omniplay_pause_guest_checked_v1");
   const auto portable=params.value("portable_files_profile",std::string{});
   if(!portable.empty()){
     if(portable!="ares_md_v1"||std::strcmp(OMNIPLAY_RUNTIME_ID,"ares-md-native")||std::strcmp(info_.library_name,"OmniPlay ares MD")||std::strcmp(info_.library_version,"0.3.0+ares.9408cb43d494")||file_io!=1||!api_.pause_guest||filesystem_save_memory_||core_save_directory_!="save/MD"||!saved_files_.enabled())throw Failure("runtime_crashed");
@@ -122,17 +126,18 @@ void Engine::prepare(const Json& params){
     else{renderer_=SDL_CreateRenderer(window_,"software");if(!renderer_)throw Failure("runtime_unavailable");}
     if(config.value("fullscreen",false))SDL_SetWindowFullscreen(window_,true);
   }
-  core_phase_=CorePhase::Loading;api_.set_environment(environment);api_.set_video(video);api_.set_audio(audio_sample);api_.set_audio_batch(audio_batch);api_.set_input_poll(input_poll);api_.set_input_state(input_state);api_.init();initialized_=true;if(fault_)throw Failure(fault_code_.load());
+  core_phase_=CorePhase::Loading;call_core(api_.set_environment,environment);call_core(api_.set_video,video);call_core(api_.set_audio,audio_sample);call_core(api_.set_audio_batch,audio_batch);call_core(api_.set_input_poll,input_poll);call_core(api_.set_input_state,input_state);call_core(api_.init);initialized_=true;if(fault_)throw Failure(fault_code_.load());
   retro_game_info game{};game.path=filename_.c_str();
   if(!info_.need_fullpath){if(expected>512u*1024u*1024u)throw Failure("unsupported_capability");rom_.resize(static_cast<std::size_t>(expected));std::ifstream source(path,std::ios::binary);if(!source.read(reinterpret_cast<char*>(rom_.data()),static_cast<std::streamsize>(rom_.size())))throw Failure("runtime_crashed");game.data=rom_.data();game.size=rom_.size();}
-  if(!api_.load_game(&game)||fault_)throw Failure(fault_?fault_code_.load():"runtime_crashed");loaded_=true;
+  loaded_=call_core(api_.load_game,&game);if(loaded_)core_paused_=false;
+  if(!loaded_||fault_)throw Failure(fault_?fault_code_.load():"runtime_crashed");
   complete_preparation();
-  if(md_portable_)md_contract_=MdSaveContract::read(api_.describe_md_save);
-  if(saved_files_.enabled()&&!filesystem_save_memory_&&(api_.memory_size(RETRO_MEMORY_SAVE_RAM)||api_.memory_size(RETRO_MEMORY_RTC)))throw Failure("unsupported_capability");
-  if(api_.flush_io_checked){flush_files();if(!api_.serialize_size()||api_.serialize_size()>kMaxSave)throw Failure("unsupported_capability");}
+  if(md_portable_)md_contract_=call_core(&MdSaveContract::read,api_.describe_md_save);
+  if(saved_files_.enabled()&&!filesystem_save_memory_&&(call_core(api_.memory_size,RETRO_MEMORY_SAVE_RAM)||call_core(api_.memory_size,RETRO_MEMORY_RTC)))throw Failure("unsupported_capability");
+  if(api_.flush_io_checked){flush_files();if(!call_core(api_.serialize_size)||call_core(api_.serialize_size)>kMaxSave)throw Failure("unsupported_capability");}
   const auto minimum_ram=params.value("minimum_system_ram_bytes",std::uint64_t(0));
-  if(minimum_ram>64u*1024u*1024u||api_.memory_size(RETRO_MEMORY_SYSTEM_RAM)<minimum_ram)throw Failure("content_mismatch");
-  for(unsigned port=0;port<4;++port)api_.controller(port,RETRO_DEVICE_JOYPAD);read_av();
+  if(minimum_ram>64u*1024u*1024u||call_core(api_.memory_size,RETRO_MEMORY_SYSTEM_RAM)<minimum_ram)throw Failure("content_mismatch");
+  for(unsigned port=0;port<4;++port)call_core(api_.controller,port,RETRO_DEVICE_JOYPAD);read_av();
   if(!presentation_){SDL_AudioSpec spec{};spec.format=SDL_AUDIO_S16;spec.channels=2;spec.freq=static_cast<int>(std::lround(sample_rate_));
     audio_=SDL_OpenAudioDeviceStream(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK,&spec,supply_audio,this);if(!audio_)throw Failure("runtime_crashed");
     int count=0;SDL_JoystickID* ids=SDL_GetGamepads(&count);for(int i=0;ids&&i<count;++i)pad_added(ids[i]);SDL_free(ids);
@@ -141,14 +146,15 @@ void Engine::prepare(const Json& params){
 }
 
 void Engine::read_av(){
-  retro_system_av_info av{};api_.av_info(&av);apply_av(av);
+  retro_system_av_info av{};call_core(api_.av_info,&av);apply_av(av);
   std::lock_guard lock(av_mutex_);pending_av_.reset();pending_geometry_.reset();
 }
 void Engine::complete_preparation(){
   if(hardware_video_){if(!gl_video_.negotiated())throw Failure("runtime_unavailable");gl_video_.reset_core();if(fault_)throw Failure("runtime_unavailable");}
   if(fault_)throw Failure(fault_code_.load());
-  if(api_.finish_prepare&&!api_.finish_prepare())throw Failure(fault_?fault_code_.load():"content_mismatch");
-  if(fault_)throw Failure(fault_code_.load());core_paused_=true;core_phase_=CorePhase::Ready;
+  if(api_.finish_prepare&&!call_core(api_.finish_prepare))throw Failure(fault_?fault_code_.load():"content_mismatch");
+  if(fault_)throw Failure(fault_code_.load());pause_core();
+  if(fault_)throw Failure(fault_code_.load());core_phase_=CorePhase::Ready;
 }
 bool Engine::valid_av(const retro_system_av_info& av)const{
   if(!std::isfinite(av.timing.fps)||av.timing.fps<1||av.timing.fps>240||!std::isfinite(av.timing.sample_rate)||av.timing.sample_rate<8000||av.timing.sample_rate>192000)return false;
@@ -158,8 +164,8 @@ bool Engine::consume_av_changes(){
   std::optional<retro_system_av_info> av;std::optional<retro_game_geometry> geometry;
   {std::lock_guard lock(av_mutex_);av=std::exchange(pending_av_,std::nullopt);geometry=std::exchange(pending_geometry_,std::nullopt);}
   if(!av&&!geometry)return false;const bool playing=running_;
-  if(av&&playing){
-    pause();
+  if(av){
+    if(playing)pause();else pause_core();
     // Draining a threaded renderer can publish one last geometry/clock update.
     // Merge it only after the guest has reached its pause barrier.
     std::lock_guard lock(av_mutex_);if(pending_av_){av=std::exchange(pending_av_,std::nullopt);geometry.reset();}if(pending_geometry_)geometry=std::exchange(pending_geometry_,std::nullopt);
@@ -184,15 +190,15 @@ void Engine::apply_av(const retro_system_av_info& av){
 }
 Json Engine::disc_status(){
   if(!discs_.get_num_images||!discs_.get_image_index||!discs_.get_eject_state||!discs_.set_eject_state||!discs_.set_image_index)return {{"supported",false},{"count",0},{"index",0},{"ejected",false}};
-  const auto count=discs_.get_num_images(),index=discs_.get_image_index();if(count>8||(count&&index>=count))throw Failure("runtime_crashed");return {{"supported",count>0},{"count",count},{"index",count?index:0},{"ejected",count?discs_.get_eject_state():false}};
+  const auto count=call_core(discs_.get_num_images),index=call_core(discs_.get_image_index);if(count>8||(count&&index>=count))throw Failure("runtime_crashed");return {{"supported",count>0},{"count",count},{"index",count?index:0},{"ejected",count?call_core(discs_.get_eject_state):false}};
 }
 bool Engine::switch_disc(unsigned index,bool ejected){
   const auto before=disc_status();if(!before.at("supported").get<bool>()||index>=before.at("count").get<unsigned>())return false;
-  auto matches_count=[&]{return discs_.get_num_images()==before.at("count").get<unsigned>();};
-  if(discs_.get_image_index()==index&&discs_.get_eject_state()==ejected)return true;
-  if(!discs_.get_eject_state()&&!discs_.set_eject_state(true))return false;if(!matches_count()||!discs_.get_eject_state())return false;
-  if(discs_.get_image_index()!=index&&!discs_.set_image_index(index))return false;if(!matches_count()||discs_.get_image_index()!=index||!discs_.get_eject_state())return false;
-  if(!ejected&&!discs_.set_eject_state(false))return false;return matches_count()&&discs_.get_image_index()==index&&discs_.get_eject_state()==ejected;
+  auto matches_count=[&]{return call_core(discs_.get_num_images)==before.at("count").get<unsigned>();};
+  if(call_core(discs_.get_image_index)==index&&call_core(discs_.get_eject_state)==ejected)return true;
+  if(!call_core(discs_.get_eject_state)&&!call_core(discs_.set_eject_state,true))return false;if(!matches_count()||!call_core(discs_.get_eject_state))return false;
+  if(call_core(discs_.get_image_index)!=index&&!call_core(discs_.set_image_index,index))return false;if(!matches_count()||call_core(discs_.get_image_index)!=index||!call_core(discs_.get_eject_state))return false;
+  if(!ejected&&!call_core(discs_.set_eject_state,false))return false;return matches_count()&&call_core(discs_.get_image_index)==index&&call_core(discs_.get_eject_state)==ejected;
 }
 void Engine::reset_audio(){
   if(!audio_)return;
@@ -202,21 +208,37 @@ void Engine::reset_audio(){
   const bool unlocked=SDL_UnlockAudioStream(audio_);
   if(!cleared||!unlocked){fault_=true;throw Failure("runtime_crashed");}
 }
+void Engine::pause_core(){
+  if(guest_pause_active_||guest_pause_failed_||core_call_active_||core_call_failed_)throw Failure("runtime_crashed");
+  if(!loaded_||core_paused_)return;
+  // Cores without a declared background producer barrier run synchronously
+  // between exports. A declared barrier must provide the exact checked ABI.
+  if(!api_.pause_guest){core_paused_=true;return;}
+  if(hardware_video_)gl_video_.make_current(); // Retryable before callback entry.
+  guest_pause_active_=true;int result=0;
+  try{result=api_.pause_guest();}
+  catch(...){guest_pause_active_=false;guest_pause_failed_=true;fault_=true;throw Failure("runtime_crashed");}
+  guest_pause_active_=false;
+  if(result!=1){guest_pause_failed_=true;fault_=true;throw Failure("runtime_crashed");}
+  core_paused_=true;
+}
 void Engine::pause(){
   measurement_.cancel("playback_interrupted");running_=false;finger_down_=false;pointer_down_=false;pointer_inside_=false;audio_running_.store(false);
   if(presentation_)presentation_->playback(false,static_cast<unsigned>(std::lround(volume_*100)));
   const bool device_paused=!audio_||SDL_PauseAudioStreamDevice(audio_);
   if(!device_paused)fault_=true;
   // Even a failed device pause must not skip the guest producer barrier.
-  if(loaded_&&api_.pause_guest&&!core_paused_){if(hardware_video_)gl_video_.make_current();api_.pause_guest();core_paused_=true;}
+  pause_core();
   stop_rumble();reset_audio();
   if(!device_paused)throw Failure("runtime_crashed");
   if(window_)SDL_SetWindowTitle(window_,("OmniPlay — "+title_+(close_requested_?" · Return to Game Hub to save and close":" · Paused · Esc to resume")).c_str());
 }
 void Engine::resume(){
-  if(!loaded_)throw Failure("invalid_state");
+  if(!loaded_||core_phase_.load()!=CorePhase::Ready)throw Failure("invalid_state");
+  if(guest_pause_active_||guest_pause_failed_||core_call_active_||core_call_failed_)throw Failure("runtime_crashed");
   if(fault_)throw Failure(fault_code_.load());
   if(running_)return; // Do not reset a ring while its guest producer is active.
+  pause_core(); // Finish any earlier pre-entry pause failure before resetting audio.
   if(presentation_){
     if(!presentation_->wait_focused(std::chrono::milliseconds(750)))throw Failure("permission_denied");
     const auto view=presentation_->snapshot();
@@ -275,7 +297,7 @@ void Engine::tick(){
   if(consume_av_changes())return;
   if(!running_)return;const auto before=Clock::now();if(before<deadline_)return;
   if(previous_frame_!=Clock::time_point{}){const auto elapsed=std::chrono::duration<double,std::milli>(before-previous_frame_).count();intervals_.push_back(elapsed);if(elapsed<=5000)active_time_ms_+=elapsed;if(intervals_.size()>1000){fault_=true;}}
-  previous_frame_=before;if(hardware_video_)gl_video_.make_current();api_.run();if(fault_)throw Failure(fault_code_.load());
+  previous_frame_=before;if(hardware_video_)gl_video_.make_current();call_core(api_.run);if(fault_)throw Failure(fault_code_.load());
   if(shutdown_requested_.exchange(false)){close_requested_=true;pause();return;}
   if(consume_av_changes())return;
   const auto period=std::chrono::duration_cast<Clock::duration>(std::chrono::duration<double>(1.0/nominal_hz_));deadline_+=period;
@@ -443,21 +465,21 @@ static void put32(std::vector<std::uint8_t>& target,std::size_t offset,std::uint
 static std::uint32_t get32(std::span<const std::uint8_t> source,std::size_t offset){return std::uint32_t(source[offset])|(std::uint32_t(source[offset+1])<<8)|(std::uint32_t(source[offset+2])<<16)|(std::uint32_t(source[offset+3])<<24);}
 void Engine::flush_files(){
   if(!saved_files_.enabled())return;if(running_||!core_paused_)throw Failure("invalid_state");
-  if(api_.flush_io_checked){const auto result=api_.flush_io_checked();if(result==0)throw Failure("storage_failure");if(result!=1){fault_=true;throw Failure("runtime_crashed");}}
-  else{if(!api_.flush_io)throw Failure("runtime_crashed");api_.flush_io();}
-  if(md_portable_&&md_contract_){try{if(MdSaveContract::read(api_.describe_md_save)!=*md_contract_)throw Failure("runtime_crashed");}catch(...){md_layout_failed_=true;fault_=true;throw Failure("runtime_crashed");}}
+  if(api_.flush_io_checked){const auto result=call_core(api_.flush_io_checked);if(result==0)throw Failure("storage_failure");if(result!=1){fault_=true;throw Failure("runtime_crashed");}}
+  else{if(!api_.flush_io)throw Failure("runtime_crashed");call_core(api_.flush_io);}
+  if(md_portable_&&md_contract_){try{if(call_core(&MdSaveContract::read,api_.describe_md_save)!=*md_contract_)throw Failure("runtime_crashed");}catch(...){md_layout_failed_=true;fault_=true;throw Failure("runtime_crashed");}}
 }
 std::vector<std::uint8_t> Engine::save_memory(bool allow_empty){
-  const auto ram=api_.memory_size(RETRO_MEMORY_SAVE_RAM),rtc=api_.memory_size(RETRO_MEMORY_RTC);const auto* a=api_.memory_data(RETRO_MEMORY_SAVE_RAM);const auto* b=api_.memory_data(RETRO_MEMORY_RTC);
+  const auto ram=call_core(api_.memory_size,RETRO_MEMORY_SAVE_RAM),rtc=call_core(api_.memory_size,RETRO_MEMORY_RTC);const auto* a=call_core(api_.memory_data,RETRO_MEMORY_SAVE_RAM);const auto* b=call_core(api_.memory_data,RETRO_MEMORY_RTC);
   if(!ram&&!rtc&&!allow_empty)throw Failure("unsupported_capability");if(ram>kMaxSave||rtc>kMaxSave||ram+rtc>kMaxSave-16||(ram&&!a)||(rtc&&!b))throw Failure("runtime_crashed");
   std::vector<std::uint8_t> out(16+ram+rtc);std::memcpy(out.data(),"OPRM0001",8);put32(out,8,static_cast<std::uint32_t>(ram));put32(out,12,static_cast<std::uint32_t>(rtc));if(ram)std::memcpy(out.data()+16,a,ram);if(rtc)std::memcpy(out.data()+16+ram,b,rtc);return out;
 }
-void Engine::validate_memory(std::span<const std::uint8_t> data)const{
+void Engine::validate_memory(std::span<const std::uint8_t> data){
   if(data.size()<16||std::memcmp(data.data(),"OPRM0001",8))throw Failure("incompatible_save");const auto ram=get32(data,8),rtc=get32(data,12);
-  if(ram!=api_.memory_size(RETRO_MEMORY_SAVE_RAM)||rtc!=api_.memory_size(RETRO_MEMORY_RTC)||std::uint64_t(ram)+rtc+16!=data.size()||(ram&&!api_.memory_data(RETRO_MEMORY_SAVE_RAM))||(rtc&&!api_.memory_data(RETRO_MEMORY_RTC)))throw Failure("incompatible_save");
+  if(ram!=call_core(api_.memory_size,RETRO_MEMORY_SAVE_RAM)||rtc!=call_core(api_.memory_size,RETRO_MEMORY_RTC)||std::uint64_t(ram)+rtc+16!=data.size()||(ram&&!call_core(api_.memory_data,RETRO_MEMORY_SAVE_RAM))||(rtc&&!call_core(api_.memory_data,RETRO_MEMORY_RTC)))throw Failure("incompatible_save");
 }
 void Engine::load_memory(std::span<const std::uint8_t> data){
-  validate_memory(data);const auto ram=get32(data,8),rtc=get32(data,12);if(ram)std::memcpy(api_.memory_data(RETRO_MEMORY_SAVE_RAM),data.data()+16,ram);if(rtc)std::memcpy(api_.memory_data(RETRO_MEMORY_RTC),data.data()+16+ram,rtc);if(reset_after_ram_load_)api_.reset();
+  validate_memory(data);const auto ram=get32(data,8),rtc=get32(data,12);if(ram)std::memcpy(call_core(api_.memory_data,RETRO_MEMORY_SAVE_RAM),data.data()+16,ram);if(rtc)std::memcpy(call_core(api_.memory_data,RETRO_MEMORY_RTC),data.data()+16+ram,rtc);if(reset_after_ram_load_)call_core(api_.reset);
 }
 std::vector<std::uint8_t> Engine::save(const std::string& kind){
   if(kind!="in_game"&&kind!="emulator_state")throw Failure("unsupported_capability");
@@ -468,34 +490,49 @@ std::vector<std::uint8_t> Engine::save(const std::string& kind){
     auto memory=save_memory(true);flush_files();auto files=saved_files_.read();const auto total=std::uint64_t(16)+memory.size()+files.size();if(total>kMaxSave)throw Failure("resource_limit");
     std::vector<std::uint8_t> out(static_cast<std::size_t>(total));std::memcpy(out.data(),"OPNM0001",8);put32(out,8,static_cast<std::uint32_t>(memory.size()));put32(out,12,static_cast<std::uint32_t>(files.size()));std::copy(memory.begin(),memory.end(),out.begin()+16);std::copy(files.begin(),files.end(),out.begin()+16+memory.size());return out;
   }
-  const auto header=saved_files_.enabled()?24u:20u;const auto size=api_.serialize_size();if(!size)throw Failure("unsupported_capability");if(size>kMaxSave-header)throw Failure("resource_limit");
-  const auto disc=disc_status();std::vector<std::uint8_t> state(size);if(!api_.serialize(state.data(),state.size()))throw Failure("runtime_crashed");flush_files();
+  const auto header=saved_files_.enabled()?24u:20u;const auto size=call_core(api_.serialize_size);if(!size)throw Failure("unsupported_capability");if(size>kMaxSave-header)throw Failure("resource_limit");
+  const auto disc=disc_status();std::vector<std::uint8_t> state(size);if(!call_core(api_.serialize,state.data(),state.size()))throw Failure("runtime_crashed");flush_files();
   auto files=saved_files_.enabled()?saved_files_.read():std::vector<std::uint8_t>{};if(disc_status()!=disc)throw Failure("invalid_state");
   if(std::uint64_t(size)+header+files.size()>kMaxSave)throw Failure("resource_limit");
   std::vector<std::uint8_t> out(size+header+files.size());std::memcpy(out.data(),saved_files_.enabled()?"OPNS0002":"OPNS0001",8);put32(out,8,disc.at("supported").get<bool>()?disc.at("index").get<unsigned>():0xffffffffu);put32(out,12,disc.at("ejected").get<bool>()?1u:0u);put32(out,16,static_cast<std::uint32_t>(size));
   if(saved_files_.enabled())put32(out,20,static_cast<std::uint32_t>(files.size()));std::copy(state.begin(),state.end(),out.begin()+header);std::copy(files.begin(),files.end(),out.begin()+header+size);return out;
 }
-void Engine::stop_content(){
+void Engine::retire_guest(){
+  if(core_call_active_||core_call_failed_||guest_pause_active_||guest_pause_failed_)throw Failure("runtime_crashed");
   if(hardware_video_&&(gl_video_.core_callback_active()||gl_video_.core_callback_failed()))throw Failure("invalid_state");
-  core_phase_=CorePhase::Stopping;if(loaded_){api_.unload_game();loaded_=false;}if(hardware_video_)gl_video_.release_core();if(initialized_){api_.deinit();initialized_=false;}discs_={};
+  pause_core();core_phase_=CorePhase::Stopping;
+  if(loaded_){
+    call_core(api_.unload_game);loaded_=false;
+  }
+  // GlVideo owns its own retry-before-entry/unknown-after-entry receipts.
+  if(hardware_video_)gl_video_.release_core();
+  if(initialized_){
+    call_core(api_.deinit);initialized_=false;
+  }
+  discs_={};
+}
+void Engine::stop_content(){
+  if(running_||audio_running_.load())throw Failure("invalid_state");
+  retire_guest();
   if(memory_files_installed_){
     // A void unload/deinit is not proof that producers released this table.
     // Obtain the real core's quiescent acknowledgement before any save swap.
-    if(api_.install_files(nullptr)!=1){fault_=true;throw Failure("runtime_crashed");}
+    if(call_core(api_.install_files,nullptr)!=1){fault_=true;throw Failure("runtime_crashed");}
     memory_files_installed_=false;
     memory_files_interface_=memory_files_.interface();
     // Conservatively retain callback ownership if the new acknowledgement is
     // refused; shutdown must still obtain uninstall or exit the owned actor.
     memory_files_installed_=true;
-    if(api_.install_files(&memory_files_interface_)!=1){fault_=true;throw Failure("runtime_crashed");}
+    if(call_core(api_.install_files,&memory_files_interface_)!=1){fault_=true;throw Failure("runtime_crashed");}
   }
 }
 bool Engine::restart_content(){
   // All old guest handles/producers retire before the private directory swap.
   stop_content();fault_=false;fault_code_="runtime_crashed";shutdown_requested_=false;core_paused_=true;core_phase_=CorePhase::Loading;
-  api_.set_environment(environment);api_.set_video(video);api_.set_audio(audio_sample);api_.set_audio_batch(audio_batch);api_.set_input_poll(input_poll);api_.set_input_state(input_state);
-  initialized_=true;api_.init();if(fault_)return false;retro_game_info game{};game.path=filename_.c_str();if(!info_.need_fullpath){game.data=rom_.data();game.size=rom_.size();}
-  if(!api_.load_game(&game)||fault_)return false;loaded_=true;complete_preparation();for(unsigned port=0;port<4;++port)api_.controller(port,RETRO_DEVICE_JOYPAD);read_av();return !fault_;
+  call_core(api_.set_environment,environment);call_core(api_.set_video,video);call_core(api_.set_audio,audio_sample);call_core(api_.set_audio_batch,audio_batch);call_core(api_.set_input_poll,input_poll);call_core(api_.set_input_state,input_state);
+  initialized_=true;call_core(api_.init);if(fault_)return false;retro_game_info game{};game.path=filename_.c_str();if(!info_.need_fullpath){game.data=rom_.data();game.size=rom_.size();}
+  loaded_=call_core(api_.load_game,&game);if(loaded_)core_paused_=false;
+  if(!loaded_||fault_)return false;complete_preparation();for(unsigned port=0;port<4;++port)call_core(api_.controller,port,RETRO_DEVICE_JOYPAD);read_av();return !fault_;
 }
 void Engine::load(const std::string& kind,const std::vector<std::uint8_t>& payload){
   if(payload.empty()||payload.size()>kMaxSave)throw Failure("incompatible_save");const bool restore_running=running_;pause();if(hardware_video_)gl_video_.make_current();
@@ -512,15 +549,15 @@ void Engine::load(const std::string& kind,const std::vector<std::uint8_t>& paylo
       target_index=get32(view,8);target_ejected=get32(view,12)==1;if(!valid_disc(target_index,target_ejected))throw Failure("incompatible_save");core_state=view.subspan(24,get32(view,16));archive=view.subspan(24+get32(view,16));
     }else throw Failure("unsupported_capability");
     // Full decode and memory/metadata admission precede any file replacement.
-    SavedFiles::validate(archive);flush_files();const auto old_size=api_.serialize_size();if(!old_size||old_size>kMaxSave)throw Failure("resource_limit");
-    std::vector<std::uint8_t> old_state(old_size);if(!api_.serialize(old_state.data(),old_state.size()))throw Failure("runtime_crashed");flush_files();const auto old_files=saved_files_.read();if(disc_status()!=before_disc)throw Failure("invalid_state");
+    SavedFiles::validate(archive);flush_files();const auto old_size=call_core(api_.serialize_size);if(!old_size||old_size>kMaxSave)throw Failure("resource_limit");
+    std::vector<std::uint8_t> old_state(old_size);if(!call_core(api_.serialize,old_state.data(),old_state.size()))throw Failure("runtime_crashed");flush_files();const auto old_files=saved_files_.read();if(disc_status()!=before_disc)throw Failure("invalid_state");
     auto same_list=[&]{const auto current=disc_status();return current.at("supported")==before_disc.at("supported")&&current.at("count")==before_disc.at("count");};
     auto matches=[&](unsigned index,bool ejected){const auto current=disc_status();return same_list()&&(index==0xffffffffu?!current.at("supported").get<bool>():current.at("index").get<unsigned>()==index&&current.at("ejected").get<bool>()==ejected);};
     const char* rejected=nullptr;
     try{
       stop_content();saved_files_.replace(archive);if(!restart_content()||!same_list())throw Failure("incompatible_save");
       if(!core_state.empty()&&target_index!=0xffffffffu&&!switch_disc(target_index,target_ejected))throw Failure("incompatible_save");
-      if(!core_state.empty()&&(!api_.unserialize(core_state.data(),core_state.size())||!matches(target_index,target_ejected)))throw Failure("incompatible_save");
+      if(!core_state.empty()&&(!call_core(api_.unserialize,core_state.data(),core_state.size())||!matches(target_index,target_ejected)))throw Failure("incompatible_save");
       if(!memory.empty())load_memory(memory);if(fault_)throw Failure("incompatible_save");flush_files();read_av();
     }catch(const Failure& error){if(md_layout_failed_)throw Failure("runtime_crashed");rejected=std::strcmp(error.code,"storage_failure")==0?"storage_failure":std::strcmp(error.code,"resource_limit")==0?"resource_limit":"incompatible_save";}
     catch(const std::filesystem::filesystem_error&){rejected="storage_failure";}
@@ -531,7 +568,7 @@ void Engine::load(const std::string& kind,const std::vector<std::uint8_t>& paylo
         stop_content();saved_files_.replace(old_files);if(!restart_content()||!same_list())throw Failure("runtime_crashed");
         const auto index=before_disc.at("supported").get<bool>()?before_disc.at("index").get<unsigned>():0xffffffffu;const auto ejected=before_disc.at("ejected").get<bool>();
         if(index!=0xffffffffu&&!switch_disc(index,ejected))throw Failure("runtime_crashed");
-        if(!api_.unserialize(old_state.data(),old_state.size())||!matches(index,ejected)||fault_)throw Failure("runtime_crashed");flush_files();read_av();
+        if(!call_core(api_.unserialize,old_state.data(),old_state.size())||!matches(index,ejected)||fault_)throw Failure("runtime_crashed");flush_files();read_av();
       }catch(...){fault_=true;throw Failure("runtime_crashed");}
       reset_audio();if(restore_running)resume();throw Failure(rejected);
     }
@@ -544,26 +581,28 @@ void Engine::load(const std::string& kind,const std::vector<std::uint8_t>& paylo
     if((index==0xffffffffu&&(disc.at("supported").get<bool>()||ejected))||(index!=0xffffffffu&&(!disc.at("supported").get<bool>()||index>=disc.at("count").get<unsigned>())))throw Failure("incompatible_save");
     const auto before=save(kind);const bool selected=index==0xffffffffu||switch_disc(index,ejected);
     const auto matches=[&](unsigned expected,bool open){const auto current=disc_status();return current.at("count")==disc.at("count")&&(expected==0xffffffffu?!current.at("supported").get<bool>():current.at("index").get<unsigned>()==expected&&current.at("ejected").get<bool>()==open);};
-    if(!selected||!api_.unserialize(payload.data()+20,payload.size()-20)||!matches(index,ejected)){
+    if(!selected||!call_core(api_.unserialize,payload.data()+20,payload.size()-20)||!matches(index,ejected)){
       const auto previous=get32(before,8);const auto open=get32(before,12)==1;
-      if((previous!=0xffffffffu&&!switch_disc(previous,open))||!api_.unserialize(before.data()+20,before.size()-20)||!matches(previous,open)){fault_=true;throw Failure("runtime_crashed");}
+      if((previous!=0xffffffffu&&!switch_disc(previous,open))||!call_core(api_.unserialize,before.data()+20,before.size()-20)||!matches(previous,open)){fault_=true;throw Failure("runtime_crashed");}
       if(restore_running)resume();throw Failure("incompatible_save");
     }
   }else throw Failure("unsupported_capability");
   read_av();reset_audio();if(restore_running)resume();
 }
 void Engine::shutdown(){
-  if(hardware_video_&&(gl_video_.core_callback_active()||gl_video_.core_callback_failed()))std::_Exit(1);
+  if(guest_pause_active_||guest_pause_failed_||core_call_active_||core_call_failed_)omni_owned_actor_exit(1);
+  if(hardware_video_&&(gl_video_.core_callback_active()||gl_video_.core_callback_failed()))omni_owned_actor_exit(1);
   measurement_.cancel("runtime_stopped");
   core_phase_=CorePhase::Stopping;
   running_=false;audio_running_.store(false);if(audio_)SDL_PauseAudioStreamDevice(audio_);
-  if(loaded_&&api_.pause_guest&&!core_paused_){try{if(hardware_video_)gl_video_.make_current();api_.pause_guest();core_paused_=true;}catch(...){}}
-  if(loaded_){api_.unload_game();loaded_=false;}if(hardware_video_){try{gl_video_.release_core();}catch(...){std::_Exit(1);}}if(initialized_){api_.deinit();initialized_=false;}
+  // Unknown pause/unload/deinit ownership may not unwind through DLL/static or
+  // callback-context destruction. The broker still waits for actual job exit.
+  try{retire_guest();}catch(...){omni_owned_actor_exit(1);}
   if(memory_files_installed_){
     // An unconfirmed producer/handle lifetime cannot survive core unload or
     // release of its callback context. This executable is the owned actor;
     // retain all state until actual process retirement, without a stop ack.
-    if(api_.install_files(nullptr)!=1)std::_Exit(1);
+    if(call_core(api_.install_files,nullptr)!=1)omni_owned_actor_exit(1);
     memory_files_installed_=false;
   }
   // Guest producers and GPU queues are joined before their audio sink vanishes.

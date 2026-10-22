@@ -243,13 +243,15 @@ RETRO_API int omniplay_install_writable_files_v1(const OmniWritableFilesV1* file
   try{if(host.loaded)return 0;return omni_md_files::install(files)?1:0;}catch(...){return 0;}
 }
 #endif
-RETRO_API void omniplay_pause_guest(){
+RETRO_API int omniplay_pause_guest_checked_v1(){
   // The worker calls this between exported core calls. All guest contexts are
   // cooperative on this owner thread, and Video::Threaded is disabled by the
   // recipe. There is no background guest I/O to join; publication runs only in
   // the checked barrier. co_active additionally enforces the owner/fiber check.
-  (void)co_active();
+  if(!host.loaded)return 0;
+  (void)co_active();return 1;
 }
+RETRO_API void omniplay_pause_guest(){(void)omniplay_pause_guest_checked_v1();}
 RETRO_API int omniplay_flush_io_checked(){return om_web_flush_save_io();}
 #endif
 RETRO_API unsigned retro_get_region(){return host.pal?RETRO_REGION_PAL:RETRO_REGION_NTSC;}

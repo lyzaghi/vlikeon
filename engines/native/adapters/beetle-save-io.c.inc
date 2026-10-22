@@ -39,10 +39,12 @@ RETRO_API void retro_run(void)
       environ_cb(RETRO_ENVIRONMENT_SHUTDOWN,NULL);
 }
 
-RETRO_API void omniplay_pause_guest(void)
+RETRO_API int omniplay_pause_guest_checked_v1(void)
 {
    mc_async_flush_and_stop();
+   return om_ps1_card_writer_quiet();
 }
+RETRO_API void omniplay_pause_guest(void){(void)omniplay_pause_guest_checked_v1();}
 
 /* 1: complete checked capture barrier; 0: storage failure; -1: invalid core
  * state/policy. The worker calls only while its synchronous guest loop stops.

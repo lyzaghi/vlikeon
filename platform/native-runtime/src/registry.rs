@@ -48,6 +48,7 @@ pub struct RuntimePackage {
     #[serde(default)]pub gpu_max_height:u32,
     #[serde(default)]pub prepare_completion:bool,
     #[serde(default)]pub pause_barrier:bool,
+    #[serde(default)]pub pause_barrier_protocol:u32,
     #[serde(default)]pub portable_in_game_format:Option<String>,
 }
 impl RuntimePackage{
@@ -158,6 +159,7 @@ pub(crate) fn parse_catalog(raw:&[u8])->Result<Vec<RuntimePackage>>{
     if catalog.schema_version!=1||catalog.runtimes.len()>32{return Err(unavailable("The native runtime catalog exceeds its version or size bound"));}
     let mut ids=std::collections::BTreeSet::new();
     for package in &catalog.runtimes {
+        if package.pause_barrier_protocol>1||package.pause_barrier!=(package.pause_barrier_protocol==1){return Err(unavailable("Native pause requires the declared checked-barrier protocol; legacy void barriers must be rebuilt"));}
         if !ids.insert(&package.manifest.id)||!valid_identifier(&package.manifest.id)||package.manifest.kind!=RuntimeKind::NativeEmulator||package.manifest.platform!=format!("{}-{}",std::env::consts::OS,std::env::consts::ARCH)||!(256..=8192).contains(&package.memory_limit_mb)||package.maximum_rom_bytes==0||package.maximum_rom_bytes>MAX_ROM_BYTES||package.files.is_empty()||package.files.len()>256||package.expected_library_name.len()>128||package.expected_library_version.len()>128||package.in_game_format_version.is_empty(){return Err(unavailable("A native runtime declaration is outside its policy"));}
         let prefix=format!("native-runtimes/{}/",package.manifest.id);
         if let Some(linux)=&package.linux{linux.validate(package)?;}else if package.manifest.platform=="linux-x86_64"{return Err(unavailable("Linux native packages require their explicit actor image closure"));}

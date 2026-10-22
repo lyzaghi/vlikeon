@@ -41,7 +41,7 @@ def prepare(output,platform,git):
     for name in ["build_beetle_psx.py","build_beetle_psx_web.py","psx_source_adaptations.py","web_core_options_policy.py"]:
         shutil.copy2(ROOT/"tools"/name,output/name)
     record={**adaptations,"source_only":True,"verification":"not_run","distribution_approved":False,
-      "pause_barrier":True,"file_io_protocol":1,"filesystem_save_memory":True,"writable_files_protocol":1,
+      "pause_barrier":True,"pause_barrier_protocol":1,"file_io_protocol":1,"filesystem_save_memory":True,"writable_files_protocol":1,
       "upstream_source_sha256":file_hash(archive),"adapter_sha256":file_hash(ADAPTER),
       "memory_adapter_sha256":{name:file_hash(path) for name,path in MEMORY_INPUTS.items()},
       "core_options_policy_sha256":file_hash(output/"core-options-policy.json"),
@@ -82,7 +82,7 @@ def main():
     suffix={"win":".dll","unix":".so","osx":".dylib"}[args.platform];library=source/("mednafen_psx_libretro"+suffix)
     if not library.is_file():raise ValueError("The PS1 build did not produce its expected core library")
     receipt={"schema_version":1,"core":"beetle-psx","revision":PIN,"version":VERSION,"library":str(library.resolve()),"corresponding_source":str(source.resolve()),
-      "library_sha256":file_hash(library),"pause_barrier":True,"file_io_protocol":1,"filesystem_save_memory":True,"writable_files_protocol":1,
+      "library_sha256":file_hash(library),"pause_barrier":True,"pause_barrier_protocol":1,"file_io_protocol":1,"filesystem_save_memory":True,"writable_files_protocol":1,
       "adapter_sha256":record["adapter_sha256"],"core_options_policy_sha256":record["core_options_policy_sha256"],
       "memory_adapter_sha256":record["memory_adapter_sha256"],
       "verification":"not_run","distribution_review_required":["compiled_third_party_notices","complete_corresponding_source","actual_core_barrier_and_device_evidence"],

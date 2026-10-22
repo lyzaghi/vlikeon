@@ -39,16 +39,17 @@ int main(int argc,char** argv){
     // to the broker; requesting channel stop alone is not process termination.
     try{
       std::thread([&inbox]{inbox.read_stdin();}).detach();
+      int exit_code=0;
       while(!engine.quitting()&&!inbox.closed()){
         engine.poll();omni::Packet packet;
         if(inbox.pop(packet)){
           try{engine.process(packet);}
-          catch(const omni::Failure& error){omni::reply_error(packet.header.at("id").get<std::uint64_t>(),error.code);if(std::strcmp(error.code,"runtime_crashed")==0)break;}
-          catch(...){omni::reply_error(packet.header.at("id").get<std::uint64_t>(),"runtime_crashed");break;}
+          catch(const omni::Failure& error){omni::reply_error(packet.header.at("id").get<std::uint64_t>(),error.code);if(std::strcmp(error.code,"runtime_crashed")==0){exit_code=1;break;}}
+          catch(...){omni::reply_error(packet.header.at("id").get<std::uint64_t>(),"runtime_crashed");exit_code=1;break;}
         }
         if(engine.quitting())break;engine.tick();SDL_Delay(1);
       }
-      engine.shutdown();std::fflush(stdout);std::_Exit(0);
-    }catch(...){try{engine.shutdown();}catch(...){}std::_Exit(1);}
-  }catch(...){std::_Exit(1);}
+      engine.shutdown();std::fflush(stdout);omni_owned_actor_exit(exit_code);
+    }catch(...){try{engine.shutdown();}catch(...){}omni_owned_actor_exit(1);}
+  }catch(...){omni_owned_actor_exit(1);}
 }

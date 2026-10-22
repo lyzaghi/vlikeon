@@ -28,10 +28,10 @@ def native_card_io(source, adapter):
     raw=exports.read_text(encoding='utf-8')
     if raw.count('retro_*;')!=1:
         raise ValueError('The pinned PS1 export map changed')
-    exports.write_text(raw.replace('retro_*;','retro_*;\n    omniplay_pause_guest;\n    omniplay_flush_io_checked;\n    omniplay_install_writable_files_v1;'),encoding='utf-8',newline='\n')
+    exports.write_text(raw.replace('retro_*;','retro_*;\n    omniplay_pause_guest;\n    omniplay_pause_guest_checked_v1;\n    omniplay_flush_io_checked;\n    omniplay_install_writable_files_v1;'),encoding='utf-8',newline='\n')
     apple=source/'libretro.osx.def'
     with apple.open('a',encoding='utf-8',newline='\n') as out:
-        out.write('\n_omniplay_pause_guest\n_omniplay_flush_io_checked\n_omniplay_install_writable_files_v1\n')
+        out.write('\n_omniplay_pause_guest\n_omniplay_pause_guest_checked_v1\n_omniplay_flush_io_checked\n_omniplay_install_writable_files_v1\n')
 
 
 def native_memory_cards(source, adapters):
@@ -40,6 +40,22 @@ def native_memory_cards(source, adapters):
     No arbitrary host stream is intercepted. BIOS/disc reads retain their
     existing readonly paths and the Windows owner withholds save/scratch writes.
     """
+    writer=source/'mc_async.c'
+    with writer.open('a',encoding='utf-8',newline='\n') as out:
+        out.write('''\n/* Owner-thread query after the actual writer join. Not a save receipt. */
+int om_ps1_card_writer_quiet(void) {
+   unsigned i;
+   if (mc_async_running || mc_async_thread || mc_async_slots_used > MC_ASYNC_SLOTS) return 0;
+   for (i=0; i<mc_async_slots_used; ++i)
+      if (retro_atomic_load_acquire_ptr(&mc_async_slots[i].pending) ||
+          retro_atomic_load_acquire_int(&mc_async_slots[i].writing)) return 0;
+   return 1;
+}
+''')
+    header=source/'mc_async.h';raw=header.read_text(encoding='utf-8')
+    anchor='void mc_async_flush_and_stop(void);'
+    if raw.count(anchor)!=1:raise ValueError('The pinned PS1 writer barrier declaration changed')
+    header.write_text(raw.replace(anchor,anchor+'\nint om_ps1_card_writer_quiet(void);'),encoding='utf-8',newline='\n')
     core=source/'libretro.c'
     raw=core.read_text(encoding='utf-8')
     include='#include "mc_async.h"'

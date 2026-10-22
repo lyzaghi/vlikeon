@@ -87,7 +87,7 @@ void GlVideo::release_core(){
 void GlVideo::destroy()noexcept{
   // Unknown core callback lifetime cannot be hidden by destroying the context
   // or later unloading the DLL. This is the contained actor process.
-  try{release_core();}catch(...){std::_Exit(1);}
+  try{release_core();}catch(...){omni_owned_actor_exit(1);}
   if(context_){if(window_&&SDL_GL_MakeCurrent(window_,context_)){if(depth_&&gl_.delete_renderbuffers)gl_.delete_renderbuffers(1,&depth_);if(framebuffer_&&gl_.delete_framebuffers)gl_.delete_framebuffers(1,&framebuffer_);if(color_&&gl_.delete_textures)gl_.delete_textures(1,&color_);}SDL_GL_DestroyContext(context_);}
   context_=nullptr;window_=nullptr;framebuffer_=color_=depth_=0;gl_={};
 }

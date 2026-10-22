@@ -93,6 +93,15 @@ def prepare(original,source,lock,exclude_assets=False,profile='software'):
     with core.open('a',encoding='utf-8') as out:
         out.write('\nextern "C" RETRO_API void omniplay_flush_io(void) { if (Memory::IsActive()) { if (gpu) gpu->FlushPendingDrawing(); __UtilityWaitForIO(); __IoWaitForAsync(); } }\n')
         out.write('extern "C" RETRO_API void omniplay_pause_guest(void) { if (Libretro::useEmuThread) Libretro::EmuThreadPause(); }\n')
+        out.write('''extern "C" RETRO_API int omniplay_pause_guest_checked_v1(void) {
+   if (Libretro::useEmuThread) {
+      Libretro::EmuThreadPause();
+      if (Libretro::emuThreadState.load() == Libretro::EmuThreadState::PAUSED) return 1;
+   }
+   return !Libretro::emuThread.joinable() &&
+      Libretro::emuThreadState.load() == Libretro::EmuThreadState::DISABLED ? 1 : 0;
+}
+''')
         if gpu:out.write('''extern "C" RETRO_API bool omniplay_finish_prepare(void) {
    const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(30);
    while (Libretro::g_pendingBoot) {
@@ -220,7 +229,7 @@ def build_prepared(args,work,output):
     text=''.join('\n===== '+path.relative_to(source).as_posix()+' =====\n'+path.read_text(encoding='utf-8',errors='replace')+'\n' for path in sorted(notices))
     if len(text.encode('utf-8'))>4*1024*1024:raise ValueError('Split full PSP attributions into bounded notice files before packaging')
     notice.write_text(text,encoding='utf-8')
-    receipt={'schema_version':1,'core':core_name,'version':version,'revision':PIN,'profile':args.profile,'video_backend':'opengl_core' if args.profile=='opengl' else 'software','prepare_completion':args.profile=='opengl','pause_barrier':True,'library':str(libraries[0].resolve()),'library_sha256':file_hash(libraries[0]),'source_policy':SOURCE_POLICY,'source_only':False,'distribution_approved':False,'prepared_source_receipt_sha256':file_hash(record_path),'committed_source_sha256':file_hash(output/'committed-source.json'),'compiled_source_sha256':source_inventory(source),'recipe_sha256':record['recipe_sha256'],'adapter_sha256':record['adapter_sha256'],'cmake_sha256':file_hash(args.cmake),'configure_command':[str(value) for value in command],'corresponding_source':str(source.resolve()),'source_lock':str((output/'ppsspp-source.lock.json').resolve()),'ffmpeg_revision':FFMPEG_PIN,'audio_output_protocol':1,'ffmpeg_receipt_sha256':hashlib.sha256(args.ffmpeg_receipt.read_bytes()).hexdigest(),'ffmpeg_build_receipt':decoder_receipt,'dependency_sources':{entry['name']:str((source/entry['path']).resolve()) for entry in lock['dependencies']},'asset_corresponding_source':atlas['corresponding_source'],'asset_build_receipt':str((output/'atlas-build-receipt.json').resolve()),'additional_notices':[str(notice.resolve())],'system_assets':assets,'firmware':[],'verification':'not_run','distribution_review_required':['pgf_font_asset_provenance','compiled_third_party_notices','complete_corresponding_source']}
+    receipt={'schema_version':1,'core':core_name,'version':version,'revision':PIN,'profile':args.profile,'video_backend':'opengl_core' if args.profile=='opengl' else 'software','prepare_completion':args.profile=='opengl','pause_barrier':True,'pause_barrier_protocol':1,'library':str(libraries[0].resolve()),'library_sha256':file_hash(libraries[0]),'source_policy':SOURCE_POLICY,'source_only':False,'distribution_approved':False,'prepared_source_receipt_sha256':file_hash(record_path),'committed_source_sha256':file_hash(output/'committed-source.json'),'compiled_source_sha256':source_inventory(source),'recipe_sha256':record['recipe_sha256'],'adapter_sha256':record['adapter_sha256'],'cmake_sha256':file_hash(args.cmake),'configure_command':[str(value) for value in command],'corresponding_source':str(source.resolve()),'source_lock':str((output/'ppsspp-source.lock.json').resolve()),'ffmpeg_revision':FFMPEG_PIN,'audio_output_protocol':1,'ffmpeg_receipt_sha256':hashlib.sha256(args.ffmpeg_receipt.read_bytes()).hexdigest(),'ffmpeg_build_receipt':decoder_receipt,'dependency_sources':{entry['name']:str((source/entry['path']).resolve()) for entry in lock['dependencies']},'asset_corresponding_source':atlas['corresponding_source'],'asset_build_receipt':str((output/'atlas-build-receipt.json').resolve()),'additional_notices':[str(notice.resolve())],'system_assets':assets,'firmware':[],'verification':'not_run','distribution_review_required':['pgf_font_asset_provenance','compiled_third_party_notices','complete_corresponding_source']}
     (output/'build-receipt.json').write_text(json.dumps(receipt,indent=2)+'\n',encoding='utf-8');print('PSP '+args.profile+' library compiled; compatibility, containment, content and license verification remain pending.')
 
 

@@ -22,14 +22,14 @@ CORES = {
               "license": "GPL-3.0-only", "notice": "LICENSE.txt", "memory_mb": 1536, "rom_bytes": 64*1024**2},
     "beetle-psx":{"id":"beetle-psx-native","revision":"df2b53b306ba52d2116f8e8cc93b9ee33d239be7",
                   "name":"Beetle PSX","library_version":"0.9.44.1+omniplay.native3","version":"0.9.44+1.omniplay.native3","systems":["ps1"],
-                  "license":"GPL-2.0-or-later","notice":"COPYING","memory_mb":1536,"rom_bytes":4*1024**3,"pause_barrier":True},
+                  "license":"GPL-2.0-or-later","notice":"COPYING","memory_mb":1536,"rom_bytes":4*1024**3,"pause_barrier":True,"pause_barrier_protocol":1},
     "melonds-ds":{"id":"melonds-ds-native","revision":"f394adbacb5722ee97c1b37c8064da9a25818310",
                   "name":"melonDS DS","library_version":"1.4.0","version":"1.4.0","systems":["nds"],
                   "license":"GPL-3.0-or-later","notice":"LICENSE","memory_mb":2048,"rom_bytes":512*1024**2},
     "ares-md":{"id":"ares-md-native","revision":"9408cb43d4948fc3ea6e152a307a34348df3fe04",
                "source_name":"ares",
                "name":"OmniPlay ares MD","library_version":"0.3.0+ares.9408cb43d494","version":"0.3.0+ares.9408cb43d494","systems":["mega_drive"],
-               "license":"ISC AND MIT","notice":"LICENSE","memory_mb":1536,"rom_bytes":64*1024**2,"pause_barrier":True},
+               "license":"ISC AND MIT","notice":"LICENSE","memory_mb":1536,"rom_bytes":64*1024**2,"pause_barrier":True,"pause_barrier_protocol":1},
     "mupen64plus-next":{"id":"mupen64plus-next-native","revision":"12edd2c74a517ff86dfa8cfc71ad75e4c10486d5",
                         "name":"Mupen64Plus-Next","library_version":"3.0.0+omniplay.sw1.12edd2c74a51","version":"3.0.0+omniplay.sw1.12edd2c74a51","systems":["n64"],
                         "license":"GPL-3.0-or-later AND LicenseRef-Angrylion-Provenance-Pending","notice":"LICENSE","memory_mb":1536,"rom_bytes":64*1024**2,"research_only":True},
@@ -38,10 +38,10 @@ CORES = {
                       "license":"GPL-2.0-only","notice":"LICENSE","memory_mb":1536,"rom_bytes":64*1024**2,"video_backend":"opengl_core","gpu_max_width":640,"gpu_max_height":480},
     "ppsspp":{"id":"ppsspp-native","revision":"a5275067b62433375bbde12921e96329a795dff0",
               "name":"PPSSPP","library_version":"1.20.4+omniplay.sw3.a5275067b624","version":"1.20.4+omniplay.sw3.a5275067b624","systems":["psp"],
-              "license":"GPL-2.0-or-later","notice":"LICENSE.TXT","memory_mb":3072,"rom_bytes":4*1024**3,"pause_barrier":True},
+              "license":"GPL-2.0-or-later","notice":"LICENSE.TXT","memory_mb":3072,"rom_bytes":4*1024**3,"pause_barrier":True,"pause_barrier_protocol":1},
     "ppsspp-gl":{"id":"ppsspp-gl-native","revision":"a5275067b62433375bbde12921e96329a795dff0","source_name":"ppsspp",
                  "name":"PPSSPP","library_version":"1.20.4+omniplay.gl3.a5275067b624","version":"1.20.4+omniplay.gl3.a5275067b624","systems":["psp"],
-                 "license":"GPL-2.0-or-later","notice":"LICENSE.TXT","memory_mb":3072,"rom_bytes":4*1024**3,"video_backend":"opengl_core","gpu_max_width":480,"gpu_max_height":272,"prepare_completion":True,"pause_barrier":True},
+                 "license":"GPL-2.0-or-later","notice":"LICENSE.TXT","memory_mb":3072,"rom_bytes":4*1024**3,"video_backend":"opengl_core","gpu_max_width":480,"gpu_max_height":272,"prepare_completion":True,"pause_barrier":True,"pause_barrier_protocol":1},
 }
 
 def require_x64_pe(path):
@@ -119,6 +119,9 @@ def main():
         raise ValueError("The native core receipt differs from the selected presentation policy")
     if any(receipt.get(field,False)!=spec.get(field,False) for field in ['prepare_completion','pause_barrier']):
         raise ValueError("The native core receipt differs from its declared lifecycle barriers")
+    pause_protocol=receipt.get('pause_barrier_protocol',0)
+    if type(pause_protocol)is not int or pause_protocol!=spec.get('pause_barrier_protocol',0):
+        raise ValueError('Native pause requires its exact checked-barrier build receipt')
     if args.core=="beetle-psx":
         if receipt.get("version")!=spec["library_version"] or receipt.get("file_io_protocol")!=1 or receipt.get("filesystem_save_memory")is not True or type(receipt.get("writable_files_protocol"))is not int or receipt['writable_files_protocol']!=1:
             raise ValueError("Native PS1 needs its exact checked card and combined-save source adaptation")
@@ -219,7 +222,7 @@ def main():
         "files": files, "minimum_system_ram_bytes":4*1024*1024 if args.core=="melonds-ds" else 64*1024 if args.core=="ares-md" else 32*1024*1024 if args.core in {"ppsspp","ppsspp-gl"} else 0,
         "reset_after_ram_load":args.core in {"mupen64plus-next","mupen64plus-gl"},
         "video_backend":spec.get("video_backend","software"),"gpu_max_width":spec.get("gpu_max_width",0),"gpu_max_height":spec.get("gpu_max_height",0),
-        "prepare_completion":spec.get("prepare_completion",False),"pause_barrier":spec.get("pause_barrier",False),
+        "prepare_completion":spec.get("prepare_completion",False),"pause_barrier":spec.get("pause_barrier",False),"pause_barrier_protocol":spec.get("pause_barrier_protocol",0),
         "core_options": ({"beetle_psx_use_mednafen_memcard0_method":"libretro","beetle_psx_enable_memcard1":"disabled","beetle_psx_cpu_dynarec":"disabled","beetle_psx_skip_bios":"disabled"} if args.core=="beetle-psx" else {"melonds_console_mode":"ds","melonds_boot_mode":"direct","melonds_sysfile_mode":"native","melonds_firmware_nds_path":"firmware.bin","melonds_touch_mode":"touch","melonds_screen_layout1":"top-bottom","melonds_number_of_screen_layouts":"1","melonds_jit_enable":"disabled","melonds_render_mode":"software","melonds_mic_input":"silence","melonds_network_mode":"disabled","melonds_homebrew_sdcard":"disabled","melonds_dsi_sdcard":"disabled","melonds_slot2_device":"auto"} if args.core=="melonds-ds" else {}),
         "content_formats": (["raw_rom","cue","m3u","chd","iso","pbp"] if args.core=="beetle-psx" else ["raw_rom"]), "firmware_requirements": receipt.get("firmware", [])}
     if brokered:
