@@ -14,7 +14,7 @@ serde_json = "=1.0.151"
 sha2 = "=0.10.9"
 thiserror = "=2.0.20"
 uuid = { version = "=1.25.0", features = ["v4", "serde"] }
-rusqlite = { version = "=0.40.2", features = ["bundled", "backup"] }
+rusqlite = { version = "=0.40.2", features = ["bundled", "backup", "fallible_uint"] }
 base64 = "=0.22.1"
 ed25519-dalek = { version = "=2.2.0", features = ["zeroize"] }
 semver = { version = "=1.0.28", features = ["serde"] }

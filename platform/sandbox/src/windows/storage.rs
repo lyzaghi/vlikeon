@@ -6,6 +6,7 @@ use std::{ffi::{OsStr,OsString,c_void},fs::{self,File,OpenOptions},os::windows::
 use windows_sys::Win32::{Foundation::{ERROR_SUCCESS,LocalFree},Security::{PSID,LABEL_SECURITY_INFORMATION,Authorization::{ConvertSidToStringSidW,ConvertStringSecurityDescriptorToSecurityDescriptorW,SetSecurityInfo,SE_FILE_OBJECT},GetSecurityDescriptorSacl},Security::Isolation::GetAppContainerFolderPath,Storage::FileSystem::{FILE_FLAG_BACKUP_SEMANTICS,FILE_FLAG_OPEN_REPARSE_POINT,FILE_READ_ATTRIBUTES},System::Com::CoTaskMemFree};
 
 const READ_CONTROL_ACCESS:u32=0x0002_0000;
+use windows_sys::Win32::System::SystemServices::SECURITY_MANDATORY_LOW_RID;
 const WRITE_OWNER_ACCESS:u32=0x0008_0000;
 const REPARSE_ATTRIBUTE:u32=0x400;
 const MAX_ENTRIES:usize=512;
@@ -131,7 +132,7 @@ pub(super) fn verify_token(token:&std::os::windows::io::OwnedHandle,expected_sid
     let label=unsafe{&*label_buffer.as_ptr().cast::<TOKEN_MANDATORY_LABEL>()};let sid=label.Label.Sid;
     if sid.is_null()||unsafe{IsValidSid(sid)}==0{return Err(unavailable());}
     let count=unsafe{*GetSidSubAuthorityCount(sid)};
-    if count!=1||unsafe{(*GetSidIdentifierAuthority(sid)).Value}!=[0,0,0,0,0,16]||unsafe{*GetSidSubAuthority(sid,0)}!=SECURITY_MANDATORY_LOW_RID{return Err(unavailable());}
+    if count!=1||unsafe{(*GetSidIdentifierAuthority(sid)).Value}!=[0,0,0,0,0,16]||unsafe{*GetSidSubAuthority(sid,0)}!=SECURITY_MANDATORY_LOW_RID as u32{return Err(unavailable());}
     let mut policy=TOKEN_MANDATORY_POLICY{Policy:0};bytes=0;
     if unsafe{GetTokenInformation(token.as_raw_handle(),TokenMandatoryPolicy,(&mut policy as*mut TOKEN_MANDATORY_POLICY).cast(),std::mem::size_of::<TOKEN_MANDATORY_POLICY>()as u32,&mut bytes)}==0||bytes as usize!=std::mem::size_of::<TOKEN_MANDATORY_POLICY>()||policy.Policy&TOKEN_MANDATORY_POLICY_NO_WRITE_UP==0{return Err(unavailable());}
     Ok(())

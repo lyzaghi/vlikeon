@@ -1,8 +1,9 @@
 //! Seal only the suspended actor's own AppContainer registry namespace.
 use super::{handle,storage,unavailable};
 use omniplay_contracts::Result;
+use windows_sys::Win32::System::SystemServices::ACCESS_ALLOWED_ACE_TYPE;
 use std::{ffi::c_void,os::windows::io::{AsRawHandle,OwnedHandle},ptr::{null,null_mut}};
-use windows_sys::Win32::{Foundation::{ERROR_FILE_NOT_FOUND,ERROR_MORE_DATA,ERROR_NO_MORE_ITEMS,ERROR_SUCCESS,LocalFree},Security::{ACCESS_ALLOWED_ACE,ACCESS_ALLOWED_ACE_TYPE,ACE_HEADER,CopySid,DACL_SECURITY_INFORMATION,GetAce,GetLengthSid,ImpersonateLoggedOnUser,INHERIT_ONLY_ACE,IsValidAcl,IsValidSid,PSID,RevertToSelf,TOKEN_DUPLICATE,TOKEN_QUERY,Authorization::{GetSecurityInfo,SE_REGISTRY_KEY},Isolation::GetAppContainerRegistryLocation},System::{Registry::*,Threading::{GetCurrentThread,OpenProcessToken,OpenThreadToken}}};
+use windows_sys::Win32::{Foundation::{ERROR_FILE_NOT_FOUND,ERROR_MORE_DATA,ERROR_NO_MORE_ITEMS,ERROR_SUCCESS,LocalFree},Security::{ACCESS_ALLOWED_ACE,ACE_HEADER,CopySid,DACL_SECURITY_INFORMATION,GetAce,GetLengthSid,ImpersonateLoggedOnUser,INHERIT_ONLY_ACE,IsValidAcl,IsValidSid,PSID,RevertToSelf,TOKEN_DUPLICATE,TOKEN_QUERY,Authorization::{GetSecurityInfo,SE_REGISTRY_KEY},Isolation::GetAppContainerRegistryLocation},System::{Registry::*,Threading::{GetCurrentThread,OpenProcessToken,OpenThreadToken}}};
 
 const READ_CONTROL_ACCESS:u32=0x0002_0000;
 const WRITE_OWNER_ACCESS:u32=0x0008_0000;

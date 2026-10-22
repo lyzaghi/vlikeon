@@ -1,5 +1,14 @@
 # Implementation status
 
+Antigravity batch 003 passed the lockfile gate and compiled dependencies, then
+reported 60 core and 3 sandbox compiler errors before any test executed. Codex
+reviewed the raw errors and authored the first corrections: rusqlite 0.40.2's
+checked `fallible_uint` feature for existing u64/usize SQL use, SystemServices
+feature/imports for the Windows ACE/mandatory-label constants, explicit RID
+type agreement, valid float literals and UTF-16 cast token spacing. These
+corrections have not yet been recompiled or accepted; the original constraints
+and --locked test requirement remain. No passing native test is claimed.
+
 Antigravity batch 002 reached Cargo on a8b5c4d but executed no tests: --locked
 rejected stale workspace dependency edges in Cargo.lock. Codex synchronized the
 workspace lockfile, adding broker libc/sandbox and native-runtime libc edges;

@@ -56,7 +56,7 @@ struct Search{process_id:u32,window:HWND,ambiguous:bool}
 unsafe extern "system" fn find_window(window:HWND,context:isize)->i32{
     if context==0{return 0;}let found=unsafe{&mut*(context as*mut Search)};let mut process=0;unsafe{GetWindowThreadProcessId(window,&mut process);}
     if process!=found.process_id||unsafe{IsWindowVisible(window)}==0||unsafe{GetAncestor(window,GA_ROOT)}!=window{return 1;}
-    let mut class=[0u16;64];let length=unsafe{GetClassNameW(window,class.as_mut_ptr(),class.len()as i32)};let expected=[b'S'as u16,b'D'as u16,b'L'as u16,b'_'as u16,b'a'as u16,b'p'as u16,b'p'as u16];
+    let mut class=[0u16;64];let length=unsafe{GetClassNameW(window,class.as_mut_ptr(),class.len()as i32)};let expected=[b'S' as u16,b'D' as u16,b'L' as u16,b'_' as u16,b'a' as u16,b'p' as u16,b'p' as u16];
     if length!=expected.len()as i32||class[..expected.len()]!=expected{return 1;}if !found.window.is_null(){found.ambiguous=true;return 0;}found.window=window;1
 }
 fn helper_environment(temporary:&Path)->Result<Vec<u16>>{
