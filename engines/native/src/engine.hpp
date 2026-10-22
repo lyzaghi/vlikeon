@@ -86,7 +86,12 @@ class Engine {
       }else{
         auto result=callback(std::forward<Args>(args)...);core_call_active_=false;return result;
       }
-    }catch(...){core_call_active_=false;core_call_failed_=true;fault_=true;throw Failure("runtime_crashed");}
+    }catch(...){
+      core_call_active_=false;core_call_failed_=true;fault_=true;
+      // Snapshot/load callbacks may still borrow caller-owned stack buffers.
+      // Do not unwind those host frames before the actor actually terminates.
+      omni_owned_actor_exit(1);
+    }
   }
   void prepare(const Json& params);void pause();void resume();void reset_audio();void read_av();
   bool restart_content();

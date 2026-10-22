@@ -48,9 +48,9 @@ live readiness claims.
 [`IMPLEMENTATION_STATUS.md`](IMPLEMENTATION_STATUS.md) records source authoring.
 References to `out/` describe local ignored snapshots, not release downloads.
 Materialization and hashing do not execute or qualify the product. The local
-`out/presentation/item2-v40-checked-guest-pause-source` snapshot records checked
-guest-pause/retirement and Windows actor termination source, following the
-v38 audio sink-commit/device-control/presentation admission work. It is a
+`out/presentation/item2-v41-control-boundary-source` snapshot records native
+control framing, terminal-channel admission and immediate exception termination,
+following the v40 checked pause and v38 audio delivery work. It is a
 source-only copy, not a compiled or executed product.
 
 [`COMPLETION_SEQUENCE.md`](COMPLETION_SEQUENCE.md) records current source work

@@ -15,7 +15,8 @@ and DLL compiler/SDK/CRT and retain all source/artifact/configuration hashes.
    with `--worker <exact-worker.exe> --core <normal-fixture.dll> --void-core
    <void-fixture.dll> --output <fresh-absolute-output-directory>`. It owns and
    reaps only the subprocesses it creates and retains an `evidence.json` report.
-3. Require all eleven cases: normal, init-throw, load-throw, run-throw,
+3. Require all thirteen cases: normal, init-throw, load-throw, run-throw,
+   serialize-throw, unserialize-throw,
    pause-refuse, pause-throw, pause-invalid,
    unload-throw, deinit-throw, void-only and protocol-zero. The normal case must
    observe actual core progress, exactly one preparation and one running pause,
@@ -25,6 +26,9 @@ and DLL compiler/SDK/CRT and retain all source/artifact/configuration hashes.
    Numeric protocol zero is rejected before core preparation, after which
    ordinary unprepared stop exits 0. Dummy SDL driver unavailability is a setup
    failure, never a passing lifecycle result.
+   Unknown init/load/snapshot exceptions must reach EOF without a host error
+   reply; termination happens before the host load/save buffers unwind. Test
+   a refused termination with live borrowed buffers separately in case 26.
 4. Inject GL make-current failure before pause entry on actual hardware routes.
    Retry while the DLL lives. Resume, AV updates and save/load must not reset
    audio or mutate saves before a successful barrier. Inject nested pause,
@@ -46,6 +50,14 @@ and DLL compiler/SDK/CRT and retain all source/artifact/configuration hashes.
    signed package hashes and new configuration identity; preserve old save
    history without inventing a cross-version restore exception. Legacy package
    rejection requires a real rebuilt package, not metadata relabelling.
+8. Run `wire_cases.py --worker <exact-worker.exe> --core <normal-fixture.dll>
+   --output <fresh-absolute-directory>` against that same qualification worker.
+   Require all 19 retained cases. Most malformed headers deliberately omit the
+   binary-length prefix while keeping stdin open: waiting for more input is a
+   failure, as is emitting any reply to the rejected frame. Boundary EOF alone
+   exits 0 after checked teardown; partial/malformed frames exit 1. Execute the
+   Rust production channel cases too, and retain real broker/process/pipe,
+   blocked I/O, cancellation and memory evidence from Windows case 26.
 
 No standalone fixture result establishes AppContainer/job behavior, real driver
 safety, all source resources, final-save durability or complete item 2.

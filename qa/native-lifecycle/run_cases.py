@@ -50,10 +50,10 @@ class Worker:
             try:self.replies.put(error,timeout=1)
             except queue.Full:pass
 
-    def call(self,method,params=None):
+    def call(self,method,params=None,payload=b''):
         self.sequence+=1
         header=json.dumps({'protocol':1,'id':self.sequence,'method':method,'params':params or {}},separators=(',',':')).encode()
-        self.process.stdin.write(struct.pack('<I',len(header))+header+struct.pack('<I',0));self.process.stdin.flush()
+        self.process.stdin.write(struct.pack('<I',len(header))+header+struct.pack('<I',len(payload))+payload);self.process.stdin.flush()
         result=self.replies.get(timeout=5)
         if isinstance(result,BaseException):raise result
         reply,payload=result
@@ -103,16 +103,23 @@ def main():
     output.mkdir(parents=True)
     report={'verification':'running','artifacts':[{'path':str(path),'sha256':digest(path)} for path in artifacts],'cases':[],'scope':'actual direct Windows worker and qualification DLL with SDL dummy drivers; no broker/AppContainer/real-core/device proof'}
     try:
-        for scenario in ('normal','init-throw','load-throw','run-throw','pause-refuse','pause-throw','pause-invalid','unload-throw','deinit-throw','void-only','protocol-zero'):
+        for scenario in ('normal','init-throw','load-throw','run-throw','serialize-throw','unserialize-throw','pause-refuse','pause-throw','pause-invalid','unload-throw','deinit-throw','void-only','protocol-zero'):
             worker=Worker(artifacts[0],artifacts[2] if scenario=='void-only' else artifacts[1],output/scenario)
             row={'scenario':scenario,'passed':False};report['cases'].append(row)
             try:
-                reply,_=worker.prepare(scenario,0 if scenario=='protocol-zero' else 1)
+                reply=None
+                try:reply,_=worker.prepare(scenario,0 if scenario=='protocol-zero' else 1)
+                except EOFError:
+                    if scenario not in ('init-throw','load-throw'):raise
+                    row['prepare_eof']=True
                 if scenario=='protocol-zero':
                     if reply.get('status')!='error' or reply.get('error_code')!='unsupported_capability':raise AssertionError('undeclared protocol admitted')
                     worker.okay('stop');expected=0
-                elif scenario in ('void-only','init-throw','load-throw'):
-                    if reply.get('status')!='error':raise AssertionError('unknown initialization or legacy export admitted')
+                elif scenario in ('init-throw','load-throw'):
+                    if reply is not None:raise AssertionError('unknown core exception unwound to a reply')
+                    expected=1
+                elif scenario=='void-only':
+                    if reply.get('status')!='error':raise AssertionError('legacy export admitted')
                     expected=1
                 elif scenario=='run-throw':
                     if reply.get('status')!='ok':raise AssertionError('fixture prepare failed')
@@ -120,7 +127,14 @@ def main():
                 else:
                     if reply.get('status')!='ok':raise AssertionError('fixture prepare failed')
                     worker.run_frame()
-                    if scenario=='normal':
+                    if scenario in ('serialize-throw','unserialize-throw'):
+                        try:
+                            if scenario=='serialize-throw':worker.call('save',{'kind':'emulator_state'})
+                            else:worker.call('load',{'kind':'emulator_state'},b'OPNS0001'+struct.pack('<III',0xffffffff,0,16)+bytes(16))
+                        except EOFError:pass
+                        else:raise AssertionError('unknown snapshot exception unwound into a reply')
+                        expected=1
+                    elif scenario=='normal':
                         worker.okay('pause');_,memory=worker.okay('save',{'kind':'in_game'})
                         if len(memory)!=32 or memory[:8]!=b'OPRM0001':raise AssertionError('wrong fixture memory envelope')
                         pauses,unloads,deinits,runs=struct.unpack('<IIII',memory[16:])

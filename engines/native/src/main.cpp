@@ -46,9 +46,12 @@ int main(int argc,char** argv){
           try{engine.process(packet);}
           catch(const omni::Failure& error){omni::reply_error(packet.header.at("id").get<std::uint64_t>(),error.code);if(std::strcmp(error.code,"runtime_crashed")==0){exit_code=1;break;}}
           catch(...){omni::reply_error(packet.header.at("id").get<std::uint64_t>(),"runtime_crashed");exit_code=1;break;}
+          packet=omni::Packet{}; // Release the old load buffer before admitting another.
+          if(!engine.quitting())inbox.complete();
         }
         if(engine.quitting())break;engine.tick();SDL_Delay(1);
       }
+      if(inbox.failed())exit_code=1;
       engine.shutdown();std::fflush(stdout);omni_owned_actor_exit(exit_code);
     }catch(...){try{engine.shutdown();}catch(...){}omni_owned_actor_exit(1);}
   }catch(...){omni_owned_actor_exit(1);}

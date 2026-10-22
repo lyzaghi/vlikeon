@@ -46,6 +46,9 @@ load, run, snapshot, file-table operations or other core calls latches unknown
 ownership, prevents further core calls and stops DLL/static/callback-context
 destruction. GL release retains its own pre-entry retry and post-entry failure
 rules. Shutdown no longer swallows a failed guest pause and continues teardown.
+The exception catch terminates the owned actor immediately; it does not unwind
+host load/snapshot buffers into a later shutdown first. See
+`NATIVE_CONTROL_BOUNDARY.md` for the corresponding EOF and borrow requirements.
 Fatal command errors produce a nonzero actor exit, and an already-faulted actor
 cannot report successful stop merely because teardown returned.
 Public content operations require Ready, so a partially prepared loaded core
@@ -75,7 +78,7 @@ real core/driver/SDK combination remain part of the complete qualification.
 ## Required evidence
 
 `qa/native-lifecycle` authors an actual qualification DLL and worker harness,
-with a live producer, initialization/load/run exceptions, refused/invalid/
+with a live producer, initialization/load/run/snapshot exceptions, refused/invalid/
 throwing pause, unload/deinit exceptions,
 legacy void-only export and protocol mismatch. DLL destructor and detach
 witnesses fail if unknown ownership reaches them. No fixture, OS termination,

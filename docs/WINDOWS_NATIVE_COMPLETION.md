@@ -6,6 +6,18 @@ deletion, filesystem cleanup or test has been executed during this work.
 
 ## Source changes in this pass
 
+Native control now validates the bounded/depth-limited/duplicate-free header,
+closed method and consecutive identity before reading a payload length. The
+reader admits one outstanding command until main releases its input buffer.
+Malformed/truncated framing exits nonzero; boundary EOF performs checked
+teardown without a save/stop receipt. The broker bounds request serialization,
+checks closed success/error envelopes before binary allocation and invalidates
+channels on timeout/cancel/terminal faults. Unknown core exceptions now terminate
+inside the guard before host load/snapshot buffers unwind. Rust codec/admission,
+13 lifecycle and 19 actual-worker wire cases are authored, not run. See
+`NATIVE_CONTROL_BOUNDARY.md` and Windows case 26. Full broker/process/resource/
+core/save qualification and all original item-2 requirements remain open.
+
 Guest pause now requires a declared numeric protocol and checked core export;
 void return alone no longer publishes quiescence. MD/PS1/PSP and the unadmitted
 N64 candidate author their actual owner/writer/thread receipts. Initial prepare,

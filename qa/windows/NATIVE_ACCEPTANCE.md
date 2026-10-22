@@ -193,6 +193,24 @@ the required OS/process/filesystem evidence.
     process/job retirement. Dummy-driver fixtures do not prove real core,
     AppContainer, device, final-save or physical-accounting behavior.
 
+26. Execute the production Rust `channel_tests` and the 19 actual-worker cases
+    in `qa/native-lifecycle/wire_cases.py`, then the real broker/core/helper pair.
+    Reject malformed/duplicate/deep/unknown/replayed headers before binary
+    admission; error replies need empty payload framing before a recoverable
+    code is accepted. Exercise wrong identities/status/result/error types,
+    maximum/zero/truncated bodies and allocation/I/O failure at each boundary.
+    Block the current command while pipelining another maximum load: retained
+    live input buffers must not include a second speculative save body. Measure
+    actual private/working-set/commit memory and preserve prior committed saves.
+    Cancel/timeout at queue, partial write/read and late-reply boundaries; no
+    future command may enter an invalidated channel, even when process
+    termination is refused. Observe actual reader/writer threads and owned
+    process/job retirement. Throw inside serialize/unserialize with borrowed
+    host buffers and refuse self-termination: those host frames must remain
+    parked until the actor dies, without an error/success reply from unwinding.
+    Unit cursors/process counters do not establish real pipes, no-op outcomes,
+    thread termination, hardware playback or physical resource bounds.
+
 Record target OS/build, toolchain/SDK, source/artifact hashes, exact failure
 injection point, observed process/job/profile state, disk/ledger/proof state,
 expected outcome and evidence location for every case. No item-2 completion is

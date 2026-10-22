@@ -217,7 +217,7 @@ void Engine::pause_core(){
   if(hardware_video_)gl_video_.make_current(); // Retryable before callback entry.
   guest_pause_active_=true;int result=0;
   try{result=api_.pause_guest();}
-  catch(...){guest_pause_active_=false;guest_pause_failed_=true;fault_=true;throw Failure("runtime_crashed");}
+  catch(...){guest_pause_active_=false;guest_pause_failed_=true;fault_=true;omni_owned_actor_exit(1);}
   guest_pause_active_=false;
   if(result!=1){guest_pause_failed_=true;fault_=true;throw Failure("runtime_crashed");}
   core_paused_=true;

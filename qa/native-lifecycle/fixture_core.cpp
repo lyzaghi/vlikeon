@@ -58,8 +58,8 @@ RETRO_API void retro_unload_game(){forbid_unknown();if(++unloads!=1)std::_Exit(8
 RETRO_API void retro_run(){forbid_unknown();if(!loaded)std::_Exit(86);ran=true;++runs;start_producer();if(mode("run-throw")){unknown=true;throw 76;}}
 RETRO_API void retro_reset(){}
 RETRO_API std::size_t retro_serialize_size(){return memory.size();}
-RETRO_API bool retro_serialize(void* data,std::size_t size){if(!data||size!=memory.size())return false;publish_memory();std::memcpy(data,memory.data(),size);return true;}
-RETRO_API bool retro_unserialize(const void*,std::size_t){return false;}
+RETRO_API bool retro_serialize(void* data,std::size_t size){if(!data||size!=memory.size())return false;if(mode("serialize-throw")){unknown=true;throw 77;}publish_memory();std::memcpy(data,memory.data(),size);return true;}
+RETRO_API bool retro_unserialize(const void*,std::size_t){if(mode("unserialize-throw")){unknown=true;throw 78;}return false;}
 RETRO_API void* retro_get_memory_data(unsigned id){publish_memory();return id==RETRO_MEMORY_SAVE_RAM?memory.data():nullptr;}
 RETRO_API std::size_t retro_get_memory_size(unsigned id){return id==RETRO_MEMORY_SAVE_RAM?memory.size():0;}
 RETRO_API void omniplay_pause_guest(){(void)checked_pause();}

@@ -7,6 +7,16 @@ authoring estimate and is retained only as historical metadata, not a live
 progress or release-readiness claim. Numbered source work and actual final
 verification evidence are tracked in `COMPLETION_SEQUENCE.md`.
 
+Native control framing source now validates headers before binary allocation,
+rejects duplicate/deep/unknown/replayed requests, retains one outstanding input
+buffer and distinguishes malformed termination from boundary EOF. Broker request
+serialization is bounded, replies use closed status-specific envelopes and
+timeout/cancel/terminal failure closes future channel admission. Core exceptions
+terminate inside the invocation guard before host snapshot/load frames unwind.
+Production Rust codec/admission and actual-worker lifecycle/wire sources are
+authored, not executed. See `NATIVE_CONTROL_BOUNDARY.md` and Windows case 26;
+item 2 and the complete product scope remain open.
+
 The next item-2 source pass introduces checked guest-pause protocol 1, exact
 builder/catalog/worker agreement and configuration identity. MD/PS1/PSP plus
 the unadmitted N64 candidate now author explicit owner/writer/thread receipts.
