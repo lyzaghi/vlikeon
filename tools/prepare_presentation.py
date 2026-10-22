@@ -63,7 +63,7 @@ def main():
         if mode not in {'100644','100755'}or stage!='0'or path.is_absolute()or any(part in {'','..','.'}for part in path.parts):raise ValueError('Selected SDL input must be an ordinary tracked source file')
         inputs.append((ordinary(sdl/relative,sdl,True),PurePosixPath('SDL')/path,{'git_blob':blob,'git_mode':mode}))
     if not any(target.as_posix()=='SDL/CMakeLists.txt'for _,target,_ in inputs)or not any(target.as_posix()=='SDL/LICENSE.txt'for _,target,_ in inputs):raise ValueError('The selected SDL source is incomplete')
-    inputs.extend(dependency_inputs(ROOT/'third_party/sources/nlohmann-json',['CMakeLists.txt','cmake','include','single_include','LICENSE.MIT'],'json',JSON_REVISION))
+    inputs.extend(dependency_inputs(ROOT/'third_party/sources/nlohmann-json',['CMakeLists.txt','cmake','include','single_include','LICENSE.MIT','nlohmann_json.natvis'],'json',JSON_REVISION))
     inputs.extend(dependency_inputs(ROOT/'third_party/sources/sameboy',['libretro/libretro.h','LICENSE'],'interface',SAMEBOY_REVISION))
     for name in ['CMakeLists.txt','host.manifest','macos-presentation.entitlements','src/wire.hpp','src/wire.cpp','src/client.hpp','src/client.cpp','src/owner.hpp','src/owner.cpp','src/main.cpp']:inputs.append((ordinary(ROOT/'engines/presentation'/name,ROOT/'engines/presentation',True),PurePosixPath('presentation')/name,{}))
     native=ROOT/'engines/native'

@@ -1,5 +1,12 @@
 # Implementation status
 
+Native worker build batch 011 reached MSVC/compiler configuration but CMake
+generation failed because the source materializer omitted the pinned JSON
+library's Visual Studio natvis input. Codex added that tracked source selection;
+upstream requirements and tests remain intact. A portable project-local CMake
+3.31.6 prerequisite is prepared with published SHA-256 and per-file inventory;
+see `WINDOWS_CMAKE_TOOLCHAIN.md`. No worker/fixture/runtime pass is claimed.
+
 Antigravity batch 010 on 99bf44a passed broker cargo check --locked after the
 scratch-grant/state-identity change. Codex reviewed actual compiler completion
 and unchanged source hashes. Evidence is under `qa/evidence/antigravity/batch-010/`.
