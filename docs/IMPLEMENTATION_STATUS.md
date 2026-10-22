@@ -1,5 +1,29 @@
 # Implementation status
 
+Antigravity batch 028 on 942cda6 passed both actual AppContainer storage cases
+with actor exit zero and unchanged source hashes. All seven observations passed
+in each case: default file/directory/DACL/label mutation denied, private registry
+key/value mutation denied, and the explicitly named scratch grant respected.
+The writable case provides a real create/write/flush/delete positive control;
+the readonly case requires denial. This is the first accepted OS storage result,
+not full Windows worker/core/helper/device qualification.
+
+The actual batch024 actor could RegSetValue despite a medium label. A package
+SID DENY ACE (batch025) and extra suspended bootstrap (batch026) did not resolve
+it. Both approaches were replaced: only package/package-group ALLOW grants in
+the exact fresh bounded registry tree now lose mutation bits; its DACL is
+protected against broader inherited package grants. Broker/user and actor-read
+permissions remain. The extra bootstrap was removed. No weaker isolation retry
+was introduced. Actual batch022 also localized USER32 initialization failure;
+the current SDL-linked worker still needs its contained loader/presentation
+dependency closure. A passing standalone storage probe does not resolve that.
+
+AppContainer construction redirected TEMP/TMP to default AC storage, distinct
+from the granted scratch. Host and worker now preserve an explicit private
+scratch identity. Batch027 built the Win32-restoration worker successfully.
+CRT restoration and dedicated ASCII/Unicode/relative-path worker/core cases
+are now authored and need their own exact build/runtime evidence.
+
 Antigravity batch 012 completed all four CMake/MSVC steps on the frozen v47
 materialization: Windows native worker and both lifecycle fixture DLLs built
 successfully, with source hashes unchanged. This resolves the missing natvis

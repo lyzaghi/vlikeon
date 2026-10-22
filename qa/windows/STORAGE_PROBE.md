@@ -29,12 +29,15 @@ the fixture receives no alternative privilege or launch bypass.
 Expected stdout is exactly `storage-probe-v2 1 1 1 1 1 1 1`. The seven real operations
 are default `AC` file-write denial, package-root subdirectory-create denial,
 package-root `WRITE_DAC` handle denial, attempted label-lowering denial,
-private registry subkey-creation denial, KEY_SET_VALUE acquisition denial and
+private registry subkey-creation denial, actual RegSetValueEx write denial and
 successful private scratch create/write/flush/delete. Registry readonly lookup
 must succeed before either registry result can pass. RegCreateKeyEx uses the
 key's descriptor check even though its parent handle is readonly; this is an
 actual mutation attempt rather than a missing handle-rights assertion.
-Missing paths, unsupported
+The exact host scratch identity is carried in OMNIPLAY_PRIVATE_SCRATCH: Windows
+may rewrite TEMP/TMP during AppContainer construction. Known access denial and
+privilege denial are accepted for attempted creation; positive writable scratch
+is required in the writable case. Missing paths, unsupported
 APIs, arbitrary I/O errors or an unexecuted fixture are not successful denial
 evidence. A label-lowering failure is tested before any scratch success claim.
 Only the test's new OS profile is affected if the negative operation unexpectedly
@@ -52,7 +55,7 @@ fresh executable with `/DOMNIPLAY_EXPECT_SCRATCH_DENIED`, set
 `windows::storage_tests::actual_actor_without_scratch_grant_cannot_write_private_scratch`
 with `--ignored --exact --nocapture`. Expected stdout is exactly
 `storage-probe-readonly-v1 1 1 1 1 1 1 1`. The scratch directory must exist and be
-readable, and its actual file-creation attempt must return ERROR_ACCESS_DENIED.
+readable, and its actual file-creation attempt must return access/privilege denial.
 No writable scratch grant is installed by this case. It tests the sandbox grant
 boundary; product package selection and legacy core compatibility remain case 28.
 

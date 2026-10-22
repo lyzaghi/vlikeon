@@ -23,7 +23,10 @@ static bool restore_private_temporary_directory(){
   if(length>=path.size()||!std::filesystem::path(path.data()).is_absolute())return false;
   // AppContainer construction can rewrite TEMP/TMP. Restore only the explicit
   // host-selected directory; its existing ACL/label controls write authority.
-  return SetEnvironmentVariableW(L"TEMP",path.data())&&SetEnvironmentVariableW(L"TMP",path.data());
+  // Keep the CRT environment coherent for cores using getenv/_wgetenv too.
+  // This happens before our worker/core threads start.
+  return _wputenv_s(L"TEMP",path.data())==0&&_wputenv_s(L"TMP",path.data())==0&&
+    SetEnvironmentVariableW(L"TEMP",path.data())&&SetEnvironmentVariableW(L"TMP",path.data());
 }
 #endif
 

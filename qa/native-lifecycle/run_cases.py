@@ -22,13 +22,14 @@ def exact(stream,size):
     return bytes(value)
 
 class Worker:
-    def __init__(self,worker,core,directory):
+    def __init__(self,worker,core,directory,environment_overrides=None):
         directory.mkdir()
         shutil.copy2(worker,directory/'omniplay-native-worker.exe')
         shutil.copy2(core,directory/CORE_NAME)
         (directory/'game.bin').write_bytes(b'LIFECYCLE'+bytes(55))
         environment=os.environ.copy()
         environment.update(SDL_VIDEODRIVER='dummy',SDL_AUDIODRIVER='dummy')
+        if environment_overrides:environment.update(environment_overrides)
         self.process=subprocess.Popen([str(directory/'omniplay-native-worker.exe'),'--stdio-runtime-v1'],cwd=directory,env=environment,stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=subprocess.DEVNULL)
         self.replies=queue.Queue(maxsize=8);self.sequence=0;self.history=[]
         self.reader=threading.Thread(target=self.read,daemon=True)

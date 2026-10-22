@@ -7,6 +7,8 @@
 #include <cstdlib>
 #include <cstring>
 #include <thread>
+#include <vector>
+#include <cwchar>
 #ifdef _WIN32
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
@@ -21,6 +23,24 @@ unsigned pauses=0,unloads=0,deinits=0,runs=0;
 std::array<unsigned char,16> memory{};
 char scenario[32]="normal";
 bool mode(const char* value){return std::strcmp(scenario,value)==0;}
+bool private_temporary_environment_matches(){
+#ifdef _WIN32
+  if(!std::getenv("OMNIPLAY_EXPECT_PRIVATE_TEMP"))return true;
+  std::vector<wchar_t> expected(32768),temporary(32768);
+  const auto size=static_cast<DWORD>(expected.size());
+  const auto count=GetEnvironmentVariableW(L"OMNIPLAY_PRIVATE_SCRATCH",expected.data(),size);
+  if(!count||count>=size)return false;
+  for(const auto* name:{L"TEMP",L"TMP"}){
+    const auto length=GetEnvironmentVariableW(name,temporary.data(),size);
+    const auto* runtime=_wgetenv(name);
+    if(!length||length>=size||!runtime||std::wcscmp(temporary.data(),expected.data())||std::wcscmp(runtime,expected.data()))return false;
+  }
+  const auto* narrow=std::getenv("OMNIPLAY_PRIVATE_SCRATCH");
+  const auto* temp=std::getenv("TEMP");const auto* tmp=std::getenv("TMP");
+  if(!narrow||!temp||!tmp||std::strcmp(narrow,temp)||std::strcmp(narrow,tmp))return false;
+#endif
+  return true;
+}
 void forbid_unknown(){if(unknown)std::_Exit(86);}
 struct Witness{~Witness(){if(unknown||producer.joinable()||initialized||loaded)std::_Exit(86);}} witness;
 void join_producer(){stop_producer.store(true);if(producer.joinable())producer.join();producer_owned=false;}
@@ -50,7 +70,7 @@ RETRO_API void retro_set_input_state(retro_input_state_t){}
 RETRO_API unsigned retro_api_version(){return RETRO_API_VERSION;}
 RETRO_API void retro_init(){initialized=true;retro_variable option{"fixture_scenario",nullptr};if(environment&&environment(RETRO_ENVIRONMENT_GET_VARIABLE,&option)&&option.value){if(std::strlen(option.value)>=sizeof(scenario))std::_Exit(86);std::strcpy(scenario,option.value);}if(mode("init-throw")){unknown=true;throw 74;}}
 RETRO_API void retro_deinit(){forbid_unknown();if(++deinits!=1)std::_Exit(86);if(mode("deinit-throw")){unknown=true;throw 72;}join_producer();initialized=false;}
-RETRO_API void retro_get_system_info(retro_system_info* info){*info={};info->library_name="OmniPlay lifecycle qualification";info->library_version="1.0.0";info->valid_extensions="bin";}
+RETRO_API void retro_get_system_info(retro_system_info* info){*info={};info->library_name="OmniPlay lifecycle qualification";info->library_version=private_temporary_environment_matches()?"1.0.0":"private-temp-mismatch";info->valid_extensions="bin";}
 RETRO_API void retro_get_system_av_info(retro_system_av_info* info){*info={};info->geometry.base_width=16;info->geometry.base_height=16;info->geometry.max_width=16;info->geometry.max_height=16;info->timing.fps=60;info->timing.sample_rate=48000;}
 RETRO_API void retro_set_controller_port_device(unsigned,unsigned){}
 RETRO_API bool retro_load_game(const retro_game_info* game){loaded=game&&game->data&&game->size==64;if(mode("load-throw")){start_producer();unknown=true;throw 75;}return loaded;}
