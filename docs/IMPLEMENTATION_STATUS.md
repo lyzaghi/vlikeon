@@ -1,5 +1,11 @@
 # Implementation status
 
+Broker compile retry batch 006 on 11bf318 passed the previous Windows input
+syntax gate and failed in sync-client's canonical credential encoding binding.
+Codex split the invalid comma-separated let declaration into two declarations,
+preserving Zeroizing and all canonical/length checks. No credential data was
+read or exported; this was compiler output. Broker acceptance is still pending.
+
 Antigravity batch 004 on edebf6d compiled native-runtime and executed all eight
 control-worker/thread/TLS and eight channel unit cases: 16 passed, zero failed
 or ignored. Batch 005 executed 11 disposable Windows work/ledger cases and the

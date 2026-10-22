@@ -57,7 +57,8 @@ pub fn load(provider:&dyn CredentialStore,profile:Uuid,account:&str)->Result<(De
     if secrets.schema_version!=1||secrets.device_seed.len()!=43||secrets.data_key.len()!=43{return Err(vault_error("Unknown credential version or seed shape"));}
     let device_seed=Zeroizing::new(URL_SAFE_NO_PAD.decode(&secrets.device_seed).map_err(vault_error)?);
     let data_key=Zeroizing::new(URL_SAFE_NO_PAD.decode(&secrets.data_key).map_err(vault_error)?);
-    let canonical_seed=Zeroizing::new(URL_SAFE_NO_PAD.encode(device_seed.as_slice())),canonical_key=Zeroizing::new(URL_SAFE_NO_PAD.encode(data_key.as_slice()));
+    let canonical_seed=Zeroizing::new(URL_SAFE_NO_PAD.encode(device_seed.as_slice()));
+    let canonical_key=Zeroizing::new(URL_SAFE_NO_PAD.encode(data_key.as_slice()));
     if canonical_seed.as_str()!=secrets.device_seed.as_str()||canonical_key.as_str()!=secrets.data_key.as_str(){return Err(vault_error("Credential encoding is not canonical"));}
     let device=DeviceIdentity::from_seed(secrets.device_id,device_seed.as_slice().try_into().map_err(vault_error)?)?;
     let cipher=SaveCipher::from_secret(account.into(),data_key.as_slice().try_into().map_err(vault_error)?)?;
