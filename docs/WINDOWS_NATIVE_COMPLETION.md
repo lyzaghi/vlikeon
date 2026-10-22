@@ -1,8 +1,12 @@
 # Item 2: Windows native runtime completion
 
-The Windows native implementation is still source only. It is not marked
-complete and no compiler, process, AppContainer, Job Object, pipe, ACL, profile
-deletion, filesystem cleanup or test has been executed during this work.
+The Windows native implementation is not complete. Antigravity has executed
+16 Rust control-worker/channel unit cases plus 11 disposable work/ledger and
+one migration case on edebf6d; all 28 passed. Codex reviewed the raw evidence
+under `qa/evidence/antigravity/batch-004/` and `batch-005/`. The broker compile
+check passed on 601f8dd in batch 007. These scoped results supersede earlier
+authoring-only notes; they do not qualify actual actor/helper/core pipes,
+AppContainer/job/profile retirement, ACL sealing or device/product behavior.
 
 ## Source changes in this pass
 

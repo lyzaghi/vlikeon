@@ -1,9 +1,11 @@
 # Owned native control worker retirement
 
-Source authored only. No worker pool, OS thread probe, compiler, SDK, native
-process, I/O thread, unit test or acceptance case has executed during this work.
-This addresses a Windows item-2 resource/lifetime component; the whole Windows
-and original product qualification requirements remain open.
+Originally source authored only. Subsequently Antigravity batch 004 on edebf6d
+compiled and executed all eight pool/thread/TLS unit cases successfully, with
+Codex review of raw results. See `qa/evidence/antigravity/batch-004/`. This is
+scoped Windows thread/pool evidence, not real actor pipes, process/job retirement
+or whole resource/device qualification. The whole Windows and original product
+qualification requirements remain open.
 
 ## Capacity before launch
 
@@ -91,6 +93,7 @@ capacity, close while a real thread is gated, panic retirement, isolated test
 pools, single-slot retirement, actual singleton recovery-owner replacement,
 unexpected record loss and Windows TLS cleanup held after body return. The production entry point
 always uses the single global pool; private test instances are not a product
-configuration interface. No case has run. Execute the test filters and real
+configuration interface. All eight passed in batch 004; the real I/O/process
+cases remain pending. Execute the applicable test filters and real
 I/O/process cases in qa/native-lifecycle/CONTROL_WORKERS.md and Windows case 27
 only in item 16, with exact artifacts and retained OS observations.

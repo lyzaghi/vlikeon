@@ -65,6 +65,13 @@ Node unit tests with zero failures/skips. Codex reviewed the raw logs, exit code
 and source hashes; retained evidence is in `qa/evidence/antigravity/batch-001/`.
 These results do not qualify live Chromium, native Windows or the full product.
 
+Subsequent Antigravity batches on edebf6d passed 28 Rust cases covering control
+workers, in-memory IPC/channel behavior, disposable Windows work/ledger recovery
+and migration. The Windows broker compile check also passed on 601f8dd. Codex
+reviewed raw logs; evidence is retained under `qa/evidence/antigravity/`.
+Compilation and these fixtures do not establish real actor/helper/core/device
+or full application behavior. Item 2 remains open.
+
 [`COMPLETION_SEQUENCE.md`](COMPLETION_SEQUENCE.md) records current source work
 and the remaining verification requirements for every numbered item.
 

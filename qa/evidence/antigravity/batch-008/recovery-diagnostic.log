@@ -1,0 +1,6 @@
+
+running 1 test
+test native_work_jobs::tests::recovery_diagnostic_redacts_capabilities_and_free_text_and_refuses_a_busy_snapshot ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

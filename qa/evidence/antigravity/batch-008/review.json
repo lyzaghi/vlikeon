@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "batch_id": "vlikeon-008",
+  "executor": "antigravity",
+  "reviewer": "codex",
+  "source_commit": "351639de16aa656f06ffb0243cba7f376c86a43e",
+  "exit_code": 0,
+  "tests": 1,
+  "passed": 1,
+  "failed": 0,
+  "ignored": 0,
+  "source_unchanged": true,
+  "compiler_warnings_present": true,
+  "log": "recovery-diagnostic.log",
+  "accepted_scope": "Production recovery diagnostic projection redaction and busy-snapshot refusal",
+  "not_established": [
+    "Actual file export",
+    "Game Hub UI",
+    "Native actor/helper/core lifetime",
+    "Complete item 2 or product readiness"
+  ]
+}

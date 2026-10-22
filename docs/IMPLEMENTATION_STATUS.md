@@ -1,5 +1,13 @@
 # Implementation status
 
+Antigravity batch 008 compiled/linked the broker test harness and executed the
+new recovery diagnostic projection case on 351639d: one passed, zero failed or
+ignored, source unchanged. Codex inspected the actual assertion output; evidence
+is under `qa/evidence/antigravity/batch-008/`. This establishes the tested
+redaction/busy-snapshot behavior, not live UI or granted-file export. Across
+distinct assigned batches there are now 29 passing Rust cases and 13 Node
+cases, plus the broker compile check. No whole item is marked complete.
+
 Antigravity batch 007 completed cargo check --locked for the Windows broker on
 601f8dd with exit 0; Codex inspected the actual compiler output and unchanged
 source record. Warnings remain. This is a compile check, not a linked release
