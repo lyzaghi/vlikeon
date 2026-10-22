@@ -1,8 +1,25 @@
-# Public status — 2026-10-22
+# Public status — 2026-10-23
 
 Vlikeon Browser is the new public identity for the source project called
 OmniPlay internally. Its positioning is a gaming superbrowser by Vlike.
 Internal names and wire formats have not been migrated.
+
+## GitHub publication
+
+The source repository is public at
+[lyzaghi/vlikeon](https://github.com/lyzaghi/vlikeon). English/Vietnamese project
+overviews, the roadmap, contribution and security guidance, licensing boundaries
+and transparent Open View neon assets are included. The profile README is
+published at [lyzaghi/lyzaghi](https://github.com/lyzaghi/lyzaghi).
+
+Private vulnerability reporting is enabled for the project. Commits use the
+account's GitHub noreply address. Generated build directories, large upstream
+checkouts and local data are excluded from Git. The source publication was
+reviewed for secrets across reachable history before the first push.
+
+Logo-asset checks cover PNG alpha/sRGB and ICO/ICNS decoding. Product build,
+runtime, device, compatibility, security and release qualification remain pending.
+No OSS grant application has been submitted or accepted.
 
 ## What exists
 
@@ -10,7 +27,7 @@ Authored browser integration, product surfaces, Rust platform/services, native
 and web engine adapters, recipes, packaging source and acceptance cases.
 Original source licensing is Apache-2.0 with upstream/per-file exceptions.
 
-Product development is paused for GitHub preparation. The source sequence
+Product development remains paused at the owner's request. The source sequence
 stopped during item 2, Windows runtime lifecycle and containment. Item 1 has
 authored integration but remains unverified. Other source areas require
 completion review; source presence does not close the roadmap.
