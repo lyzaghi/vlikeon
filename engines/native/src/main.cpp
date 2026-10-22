@@ -40,14 +40,19 @@ int main(int argc,char** argv){
 #endif
   std::optional<omni::presentation::Admission> admission;
   try{if(argc<2||std::strcmp(argv[1],"--stdio-runtime-v1")!=0)return 2;if(argc==6&&std::strcmp(argv[2],"--presentation-client-v2")==0)admission=omni::presentation::Admission{omni::presentation::session_from_text(std::span<const char>(argv[3],std::strlen(argv[3]))),endpoint(argv[4]),endpoint(argv[5])};else if(argc!=2)return 2;}catch(...){return 2;}
+#ifdef OMNIPLAY_DEVICE_FREE_ACTOR
+  if(!admission)return 2; // No direct/UI/device fallback in this actor image.
+#endif
 #ifdef _WIN32
   if(!restore_private_temporary_directory())return 2;
   if(_setmode(_fileno(stdin),_O_BINARY)==-1||_setmode(_fileno(stdout),_O_BINARY)==-1)return 2;
 #endif
   if(!omni::initialize_transport())return 2;
   // Private duplicated handles carry framed IPC; ordinary core/SDL output is discarded.
+#ifndef OMNIPLAY_DEVICE_FREE_ACTOR
   SDL_SetLogOutputFunction([](void*,int,SDL_LogPriority,const char*){},nullptr);
   SDL_SetMainReady();
+#endif
   try{
     std::unique_ptr<omni::presentation::Client> presentation;if(admission){presentation=std::make_unique<omni::presentation::Client>(*admission);if(!presentation->wait_ready(std::chrono::seconds(5)))throw omni::Failure("runtime_unavailable");}
     omni::Engine engine(std::move(presentation));omni::Inbox inbox;
@@ -66,7 +71,7 @@ int main(int argc,char** argv){
           packet=omni::Packet{}; // Release the old load buffer before admitting another.
           if(!engine.quitting())inbox.complete();
         }
-        if(engine.quitting())break;engine.tick();SDL_Delay(1);
+        if(engine.quitting())break;engine.tick();std::this_thread::sleep_for(std::chrono::milliseconds(1));
       }
       if(inbox.failed())exit_code=1;
       engine.shutdown();std::fflush(stdout);omni_owned_actor_exit(exit_code);

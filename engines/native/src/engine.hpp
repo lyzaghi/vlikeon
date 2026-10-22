@@ -1,5 +1,6 @@
 #pragma once
 #include "protocol.hpp"
+#include "core_module.hpp"
 #include "runtime_identity.hpp"
 #include "saved_files.hpp"
 #include "memory_files.hpp"
@@ -30,7 +31,7 @@ class Engine {
   std::unique_ptr<presentation::Client> presentation_;
   std::uint64_t presentation_epoch_=0,presentation_count_=0;bool presentation_escape_=false,presentation_input_seen_=false;
   std::atomic<unsigned> presentation_rate_{48000};
-  SDL_SharedObject* object_=nullptr;
+  CoreModule object_=nullptr;
   SDL_Window* window_=nullptr;SDL_Renderer* renderer_=nullptr;SDL_Texture* texture_=nullptr;SDL_AudioStream* audio_=nullptr;
   std::array<SDL_Gamepad*,4> pads_{};InputProfile input_profile_;
   std::array<std::array<std::array<std::int16_t,2>,2>,4> stick_input_{};
@@ -108,10 +109,13 @@ class Engine {
   static void audio_sample(std::int16_t left,std::int16_t right);
   static std::size_t audio_batch(const std::int16_t* data,std::size_t frames);
   static void input_poll();static std::int16_t input_state(unsigned port,unsigned device,unsigned index,unsigned id);
+#ifndef OMNIPLAY_DEVICE_FREE_ACTOR
   void update_pointer();
   static void SDLCALL supply_audio(void* context,SDL_AudioStream* stream,int additional,int total);
+  void pad_added(SDL_JoystickID id);void pad_removed(SDL_JoystickID id);
+#endif
   static void quiet_log(enum retro_log_level,const char*,...);
-  void pad_added(SDL_JoystickID id);void pad_removed(SDL_JoystickID id);void update_metrics();
+  void update_metrics();
   static bool rumble(unsigned port,retro_rumble_effect effect,std::uint16_t strength);void flush_rumble();void stop_rumble();
 public:
   explicit Engine(std::unique_ptr<presentation::Client> presentation={});~Engine();

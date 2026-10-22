@@ -15,10 +15,12 @@ struct InputProfile {
   std::array<SDL_Scancode,16> keyboard{SDL_SCANCODE_Z,SDL_SCANCODE_A,SDL_SCANCODE_RSHIFT,SDL_SCANCODE_RETURN,SDL_SCANCODE_UP,SDL_SCANCODE_DOWN,SDL_SCANCODE_LEFT,SDL_SCANCODE_RIGHT,SDL_SCANCODE_X,SDL_SCANCODE_S,SDL_SCANCODE_Q,SDL_SCANCODE_W,SDL_SCANCODE_E,SDL_SCANCODE_R,SDL_SCANCODE_D,SDL_SCANCODE_F};
   std::array<SDL_Scancode,4> analog{SDL_SCANCODE_I,SDL_SCANCODE_K,SDL_SCANCODE_J,SDL_SCANCODE_L};
   std::array<unsigned,16> buttons{0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15};
+#ifndef OMNIPLAY_DEVICE_FREE_ACTOR
   std::array<std::int16_t,2> stick(SDL_Gamepad* pad,unsigned index)const{
     if(!pad||index>1)return {0,0};const auto raw_x=SDL_GetGamepadAxis(pad,index?SDL_GAMEPAD_AXIS_RIGHTX:SDL_GAMEPAD_AXIS_LEFTX),raw_y=SDL_GetGamepadAxis(pad,index?SDL_GAMEPAD_AXIS_RIGHTY:SDL_GAMEPAD_AXIS_LEFTY);
     return stick_axes(raw_x,raw_y);
   }
+#endif
   std::array<std::int16_t,2> stick_axes(std::int16_t raw_x,std::int16_t raw_y)const{
     if(analog_deadzone_percent>50)return{0,0};
     const double x=double(raw_x)/(raw_x<0?32768.0:32767.0),y=double(raw_y)/(raw_y<0?32768.0:32767.0),length=std::hypot(x,y),deadzone=double(analog_deadzone_percent)/100.0;
