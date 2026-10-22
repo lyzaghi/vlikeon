@@ -109,7 +109,7 @@ def main():
         inputs.append((ordinary(ROOT/name,ROOT,True),PurePosixPath(name),{}))
     for name in ['docs/NATIVE_GUEST_PAUSE.md','qa/native-lifecycle/CMakeLists.txt','qa/native-lifecycle/fixture_core.cpp','qa/native-lifecycle/run_cases.py','qa/native-lifecycle/ACCEPTANCE.md','tools/build_ppsspp.py']:
         inputs.append((ordinary(ROOT/name,ROOT,True),PurePosixPath(name),{}))
-    for name in ['docs/NATIVE_CONTROL_BOUNDARY.md','qa/native-lifecycle/wire_cases.py']:
+    for name in ['docs/NATIVE_CONTROL_BOUNDARY.md','qa/native-lifecycle/wire_cases.py','qa/native-lifecycle/temporary_directory_cases.py']:
         inputs.append((ordinary(ROOT/name,ROOT,True),PurePosixPath(name),{}))
     for name in ['docs/NATIVE_CONTROL_WORKERS.md','qa/native-lifecycle/CONTROL_WORKERS.md']:
         inputs.append((ordinary(ROOT/name,ROOT,True),PurePosixPath(name),{}))

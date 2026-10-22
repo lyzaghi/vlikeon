@@ -1,0 +1,64 @@
+{
+  "batch_id": "vlikeon-028",
+  "source_commit": "942cda622163024b9781d593f7ef0c8fbadef069",
+  "executor": "antigravity",
+  "started_at": "2026-10-22T21:56:50.959Z",
+  "cases": [
+    {
+      "id": "writable-compile",
+      "executable": "C:\\Windows\\System32\\cmd.exe",
+      "args": [
+        "/d",
+        "/s",
+        "/c",
+        "\"\"E:\\V10\\work\\vlikeon-qa-20261023\\build-batch-028\\writable\\compile.cmd\"\""
+      ],
+      "elapsed_ms": 2544,
+      "exit_code": 0,
+      "signal": null,
+      "error": null,
+      "status": "completed"
+    },
+    {
+      "id": "readonly-compile",
+      "executable": "C:\\Windows\\System32\\cmd.exe",
+      "args": [
+        "/d",
+        "/s",
+        "/c",
+        "\"\"E:\\V10\\work\\vlikeon-qa-20261023\\build-batch-028\\readonly\\compile.cmd\"\""
+      ],
+      "elapsed_ms": 2243,
+      "exit_code": 0,
+      "signal": null,
+      "error": null,
+      "status": "completed"
+    },
+    {
+      "id": "storage-tests",
+      "args": [
+        "test",
+        "--frozen",
+        "-p",
+        "omniplay-sandbox",
+        "--target",
+        "x86_64-pc-windows-msvc",
+        "windows::storage_tests::",
+        "--",
+        "--ignored",
+        "--skip",
+        "actual_actor_reports_staged_system_dll_initialization",
+        "--nocapture",
+        "--test-threads=1"
+      ],
+      "exit_code": 0,
+      "elapsed_ms": 8567,
+      "error": null,
+      "status": "completed"
+    }
+  ],
+  "compiler_setup": "E:\\MUONLINE\\_BuildTools\\VS2022\\VC\\Auxiliary\\Build\\vcvars64.bat",
+  "source_unchanged": true,
+  "finished_at": "2026-10-22T21:57:04.521Z",
+  "status": "completed"
+}

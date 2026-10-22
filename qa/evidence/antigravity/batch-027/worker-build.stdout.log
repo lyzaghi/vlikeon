@@ -1,0 +1,380 @@
+MSBuild version 17.14.51+25f168cee for .NET Framework
+
+  Checking File Globs
+  1>Checking Build System
+  Building Custom Rule E:/V10/work/vlikeon-qa-20261023/native-source-v48/SDL/CMakeLists.txt
+  Scanning sources for module dependencies...
+  SDL_windowsgameinput.cpp
+  Building Custom Rule E:/V10/work/vlikeon-qa-20261023/native-source-v48/presentation/CMakeLists.txt
+  pch_cpp.cpp
+  SDL_gameinput.cpp
+  wire.cpp
+  Compiling...
+  cmake_pch.cxx
+E:\V10\work\vlikeon-qa-20261023\native-source-v48\presentation\src\wire.cpp(48,464): warning C4996: 'freopen': This function or variable may be unsafe. Consider using freopen_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details. [E:\V10\work\vlikeon-qa-20261023\build-batch-027\worker\presentation\omniplay-presentation-wire.vcxproj]
+  SDL_windowsgameinput.cpp
+  pch_cpp.cpp
+  SDL_gameinput.cpp
+  omniplay-presentation-wire.vcxproj -> E:\V10\work\vlikeon-qa-20261023\build-batch-027\worker\presentation\Release\omniplay-presentation-wire.lib
+  Building Custom Rule E:/V10/work/vlikeon-qa-20261023/native-source-v48/presentation/CMakeLists.txt
+  cmake_pch.c
+  client.cpp
+  SDL.c
+  SDL_assert.c
+  SDL_error.c
+  SDL_guid.c
+  SDL_hashtable.c
+  SDL_hints.c
+  SDL_list.c
+  SDL_log.c
+  SDL_properties.c
+  SDL_utils.c
+  SDL_atomic.c
+  SDL_spinlock.c
+  SDL_audio.c
+  SDL_audiocvt.c
+  SDL_audiodev.c
+  SDL_audioqueue.c
+  SDL_audioresample.c
+  SDL_audiotypecvt.c
+  SDL_mixer.c
+  SDL_wave.c
+  Generating Code...
+  Compiling...
+  SDL_camera.c
+  SDL_core_unsupported.c
+  SDL_cpuinfo.c
+  SDL_categories.c
+  SDL_clipboardevents.c
+  SDL_displayevents.c
+  SDL_dropevents.c
+  SDL_events.c
+  SDL_eventwatch.c
+  SDL_keyboard.c
+  SDL_keymap.c
+  SDL_keysym_to_keycode.c
+  SDL_keysym_to_scancode.c
+  SDL_mouse.c
+  omniplay-presentation-client.vcxproj -> E:\V10\work\vlikeon-qa-20261023\build-batch-027\worker\presentation\Release\omniplay-presentation-client.lib
+  SDL_pen.c
+  SDL_quit.c
+  SDL_scancode_tables.c
+  SDL_touch.c
+  SDL_windowevents.c
+  imKStoUCS.c
+  Generating Code...
+  Compiling...
+  SDL_filesystem.c
+  SDL_gpu.c
+  SDL_haptic.c
+  SDL_hidapi.c
+  SDL_asyncio.c
+  SDL_iostream.c
+  SDL_asyncio_generic.c
+  SDL_gamepad.c
+  SDL_joystick.c
+  SDL_steam_virtual_gamepad.c
+  controller_type.c
+  SDL_locale.c
+  SDL_main_callbacks.c
+  SDL_runapp.c
+  SDL_libusb.c
+  SDL_url.c
+  SDL_power.c
+  SDL_render.c
+  SDL_render_unsupported.c
+  SDL_yuv_sw.c
+  Generating Code...
+  Compiling...
+  SDL_render_d3d.c
+  SDL_shaders_d3d.c
+  SDL_render_d3d11.c
+  SDL_shaders_d3d11.c
+  SDL_render_d3d12.c
+  SDL_shaders_d3d12.c
+  SDL_pipeline_gpu.c
+  SDL_render_gpu.c
+  SDL_shaders_gpu.c
+  SDL_render_ngage.c
+  SDL_render_gl.c
+  SDL_shaders_gl.c
+  SDL_render_gles2.c
+  SDL_shaders_gles2.c
+  SDL_render_ps2.c
+  SDL_render_psp.c
+  SDL_blendfillrect.c
+  SDL_blendline.c
+  SDL_blendpoint.c
+  SDL_drawline.c
+  Generating Code...
+  Compiling...
+  SDL_drawpoint.c
+  SDL_render_sw.c
+  SDL_triangle.c
+  SDL_render_vita_gxm.c
+  SDL_render_vita_gxm_memory.c
+  SDL_render_vita_gxm_tools.c
+  SDL_render_vulkan.c
+  SDL_shaders_vulkan.c
+  SDL_sensor.c
+  SDL_crc16.c
+  SDL_crc32.c
+  SDL_getenv.c
+  SDL_iconv.c
+  SDL_malloc.c
+  SDL_memcpy.c
+  SDL_memmove.c
+  SDL_memset.c
+  SDL_murmur3.c
+  SDL_qsort.c
+  SDL_random.c
+  Generating Code...
+  Compiling...
+  SDL_stdlib.c
+  SDL_string.c
+  SDL_strtokr.c
+  SDL_storage.c
+  SDL_thread.c
+  SDL_time.c
+  SDL_timer.c
+  SDL_RLEaccel.c
+  SDL_blit.c
+  SDL_blit_0.c
+  SDL_blit_1.c
+  SDL_blit_A.c
+  SDL_blit_N.c
+  SDL_blit_auto.c
+  SDL_blit_copy.c
+  SDL_blit_slow.c
+  SDL_bmp.c
+  SDL_clipboard.c
+  SDL_egl.c
+  SDL_fillrect.c
+  Generating Code...
+  Compiling...
+  SDL_pixels.c
+  SDL_rect.c
+  SDL_rotate.c
+  SDL_stb.c
+  SDL_stretch.c
+  SDL_surface.c
+  SDL_video.c
+  SDL_video_unsupported.c
+  SDL_vulkan_utils.c
+  SDL_yuv.c
+  yuv_rgb_lsx.c
+  yuv_rgb_sse.c
+  yuv_rgb_std.c
+  e_atan2.c
+  e_exp.c
+  e_fmod.c
+  e_log.c
+  e_log10.c
+  e_pow.c
+  e_rem_pio2.c
+  Generating Code...
+  Compiling...
+  e_sqrt.c
+  k_cos.c
+  k_rem_pio2.c
+  k_sin.c
+  k_tan.c
+  s_atan.c
+  s_copysign.c
+  s_cos.c
+  s_fabs.c
+  s_floor.c
+  s_isinf.c
+  s_isinff.c
+  s_isnan.c
+  s_isnanf.c
+  s_modf.c
+  s_scalbn.c
+  s_sin.c
+  s_tan.c
+  SDL_dummyaudio.c
+  SDL_diskaudio.c
+  Generating Code...
+  Compiling...
+  SDL_camera_dummy.c
+  SDL_virtualjoystick.c
+  SDL_nullevents.c
+  SDL_nullframebuffer.c
+  SDL_nullvideo.c
+  SDL_hid.c
+  SDL_immdevice.c
+  SDL_windows.c
+  SDL_xinput.c
+  pch.c
+  SDL_sysmain_runapp.c
+  SDL_asyncio_windows_ioring.c
+  SDL_sysurl.c
+  SDL_directsound.c
+  SDL_wasapi.c
+  SDL_windowsclipboard.c
+  SDL_windowsevents.c
+  SDL_windowsframebuffer.c
+  SDL_windowskeyboard.c
+  SDL_windowsmessagebox.c
+  Generating Code...
+  Compiling...
+  SDL_windowsmodes.c
+  SDL_windowsmouse.c
+  SDL_windowsopengl.c
+  SDL_windowsopengles.c
+  SDL_windowsrawinput.c
+  SDL_windowsshape.c
+  SDL_windowsvideo.c
+  SDL_windowsvulkan.c
+  SDL_windowswindow.c
+  SDL_syscond.c
+  SDL_sysrwlock.c
+  SDL_syscond_cv.c
+  SDL_sysmutex.c
+  SDL_sysrwlock_srw.c
+  SDL_syssem.c
+  SDL_systhread.c
+  SDL_systls.c
+  SDL_windowssensor.c
+  SDL_syspower.c
+  SDL_syslocale.c
+  Generating Code...
+  Compiling...
+  SDL_sysfilesystem.c
+  SDL_sysfsops.c
+  SDL_genericstorage.c
+  SDL_steamstorage.c
+  SDL_systime.c
+  SDL_systimer.c
+  SDL_sysloadso.c
+  SDL_tray.c
+  SDL_hidapi_8bitdo.c
+  SDL_hidapi_combined.c
+  SDL_hidapi_flydigi.c
+  SDL_hidapi_gamecube.c
+  SDL_hidapi_gip.c
+  SDL_hidapi_lg4ff.c
+  SDL_hidapi_luna.c
+  SDL_hidapi_ps3.c
+  SDL_hidapi_ps4.c
+  SDL_hidapi_ps5.c
+  SDL_hidapi_rumble.c
+  SDL_hidapi_shield.c
+  Generating Code...
+  Compiling...
+  SDL_hidapi_sinput.c
+  SDL_hidapi_stadia.c
+  SDL_hidapi_steam.c
+  SDL_hidapi_steam_hori.c
+  SDL_hidapi_steam_triton.c
+  SDL_hidapi_steamdeck.c
+  SDL_hidapi_switch.c
+  SDL_hidapi_switch2.c
+  SDL_hidapi_wii.c
+  SDL_hidapi_xbox360.c
+  SDL_hidapi_xbox360w.c
+  SDL_hidapi_xboxone.c
+  SDL_hidapi_zuiki.c
+  SDL_hidapijoystick.c
+  SDL_report_descriptor.c
+  SDL_hidapihaptic.c
+  SDL_hidapihaptic_lg4ff.c
+  SDL_dinputjoystick.c
+  SDL_rawinputjoystick.c
+  SDL_windows_gaming_input.c
+  Generating Code...
+  Compiling...
+  SDL_windowsjoystick.c
+  SDL_xinputjoystick.c
+  SDL_dinputhaptic.c
+  SDL_windowshaptic.c
+  SDL_camera_mediafoundation.c
+  SDL_dialog.c
+  SDL_dialog_utils.c
+  SDL_windowsdialog.c
+  SDL_process.c
+  SDL_windowsprocess.c
+  SDL_offscreenevents.c
+  SDL_offscreenframebuffer.c
+  SDL_offscreenopengles.c
+  SDL_offscreenvideo.c
+  SDL_offscreenvulkan.c
+  SDL_offscreenwindow.c
+  SDL_tray_utils.c
+  SDL_gpu_d3d12.c
+  SDL_gpu_vulkan.c
+  SDL_sysmain_callbacks.c
+  Generating Code...
+  SDL_dynapi.c
+  SDL_mslibc.c
+  SDL3-static.vcxproj -> E:\V10\work\vlikeon-qa-20261023\build-batch-027\worker\sdl\Release\SDL3-static.lib
+  Building Custom Rule E:/V10/work/vlikeon-qa-20261023/native-source-v48/native/CMakeLists.txt
+  main.cpp
+E:\V10\work\vlikeon-qa-20261023\native-source-v48\native\src\input_profile.hpp(43,132): warning C4458: declaration of 'buttons' hides class member [E:\V10\work\vlikeon-qa-20261023\build-batch-027\worker\omniplay-native-worker.vcxproj]
+  (compiling source file '../../native-source-v48/native/src/main.cpp')
+      E:\V10\work\vlikeon-qa-20261023\native-source-v48\native\src\input_profile.hpp(17,27):
+      see declaration of 'omni::InputProfile::buttons'
+  
+  engine.cpp
+E:\V10\work\vlikeon-qa-20261023\native-source-v48\native\src\input_profile.hpp(43,132): warning C4458: declaration of 'buttons' hides class member [E:\V10\work\vlikeon-qa-20261023\build-batch-027\worker\omniplay-native-worker.vcxproj]
+  (compiling source file '../../native-source-v48/native/src/engine.cpp')
+      E:\V10\work\vlikeon-qa-20261023\native-source-v48\native\src\input_profile.hpp(17,27):
+      see declaration of 'omni::InputProfile::buttons'
+  
+E:\MUONLINE\_BuildTools\VS2022\VC\Tools\MSVC\14.44.35207\include\xutility(5310,24): warning C4244: '=': conversion from 'const _Ty' to '_Ty', possible loss of data [E:\V10\work\vlikeon-qa-20261023\build-batch-027\worker\omniplay-native-worker.vcxproj]
+E:\MUONLINE\_BuildTools\VS2022\VC\Tools\MSVC\14.44.35207\include\xutility(5310,24): warning C4244:         with [E:\V10\work\vlikeon-qa-20261023\build-batch-027\worker\omniplay-native-worker.vcxproj]
+E:\MUONLINE\_BuildTools\VS2022\VC\Tools\MSVC\14.44.35207\include\xutility(5310,24): warning C4244:         [ [E:\V10\work\vlikeon-qa-20261023\build-batch-027\worker\omniplay-native-worker.vcxproj]
+E:\MUONLINE\_BuildTools\VS2022\VC\Tools\MSVC\14.44.35207\include\xutility(5310,24): warning C4244:             _Ty=int [E:\V10\work\vlikeon-qa-20261023\build-batch-027\worker\omniplay-native-worker.vcxproj]
+E:\MUONLINE\_BuildTools\VS2022\VC\Tools\MSVC\14.44.35207\include\xutility(5310,24): warning C4244:         ] [E:\V10\work\vlikeon-qa-20261023\build-batch-027\worker\omniplay-native-worker.vcxproj]
+  (compiling source file '../../native-source-v48/native/src/engine.cpp')
+      E:\MUONLINE\_BuildTools\VS2022\VC\Tools\MSVC\14.44.35207\include\xutility(5310,24):
+      the template instantiation context (the oldest one first) is
+          E:\V10\work\vlikeon-qa-20261023\native-source-v48\native\src\engine.cpp(363,39):
+          see reference to function template instantiation 'omni::AudioRing::ReadReceipt omni::AudioRing::deliver<omni::Engine::supply_audio::<lambda_1>>(std::span<int16_t,18446744073709551615>,uint64_t,uint64_t,float,Sink &&)' being compiled
+          with
+          [
+              Sink=omni::Engine::supply_audio::<lambda_1>
+          ]
+          E:\V10\work\vlikeon-qa-20261023\native-source-v48\native\src\audio_ring.hpp(63,10):
+          see reference to function template instantiation 'void std::fill<std::_Span_iterator<_Ty>,int>(const _FwdIt,const _FwdIt,const int &)' being compiled
+          with
+          [
+              _Ty=int16_t,
+              _FwdIt=std::_Span_iterator<int16_t>
+          ]
+  
+  protocol.cpp
+E:\V10\work\vlikeon-qa-20261023\native-source-v48\native\src\protocol.cpp(26,45): warning C4996: 'freopen': This function or variable may be unsafe. Consider using freopen_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details. [E:\V10\work\vlikeon-qa-20261023\build-batch-027\worker\omniplay-native-worker.vcxproj]
+  saved_files.cpp
+E:\V10\work\vlikeon-qa-20261023\native-source-v48\native\src\input_profile.hpp(43,132): warning C4458: declaration of 'buttons' hides class member [E:\V10\work\vlikeon-qa-20261023\build-batch-027\worker\omniplay-native-worker.vcxproj]
+  (compiling source file '../../native-source-v48/native/src/saved_files.cpp')
+      E:\V10\work\vlikeon-qa-20261023\native-source-v48\native\src\input_profile.hpp(17,27):
+      see declaration of 'omni::InputProfile::buttons'
+  
+E:\V10\work\vlikeon-qa-20261023\native-source-v48\native\src\saved_files.cpp(145,123): warning C4996: 'std::filesystem::u8path': warning STL4021: The std::filesystem::u8path() overloads are deprecated in C++20. The constructors of std::filesystem::path provide equivalent functionality via construction from u8string, u8string_view, or iterators with value_type char8_t. You can define _SILENCE_CXX20_U8PATH_DEPRECATION_WARNING or _SILENCE_ALL_CXX20_DEPRECATION_WARNINGS to suppress this warning. [E:\V10\work\vlikeon-qa-20261023\build-batch-027\worker\omniplay-native-worker.vcxproj]
+E:\V10\work\vlikeon-qa-20261023\native-source-v48\native\src\saved_files.cpp(189,73): warning C4996: 'std::filesystem::u8path': warning STL4021: The std::filesystem::u8path() overloads are deprecated in C++20. The constructors of std::filesystem::path provide equivalent functionality via construction from u8string, u8string_view, or iterators with value_type char8_t. You can define _SILENCE_CXX20_U8PATH_DEPRECATION_WARNING or _SILENCE_ALL_CXX20_DEPRECATION_WARNINGS to suppress this warning. [E:\V10\work\vlikeon-qa-20261023\build-batch-027\worker\omniplay-native-worker.vcxproj]
+  memory_files.cpp
+E:\V10\work\vlikeon-qa-20261023\native-source-v48\native\src\memory_files.cpp(162,83): warning C4456: declaration of 'name' hides previous local declaration [E:\V10\work\vlikeon-qa-20261023\build-batch-027\worker\omniplay-native-worker.vcxproj]
+      E:\V10\work\vlikeon-qa-20261023\native-source-v48\native\src\memory_files.cpp(157,125):
+      see declaration of 'name'
+  
+  md_portable.cpp
+E:\V10\work\vlikeon-qa-20261023\native-source-v48\native\src\input_profile.hpp(43,132): warning C4458: declaration of 'buttons' hides class member [E:\V10\work\vlikeon-qa-20261023\build-batch-027\worker\omniplay-native-worker.vcxproj]
+  (compiling source file '../../native-source-v48/native/src/md_portable.cpp')
+      E:\V10\work\vlikeon-qa-20261023\native-source-v48\native\src\input_profile.hpp(17,27):
+      see declaration of 'omni::InputProfile::buttons'
+  
+  gl_video.cpp
+E:\V10\work\vlikeon-qa-20261023\native-source-v48\native\src\input_profile.hpp(43,132): warning C4458: declaration of 'buttons' hides class member [E:\V10\work\vlikeon-qa-20261023\build-batch-027\worker\omniplay-native-worker.vcxproj]
+  (compiling source file '../../native-source-v48/native/src/gl_video.cpp')
+      E:\V10\work\vlikeon-qa-20261023\native-source-v48\native\src\input_profile.hpp(17,27):
+      see declaration of 'omni::InputProfile::buttons'
+  
+  measurement.cpp
+E:\V10\work\vlikeon-qa-20261023\native-source-v48\native\src\input_profile.hpp(43,132): warning C4458: declaration of 'buttons' hides class member [E:\V10\work\vlikeon-qa-20261023\build-batch-027\worker\omniplay-native-worker.vcxproj]
+  (compiling source file '../../native-source-v48/native/src/measurement.cpp')
+      E:\V10\work\vlikeon-qa-20261023\native-source-v48\native\src\input_profile.hpp(17,27):
+      see declaration of 'omni::InputProfile::buttons'
+  
+  Generating Code...
+  omniplay-native-worker.vcxproj -> E:\V10\work\vlikeon-qa-20261023\build-batch-027\worker\Release\omniplay-native-worker.exe

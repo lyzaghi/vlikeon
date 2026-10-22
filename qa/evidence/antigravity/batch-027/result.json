@@ -1,0 +1,62 @@
+{
+  "batch_id": "vlikeon-027",
+  "source_commit": "06f8abe030fb271121af792fc0c29ae759929434",
+  "executor": "antigravity",
+  "started_at": "2026-10-22T21:53:55.645Z",
+  "cases": [
+    {
+      "id": "worker-configure",
+      "args": [
+        "-S",
+        "E:\\V10\\work\\vlikeon-qa-20261023\\native-source-v48\\native",
+        "-B",
+        "E:\\V10\\work\\vlikeon-qa-20261023\\build-batch-027\\worker",
+        "-G",
+        "Visual Studio 17 2022",
+        "-A",
+        "x64",
+        "-DOMNIPLAY_SDL_SOURCE=E:\\V10\\work\\vlikeon-qa-20261023\\native-source-v48\\SDL",
+        "-DOMNIPLAY_JSON_SOURCE=E:\\V10\\work\\vlikeon-qa-20261023\\native-source-v48\\json",
+        "-DOMNIPLAY_LIBRETRO_INCLUDE=E:\\V10\\work\\vlikeon-qa-20261023\\native-source-v48\\interface\\libretro",
+        "-DOMNIPLAY_PRESENTATION_SOURCE=E:\\V10\\work\\vlikeon-qa-20261023\\native-source-v48\\presentation",
+        "-DOMNIPLAY_RUNTIME_ID=native-lifecycle-fixture",
+        "-DOMNIPLAY_CORE_FILENAME=omniplay-lifecycle-fixture.dll",
+        "-DOMNIPLAY_VIDEO_BACKEND=software",
+        "-DOMNIPLAY_BUILD_PRESENTATION_HOST=OFF",
+        "-DSDL_REVISION=SDL-3.4.18-829a65d769d935c4852f8159e964312c0957260a"
+      ],
+      "elapsed_ms": 27418,
+      "exit_code": 0,
+      "signal": null,
+      "error": null,
+      "status": "completed"
+    },
+    {
+      "id": "worker-build",
+      "args": [
+        "--build",
+        "E:\\V10\\work\\vlikeon-qa-20261023\\build-batch-027\\worker",
+        "--config",
+        "Release",
+        "--target",
+        "omniplay-native-worker",
+        "--parallel",
+        "2"
+      ],
+      "elapsed_ms": 65651,
+      "exit_code": 0,
+      "signal": null,
+      "error": null,
+      "status": "completed"
+    }
+  ],
+  "artifacts": {
+    "worker/Release/omniplay-native-worker.exe": {
+      "bytes": 3091968,
+      "sha256": "7e2c662880796eca60be8d0db2197fcedd023aa0973984d21bbc42723dca902e"
+    }
+  },
+  "source_unchanged": true,
+  "finished_at": "2026-10-22T21:55:29.159Z",
+  "status": "completed"
+}

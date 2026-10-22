@@ -1,0 +1,15 @@
+   Compiling omniplay-contracts v0.1.0 (E:\V10\work\vlikeon-qa-20261023\source-942cda6\platform\contracts)
+   Compiling omniplay-sandbox v0.1.0 (E:\V10\work\vlikeon-qa-20261023\source-942cda6\platform\sandbox)
+warning: unused import: `GetSidSubAuthorityCount`
+ --> platform\sandbox\src\windows\registry_storage.rs:6:335
+  |
+6 | ...LengthSid,GetSidIdentifierAuthority,GetSidSubAuthority,GetSidSubAuthorityCount,ImpersonateLoggedOnUser,INHERIT_ONLY_ACE,IsValidAcl,IsV...
+  |                                                           ^^^^^^^^^^^^^^^^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` on by default
+
+warning: `omniplay-sandbox` (lib test) generated 1 warning (run `cargo fix --lib -p omniplay-sandbox --tests` to apply 1 suggestion)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 8.12s
+     Running unittests src\lib.rs (E:\V10\work\vlikeon-qa-20261023\target-batch-004\x86_64-pc-windows-msvc\debug\deps\omniplay_sandbox-9abd4aba1f5674ea.exe)
+storage probe observed exit code: 0x00000000
+storage probe observed exit code: 0x00000000

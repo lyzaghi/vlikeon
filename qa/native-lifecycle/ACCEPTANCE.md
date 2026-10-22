@@ -1,9 +1,18 @@
 # Native lifecycle final qualification
 
-Authored only. Configure/build/run solely during the consolidated item-16 pass.
+Execute only in an explicit Antigravity batch or the consolidated item-16 pass.
 This fixture intentionally violates a C ABI with C++ exceptions; do not ship it,
 use real game data, or put it into a product runtime catalog. Match the worker
 and DLL compiler/SDK/CRT and retain all source/artifact/configuration hashes.
+
+For the worker temporary-directory ingress cases, use the current fixture DLL
+and run `temporary_directory_cases.py --worker <absolute-worker> --core
+<absolute-fixture> --output <fresh-output>`. It provides deliberately stale
+TEMP/TMP values and a separate private scratch identity. The actual loaded DLL
+checks Win32, wide CRT and narrow CRT observations for ASCII and Unicode paths.
+A relative private path must terminate the worker with code 2 before core load.
+This is direct-worker environment qualification, not an AppContainer/device
+test or proof that every statically linked third-party CRT shares environment.
 
 1. Build `engines/native` (or frozen `source/native`) using explicit pinned SDL,
    JSON, libretro and presentation sources. Set `OMNIPLAY_RUNTIME_ID` to
