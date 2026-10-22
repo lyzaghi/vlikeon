@@ -71,6 +71,12 @@ reset/release/driver and process-exit acceptance remains unexecuted.
 Native audio ring receipts now report copied frames, and N64 offers match the
 worker batch cap; actual partial/zero admission, latency and device qualification
 remain open.
+Native consumer slots/priming/underruns now commit only after a complete sink
+receipt; rejection latches failure and clears SDL's potentially partial queue.
+Device-control receipts, deliberately discarded paused producer flushes,
+atomic presentation batch admission and same-epoch media-clear generations are
+now source-authored. Actual production-ring cases and full device/core/transport
+failure acceptance remain unexecuted in `qa/native-audio` and Windows case 24.
 Complete semantic snapshot/resource
 admission, remaining writer closure and actual Windows qualification are open.
 Item 1's authored integration is retained for actual item-16 qualification;

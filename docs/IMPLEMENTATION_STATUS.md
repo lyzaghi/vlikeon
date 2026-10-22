@@ -7,6 +7,17 @@ authoring estimate and is retained only as historical metadata, not a live
 progress or release-readiness claim. Numbered source work and actual final
 verification evidence are tracked in `COMPLETION_SEQUENCE.md`.
 
+The resumed item-2 source work now extracts the production native audio ring
+with sink-acknowledged cursor/trim/priming publication. SDL rejection latches
+failure and clears its potentially partial queue; device-control failures no
+longer silently publish reset/resume success. Paused producer flushes discard
+deliberately, and repeated resume does not reset an active ring. Presentation
+audio now stages whole batches before allocation-free shared publication, honors
+rejection in the native callback, and rejects old audio/video copies after a
+same-epoch media clear. `qa/native-audio` supplies authored production-ring
+cases and the final device/transport failure matrix. None has been executed;
+item 2 and the complete 1–16 scope remain open.
+
 The user now requests sequential completion of items 1 through 16. Item 1's authored desktop integration is retained for the final execution matrix; the current source work is item 2, Windows native lifecycle and containment, tracked in `COMPLETION_SEQUENCE.md`. The desktop source adds shared live-document admission, lazy trusted-storage profile identity, bounded authentication/replay admission, generation-aware native-port cleanup and document-owned sessions, selected file grants, transfer directions, imports, input and media capabilities across a shared profile broker. Obsolete generated files are retired during staging. Three target configurations have frozen source/overlay recipes and a resumable later dependency-sync/hook/GN/autoninja procedure. A separate three-sided local-object upgrade review preserves the active pin. See `DESKTOP_BROWSER_BUILD.md`. No dependency hook, configuration, compiler, browser or test ran; item 1 remains open for verified completion.
 
 The current desktop source checkpoints are `out/desktop-browser/item1-v3-document-ownership-windows-source` (130 files / 1,171,018 bytes), `out/desktop-browser/item1-v3-document-ownership-linux-source` (130 files / 1,171,018 bytes) and `out/desktop-browser/item1-v3-document-ownership-macos-source` (130 files / 1,171,020 bytes). All three retain `verification=not_run`, development-only resource catalogs, no compiler/browser execution and no distribution approval. The desktop patch/resource source was regenerated and staged into the pinned sparse checkout. Source authoring also binds the component key fingerprint, allowlist and broker origin and refuses reuse of obsolete upstream snapshots after a revision change. Authored document-admission/handle-ownership cases and the real-desktop acceptance matrix remain unexecuted. These snapshots establish source provenance only; item 1 is not verified complete.

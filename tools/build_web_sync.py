@@ -90,6 +90,7 @@ def prepare(project):
     extras+=['engines/native/adapters/n64-ai-fifo.c.inc']
     extras+=['engines/native/adapters/n64-event-insert.c.inc','qa/n64-memory/event_insert_fixture.c','qa/n64-memory/event_insert_cases.cpp']
     extras+=['engines/native/src/gl_video.hpp','engines/native/src/gl_video.cpp','qa/windows/NATIVE_ACCEPTANCE.md']
+    extras+=['engines/native/src/audio_ring.hpp','qa/native-audio/CMakeLists.txt','qa/native-audio/audio_ring_cases.cpp','qa/native-audio/ACCEPTANCE.md']
     paths.extend(ROOT/name for name in extras);total=0
     for path in paths:
         regular(path,ROOT);total+=path.stat().st_size

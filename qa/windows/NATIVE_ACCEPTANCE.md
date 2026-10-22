@@ -173,7 +173,11 @@ the required OS/process/filesystem evidence.
     core's handling of partial/zero receipts without hangs or lost ownership.
     Qualify concurrent SDL consumption, pause/resume/reset, audio disabled,
     latency trimming and presentation-helper enqueue failures separately from
-    physical playback. Test GL procedure names of lengths 0/127/128 and invalid
+    physical playback. Execute `qa/native-audio/ACCEPTANCE.md`: include SDL
+    failure after a partial internal queue copy, non-replay/fault clearing,
+    device-control failure receipts, no running-state publication on failed
+    resume, same-epoch pause/media-clear races, and staging allocation failure
+    before atomic presentation admission. Test GL procedure names of lengths 0/127/128 and invalid
     characters with exact accessible buffers, before any dynamic lookup.
 
 Record target OS/build, toolchain/SDK, source/artifact hashes, exact failure

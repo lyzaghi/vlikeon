@@ -15,6 +15,26 @@ Actual device/presentation routes and partial-frame handling in every core
 require acceptance case 24. GL procedure-name length checks now precede reads
 at the maximum index. No source/test copy proves runtime audio or GL behavior.
 
+The production native ring now stages output and latency trimming privately;
+only a complete successful sink receipt releases ring slots and changes priming
+or underrun state. Both producer and consumer reject impossible occupancy.
+Pinned SDL's chunked queue writer can return false after copying a prefix, so
+the worker latches a fault and clears queued SDL audio on rejection instead of
+replaying the retained ring. Clearing is not physical playback retraction.
+Preparation/paused producer flushes deliberately discard audio; they do not wait
+for a stopped device. Stream lock/clear/format/unlock/pause/resume failures are
+no longer silent. Failed device pause still attempts the guest pause barrier;
+successful device resume precedes publication of running/started state. A
+repeated resume while already running does not reset a live producer's ring.
+
+Presentation audio batches now allocate and encode fully before one mutex-owned
+commit, use allocation-free list splicing and retain documented oldest-packet
+trimming. Engine batch receipts now honor presentation rejection. Local media
+generations reject audio/video copies racing a same-epoch pause or stale-media
+clear. None of these queue receipts acknowledges transport/helper/device output.
+`qa/native-audio` now authors actual production-ring cases and the failure/race
+matrix for item 16. No new case, toolchain or runtime was executed.
+
 Graphics callback release now retains ownership when making the context
 current fails before invocation. A later attempt may retry while the DLL and
 callback context remain live. An exception after callback entry latches unknown

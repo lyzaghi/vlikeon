@@ -48,6 +48,22 @@ queued data is dropped to stay within the bound. A blocked pipe never makes a
 core callback write directly to the OS. Snapshot input is copied as a fixed
 160-byte value, with unknown/stale/unfocused input returned released.
 
+Audio batch encoding and list-node allocations now finish in a private staging
+list before shared queue mutation. The client checks focus freshness, host epoch
+and local media generation again under the mutex, then splices the whole list
+without allocation and trims oldest packets under that same lock. False or an
+encoding/allocation exception publishes no prefix. A true result acknowledges
+queue admission including the stated trimming policy, not transmission or device
+playback. The staging input cap remains 65536 stereo frames (256 KiB PCM), plus
+bounded packet bodies/nodes and the existing pending queue. The copy is not free.
+
+Every shared media clear advances a local generation, including pause and stale
+producer retirement without an epoch change. Audio/video copies started before
+that clear cannot repopulate the queue afterward. Generation exhaustion fails
+closed. This does not retract a message already removed by the writer or bytes
+already sent to the helper; actual stop/epoch/device behavior still needs the
+complete process and transport qualification matrix.
+
 Playback commands enforce the received focus snapshot and finite volume field.
 Pause retires queued media/controls, so earlier rumble or resume work cannot remain
 behind a new pause in the pending control queue. Resume coalesces an older pending

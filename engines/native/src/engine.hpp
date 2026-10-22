@@ -7,6 +7,7 @@
 #include "gl_video.hpp"
 #include "measurement.hpp"
 #include "input_profile.hpp"
+#include "audio_ring.hpp"
 #include "client.hpp"
 #include <SDL3/SDL.h>
 #include <libretro.h>
@@ -38,11 +39,9 @@ class Engine {
   std::atomic<bool> running_{false},started_{false},fault_{false},shutdown_requested_{false};
   enum class CorePhase{Created,Loading,Ready,Stopping};std::atomic<CorePhase> core_phase_{CorePhase::Created};
   std::atomic<bool> audio_running_{false};
-  static constexpr std::uint64_t kAudioFrames=65536;
-  std::array<std::int16_t,kAudioFrames*2> audio_samples_{};
-  std::atomic<std::uint64_t> audio_read_{0},audio_write_{0};std::atomic<std::uint32_t> underruns_{0};
+  AudioRing audio_ring_;std::atomic<std::uint32_t> underruns_{0};
   std::atomic<std::uint64_t> total_presented_{0},total_underruns_{0};std::uint64_t total_dropped_=0;Measurement measurement_;
-  bool audio_primed_=false;unsigned latency_frames_=2;double nominal_hz_=60.0,sample_rate_=48000.0;float volume_=0.8f;
+  unsigned latency_frames_=2;double nominal_hz_=60.0,sample_rate_=48000.0;float volume_=0.8f;
   double active_time_ms_=0;
   bool reset_after_ram_load_=false;
   GlVideo gl_video_;bool hardware_video_=false,analog_controls_=false;std::atomic<const char*> fault_code_{"runtime_crashed"};

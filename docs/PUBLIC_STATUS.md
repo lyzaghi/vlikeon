@@ -27,8 +27,8 @@ Authored browser integration, product surfaces, Rust platform/services, native
 and web engine adapters, recipes, packaging source and acceptance cases.
 Original source licensing is Apache-2.0 with upstream/per-file exceptions.
 
-Product development remains paused at the owner's request. The source sequence
-stopped during item 2, Windows runtime lifecycle and containment. Item 1 has
+Product source development has resumed in the owner's 1–16 sequence, currently
+on item 2, Windows runtime lifecycle and containment. Item 1 has
 authored integration but remains unverified. Other source areas require
 completion review; source presence does not close the roadmap.
 
@@ -47,12 +47,13 @@ live readiness claims.
 
 [`IMPLEMENTATION_STATUS.md`](IMPLEMENTATION_STATUS.md) records source authoring.
 References to `out/` describe local ignored snapshots, not release downloads.
-Materialization and hashing do not execute or qualify the product. The latest
-paused audio enqueue/batch-cap edits follow the last complete materializations
-and have not been regenerated or executed.
+Materialization and hashing do not execute or qualify the product. The local
+`out/presentation/item2-v38-audio-delivery-source` snapshot records the resumed
+audio sink-commit, device-control and presentation admission source. It is a
+source-only copy, not a compiled or executed product.
 
-[`COMPLETION_SEQUENCE.md`](COMPLETION_SEQUENCE.md) describes where development
-paused; its historical current-work wording does not mean development resumed.
+[`COMPLETION_SEQUENCE.md`](COMPLETION_SEQUENCE.md) records current source work
+and the remaining verification requirements for every numbered item.
 
 Use evidence for feature, benchmark, user, audit and compatibility claims. Do
 not use unearned passing badges, fabricate activity, backdate commits or imply

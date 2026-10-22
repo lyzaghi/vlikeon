@@ -24,6 +24,9 @@ public:
   // thread alone cannot keep a hung core's host heartbeat alive indefinitely.
   void progress();
   bool video(std::span<const std::uint32_t> argb,unsigned width,unsigned height,unsigned logical_width,std::uint64_t timestamp_us);
+  // Whole-batch queue admission. False/exception publishes no prefix. True
+  // allows the bounded queue's documented oldest-audio trimming; it is not a
+  // transport, helper or physical-device delivery acknowledgement.
   bool audio(std::span<const std::int16_t> stereo,unsigned sample_rate);
   bool playback(bool running,unsigned volume_percent,unsigned fullscreen_change=0);
   bool rumble(unsigned port,std::uint16_t strong,std::uint16_t weak,unsigned milliseconds);

@@ -169,10 +169,17 @@ bool Engine::consume_av_changes(){
 }
 void Engine::apply_av(const retro_system_av_info& av){
   if(!valid_av(av))throw Failure("unsupported_capability");
-  if(audio_){if(!SDL_LockAudioStream(audio_))throw Failure("runtime_crashed");SDL_AudioSpec input{};input.format=SDL_AUDIO_S16;input.channels=2;input.freq=static_cast<int>(std::lround(av.timing.sample_rate));if(!SDL_SetAudioStreamFormat(audio_,&input,nullptr)){SDL_UnlockAudioStream(audio_);throw Failure("runtime_crashed");}audio_read_.store(0);audio_write_.store(0);audio_primed_=false;SDL_ClearAudioStream(audio_);}
+  if(audio_){
+    if(!SDL_LockAudioStream(audio_)){fault_=true;throw Failure("runtime_crashed");}
+    SDL_AudioSpec input{};input.format=SDL_AUDIO_S16;input.channels=2;input.freq=static_cast<int>(std::lround(av.timing.sample_rate));
+    if(!SDL_SetAudioStreamFormat(audio_,&input,nullptr)||!SDL_ClearAudioStream(audio_)){
+      fault_=true;SDL_UnlockAudioStream(audio_);throw Failure("runtime_crashed");
+    }
+    audio_ring_.reset_quiescent();
+  }
   nominal_hz_=av.timing.fps;sample_rate_=av.timing.sample_rate;
   presentation_rate_.store(static_cast<unsigned>(std::lround(sample_rate_)));
-  if(audio_)SDL_UnlockAudioStream(audio_);
+  if(audio_&&!SDL_UnlockAudioStream(audio_)){fault_=true;throw Failure("runtime_crashed");}
   aspect_ratio_=std::isfinite(av.geometry.aspect_ratio)&&av.geometry.aspect_ratio>.1f&&av.geometry.aspect_ratio<10.f?av.geometry.aspect_ratio:0;
 }
 Json Engine::disc_status(){
@@ -187,10 +194,29 @@ bool Engine::switch_disc(unsigned index,bool ejected){
   if(discs_.get_image_index()!=index&&!discs_.set_image_index(index))return false;if(!matches_count()||discs_.get_image_index()!=index||!discs_.get_eject_state())return false;
   if(!ejected&&!discs_.set_eject_state(false))return false;return matches_count()&&discs_.get_image_index()==index&&discs_.get_eject_state()==ejected;
 }
-void Engine::reset_audio(){if(!audio_)return;if(SDL_LockAudioStream(audio_)){audio_read_.store(0);audio_write_.store(0);audio_primed_=false;SDL_ClearAudioStream(audio_);SDL_UnlockAudioStream(audio_);}}
-void Engine::pause(){measurement_.cancel("playback_interrupted");running_=false;finger_down_=false;pointer_down_=false;pointer_inside_=false;audio_running_.store(false);if(presentation_)presentation_->playback(false,static_cast<unsigned>(std::lround(volume_*100)));if(audio_)SDL_PauseAudioStreamDevice(audio_);if(loaded_&&api_.pause_guest&&!core_paused_){if(hardware_video_)gl_video_.make_current();api_.pause_guest();core_paused_=true;}stop_rumble();reset_audio();if(window_)SDL_SetWindowTitle(window_,("OmniPlay — "+title_+(close_requested_?" · Return to Game Hub to save and close":" · Paused · Esc to resume")).c_str());}
+void Engine::reset_audio(){
+  if(!audio_)return;
+  if(!SDL_LockAudioStream(audio_)){fault_=true;throw Failure("runtime_crashed");}
+  const bool cleared=SDL_ClearAudioStream(audio_);
+  if(cleared)audio_ring_.reset_quiescent();
+  const bool unlocked=SDL_UnlockAudioStream(audio_);
+  if(!cleared||!unlocked){fault_=true;throw Failure("runtime_crashed");}
+}
+void Engine::pause(){
+  measurement_.cancel("playback_interrupted");running_=false;finger_down_=false;pointer_down_=false;pointer_inside_=false;audio_running_.store(false);
+  if(presentation_)presentation_->playback(false,static_cast<unsigned>(std::lround(volume_*100)));
+  const bool device_paused=!audio_||SDL_PauseAudioStreamDevice(audio_);
+  if(!device_paused)fault_=true;
+  // Even a failed device pause must not skip the guest producer barrier.
+  if(loaded_&&api_.pause_guest&&!core_paused_){if(hardware_video_)gl_video_.make_current();api_.pause_guest();core_paused_=true;}
+  stop_rumble();reset_audio();
+  if(!device_paused)throw Failure("runtime_crashed");
+  if(window_)SDL_SetWindowTitle(window_,("OmniPlay — "+title_+(close_requested_?" · Return to Game Hub to save and close":" · Paused · Esc to resume")).c_str());
+}
 void Engine::resume(){
   if(!loaded_)throw Failure("invalid_state");
+  if(fault_)throw Failure(fault_code_.load());
+  if(running_)return; // Do not reset a ring while its guest producer is active.
   if(presentation_){
     if(!presentation_->wait_focused(std::chrono::milliseconds(750)))throw Failure("permission_denied");
     const auto view=presentation_->snapshot();
@@ -199,7 +225,9 @@ void Engine::resume(){
     // the next poll, while a held Escape cannot become a new resume edge.
     presentation_epoch_=view.epoch;presentation_escape_=presentation_key(view,SDL_SCANCODE_ESCAPE);presentation_input_seen_=false;
   }
-  close_requested_=false;reset_audio();core_paused_=false;running_=true;started_=true;audio_running_.store(true);deadline_=Clock::now();previous_frame_=Clock::time_point{};metrics_start_=deadline_;intervals_.clear();presented_=0;dropped_=0;underruns_.store(0);presentation_due_=Clock::time_point{};if(window_)SDL_SetWindowTitle(window_,("OmniPlay — "+title_).c_str());if(audio_&&!SDL_ResumeAudioStreamDevice(audio_))throw Failure("runtime_crashed");
+  reset_audio();
+  if(audio_&&!SDL_ResumeAudioStreamDevice(audio_)){fault_=true;throw Failure("runtime_crashed");}
+  close_requested_=false;core_paused_=false;running_=true;started_=true;audio_running_.store(true);deadline_=Clock::now();previous_frame_=Clock::time_point{};metrics_start_=deadline_;intervals_.clear();presented_=0;dropped_=0;underruns_.store(0);presentation_due_=Clock::time_point{};if(window_)SDL_SetWindowTitle(window_,("OmniPlay — "+title_).c_str());
 }
 
 bool Engine::rumble(unsigned port,retro_rumble_effect effect,std::uint16_t strength){
@@ -287,27 +315,40 @@ void Engine::video_impl(const void* data,unsigned width,unsigned height,std::siz
 }
 
 std::size_t Engine::audio_batch(const std::int16_t* data,std::size_t frames){
-  auto* e=active_;if(!e)return 0;if(!data||frames>16384){e->fault_=true;return 0;}if(e->presentation_){if(frames&&e->audio_running_.load()){try{e->presentation_->audio(std::span<const std::int16_t>(data,frames*2),e->presentation_rate_.load());}catch(...){e->fault_=true;return 0;}}return frames;}if(!e->audio_)return frames;
-  auto write=e->audio_write_.load(std::memory_order_relaxed);const auto read=e->audio_read_.load(std::memory_order_acquire);
-  if(write-read>kAudioFrames){e->fault_=true;return 0;}
-  const auto available=kAudioFrames-(write-read);const auto count=std::min<std::uint64_t>(frames,available);
-  for(std::uint64_t n=0;n<count;++n){const auto index=((write+n)%kAudioFrames)*2;e->audio_samples_[index]=data[n*2];e->audio_samples_[index+1]=data[n*2+1];}
-  e->audio_write_.store(write+count,std::memory_order_release);return static_cast<std::size_t>(count);
+  auto* e=active_;if(!e)return 0;
+  if((!data&&frames)||frames>AudioRing::batch_limit){e->fault_=true;return 0;}
+  if(!frames)return 0;
+  // Preparation and the guest pause barrier may flush pending audio. Discarding
+  // it here is deliberate, so a stopped device cannot stall producer retirement.
+  if(!e->audio_running_.load())return frames;
+  if(e->fault_)return 0;
+  if(e->presentation_){
+    try{return e->presentation_->audio(std::span<const std::int16_t>(data,frames*2),e->presentation_rate_.load())?frames:0;}
+    catch(...){e->fault_=true;return 0;}
+  }
+  if(!e->audio_)return frames;
+  const auto receipt=e->audio_ring_.push(std::span<const std::int16_t>(data,frames*2));
+  if(!receipt.valid)e->fault_=true;
+  return receipt.frames;
 }
 void Engine::audio_sample(std::int16_t left,std::int16_t right){const std::array<std::int16_t,2> pair{left,right};audio_batch(pair.data(),1);}
 void SDLCALL Engine::supply_audio(void* context,SDL_AudioStream* stream,int additional,int){
-  auto* e=static_cast<Engine*>(context);if(additional<=0)return;
+  auto* e=static_cast<Engine*>(context);if(additional<=0||e->fault_)return;
   std::array<std::int16_t,8192> output{};int remaining=std::min(additional,256*1024);
-  while(remaining>0){const auto requested=std::min<std::uint64_t>((std::uint64_t(remaining)+3)/4,4096);auto read=e->audio_read_.load(std::memory_order_relaxed);const auto write=e->audio_write_.load(std::memory_order_acquire);auto queued=write-read;
-    const auto target=std::min<std::uint64_t>(kAudioFrames/2,std::max<std::uint64_t>(128,static_cast<std::uint64_t>(e->sample_rate_/e->nominal_hz_*e->latency_frames_)));
-    if(queued>std::min<std::uint64_t>(kAudioFrames-1,target+static_cast<std::uint64_t>(e->sample_rate_*.05))){read=write-target;queued=target;e->audio_read_.store(read,std::memory_order_release);}
-    if(!e->audio_primed_&&queued>=target)e->audio_primed_=true;
-    const auto count=e->audio_primed_?std::min<std::uint64_t>(requested,queued):0;
-    std::fill(output.begin(),output.end(),0);
-    for(std::uint64_t n=0;n<count;++n){const auto index=((read+n)%kAudioFrames)*2;output[n*2]=static_cast<std::int16_t>(std::lround(e->audio_samples_[index]*e->volume_));output[n*2+1]=static_cast<std::int16_t>(std::lround(e->audio_samples_[index+1]*e->volume_));}
-    e->audio_read_.store(read+count,std::memory_order_release);
-    if(e->audio_primed_&&count<requested){if(e->audio_running_.load()){e->underruns_.fetch_add(1);e->total_underruns_.fetch_add(1);}e->audio_primed_=false;}
-    if(!SDL_PutAudioStreamData(stream,output.data(),static_cast<int>(requested*4)))return;remaining-=static_cast<int>(requested*4);
+  while(remaining>0){
+    const auto requested=std::min<std::size_t>((std::uint64_t(remaining)+3)/4,AudioRing::output_limit);
+    const auto target=std::min<std::uint64_t>(AudioRing::capacity/2,std::max<std::uint64_t>(128,static_cast<std::uint64_t>(e->sample_rate_/e->nominal_hz_*e->latency_frames_)));
+    const auto receipt=e->audio_ring_.deliver(std::span<std::int16_t>(output.data(),requested*2),target,
+      static_cast<std::uint64_t>(e->sample_rate_*.05),e->volume_,[stream](std::span<const std::int16_t> samples){
+        return SDL_PutAudioStreamData(stream,samples.data(),static_cast<int>(samples.size_bytes()));
+      });
+    if(receipt.delivery!=AudioRing::Delivery::Accepted){
+      // Pinned SDL may copy a prefix before a later allocation fails. Stop this
+      // actor's audio and clear its queued data; never replay an unknown prefix.
+      e->fault_=true;SDL_ClearAudioStream(stream);return;
+    }
+    if(receipt.underrun&&e->audio_running_.load()){e->underruns_.fetch_add(1);e->total_underruns_.fetch_add(1);}
+    remaining-=static_cast<int>(requested*4);
   }
 }
 
