@@ -1,7 +1,7 @@
 # Final-pass Windows default-storage fixture
 
-Authored only. Do not compile or execute this fixture during source authoring.
-Run as part of item 16 using the qualified Windows x64/MSVC/SDK environment and
+Authored fixture; no actual OS pass is claimed. Run only in an explicitly assigned
+Antigravity batch or as part of item 16 using the Windows x64/MSVC/SDK environment and
 the complete current Cargo workspace. It is a test actor, never a production
 runtime/package/catalog entry. Record toolchain, source and executable hashes.
 
@@ -45,6 +45,21 @@ before and after launch. It caps captured output, uses a finite response wait, t
 contained probe and requires confirmed process exit before reporting success.
 Missing environment/artifact input fails this explicitly selected case. An
 ordinary unit run which skips this ignored case proves no Windows behavior.
+
+For the companion readonly-scratch case, compile the same source into a separate
+fresh executable with `/DOMNIPLAY_EXPECT_SCRATCH_DENIED`, set
+`OMNIPLAY_WINDOWS_READONLY_STORAGE_PROBE` to its absolute path and select
+`windows::storage_tests::actual_actor_without_scratch_grant_cannot_write_private_scratch`
+with `--ignored --exact --nocapture`. Expected stdout is exactly
+`storage-probe-readonly-v1 1 1 1 1 1 1 1`. The scratch directory must exist and be
+readable, and its actual file-creation attempt must return ERROR_ACCESS_DENIED.
+No writable scratch grant is installed by this case. It tests the sandbox grant
+boundary; product package selection and legacy core compatibility remain case 28.
+
+The harness deletes its temporary tree only after confirmed process exit,
+expected observations and successful profile retirement. An uncertain or failed
+run retains the tree and prints its location. Reader joins require actual held
+Windows thread completion, including TLS teardown.
 
 Also run matrix cases 15 and 16 for default-folder layout variants, existing child ACLs,
 alternate streams, replace/delete/rename attempts, token-policy mismatches,

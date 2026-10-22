@@ -1,0 +1,54 @@
+{
+  "batch_id": "vlikeon-013",
+  "source_commit": "3b2c2137cf64cb779c084ef8b941498f2bf7e0ee",
+  "executor": "antigravity",
+  "started_at": "2026-10-22T21:23:24.628Z",
+  "inputs": {
+    "E:\\V10\\work\\vlikeon-qa-20261023\\build-batch-012\\worker\\Release\\omniplay-native-worker.exe": "853068fc3709600d1a3c8992b04d58266edd0970d6a0319016af742ce01b2809",
+    "E:\\V10\\work\\vlikeon-qa-20261023\\build-batch-012\\fixtures\\Release\\omniplay-lifecycle-fixture.dll": "e04003626454211ea9c4308a382bb92a495b38487270b2d4c7cf8d31e758790c",
+    "E:\\V10\\work\\vlikeon-qa-20261023\\build-batch-012\\fixtures\\Release\\omniplay-lifecycle-void-fixture.dll": "ffbf8a1637aa4d5faeab6d004cc5a9dc4edb596dc8817989eda3491ff8b37076",
+    "E:\\V10\\work\\vlikeon-qa-20261023\\native-source-v47\\qa\\native-lifecycle\\run_cases.py": "45644f8b44a5b6bd4de5ca8f5c28b179b5010542740b6d3f9b1d83173498f0b2",
+    "E:\\V10\\work\\vlikeon-qa-20261023\\native-source-v47\\qa\\native-lifecycle\\wire_cases.py": "cec9316f1e0a24e562f9fcf6704aae66fe3da42fc3e4691a63cb849d299e9350"
+  },
+  "cases": [
+    {
+      "id": "lifecycle",
+      "args": [
+        "-X",
+        "utf8",
+        "E:\\V10\\work\\vlikeon-qa-20261023\\native-source-v47\\qa\\native-lifecycle\\run_cases.py",
+        "--worker",
+        "E:\\V10\\work\\vlikeon-qa-20261023\\build-batch-012\\worker\\Release\\omniplay-native-worker.exe",
+        "--core",
+        "E:\\V10\\work\\vlikeon-qa-20261023\\build-batch-012\\fixtures\\Release\\omniplay-lifecycle-fixture.dll",
+        "--void-core",
+        "E:\\V10\\work\\vlikeon-qa-20261023\\build-batch-012\\fixtures\\Release\\omniplay-lifecycle-void-fixture.dll",
+        "--output",
+        "E:\\V10\\work\\vlikeon-qa-20261023\\runs\\batch-013\\lifecycle"
+      ],
+      "elapsed_ms": 2691,
+      "exit_code": 0,
+      "error": null
+    },
+    {
+      "id": "wire",
+      "args": [
+        "-X",
+        "utf8",
+        "E:\\V10\\work\\vlikeon-qa-20261023\\native-source-v47\\qa\\native-lifecycle\\wire_cases.py",
+        "--worker",
+        "E:\\V10\\work\\vlikeon-qa-20261023\\build-batch-012\\worker\\Release\\omniplay-native-worker.exe",
+        "--core",
+        "E:\\V10\\work\\vlikeon-qa-20261023\\build-batch-012\\fixtures\\Release\\omniplay-lifecycle-fixture.dll",
+        "--output",
+        "E:\\V10\\work\\vlikeon-qa-20261023\\runs\\batch-013\\wire"
+      ],
+      "elapsed_ms": 3086,
+      "exit_code": 0,
+      "error": null
+    }
+  ],
+  "inputs_unchanged": true,
+  "finished_at": "2026-10-22T21:23:30.410Z",
+  "status": "completed"
+}

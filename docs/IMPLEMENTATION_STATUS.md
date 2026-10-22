@@ -1,5 +1,19 @@
 # Implementation status
 
+Antigravity batch 012 completed all four CMake/MSVC steps on the frozen v47
+materialization: Windows native worker and both lifecycle fixture DLLs built
+successfully, with source hashes unchanged. This resolves the missing natvis
+build input from batch 011. Batch 013 then passed all 13 lifecycle and 19 wire
+cases on those exact artifacts, with unchanged artifact/harness hashes. Codex
+reviewed the actual case observations; evidence is under
+`qa/evidence/antigravity/batch-012/` and `batch-013/`. These use qualification DLLs
+and dummy SDL drivers, not production cores or broker/AppContainer/device proof.
+
+The Windows storage fixture now includes a distinct readonly-scratch actor.
+Its real file-creation attempt must be denied on an existing readable directory.
+The harness retains uncertain trees and requires actual Windows thread completion
+before joining a reader. Both storage cases still require explicit OS execution.
+
 Native worker build batch 011 reached MSVC/compiler configuration but CMake
 generation failed because the source materializer omitted the pinned JSON
 library's Visual Studio natvis input. Codex added that tracked source selection;

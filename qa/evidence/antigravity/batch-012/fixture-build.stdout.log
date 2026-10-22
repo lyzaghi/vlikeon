@@ -1,0 +1,70 @@
+MSBuild version 17.14.51+25f168cee for .NET Framework
+
+  1>Checking Build System
+  Building Custom Rule E:/V10/work/vlikeon-qa-20261023/native-source-v47/qa/native-lifecycle/CMakeLists.txt
+  Building Custom Rule E:/V10/work/vlikeon-qa-20261023/native-source-v47/qa/native-lifecycle/CMakeLists.txt
+  fixture_core.cpp
+  fixture_core.cpp
+E:\V10\work\vlikeon-qa-20261023\native-source-v47\qa\native-lifecycle\fixture_core.cpp(51,246): warning C4996: 'strcpy': This function or variable may be unsafe. Consider using strcpy_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details. [E:\V10\work\vlikeon-qa-20261023\build-batch-012\fixtures\omniplay-lifecycle-void-fixture.vcxproj]
+E:\V10\work\vlikeon-qa-20261023\native-source-v47\qa\native-lifecycle\fixture_core.cpp(51,313): warning C4297: 'retro_init': function assumed not to throw an exception but does [E:\V10\work\vlikeon-qa-20261023\build-batch-012\fixtures\omniplay-lifecycle-void-fixture.vcxproj]
+      E:\V10\work\vlikeon-qa-20261023\native-source-v47\qa\native-lifecycle\fixture_core.cpp(51,313):
+      The function is extern "C" and /EHc was specified
+  
+E:\V10\work\vlikeon-qa-20261023\native-source-v47\qa\native-lifecycle\fixture_core.cpp(52,117): warning C4297: 'retro_deinit': function assumed not to throw an exception but does [E:\V10\work\vlikeon-qa-20261023\build-batch-012\fixtures\omniplay-lifecycle-void-fixture.vcxproj]
+      E:\V10\work\vlikeon-qa-20261023\native-source-v47\qa\native-lifecycle\fixture_core.cpp(52,117):
+      The function is extern "C" and /EHc was specified
+  
+E:\V10\work\vlikeon-qa-20261023\native-source-v47\qa\native-lifecycle\fixture_core.cpp(56,154): warning C4297: 'retro_load_game': function assumed not to throw an exception but does [E:\V10\work\vlikeon-qa-20261023\build-batch-012\fixtures\omniplay-lifecycle-void-fixture.vcxproj]
+      E:\V10\work\vlikeon-qa-20261023\native-source-v47\qa\native-lifecycle\fixture_core.cpp(56,154):
+      The function is extern "C" and /EHc was specified
+  
+E:\V10\work\vlikeon-qa-20261023\native-source-v47\qa\native-lifecycle\fixture_core.cpp(57,122): warning C4297: 'retro_unload_game': function assumed not to throw an exception but does [E:\V10\work\vlikeon-qa-20261023\build-batch-012\fixtures\omniplay-lifecycle-void-fixture.vcxproj]
+      E:\V10\work\vlikeon-qa-20261023\native-source-v47\qa\native-lifecycle\fixture_core.cpp(57,122):
+      The function is extern "C" and /EHc was specified
+  
+E:\V10\work\vlikeon-qa-20261023\native-source-v47\qa\native-lifecycle\fixture_core.cpp(58,139): warning C4297: 'retro_run': function assumed not to throw an exception but does [E:\V10\work\vlikeon-qa-20261023\build-batch-012\fixtures\omniplay-lifecycle-void-fixture.vcxproj]
+      E:\V10\work\vlikeon-qa-20261023\native-source-v47\qa\native-lifecycle\fixture_core.cpp(58,139):
+      The function is extern "C" and /EHc was specified
+  
+E:\V10\work\vlikeon-qa-20261023\native-source-v47\qa\native-lifecycle\fixture_core.cpp(61,145): warning C4297: 'retro_serialize': function assumed not to throw an exception but does [E:\V10\work\vlikeon-qa-20261023\build-batch-012\fixtures\omniplay-lifecycle-void-fixture.vcxproj]
+      E:\V10\work\vlikeon-qa-20261023\native-source-v47\qa\native-lifecycle\fixture_core.cpp(61,145):
+      The function is extern "C" and /EHc was specified
+  
+E:\V10\work\vlikeon-qa-20261023\native-source-v47\qa\native-lifecycle\fixture_core.cpp(62,102): warning C4297: 'retro_unserialize': function assumed not to throw an exception but does [E:\V10\work\vlikeon-qa-20261023\build-batch-012\fixtures\omniplay-lifecycle-void-fixture.vcxproj]
+      E:\V10\work\vlikeon-qa-20261023\native-source-v47\qa\native-lifecycle\fixture_core.cpp(62,102):
+      The function is extern "C" and /EHc was specified
+  
+E:\V10\work\vlikeon-qa-20261023\native-source-v47\qa\native-lifecycle\fixture_core.cpp(51,246): warning C4996: 'strcpy': This function or variable may be unsafe. Consider using strcpy_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details. [E:\V10\work\vlikeon-qa-20261023\build-batch-012\fixtures\omniplay-lifecycle-fixture.vcxproj]
+E:\V10\work\vlikeon-qa-20261023\native-source-v47\qa\native-lifecycle\fixture_core.cpp(51,313): warning C4297: 'retro_init': function assumed not to throw an exception but does [E:\V10\work\vlikeon-qa-20261023\build-batch-012\fixtures\omniplay-lifecycle-fixture.vcxproj]
+      E:\V10\work\vlikeon-qa-20261023\native-source-v47\qa\native-lifecycle\fixture_core.cpp(51,313):
+      The function is extern "C" and /EHc was specified
+  
+E:\V10\work\vlikeon-qa-20261023\native-source-v47\qa\native-lifecycle\fixture_core.cpp(52,117): warning C4297: 'retro_deinit': function assumed not to throw an exception but does [E:\V10\work\vlikeon-qa-20261023\build-batch-012\fixtures\omniplay-lifecycle-fixture.vcxproj]
+      E:\V10\work\vlikeon-qa-20261023\native-source-v47\qa\native-lifecycle\fixture_core.cpp(52,117):
+      The function is extern "C" and /EHc was specified
+  
+E:\V10\work\vlikeon-qa-20261023\native-source-v47\qa\native-lifecycle\fixture_core.cpp(56,154): warning C4297: 'retro_load_game': function assumed not to throw an exception but does [E:\V10\work\vlikeon-qa-20261023\build-batch-012\fixtures\omniplay-lifecycle-fixture.vcxproj]
+      E:\V10\work\vlikeon-qa-20261023\native-source-v47\qa\native-lifecycle\fixture_core.cpp(56,154):
+      The function is extern "C" and /EHc was specified
+  
+E:\V10\work\vlikeon-qa-20261023\native-source-v47\qa\native-lifecycle\fixture_core.cpp(57,122): warning C4297: 'retro_unload_game': function assumed not to throw an exception but does [E:\V10\work\vlikeon-qa-20261023\build-batch-012\fixtures\omniplay-lifecycle-fixture.vcxproj]
+      E:\V10\work\vlikeon-qa-20261023\native-source-v47\qa\native-lifecycle\fixture_core.cpp(57,122):
+      The function is extern "C" and /EHc was specified
+  
+E:\V10\work\vlikeon-qa-20261023\native-source-v47\qa\native-lifecycle\fixture_core.cpp(58,139): warning C4297: 'retro_run': function assumed not to throw an exception but does [E:\V10\work\vlikeon-qa-20261023\build-batch-012\fixtures\omniplay-lifecycle-fixture.vcxproj]
+      E:\V10\work\vlikeon-qa-20261023\native-source-v47\qa\native-lifecycle\fixture_core.cpp(58,139):
+      The function is extern "C" and /EHc was specified
+  
+E:\V10\work\vlikeon-qa-20261023\native-source-v47\qa\native-lifecycle\fixture_core.cpp(61,145): warning C4297: 'retro_serialize': function assumed not to throw an exception but does [E:\V10\work\vlikeon-qa-20261023\build-batch-012\fixtures\omniplay-lifecycle-fixture.vcxproj]
+      E:\V10\work\vlikeon-qa-20261023\native-source-v47\qa\native-lifecycle\fixture_core.cpp(61,145):
+      The function is extern "C" and /EHc was specified
+  
+E:\V10\work\vlikeon-qa-20261023\native-source-v47\qa\native-lifecycle\fixture_core.cpp(62,102): warning C4297: 'retro_unserialize': function assumed not to throw an exception but does [E:\V10\work\vlikeon-qa-20261023\build-batch-012\fixtures\omniplay-lifecycle-fixture.vcxproj]
+      E:\V10\work\vlikeon-qa-20261023\native-source-v47\qa\native-lifecycle\fixture_core.cpp(62,102):
+      The function is extern "C" and /EHc was specified
+  
+     Creating library E:/V10/work/vlikeon-qa-20261023/build-batch-012/fixtures/Release/omniplay-lifecycle-void-fixture.lib and object E:/V10/work/vlikeon-qa-20261023/build-batch-012/fixtures/Release/omniplay-lifecycle-void-fixture.exp
+     Creating library E:/V10/work/vlikeon-qa-20261023/build-batch-012/fixtures/Release/omniplay-lifecycle-fixture.lib and object E:/V10/work/vlikeon-qa-20261023/build-batch-012/fixtures/Release/omniplay-lifecycle-fixture.exp
+  omniplay-lifecycle-void-fixture.vcxproj -> E:\V10\work\vlikeon-qa-20261023\build-batch-012\fixtures\Release\omniplay-lifecycle-void-fixture.dll
+  omniplay-lifecycle-fixture.vcxproj -> E:\V10\work\vlikeon-qa-20261023\build-batch-012\fixtures\Release\omniplay-lifecycle-fixture.dll
+  Building Custom Rule E:/V10/work/vlikeon-qa-20261023/native-source-v47/qa/native-lifecycle/CMakeLists.txt

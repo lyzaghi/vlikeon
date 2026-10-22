@@ -87,8 +87,16 @@ int wmain() {
   const bool denied_dacl=write_dacl_denied(package);
   const bool denied_label=lower_label_denied(package);
   const auto registry=registry_writes_denied(name);
+  const auto scratch_attributes=GetFileAttributesW(temporary);
+  if(scratch_attributes==INVALID_FILE_ATTRIBUTES||!(scratch_attributes&FILE_ATTRIBUTE_DIRECTORY))return 4;
+#ifdef OMNIPLAY_EXPECT_SCRATCH_DENIED
+  const bool scratch_allowed=create_file(std::wstring(temporary)+L"\\"+name+L".tmp",true);
+  const char* protocol="storage-probe-readonly-v1";
+#else
   const bool scratch_allowed=create_file(std::wstring(temporary)+L"\\"+name+L".tmp",false);
-  std::printf("storage-probe-v2 %d %d %d %d %d %d %d\n",denied_file,denied_directory,denied_dacl,denied_label,registry.create_denied,registry.set_denied,scratch_allowed);
+  const char* protocol="storage-probe-v2";
+#endif
+  std::printf("%s %d %d %d %d %d %d %d\n",protocol,denied_file,denied_directory,denied_dacl,denied_label,registry.create_denied,registry.set_denied,scratch_allowed);
   std::fflush(stdout);
   return denied_file&&denied_directory&&denied_dacl&&denied_label&&registry.create_denied&&registry.set_denied&&scratch_allowed?0:1;
 }
