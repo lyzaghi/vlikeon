@@ -1,0 +1,85 @@
+    Checking omniplay-contracts v0.1.0 (E:\V10\work\vlikeon-qa-20261023\source-601f8dd\platform\contracts)
+    Checking omniplay-core v0.1.0 (E:\V10\work\vlikeon-qa-20261023\source-601f8dd\platform\core)
+    Checking omniplay-sync v0.1.0 (E:\V10\work\vlikeon-qa-20261023\source-601f8dd\platform\sync)
+    Checking omniplay-sandbox v0.1.0 (E:\V10\work\vlikeon-qa-20261023\source-601f8dd\platform\sandbox)
+    Checking omniplay-device-info v0.1.0 (E:\V10\work\vlikeon-qa-20261023\source-601f8dd\platform\device-info)
+    Checking omniplay-streaming v0.1.0 (E:\V10\work\vlikeon-qa-20261023\source-601f8dd\platform\streaming)
+    Checking omniplay-stream-input v0.1.0 (E:\V10\work\vlikeon-qa-20261023\source-601f8dd\platform\stream-input)
+warning: unused import: `Signer`
+ --> platform\sync\src\account.rs:3:32
+  |
+3 | use ed25519_dalek::{SigningKey,Signer};
+  |                                ^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` on by default
+
+warning: variable does not need to be mutable
+  --> platform\sync\src\transfer_files.rs:29:36
+   |
+29 |     let path=parent.join(name);let mut builder=std::fs::DirBuilder::new();
+   |                                    ----^^^^^^^
+   |                                    |
+   |                                    help: remove this `mut`
+   |
+   = note: `#[warn(unused_mut)]` on by default
+
+warning: `omniplay-sync` (lib) generated 2 warnings (run `cargo fix --lib -p omniplay-sync` to apply 2 suggestions)
+warning: unused import: `io::Write`
+ --> platform\core\src\firmware.rs:5:34
+  |
+5 | use std::{fs::{File,OpenOptions},io::Write};
+  |                                  ^^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` on by default
+
+warning: variable does not need to be mutable
+  --> platform\core\src\save_payloads.rs:35:19
+   |
+35 |     if create{let mut builder=fs::DirBuilder::new();
+   |                   ----^^^^^^^
+   |                   |
+   |                   help: remove this `mut`
+   |
+   = note: `#[warn(unused_mut)]` on by default
+
+warning: `omniplay-core` (lib) generated 2 warnings (run `cargo fix --lib -p omniplay-core` to apply 1 suggestion)
+    Checking omniplay-sync-client v0.1.0 (E:\V10\work\vlikeon-qa-20261023\source-601f8dd\platform\sync-client)
+    Checking omniplay-updater v0.1.0 (E:\V10\work\vlikeon-qa-20261023\source-601f8dd\platform\updater)
+    Checking omniplay-native-runtime v0.1.0 (E:\V10\work\vlikeon-qa-20261023\source-601f8dd\platform\native-runtime)
+    Checking omniplay-local-service v0.1.0 (E:\V10\work\vlikeon-qa-20261023\source-601f8dd\platform\local-service)
+warning: variable does not need to be mutable
+  --> platform\native-runtime\src\runtime.rs:65:55
+   |
+65 |         let work=parent.join(work_id.to_string());let mut directory=std::fs::DirBuilder::new();
+   |                                                       ----^^^^^^^^^
+   |                                                       |
+   |                                                       help: remove this `mut`
+   |
+   = note: `#[warn(unused_mut)]` on by default
+
+warning: method `call` is never used
+  --> platform\native-runtime\src\channel.rs:70:12
+   |
+57 | impl WorkerChannel {
+   | ------------------ method in this implementation
+...
+70 |     pub fn call(&mut self,process:&impl WorkerProcess,method:&str,params:Value,payload:Vec<u8>,timeout:Duration)->Result<Reply> {
+   |            ^^^^
+   |
+   = note: `#[warn(dead_code)]` on by default
+
+warning: function `collect_abandoned_work` is never used
+   --> platform\native-runtime\src\registry.rs:120:4
+    |
+120 | fn collect_abandoned_work(profile_root:&Path,profile_id:Uuid){crate::work::collect_abandoned(profile_root,profile_id);}
+    |    ^^^^^^^^^^^^^^^^^^^^^^
+
+warning: function `collect_abandoned` is never used
+   --> platform\native-runtime\src\work.rs:175:8
+    |
+175 | pub fn collect_abandoned(profile:&Path,profile_id:Uuid){
+    |        ^^^^^^^^^^^^^^^^^
+
+warning: `omniplay-native-runtime` (lib) generated 4 warnings (run `cargo fix --lib -p omniplay-native-runtime` to apply 1 suggestion)
+    Checking omniplay-broker v0.1.0 (E:\V10\work\vlikeon-qa-20261023\source-601f8dd\platform\broker)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 6.85s

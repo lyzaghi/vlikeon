@@ -1,5 +1,13 @@
 # Implementation status
 
+Antigravity batch 007 completed cargo check --locked for the Windows broker on
+601f8dd with exit 0; Codex inspected the actual compiler output and unchanged
+source record. Warnings remain. This is a compile check, not a linked release
+or runtime/UI/export result. The raw evidence and scope are retained under
+`qa/evidence/antigravity/batch-007/`. A new broker recovery-diagnostic regression
+case now checks capability/free-text redaction and busy-snapshot refusal;
+it is authored but not yet executed. Whole item-2 completion remains open.
+
 Broker compile retry batch 006 on 11bf318 passed the previous Windows input
 syntax gate and failed in sync-client's canonical credential encoding binding.
 Codex split the invalid comma-separated let declaration into two declarations,

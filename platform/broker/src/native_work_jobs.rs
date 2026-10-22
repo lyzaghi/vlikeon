@@ -92,3 +92,29 @@ impl NativeWorkJobs {
 }
 
 impl Drop for NativeWorkJobs {fn drop(&mut self){self.cancel_all();}}
+
+#[cfg(all(test,windows))]
+mod tests{
+    use super::*;
+    #[test]
+    fn recovery_diagnostic_redacts_capabilities_and_free_text_and_refuses_a_busy_snapshot(){
+        let id=Uuid::new_v4();let(release,gate)=std::sync::mpsc::channel();
+        let worker=NativeRecoveryWorker::spawn(move||{let _=gate.recv();}).expect("isolated recovery test worker");
+        let snapshot=Arc::new(Mutex::new(JobSnapshot{id,state:JobState::Failed,
+            summary:NativeWorkRecoverySummary::default(),started_at_ms:10,finished_at_ms:Some(20),
+            error:Some(PlatformError::new(ErrorCode::StorageFailure,"PRIVATE_TEST_PATH_AND_ERROR").recover("PRIVATE_TEST_RECOVERY_ACTION"))}));
+        let jobs=NativeWorkJobs{current:Some(Active{snapshot:snapshot.clone(),cancel:Arc::new(AtomicBool::new(false)),worker})};
+        let diagnostic=jobs.diagnostic().expect("projection").expect("observed recovery");
+        let encoded=serde_json::to_value(diagnostic).expect("diagnostic serialization");
+        let text=encoded.to_string();
+        let redacted=!text.contains(&id.to_string())&&!text.contains("PRIVATE_TEST_PATH_AND_ERROR")&&!text.contains("PRIVATE_TEST_RECOVERY_ACTION");
+        let guard=snapshot.lock().expect("hold actual snapshot");
+        let busy=jobs.diagnostic().err().map(|error|error.code);drop(guard);
+        // Release before assertions, including when the projection is wrong.
+        let _=release.send(());drop(jobs);
+        assert!(redacted);assert_eq!(encoded["state"],"failed");assert_eq!(encoded["error_code"],"storage_failure");
+        assert_eq!(encoded["started_at_ms"],10);assert_eq!(encoded["finished_at_ms"],20);
+        assert_eq!(busy,Some(ErrorCode::Busy));
+        assert_eq!(encoded.as_object().unwrap().len(),5);
+    }
+}

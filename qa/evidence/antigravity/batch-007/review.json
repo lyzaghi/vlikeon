@@ -1,0 +1,27 @@
+{
+  "schema_version": 1,
+  "batch_id": "vlikeon-007",
+  "executor": "antigravity",
+  "reviewer": "codex",
+  "source_commit": "601f8ddcc1a0691973f105841a8b63132c120514",
+  "command": [
+    "cargo",
+    "check",
+    "--locked",
+    "-p",
+    "omniplay-broker",
+    "--bin",
+    "omniplay-broker"
+  ],
+  "exit_code": 0,
+  "source_unchanged": true,
+  "warnings_present": true,
+  "log": "broker-check.log",
+  "accepted_scope": "Rust broker compile check only",
+  "not_established": [
+    "Linked release binary",
+    "Broker runtime/export/UI",
+    "Native core/process/device qualification",
+    "Full Windows item 2"
+  ]
+}

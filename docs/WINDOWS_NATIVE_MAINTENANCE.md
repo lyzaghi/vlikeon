@@ -141,6 +141,13 @@ failed file writes, cancellation/disconnect and non-Windows report shape.
 No diagnostics command, export/file operation, compiler or test ran during
 this authoring step.
 
+Subsequent evidence: Antigravity batch 005 passed all 11 Windows work/ledger
+fixtures and the schema 14-to-15 migration case on edebf6d. Batch 007 passed
+the broker's --locked compile check on 601f8dd. These do not exercise the real
+UI, export destination or full actor/profile lifecycle. A broker projection
+regression is now authored for ID/free-text redaction and busy-lock behavior;
+its execution remains a separately assigned test batch.
+
 Item 16 must build the complete broker/shared contracts and exercise handshake
 availability, foreign-profile rows, two tabs, stale IDs, late start/cancel/status,
 worker completion versus stopping, actual blocked I/O, startup responsiveness,
