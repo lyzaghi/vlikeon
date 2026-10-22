@@ -66,7 +66,7 @@ impl ContainerIdentity {
 
     pub fn launch(&self,executable:&Path,working_directory:&Path,limits:&Limits,before_resume:impl FnOnce(crate::ProcessIdentity)->Result<()>)->Result<Launched>{
         let _lifecycle=self.profile.lifecycle.lock().map_err(|_|unavailable())?;
-        self.claim_launch(limits)?;self.launch_claimed(executable,working_directory,limits,None,false,before_resume)
+        self.claim_launch(limits)?;self.launch_claimed(executable,working_directory,limits,None,before_resume)
     }
     fn claim_launch(&self,limits:&Limits)->Result<()>{
         use std::sync::atomic::Ordering;
@@ -76,9 +76,9 @@ impl ContainerIdentity {
     }
     pub fn launch_presented(&self,executable:&Path,working_directory:&Path,limits:&Limits,spec:&PresentationLaunch<'_>,before_actor:impl FnOnce(crate::ProcessIdentity)->Result<()>,before_helper:impl FnOnce(crate::ProcessIdentity)->Result<()>)->Result<PresentedLaunched>{
         let _lifecycle=self.profile.lifecycle.lock().map_err(|_|unavailable())?;
-        self.claim_launch(limits)?;let prepared=presentation::Prepared::launch(self.profile.clone(),spec,before_helper)?;let actor=self.launch_claimed(executable,working_directory,limits,Some(&prepared),false,before_actor)?;Ok(PresentedLaunched{actor,presentation:prepared.finish()})
+        self.claim_launch(limits)?;let prepared=presentation::Prepared::launch(self.profile.clone(),spec,before_helper)?;let actor=self.launch_claimed(executable,working_directory,limits,Some(&prepared),before_actor)?;Ok(PresentedLaunched{actor,presentation:prepared.finish()})
     }
-    fn launch_claimed(&self,executable:&Path,working_directory:&Path,limits:&Limits,presentation:Option<&presentation::Prepared>,presealed:bool,before_resume:impl FnOnce(crate::ProcessIdentity)->Result<()>)->Result<Launched>{
+    fn launch_claimed(&self,executable:&Path,working_directory:&Path,limits:&Limits,presentation:Option<&presentation::Prepared>,before_resume:impl FnOnce(crate::ProcessIdentity)->Result<()>)->Result<Launched>{
         use std::sync::atomic::Ordering;
         let application=wide(executable.as_os_str())?;let directory=wide(working_directory.as_os_str())?;
         let path=executable.to_str().ok_or_else(unavailable)?;
@@ -140,22 +140,6 @@ impl ContainerIdentity {
         let name=self.profile.name.strip_suffix(&[0u16][..]).ok_or_else(unavailable)?;
         let name=String::from_utf16(name).map_err(|_|unavailable())?;
         launch_checkpoint("seal-default-files",storage::seal_default_files(self.profile.sid,&name))?;
-        if !presealed{
-            // Windows can establish private registry handles during process
-            // creation. Sealing after that point cannot revoke those handles.
-            // Use the first fully contained, still-suspended process solely to
-            // materialize/identify/seal this fresh namespace. It never executes
-            // an actor instruction and is never published as the runtime actor.
-            guard.terminate();
-            if !guard.has_exited(){return Err(unavailable());}
-            drop(thread);drop(guard);drop(attributes);
-            drop(child_input);drop(child_output);drop(error_file);
-            drop(parent_input);drop(parent_output);
-            // Exactly one replacement, with a fresh creation-time job and the
-            // identical token/mitigations/limits. Existing SID write denials now
-            // precede creation; any failure remains closed with no retry mode.
-            return self.launch_claimed(executable,working_directory,limits,presentation,true,before_resume);
-        }
         launch_checkpoint("pre-resume-admission",before_resume(process_identity(&guard.process)?))?;
         if unsafe{ResumeThread(thread.as_raw_handle())}==u32::MAX{return Err(unavailable());}
         drop(thread);drop(child_input);drop(child_output);drop(error_file);

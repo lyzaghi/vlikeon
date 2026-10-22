@@ -1,9 +1,9 @@
 //! Seal only the suspended actor's own AppContainer registry namespace.
 use super::{handle,storage,unavailable};
 use omniplay_contracts::Result;
-use windows_sys::Win32::System::SystemServices::ACCESS_ALLOWED_ACE_TYPE;
+use windows_sys::Win32::System::SystemServices::{ACCESS_ALLOWED_ACE_TYPE,ACCESS_DENIED_ACE_TYPE};
 use std::{ffi::c_void,os::windows::io::{AsRawHandle,OwnedHandle},ptr::{null,null_mut}};
-use windows_sys::Win32::{Foundation::{ERROR_FILE_NOT_FOUND,ERROR_MORE_DATA,ERROR_NO_MORE_ITEMS,ERROR_SUCCESS,LocalFree},Security::{ACCESS_ALLOWED_ACE,ACE_HEADER,CopySid,DACL_SECURITY_INFORMATION,GetAce,GetLengthSid,ImpersonateLoggedOnUser,INHERIT_ONLY_ACE,IsValidAcl,IsValidSid,PSID,RevertToSelf,TOKEN_DUPLICATE,TOKEN_QUERY,Authorization::{GetSecurityInfo,SetSecurityInfo,SetEntriesInAclW,EXPLICIT_ACCESS_W,TRUSTEE_W,TRUSTEE_IS_SID,TRUSTEE_IS_UNKNOWN,NO_MULTIPLE_TRUSTEE,DENY_ACCESS,SE_REGISTRY_KEY},Isolation::GetAppContainerRegistryLocation},System::{Registry::*,Threading::{GetCurrentThread,OpenProcessToken,OpenThreadToken}}};
+use windows_sys::Win32::{Foundation::{ERROR_FILE_NOT_FOUND,ERROR_MORE_DATA,ERROR_NO_MORE_ITEMS,ERROR_SUCCESS,LocalFree},Security::{ACCESS_ALLOWED_ACE,ACE_HEADER,ACL,ACL_REVISION,AddAce,InitializeAcl,CopySid,DACL_SECURITY_INFORMATION,PROTECTED_DACL_SECURITY_INFORMATION,GetAce,GetLengthSid,GetSidIdentifierAuthority,GetSidSubAuthority,GetSidSubAuthorityCount,ImpersonateLoggedOnUser,INHERIT_ONLY_ACE,IsValidAcl,IsValidSid,PSID,RevertToSelf,TOKEN_DUPLICATE,TOKEN_QUERY,Authorization::{GetSecurityInfo,SetSecurityInfo,SE_REGISTRY_KEY},Isolation::GetAppContainerRegistryLocation},System::{Registry::*,Threading::{GetCurrentThread,OpenProcessToken,OpenThreadToken}}};
 
 const READ_CONTROL_ACCESS:u32=0x0002_0000;
 const WRITE_OWNER_ACCESS:u32=0x0008_0000;
@@ -28,14 +28,41 @@ impl RegistryKey {
         if unsafe{GetSecurityInfo(self.0,SE_REGISTRY_KEY,DACL_SECURITY_INFORMATION,null_mut(),null_mut(),&mut old,null_mut(),&mut descriptor)}!=ERROR_SUCCESS{return Err(unavailable());}
         let _descriptor=Descriptor(descriptor);
         if old.is_null()||unsafe{IsValidAcl(old)}==0||unsafe{(*old).AceCount}>256{return Err(unavailable());}
-        // Do not use KEY_WRITE: it also includes READ_CONTROL. Preserve readonly
-        // lookup and broker/user access, denying mutation only to this fresh SID.
+        // AppContainer access checks cannot rely on a DENY ACE for a package
+        // SID (actual batch025). Remove mutation bits from matching grants.
+        // Do not use KEY_WRITE: it also includes readonly READ_CONTROL.
         let rights=KEY_SET_VALUE|KEY_CREATE_SUB_KEY|KEY_CREATE_LINK|DELETE_ACCESS|WRITE_DACL_ACCESS|WRITE_OWNER_ACCESS;
-        let entry=EXPLICIT_ACCESS_W{grfAccessPermissions:rights,grfAccessMode:DENY_ACCESS,grfInheritance:2,Trustee:TRUSTEE_W{pMultipleTrustee:null_mut(),MultipleTrusteeOperation:NO_MULTIPLE_TRUSTEE,TrusteeForm:TRUSTEE_IS_SID,TrusteeType:TRUSTEE_IS_UNKNOWN,ptstrName:sid.cast()}};
-        let mut updated=null_mut();
-        if unsafe{SetEntriesInAclW(1,&entry,old,&mut updated)}!=ERROR_SUCCESS{return Err(unavailable());}
-        let _updated=Descriptor(updated.cast());
-        if updated.is_null()||unsafe{SetSecurityInfo(self.0,SE_REGISTRY_KEY,DACL_SECURITY_INFORMATION,null_mut(),null_mut(),updated,null())}!=ERROR_SUCCESS{return Err(unavailable());}
+        let mut entries=Vec::new();let mut capacity=std::mem::size_of::<ACL>();
+        for index in 0..u32::from(unsafe{(*old).AceCount}){
+            let mut raw=null_mut();if unsafe{GetAce(old,index,&mut raw)}==0||raw.is_null(){return Err(unavailable());}
+            let header=unsafe{&*raw.cast::<ACE_HEADER>()};let size=usize::from(header.AceSize);
+            if size<std::mem::size_of::<ACE_HEADER>()||size>usize::from(unsafe{(*old).AclSize})||
+                !matches!(u32::from(header.AceType),ACCESS_ALLOWED_ACE_TYPE|ACCESS_DENIED_ACE_TYPE){return Err(unavailable());}
+            let mut entry=unsafe{std::slice::from_raw_parts(raw.cast::<u8>(),size)}.to_vec();
+            if u32::from(header.AceType)==ACCESS_ALLOWED_ACE_TYPE{
+                let offset=std::mem::offset_of!(ACCESS_ALLOWED_ACE,SidStart);
+                if size<offset+8{return Err(unavailable());}
+                let count=entry[offset+1];if count>15||offset+8+usize::from(count)*4>size{return Err(unavailable());}
+                let granted_sid=unsafe{raw.cast::<u8>().add(offset)}.cast();
+                if unsafe{IsValidSid(granted_sid)}==0{return Err(unavailable());}
+                let package_group=count==2&&unsafe{(*GetSidIdentifierAuthority(granted_sid)).Value}==[0,0,0,0,0,15]&&
+                    unsafe{*GetSidSubAuthority(granted_sid,0)}==2&&matches!(unsafe{*GetSidSubAuthority(granted_sid,1)},1|2);
+                if package_group||unsafe{windows_sys::Win32::Security::EqualSid(granted_sid,sid)}!=0{
+                    let mut mask=unsafe{(*raw.cast::<ACCESS_ALLOWED_ACE>()).Mask};
+                    if mask&0x0200_0000!=0{return Err(unavailable());} // Unknown MAXIMUM_ALLOWED grant.
+                    if mask&0x1000_0000!=0{mask=(mask&!0x1000_0000)|KEY_ALL_ACCESS;}
+                    if mask&0x4000_0000!=0{mask=(mask&!0x4000_0000)|KEY_WRITE;}
+                    entry[4..8].copy_from_slice(&(mask&!rights).to_ne_bytes());
+                }
+            }
+            capacity+=entry.len();if capacity>u16::MAX as usize{return Err(unavailable());}entries.push(entry);
+        }
+        let mut allocation=vec![0usize;capacity.div_ceil(std::mem::size_of::<usize>())];let updated=allocation.as_mut_ptr().cast::<ACL>();
+        if unsafe{InitializeAcl(updated,capacity as u32,ACL_REVISION)}==0{return Err(unavailable());}
+        for entry in &entries{if unsafe{AddAce(updated,ACL_REVISION,u32::MAX,entry.as_ptr().cast(),entry.len()as u32)}==0{return Err(unavailable());}}
+        // Protect only the fresh private namespace from re-inheriting broader
+        // package grants. All existing user/broker and readonly grants remain.
+        if unsafe{SetSecurityInfo(self.0,SE_REGISTRY_KEY,DACL_SECURITY_INFORMATION|PROTECTED_DACL_SECURITY_INFORMATION,null_mut(),null_mut(),updated,null())}!=ERROR_SUCCESS{return Err(unavailable());}
         Ok(())
     }
     fn own(raw:HKEY)->Result<Self>{
