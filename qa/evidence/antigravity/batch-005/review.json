@@ -1,0 +1,29 @@
+{
+  "schema_version": 1,
+  "batch_id": "vlikeon-005",
+  "executor": "antigravity",
+  "reviewer": "codex",
+  "source_commit": "edebf6d97563c2c903075ed08236b70c0902192c",
+  "source_unchanged": true,
+  "tests": 12,
+  "passed": 12,
+  "failed": 0,
+  "ignored": 0,
+  "broker_compile_exit": 101,
+  "broker_compile_accepted": false,
+  "root_error": "Invalid .05 float literal in stream-input Windows",
+  "logs": [
+    "windows-work.log",
+    "ledger-migration.log",
+    "broker-compile.log"
+  ],
+  "accepted_scope": [
+    "11 disposable Windows work/ledger recovery fixtures",
+    "1 schema 14-to-15 migration fixture"
+  ],
+  "not_established": [
+    "Broker compilation/runtime",
+    "Native actor/helper/core lifecycle",
+    "Full Windows item 2"
+  ]
+}

@@ -1,0 +1,36 @@
+{
+  "schema_version": 1,
+  "batch_id": "vlikeon-004",
+  "executor": "antigravity",
+  "reviewer": "codex",
+  "source_commit": "edebf6d97563c2c903075ed08236b70c0902192c",
+  "declared_toolchain": "Rust 1.89.0 x86_64-pc-windows-msvc",
+  "os": "Microsoft Windows NT 10.0.26200.0",
+  "started_at": "2026-10-22T20:46:03.197Z",
+  "finished_at": "2026-10-22T20:46:33.153Z",
+  "tests": 16,
+  "passed": 16,
+  "failed": 0,
+  "ignored": 0,
+  "filtered_out_per_filter": 19,
+  "source_unchanged": true,
+  "exit_codes": [
+    0,
+    0
+  ],
+  "compiler_warnings_present": true,
+  "logs": [
+    "control-workers.log",
+    "channel.log"
+  ],
+  "accepted_scope": [
+    "8 production control-worker pool/thread/TLS unit cases on Windows",
+    "8 codec/admission/channel unit cases, including fake-process and in-memory I/O cases"
+  ],
+  "not_established": [
+    "Real actor/helper pipes and process retirement",
+    "AppContainer/job/storage behavior",
+    "Full recovery/diagnostics flow",
+    "Complete Windows item 2 or product readiness"
+  ]
+}

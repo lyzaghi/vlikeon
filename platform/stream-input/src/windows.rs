@@ -71,7 +71,7 @@ impl TargetInput{
         if self.state=="revoked"||!self.activated{return Ok(());}
         // Virtual gamepads require a separately qualified device adapter. They are
         // not silently translated to arbitrary keyboard shortcuts here.
-        if frame.pads.iter().any(|p|p.buttons!=0||p.axes.iter().any(|a|a.abs()>.05)){self.revoke("gamepad_unavailable");return Ok(());}
+        if frame.pads.iter().any(|p|p.buttons!=0||p.axes.iter().any(|a|a.abs()>0.05)){self.revoke("gamepad_unavailable");return Ok(());}
         let wanted:BTreeSet<Key>=frame.keys.iter().map(|v|key(v).ok_or_else(failure)).collect::<Result<_>>()?;
         let thread=unsafe{GetWindowThreadProcessId(self.window,std::ptr::null_mut())};let layout=unsafe{GetKeyboardLayout(thread)};
         if thread==0||layout.is_null(){self.revoke("input_unmapped");return Ok(());}

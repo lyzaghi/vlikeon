@@ -1,5 +1,18 @@
 # Implementation status
 
+Antigravity batch 004 on edebf6d compiled native-runtime and executed all eight
+control-worker/thread/TLS and eight channel unit cases: 16 passed, zero failed
+or ignored. Batch 005 executed 11 disposable Windows work/ledger cases and the
+schema 14-to-15 migration case: 12 more passed. Codex reviewed actual counts and
+raw output; source hashes remained unchanged. Evidence is under
+`qa/evidence/antigravity/batch-004/` and `batch-005/`. This validates selected
+thread/codec/recovery fixtures, not full actor/job/device/product behavior.
+
+Batch 005's broker compile step failed on the Windows stream-input `.05` float
+literal before broker acceptance. Codex changed it to `0.05`, preserving the
+intended threshold; broker compilation must be retried on a new frozen source.
+Compiler warnings remain recorded. Item 2 and the full roadmap remain open.
+
 Antigravity batch 003 passed the lockfile gate and compiled dependencies, then
 reported 60 core and 3 sandbox compiler errors before any test executed. Codex
 reviewed the raw errors and authored the first corrections: rusqlite 0.40.2's
