@@ -27,6 +27,12 @@ Batch 016 on 520ce0d compiled and passed the launch/token/registry/filesystem
 admission steps, but both probes produced empty stdout. Neither OS case passed.
 The fixture now records terminal exit observations and closed early-failure
 stage names so loader failure can be distinguished from probe setup failure.
+Batch 017 compiled both probes and the updated sandbox harness, then observed
+0xc0000142 in both contained actors with no probe stdout. This is an unresolved
+DLL initialization failure before the fixture's observations, not successful
+write denial. No mitigation, job, token, ACL or registry-sealing fallback was
+introduced. The isolated trees and full local batch logs are retained for
+continued diagnosis; item 2 remains open.
 
 Native worker build batch 011 reached MSVC/compiler configuration but CMake
 generation failed because the source materializer omitted the pinned JSON
