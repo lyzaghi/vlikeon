@@ -36,6 +36,12 @@ fn run_probe(variable:&str,writable_scratch:bool,expected:&str){
     drop(input);let(sender,receiver)=mpsc::channel();
     let reader=std::thread::spawn(move||{let mut bytes=Vec::new();let result=output.take(4097).read_to_end(&mut bytes).map(|_|bytes);let _=sender.send(result);});
     let result=receiver.recv_timeout(Duration::from_secs(15));
+    let exit_deadline=std::time::Instant::now()+Duration::from_secs(1);
+    while !process.has_exited()&&std::time::Instant::now()<exit_deadline{std::thread::sleep(Duration::from_millis(10));}
+    let mut exit_code=0u32;
+    if unsafe{GetExitCodeProcess(process.process.as_raw_handle(),&mut exit_code)}!=0{
+        eprintln!("storage probe observed exit code: {exit_code:#010x}");
+    }
     process.terminate();let ended=process.has_exited();drop(process);
     if crate::owned_thread_ended(&reader){reader.join().unwrap();}
     assert!(ended,"the real probe process must be confirmed ended");

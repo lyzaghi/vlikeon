@@ -23,6 +23,10 @@ no arbitrary parent environment, ACL grant, token or mitigation fallback is adde
 This proposed fix requires a fresh exact OS batch before acceptance. References:
 [Microsoft AppContainer launch](https://learn.microsoft.com/en-us/windows/win32/secauthz/implementing-an-appcontainer)
 and [known-folder API](https://learn.microsoft.com/en-us/windows/win32/api/shlobj_core/nf-shlobj_core-shgetknownfolderpath).
+Batch 016 on 520ce0d compiled and passed the launch/token/registry/filesystem
+admission steps, but both probes produced empty stdout. Neither OS case passed.
+The fixture now records terminal exit observations and closed early-failure
+stage names so loader failure can be distinguished from probe setup failure.
 
 Native worker build batch 011 reached MSVC/compiler configuration but CMake
 generation failed because the source materializer omitted the pinned JSON

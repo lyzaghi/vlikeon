@@ -75,20 +75,25 @@ static RegistryObservation registry_writes_denied(const std::wstring& name) {
   return observed;
 }
 
+static int invalid_observation(const char* stage,int code) {
+  std::printf("storage-probe-invalid %s %lu\n",stage,GetLastError());
+  std::fflush(stdout);return code;
+}
+
 int wmain() {
   const auto folder=private_folder();const auto split=folder.find_last_of(L"\\/");
-  if(split==std::wstring::npos||_wcsicmp(folder.substr(split+1).c_str(),L"AC"))return 2;
+  if(split==std::wstring::npos||_wcsicmp(folder.substr(split+1).c_str(),L"AC"))return invalid_observation("private-folder",2);
   const auto package=folder.substr(0,split);
   const auto name=L"omniplay-probe-"+std::to_wstring(GetCurrentProcessId());
   wchar_t temporary[32768];const auto length=GetEnvironmentVariableW(L"TMP",temporary,32768);
-  if(!length||length>=32768)return 3;
+  if(!length||length>=32768)return invalid_observation("scratch-environment",3);
   const bool denied_file=create_file(folder+L"\\"+name+L".tmp",true);
   const bool denied_directory=create_directory_denied(package+L"\\"+name);
   const bool denied_dacl=write_dacl_denied(package);
   const bool denied_label=lower_label_denied(package);
   const auto registry=registry_writes_denied(name);
   const auto scratch_attributes=GetFileAttributesW(temporary);
-  if(scratch_attributes==INVALID_FILE_ATTRIBUTES||!(scratch_attributes&FILE_ATTRIBUTE_DIRECTORY))return 4;
+  if(scratch_attributes==INVALID_FILE_ATTRIBUTES||!(scratch_attributes&FILE_ATTRIBUTE_DIRECTORY))return invalid_observation("scratch-directory",4);
 #ifdef OMNIPLAY_EXPECT_SCRATCH_DENIED
   const bool scratch_allowed=create_file(std::wstring(temporary)+L"\\"+name+L".tmp",true);
   const char* protocol="storage-probe-readonly-v1";
