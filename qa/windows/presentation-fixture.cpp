@@ -32,7 +32,12 @@ int main(int argc,char** argv){
         if(message.kind==Kind::Stop)break;
         if(message.kind==Kind::State)playing=message.body[0]!=0;
         if(message.kind==Kind::Video){
-          check(u32(message.body,0)==16&&u32(message.body,4)==16&&u32(message.body,32)==0xff345678u);++videos;
+          // Production wire is RGBA byte order, not little-endian ARGB words.
+          check(u32(message.body,0)==16&&u32(message.body,4)==16);
+          for(std::size_t offset=32;offset<message.body.size();offset+=4){
+            check(message.body[offset]==0x34&&message.body[offset+1]==0x56&&message.body[offset+2]==0x78&&message.body[offset+3]==0xff);
+          }
+          ++videos;
         }
         if(message.kind==Kind::Audio){
           check(u32(message.body,0)==48000&&u32(message.body,4)==64&&u16(message.body,16)==123&&u16(message.body,18)==65413);++audios;
