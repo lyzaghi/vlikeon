@@ -299,10 +299,10 @@ impl Broker {
                 Ok(json!({"exported":true}))
             }
             Command::PermissionRevoke { grant_id } => { self.permissions.revoke(self.client_id,grant_id)?;self.directory_grants.revoke(self.client_id,grant_id)?;Ok(json!({"revoked":true})) }
-            Command::DiagnosticsPreview => {let mut sessions=self.sessions.list();sessions.extend(self.web_sessions.list());encode(DiagnosticPreview::collect(&self.database,&sessions)?)}
+            Command::DiagnosticsPreview => encode(self.diagnostic_preview()?),
             Command::DiagnosticsExport { destination_grant_id } => {
                 let mut file = self.permissions.take(self.client_id,destination_grant_id,FileAccess::ExportWrite)?;
-                let mut sessions=self.sessions.list();sessions.extend(self.web_sessions.list());DiagnosticPreview::collect(&self.database,&sessions)?.write(&mut file)?;
+                self.diagnostic_preview()?.write(&mut file)?;
                 Ok(json!({"exported":true}))
             }
             Command::SettingsGet => encode(self.database.settings()?),
@@ -405,6 +405,18 @@ impl Broker {
         }
         let stopped=self.sessions.change_state(&self.database,id,SessionState::Stopping).is_ok();
         Ok(json!({"stopped":stopped,"recovered_saves":recovered}))
+    }
+
+    fn diagnostic_preview(&self)->Result<DiagnosticPreview>{
+        let mut sessions=self.sessions.list();sessions.extend(self.web_sessions.list());
+        let mut preview=DiagnosticPreview::collect(&self.database,&sessions)?;
+        if crate::native_work_jobs::enabled(){
+            let pending=self.native_work_jobs.busy();
+            let(storage,storage_error)=match omniplay_core::native_work_storage::status(&self.database,self.profile_id){Ok(mut status)=>{status.recovery_running=pending;(Some(status),None)},Err(error)=>(None,Some(error.code))};
+            let(recovery,recovery_status_error)=match self.native_work_jobs.diagnostic(){Ok(value)=>(value,None),Err(error)=>(None,Some(error.code))};
+            preview.native_work=Some(omniplay_core::diagnostics::NativeWorkDiagnostic{observed_at_ms:omniplay_core::now_ms(),storage,storage_error,recovery,recovery_status_error,worker_pending:pending});
+        }
+        Ok(preview)
     }
 
     pub fn close(&mut self) { self.native_work_jobs.cancel_all();self.asset_ranges.close_owner(self.client_id);self.stream_inputs.close();self.jobs.cancel_all();self.update_jobs.cancel_all();self.import_jobs.cancel_all();self.preparations.cancel_all();let ids=self.sessions.list().into_iter().filter(|s|!s.state.is_terminal()).map(|s|s.id).collect::<Vec<_>>();for id in ids{let _=self.detach_session(id);}self.sessions.stop_all(&self.database);self.web_sessions.close(&self.database);self.transfers.clear();self.permissions.revoke_owner(self.client_id);self.directory_grants.revoke_owner(self.client_id); }

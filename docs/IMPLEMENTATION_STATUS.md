@@ -1,5 +1,18 @@
 # Implementation status
 
+Antigravity batch 001 has now executed on frozen commit 264d4d0: 13 Node unit
+tests passed, none failed/skipped, both exit codes zero and stderr empty.
+Codex reviewed the TAP logs and unchanged source hashes. Evidence is under
+`qa/evidence/antigravity/batch-001/`; this supersedes the earlier command blocker
+for that batch only. No live browser/native/product acceptance is inferred.
+
+Current source adds aggregate Windows recovery data to existing Diagnostics
+preview and destination-granted export through one projection. It excludes
+capability/identity/path/raw-error fields, uses a nonblocking collector snapshot
+and reports unavailable observations explicitly. It does not trigger cleanup,
+repair missing proof or back up payloads. This new Rust/export path is unbuilt
+and unexecuted; item 2 remains open.
+
 The owner now requests concurrent work: Codex authors the complete application
 and reviews results/fixes; Antigravity executes only exact assigned test batches
 against frozen copies, without source review, diagnosis or code changes. The

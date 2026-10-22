@@ -115,6 +115,32 @@ use a separately released disposable-profile batch with the required toolchain.
 
 ## Required final evidence
 
+The existing Diagnostics preview/export now includes a Windows-only aggregate
+native-work section. Both paths use one projection function, and export keeps
+the existing document-owned destination grant. It includes reservation counters,
+the last collector summary/state/times, a closed error code and actual pending
+worker observation. Storage and recovery observations are independent, not an
+atomic inventory or a preview-to-export transaction. Read failures are explicit
+nullable data plus error codes; they never become fabricated zero counters.
+The recovery snapshot uses try_lock so a busy/poisoned worker does not block
+export. No cleanup/recovery pass is started by preview or export.
+
+The projection excludes work/profile/job UUIDs, PIDs, paths, free-form error
+text, game data and capability IDs. Other platforms keep the existing report
+shape. Settings points retained-data users to preview/export and states that
+the report is not a backup. The application neither uploads this report nor
+uses it to promote old debt, authorize deletion or reconstruct missing proof.
+This supplies a concrete operator review handoff; data repair/migration and
+full Windows resource/core completion remain separate obligations.
+
+Final acceptance must compare actual preview and user-granted export, inject
+sensitive strings/paths/IDs into collector errors, require only closed codes
+and aggregate data, test busy/poisoned snapshots and database failures, and
+exercise concurrent recovery, two documents, consumed/foreign export grants,
+failed file writes, cancellation/disconnect and non-Windows report shape.
+No diagnostics command, export/file operation, compiler or test ran during
+this authoring step.
+
 Item 16 must build the complete broker/shared contracts and exercise handshake
 availability, foreign-profile rows, two tabs, stale IDs, late start/cancel/status,
 worker completion versus stopping, actual blocked I/O, startup responsiveness,

@@ -57,3 +57,15 @@ requires an actual supported permission-state change; source work continues.
 Later reports must bind the exact batch/source/artifact, environment, command,
 exit status and raw evidence. A source copy, an agent's assertion or a CLI
 success marker alone cannot establish application correctness or 100% readiness.
+
+## First executed batch
+
+After the owner reported Antigravity permission changes, the normal command
+gate allowed execution. The first invocation failed in PowerShell parsing;
+Codex corrected the missing call operator and Antigravity executed the fixed
+batch. Codex changed no permission settings. Batch 001 then returned exit 0
+for both Node files: 7 ownership tests and 6 context tests, zero failures/skips,
+empty stderr and unchanged source hashes. Codex reviewed the raw TAP logs.
+Evidence is in `qa/evidence/antigravity/batch-001/` at source commit 264d4d0.
+This resolves the initial execution blocker for that batch. It establishes only
+those unit cases, not actual Chromium, native Windows or whole-product behavior.

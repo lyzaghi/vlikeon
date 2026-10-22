@@ -59,6 +59,12 @@ The initial concurrent Node batch was denied by the CLI's command gate before
 execution; no test pass or product qualification is inferred. No permission
 settings were changed. Full platform/device/release acceptance remains pending.
 
+That batch subsequently ran after the owner's reported permission change and
+a Codex correction to the PowerShell invocation. Antigravity produced 13 passing
+Node unit tests with zero failures/skips. Codex reviewed the raw logs, exit codes
+and source hashes; retained evidence is in `qa/evidence/antigravity/batch-001/`.
+These results do not qualify live Chromium, native Windows or the full product.
+
 [`COMPLETION_SEQUENCE.md`](COMPLETION_SEQUENCE.md) records current source work
 and the remaining verification requirements for every numbered item.
 

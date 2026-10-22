@@ -1,0 +1,47 @@
+TAP version 13
+# Subtest: Game Hub document authority
+    # Subtest: uses the live browser tab/window instead of renderer-supplied identities
+    ok 1 - uses the live browser tab/window instead of renderer-supplied identities
+      ---
+      duration_ms: 1.4768
+      type: 'test'
+      ...
+    # Subtest: allows the product hash route without granting query URLs
+    ok 2 - allows the product hash route without granting query URLs
+      ---
+      duration_ms: 0.9063
+      type: 'test'
+      ...
+    # Subtest: rejects foreign, private, subframe and missing-identity senders before querying
+    ok 3 - rejects foreign, private, subframe and missing-identity senders before querying
+      ---
+      duration_ms: 0.8603
+      type: 'test'
+      ...
+    # Subtest: does not trust a stale sender after its document disappears or changes context
+    ok 4 - does not trust a stale sender after its document disappears or changes context
+      ---
+      duration_ms: 0.6398
+      type: 'test'
+      ...
+    # Subtest: rechecks caller liveness after the asynchronous browser lookup
+    ok 5 - rechecks caller liveness after the asynchronous browser lookup
+      ---
+      duration_ms: 0.2826
+      type: 'test'
+      ...
+    1..5
+ok 1 - Game Hub document authority
+  ---
+  duration_ms: 5.6416
+  type: 'test'
+  ...
+1..1
+# tests 6
+# suites 0
+# pass 6
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 97.9983

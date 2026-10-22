@@ -1,0 +1,41 @@
+{
+  "schema_version": 1,
+  "batch_id": "vlikeon-001",
+  "executor": "antigravity",
+  "reviewer": "codex",
+  "source_commit": "264d4d0860d7fec80b43a67ee4466143700bc390",
+  "node": "v24.19.0",
+  "started_at": "2026-10-22T20:33:02.163Z",
+  "finished_at": "2026-10-22T20:33:02.523Z",
+  "tests": 13,
+  "passed": 13,
+  "failed": 0,
+  "skipped": 0,
+  "exit_codes": [
+    0,
+    0
+  ],
+  "stderr_bytes": [
+    0,
+    0
+  ],
+  "source_unchanged": true,
+  "source_sha256": {
+    "qa/browser/component-ownership.test.mjs": "e637ae9a3e2137f286385317bae4716b13b490e1b3b3a61afc0c2279c5cf3b3b",
+    "qa/browser/component-context.test.mjs": "22247df1664604014c0fdbb6b30911b5edff520aa2e61487df36230b84100e6e",
+    "apps/game-hub/component-ownership.js": "9c118d9b9886b0fe5d9834231d63246bea35fcfa48da734ba300506aa754f1b0",
+    "apps/game-hub/component-context.js": "364d413fd30ac191a806eedfb499764dd9b967198c4448a387e16e17ba92b2e2"
+  },
+  "logs": [
+    "ownership.tap",
+    "context.tap"
+  ],
+  "accepted_scope": "Node unit cases for document ownership and browser-context authority only",
+  "not_established": [
+    "Live Chromium behavior",
+    "Native Windows lifecycle",
+    "Current recovery diagnostics implementation",
+    "Complete item 1 or 2",
+    "Product readiness"
+  ]
+}

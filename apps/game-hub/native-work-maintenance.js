@@ -140,6 +140,7 @@ export class NativeWorkMaintenancePanel {
     }
     if(retention?.other_platform)message+=' '+text(`${retention.other_platform} mục cần công cụ phục hồi của hệ điều hành tương ứng.`,`${retention.other_platform} entries require recovery on their corresponding operating system.`);
     if(retention?.unconfirmed)message+=' '+text(`${retention.unconfirmed} mục chưa thể xác minh; dữ liệu vẫn được giữ lại.`,`${retention.unconfirmed} entries could not be confirmed; their data remains retained.`);
+    if(summary?.retained||summary?.unknown_entries)message+=' '+text('Bạn có thể xem và xuất Báo cáo chẩn đoán trong Cài đặt để hỗ trợ kiểm tra phục hồi. Báo cáo không phải bản sao lưu dữ liệu.', 'You can preview and export Diagnostics in Settings for recovery review. The report is not a data backup.');
     if(summary?.more_available&&!this.#running())message+=' '+text('Còn mục chưa kiểm tra; bạn có thể chạy tiếp một lượt.','More entries remain; you can run another pass.');
     if(this.#progress.textContent!==message)this.#progress.textContent=message;
     this.#start.textContent=summary?.more_available?text('Tiếp tục kiểm tra','Continue inspection'):text('Kiểm tra và thu hồi','Inspect and recover');

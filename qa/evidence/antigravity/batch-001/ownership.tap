@@ -1,0 +1,52 @@
+TAP version 13
+# Subtest: transient document handles do not cross Game Hub tabs
+ok 1 - transient document handles do not cross Game Hub tabs
+  ---
+  duration_ms: 1.146
+  type: 'test'
+  ...
+# Subtest: selected grants are document- and direction-bound and consumed on success
+ok 2 - selected grants are document- and direction-bound and consumed on success
+  ---
+  duration_ms: 0.3945
+  type: 'test'
+  ...
+# Subtest: transfer IDs cannot be reused for the wrong direction or by another document
+ok 3 - transfer IDs cannot be reused for the wrong direction or by another document
+  ---
+  duration_ms: 0.2478
+  type: 'test'
+  ...
+# Subtest: late successful creation returns cleanup instead of granting a closed document authority
+ok 4 - late successful creation returns cleanup instead of granting a closed document authority
+  ---
+  duration_ms: 0.8622
+  type: 'test'
+  ...
+# Subtest: document close retires its grants, transfers and jobs once
+ok 5 - document close retires its grants, transfers and jobs once
+  ---
+  duration_ms: 0.2573
+  type: 'test'
+  ...
+# Subtest: native disconnect invalidates retained handles while keeping page admission
+ok 6 - native disconnect invalidates retained handles while keeping page admission
+  ---
+  duration_ms: 0.2041
+  type: 'test'
+  ...
+# Subtest: native maintenance jobs belong to their initiating document and late starts are cancelled
+ok 7 - native maintenance jobs belong to their initiating document and late starts are cancelled
+  ---
+  duration_ms: 0.2677
+  type: 'test'
+  ...
+1..7
+# tests 7
+# suites 0
+# pass 7
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 98.7514

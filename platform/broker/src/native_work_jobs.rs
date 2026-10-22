@@ -77,6 +77,18 @@ impl NativeWorkJobs {
     }
 
     pub fn cancel_all(&self){if let Some(active)=&self.current{active.cancel.store(true,Ordering::Release);}}
+
+    pub fn diagnostic(&self)->Result<Option<omniplay_core::diagnostics::NativeRecoveryDiagnostic>>{
+        let Some(active)=&self.current else{return Ok(None)};
+        // Export never waits on a worker-held snapshot lock and never exposes
+        // its job cancellation capability or free-form error message.
+        let value=active.snapshot.try_lock().map_err(|error|{
+            let code=match error{std::sync::TryLockError::WouldBlock=>ErrorCode::Busy,std::sync::TryLockError::Poisoned(_)=>ErrorCode::Internal};
+            PlatformError::new(code,"Native recovery diagnostic is unavailable")
+        })?;
+        let state=match value.state{JobState::Running=>"running",JobState::Stopping=>"stopping",JobState::Complete=>"complete",JobState::Cancelled=>"cancelled",JobState::Failed=>"failed"};
+        Ok(Some(omniplay_core::diagnostics::NativeRecoveryDiagnostic{state,error_code:value.error.as_ref().map(|error|error.code),summary:value.summary.clone(),started_at_ms:value.started_at_ms,finished_at_ms:value.finished_at_ms}))
+    }
 }
 
 impl Drop for NativeWorkJobs {fn drop(&mut self){self.cancel_all();}}
