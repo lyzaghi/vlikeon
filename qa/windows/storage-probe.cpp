@@ -58,11 +58,41 @@ static bool lower_label_denied(const std::wstring& path) {
   LocalFree(descriptor);return result==ERROR_ACCESS_DENIED;
 }
 
-struct RegistryObservation {bool create_denied=false;bool set_denied=false;HRESULT lookup=E_FAIL;DWORD create=ERROR_INVALID_FUNCTION;HRESULT write=E_FAIL;};
+static std::wstring object_label(HANDLE object,SE_OBJECT_TYPE type) {
+  PSECURITY_DESCRIPTOR descriptor=nullptr;PACL sacl=nullptr;
+  const auto result=GetSecurityInfo(object,type,LABEL_SECURITY_INFORMATION,nullptr,nullptr,nullptr,&sacl,&descriptor);
+  if(result!=ERROR_SUCCESS)return L"query-error-"+std::to_wstring(result);
+  LPWSTR text=nullptr;
+  const bool converted=ConvertSecurityDescriptorToStringSecurityDescriptorW(descriptor,SDDL_REVISION_1,LABEL_SECURITY_INFORMATION,&text,nullptr)!=0;
+  std::wstring value=converted&&text?text:L"conversion-error";
+  if(text)LocalFree(text);if(descriptor)LocalFree(descriptor);return value;
+}
+
+static std::wstring file_label(const std::wstring& path) {
+  const auto file=CreateFileW(path.c_str(),READ_CONTROL,FILE_SHARE_READ|FILE_SHARE_WRITE|FILE_SHARE_DELETE,nullptr,OPEN_EXISTING,FILE_FLAG_BACKUP_SEMANTICS,nullptr);
+  if(file==INVALID_HANDLE_VALUE)return L"open-error-"+std::to_wstring(GetLastError());
+  const auto value=object_label(file,SE_FILE_OBJECT);CloseHandle(file);return value;
+}
+
+static void report_token() {
+  HANDLE token=nullptr;if(!OpenProcessToken(GetCurrentProcess(),TOKEN_QUERY,&token))return;
+  alignas(TOKEN_MANDATORY_LABEL) unsigned char buffer[1024]={};DWORD bytes=0,app=0;
+  TOKEN_MANDATORY_POLICY policy{};DWORD rid=0xffffffff;
+  if(GetTokenInformation(token,TokenIntegrityLevel,buffer,sizeof(buffer),&bytes)){
+    const auto sid=reinterpret_cast<TOKEN_MANDATORY_LABEL*>(buffer)->Label.Sid;
+    if(IsValidSid(sid)){const auto count=*GetSidSubAuthorityCount(sid);if(count)rid=*GetSidSubAuthority(sid,count-1);}
+  }
+  GetTokenInformation(token,TokenMandatoryPolicy,&policy,sizeof(policy),&bytes);
+  GetTokenInformation(token,TokenIsAppContainer,&app,sizeof(app),&bytes);
+  CloseHandle(token);std::printf("storage-probe-token integrity=%lu mandatory-policy=%lu app-container=%lu\n",rid,policy.Policy,app);
+}
+
+struct RegistryObservation {bool create_denied=false;bool set_denied=false;HRESULT lookup=E_FAIL;DWORD create=ERROR_INVALID_FUNCTION;HRESULT write=E_FAIL;std::wstring label;};
 static RegistryObservation registry_writes_denied(const std::wstring& name) {
   RegistryObservation observed;HKEY readonly=nullptr;
   observed.lookup=GetAppContainerRegistryLocation(KEY_READ,&readonly);
   if(FAILED(observed.lookup)||!readonly){if(readonly)RegCloseKey(readonly);return observed;}
+  observed.label=object_label(readonly,SE_REGISTRY_KEY);
   // RegCreateKeyEx checks the key's security descriptor, not merely the access
   // mask on this readonly handle. It can create the child if the policy leaks.
   HKEY child=nullptr;DWORD disposition=0;
@@ -109,6 +139,8 @@ int wmain() {
   std::printf("%s %d %d %d %d %d %d %d\n",protocol,denied_file,denied_directory,denied_dacl,denied_label,registry.create_denied,registry.set_denied,scratch_allowed);
   if(!denied_file||!registry.create_denied||!registry.set_denied||!scratch_allowed){
     std::printf("storage-probe-errors default=%lu scratch=%lu registry-read=%08lx registry-create=%lu registry-write=%08lx\n",default_error,scratch_error,static_cast<unsigned long>(registry.lookup),registry.create,static_cast<unsigned long>(registry.write));
+    report_token();
+    std::printf("storage-probe-labels default=%ls scratch=%ls registry=%ls\n",file_label(folder).c_str(),file_label(temporary).c_str(),registry.label.c_str());
   }
   std::fflush(stdout);
   return denied_file&&denied_directory&&denied_dacl&&denied_label&&registry.create_denied&&registry.set_denied&&scratch_allowed?0:1;
