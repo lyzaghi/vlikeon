@@ -1,5 +1,10 @@
 # Vlikeon Browser
 
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="branding/vlikeon/png/display-1024.png">
+  <img src="branding/vlikeon/png/light-1024.png" width="192" alt="Logo Vlikeon Browser — khung mở viền neon">
+</picture>
+
 **Gaming Superbrowser by Vlike — trình duyệt hướng tới trải nghiệm chơi game hợp nhất.**
 
 Vlikeon Browser là tên công khai mới của dự án OmniPlay: trình duyệt dựa trên
@@ -31,6 +36,7 @@ WebKit. Công việc phát triển sản phẩm đang tạm dừng theo yêu c�
 - [Hướng dẫn đóng góp](CONTRIBUTING.md)
 - [Báo cáo bảo mật](SECURITY.md)
 - [Phạm vi giấy phép](LICENSING.md)
+- [Logo trong suốt và bộ icon nền tảng](branding/vlikeon/README.vi.md)
 
 Repository chưa có quy trình build từ clone sạch được kiểm chứng. Các recipe
 trong `tools/` là mã nguồn triển khai, không phải bằng chứng build thành công.

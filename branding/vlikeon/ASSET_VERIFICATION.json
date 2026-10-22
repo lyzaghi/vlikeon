@@ -1,0 +1,55 @@
+{
+  "type": "logo_asset_export_only",
+  "product_execution": "not_run",
+  "native_platform_qualification": "not_run",
+  "files": [
+    {
+      "path": "png/neon-4096.png",
+      "width": 4096,
+      "height": 4096,
+      "corner_alpha": 0,
+      "center_alpha": 0,
+      "left_interior_alpha": 0
+    },
+    {
+      "path": "png/light-4096.png",
+      "width": 4096,
+      "height": 4096,
+      "corner_alpha": 0,
+      "center_alpha": 0,
+      "left_interior_alpha": 0
+    },
+    {
+      "path": "png/display-4096.png",
+      "width": 4096,
+      "height": 4096,
+      "corner_alpha": 0,
+      "center_alpha": 0,
+      "left_interior_alpha": 0
+    },
+    {
+      "path": "png/app-icon-4096.png",
+      "width": 4096,
+      "height": 4096,
+      "corner_alpha": 0,
+      "center_alpha": 0,
+      "left_interior_alpha": 0
+    },
+    {
+      "path": "web/icon-192.png",
+      "width": 192,
+      "height": 192,
+      "corner_alpha": 0,
+      "center_alpha": 0,
+      "left_interior_alpha": 0
+    },
+    {
+      "path": "android/foreground-432.png",
+      "width": 432,
+      "height": 432,
+      "corner_alpha": 0,
+      "center_alpha": 0,
+      "left_interior_alpha": 0
+    }
+  ]
+}

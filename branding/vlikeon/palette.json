@@ -1,0 +1,21 @@
+{
+  "brand": "Vlikeon Browser",
+  "direction": "D / Open View",
+  "canvas": "transparent",
+  "neon": {
+    "cyan": "#00E5FF",
+    "violet": "#885CFF",
+    "magenta": "#FF2BD6"
+  },
+  "light": {
+    "cyan": "#008CA3",
+    "violet": "#5B21B6",
+    "magenta": "#C026D3"
+  },
+  "small": {
+    "cyan": "#00E5FF",
+    "violet": "#A366FF",
+    "magenta": "#FF33D6"
+  },
+  "halo": "display variant only"
+}

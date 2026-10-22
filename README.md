@@ -1,5 +1,10 @@
 # Vlikeon Browser
 
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="branding/vlikeon/png/display-1024.png">
+  <img src="branding/vlikeon/png/light-1024.png" width="192" alt="Vlikeon Browser — Open View neon logo">
+</picture>
+
 **Gaming Superbrowser by Vlike**
 
 An experimental Chromium-first browser project bringing a game hub, isolated
@@ -14,6 +19,8 @@ not undergone its consolidated build and verification pass.
 [Tiếng Việt](README.vi.md) · [Roadmap](ROADMAP.md) ·
 [Contributing](CONTRIBUTING.md) · [Security](SECURITY.md) ·
 [License scope](LICENSING.md)
+
+[Transparent logo and platform icon assets](branding/vlikeon/README.vi.md)
 
 ## What we are building
 

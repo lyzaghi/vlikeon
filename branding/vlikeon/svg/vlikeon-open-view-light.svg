@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="100%" height="100%" fill="none" role="img" aria-labelledby="title-light desc-light">
+  <title id="title-light">Vlikeon Browser — Open View Transparent Light Edition</title>
+  <desc id="desc-light">Transparent light background edition for Vlikeon Gaming Superbrowser. Deep-chroma cyan, violet, and magenta outline tuned for clear legibility on white and light backgrounds. Pure outline, zero dark fill, zero background.</desc>
+  <defs>
+    <!-- Deepened Cyberpunk Neon Gradient tuned for high contrast against light/white backdrops -->
+    <linearGradient id="light-neon-grad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#008CA3" />
+      <stop offset="52%" stop-color="#5B21B6" />
+      <stop offset="100%" stop-color="#C026D3" />
+    </linearGradient>
+  </defs>
+  <!-- Pure Outlines on Light: fill=none, 6px deep-neon stroke, transparent interior and canvas -->
+  <g fill="none" stroke="url(#light-neon-grad)" stroke-width="6" stroke-linejoin="round">
+    <!-- Left Architectural Bracket -->
+    <path d="M 48,76 L 68,56 L 100,56 L 120,156 L 120,200 L 64,200 L 48,184 Z" />
+    <!-- Right Architectural Bracket -->
+    <path d="M 208,76 L 188,56 L 156,56 L 136,156 L 136,200 L 192,200 L 208,184 Z" />
+  </g>
+</svg>

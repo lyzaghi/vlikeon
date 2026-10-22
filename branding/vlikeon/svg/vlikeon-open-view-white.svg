@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="100%" height="100%" fill="none" role="img" aria-labelledby="title-mono desc-mono">
+  <title id="title-mono">Vlikeon Browser — Open View Transparent Monochrome Outline</title>
+  <desc id="desc-mono">Single-color transparent outline edition for Vlikeon Gaming Superbrowser. Solid black strokes with fully transparent interiors and canvas, suitable for single-ink reproduction, technical blueprints, and custom fills.</desc>
+  <!-- Pure Single-Color Outline: fill=none, solid black stroke (#FFFFFF), zero gradients, zero filters -->
+  <g fill="none" stroke="#FFFFFF" stroke-width="6" stroke-linejoin="round">
+    <!-- Left Architectural Bracket -->
+    <path d="M 48,76 L 68,56 L 100,56 L 120,156 L 120,200 L 64,200 L 48,184 Z" />
+    <!-- Right Architectural Bracket -->
+    <path d="M 208,76 L 188,56 L 156,56 L 136,156 L 136,200 L 192,200 L 208,184 Z" />
+  </g>
+</svg>

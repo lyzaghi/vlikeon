@@ -1,0 +1,728 @@
+{
+  "scope": "graphic assets only",
+  "png_files_checked": 72,
+  "product_build_or_tests": "not_run",
+  "native_device_or_store_qualification": "not_run",
+  "files": [
+    {
+      "path": "android/foreground-432.png",
+      "size": [
+        432,
+        432
+      ],
+      "alpha": true,
+      "icc_profile": true,
+      "transparent_outer_edges": true
+    },
+    {
+      "path": "android/res/mipmap-hdpi/ic_launcher_vlikeon.png",
+      "size": [
+        72,
+        72
+      ],
+      "alpha": true,
+      "icc_profile": true,
+      "transparent_outer_edges": true
+    },
+    {
+      "path": "android/res/mipmap-mdpi/ic_launcher_vlikeon.png",
+      "size": [
+        48,
+        48
+      ],
+      "alpha": true,
+      "icc_profile": true,
+      "transparent_outer_edges": true
+    },
+    {
+      "path": "android/res/mipmap-xhdpi/ic_launcher_vlikeon.png",
+      "size": [
+        96,
+        96
+      ],
+      "alpha": true,
+      "icc_profile": true,
+      "transparent_outer_edges": true
+    },
+    {
+      "path": "android/res/mipmap-xxhdpi/ic_launcher_vlikeon.png",
+      "size": [
+        144,
+        144
+      ],
+      "alpha": true,
+      "icc_profile": true,
+      "transparent_outer_edges": true
+    },
+    {
+      "path": "android/res/mipmap-xxxhdpi/ic_launcher_vlikeon.png",
+      "size": [
+        192,
+        192
+      ],
+      "alpha": true,
+      "icc_profile": true,
+      "transparent_outer_edges": true
+    },
+    {
+      "path": "apple/foreground-light-1024.png",
+      "size": [
+        1024,
+        1024
+      ],
+      "alpha": true,
+      "icc_profile": true,
+      "transparent_outer_edges": true
+    },
+    {
+      "path": "apple/foreground-mono-1024.png",
+      "size": [
+        1024,
+        1024
+      ],
+      "alpha": true,
+      "icc_profile": true,
+      "transparent_outer_edges": true
+    },
+    {
+      "path": "apple/foreground-neon-1024.png",
+      "size": [
+        1024,
+        1024
+      ],
+      "alpha": true,
+      "icc_profile": true,
+      "transparent_outer_edges": true
+    },
+    {
+      "path": "linux/hicolor/1024x1024/apps/vlikeon.png",
+      "size": [
+        1024,
+        1024
+      ],
+      "alpha": true,
+      "icc_profile": true,
+      "transparent_outer_edges": true
+    },
+    {
+      "path": "linux/hicolor/128x128/apps/vlikeon.png",
+      "size": [
+        128,
+        128
+      ],
+      "alpha": true,
+      "icc_profile": true,
+      "transparent_outer_edges": true
+    },
+    {
+      "path": "linux/hicolor/16x16/apps/vlikeon.png",
+      "size": [
+        16,
+        16
+      ],
+      "alpha": true,
+      "icc_profile": true,
+      "transparent_outer_edges": true
+    },
+    {
+      "path": "linux/hicolor/24x24/apps/vlikeon.png",
+      "size": [
+        24,
+        24
+      ],
+      "alpha": true,
+      "icc_profile": true,
+      "transparent_outer_edges": true
+    },
+    {
+      "path": "linux/hicolor/256x256/apps/vlikeon.png",
+      "size": [
+        256,
+        256
+      ],
+      "alpha": true,
+      "icc_profile": true,
+      "transparent_outer_edges": true
+    },
+    {
+      "path": "linux/hicolor/32x32/apps/vlikeon.png",
+      "size": [
+        32,
+        32
+      ],
+      "alpha": true,
+      "icc_profile": true,
+      "transparent_outer_edges": true
+    },
+    {
+      "path": "linux/hicolor/48x48/apps/vlikeon.png",
+      "size": [
+        48,
+        48
+      ],
+      "alpha": true,
+      "icc_profile": true,
+      "transparent_outer_edges": true
+    },
+    {
+      "path": "linux/hicolor/512x512/apps/vlikeon.png",
+      "size": [
+        512,
+        512
+      ],
+      "alpha": true,
+      "icc_profile": true,
+      "transparent_outer_edges": true
+    },
+    {
+      "path": "linux/hicolor/64x64/apps/vlikeon.png",
+      "size": [
+        64,
+        64
+      ],
+      "alpha": true,
+      "icc_profile": true,
+      "transparent_outer_edges": true
+    },
+    {
+      "path": "linux/hicolor/96x96/apps/vlikeon.png",
+      "size": [
+        96,
+        96
+      ],
+      "alpha": true,
+      "icc_profile": true,
+      "transparent_outer_edges": true
+    },
+    {
+      "path": "macos/Vlikeon.iconset/icon_128x128.png",
+      "size": [
+        128,
+        128
+      ],
+      "alpha": true,
+      "icc_profile": true,
+      "transparent_outer_edges": true
+    },
+    {
+      "path": "macos/Vlikeon.iconset/icon_128x128@2x.png",
+      "size": [
+        256,
+        256
+      ],
+      "alpha": true,
+      "icc_profile": true,
+      "transparent_outer_edges": true
+    },
+    {
+      "path": "macos/Vlikeon.iconset/icon_16x16.png",
+      "size": [
+        16,
+        16
+      ],
+      "alpha": true,
+      "icc_profile": true,
+      "transparent_outer_edges": true
+    },
+    {
+      "path": "macos/Vlikeon.iconset/icon_16x16@2x.png",
+      "size": [
+        32,
+        32
+      ],
+      "alpha": true,
+      "icc_profile": true,
+      "transparent_outer_edges": true
+    },
+    {
+      "path": "macos/Vlikeon.iconset/icon_256x256.png",
+      "size": [
+        256,
+        256
+      ],
+      "alpha": true,
+      "icc_profile": true,
+      "transparent_outer_edges": true
+    },
+    {
+      "path": "macos/Vlikeon.iconset/icon_256x256@2x.png",
+      "size": [
+        512,
+        512
+      ],
+      "alpha": true,
+      "icc_profile": true,
+      "transparent_outer_edges": true
+    },
+    {
+      "path": "macos/Vlikeon.iconset/icon_32x32.png",
+      "size": [
+        32,
+        32
+      ],
+      "alpha": true,
+      "icc_profile": true,
+      "transparent_outer_edges": true
+    },
+    {
+      "path": "macos/Vlikeon.iconset/icon_32x32@2x.png",
+      "size": [
+        64,
+        64
+      ],
+      "alpha": true,
+      "icc_profile": true,
+      "transparent_outer_edges": true
+    },
+    {
+      "path": "macos/Vlikeon.iconset/icon_512x512.png",
+      "size": [
+        512,
+        512
+      ],
+      "alpha": true,
+      "icc_profile": true,
+      "transparent_outer_edges": true
+    },
+    {
+      "path": "macos/Vlikeon.iconset/icon_512x512@2x.png",
+      "size": [
+        1024,
+        1024
+      ],
+      "alpha": true,
+      "icc_profile": true,
+      "transparent_outer_edges": true
+    },
+    {
+      "path": "png/app-icon-1024.png",
+      "size": [
+        1024,
+        1024
+      ],
+      "alpha": true,
+      "icc_profile": true,
+      "transparent_outer_edges": true
+    },
+    {
+      "path": "png/app-icon-180.png",
+      "size": [
+        180,
+        180
+      ],
+      "alpha": true,
+      "icc_profile": true,
+      "transparent_outer_edges": true
+    },
+    {
+      "path": "png/app-icon-192.png",
+      "size": [
+        192,
+        192
+      ],
+      "alpha": true,
+      "icc_profile": true,
+      "transparent_outer_edges": true
+    },
+    {
+      "path": "png/app-icon-2048.png",
+      "size": [
+        2048,
+        2048
+      ],
+      "alpha": true,
+      "icc_profile": true,
+      "transparent_outer_edges": true
+    },
+    {
+      "path": "png/app-icon-4096.png",
+      "size": [
+        4096,
+        4096
+      ],
+      "alpha": true,
+      "icc_profile": true,
+      "transparent_outer_edges": true
+    },
+    {
+      "path": "png/app-icon-512.png",
+      "size": [
+        512,
+        512
+      ],
+      "alpha": true,
+      "icc_profile": true,
+      "transparent_outer_edges": true
+    },
+    {
+      "path": "png/display-1024.png",
+      "size": [
+        1024,
+        1024
+      ],
+      "alpha": true,
+      "icc_profile": true,
+      "transparent_outer_edges": true
+    },
+    {
+      "path": "png/display-2048.png",
+      "size": [
+        2048,
+        2048
+      ],
+      "alpha": true,
+      "icc_profile": true,
+      "transparent_outer_edges": true
+    },
+    {
+      "path": "png/display-4096.png",
+      "size": [
+        4096,
+        4096
+      ],
+      "alpha": true,
+      "icc_profile": true,
+      "transparent_outer_edges": true
+    },
+    {
+      "path": "png/favicon-128.png",
+      "size": [
+        128,
+        128
+      ],
+      "alpha": true,
+      "icc_profile": true,
+      "transparent_outer_edges": true
+    },
+    {
+      "path": "png/favicon-16.png",
+      "size": [
+        16,
+        16
+      ],
+      "alpha": true,
+      "icc_profile": true,
+      "transparent_outer_edges": true
+    },
+    {
+      "path": "png/favicon-24.png",
+      "size": [
+        24,
+        24
+      ],
+      "alpha": true,
+      "icc_profile": true,
+      "transparent_outer_edges": true
+    },
+    {
+      "path": "png/favicon-256.png",
+      "size": [
+        256,
+        256
+      ],
+      "alpha": true,
+      "icc_profile": true,
+      "transparent_outer_edges": true
+    },
+    {
+      "path": "png/favicon-32.png",
+      "size": [
+        32,
+        32
+      ],
+      "alpha": true,
+      "icc_profile": true,
+      "transparent_outer_edges": true
+    },
+    {
+      "path": "png/favicon-48.png",
+      "size": [
+        48,
+        48
+      ],
+      "alpha": true,
+      "icc_profile": true,
+      "transparent_outer_edges": true
+    },
+    {
+      "path": "png/favicon-64.png",
+      "size": [
+        64,
+        64
+      ],
+      "alpha": true,
+      "icc_profile": true,
+      "transparent_outer_edges": true
+    },
+    {
+      "path": "png/light-1024.png",
+      "size": [
+        1024,
+        1024
+      ],
+      "alpha": true,
+      "icc_profile": true,
+      "transparent_outer_edges": true
+    },
+    {
+      "path": "png/light-2048.png",
+      "size": [
+        2048,
+        2048
+      ],
+      "alpha": true,
+      "icc_profile": true,
+      "transparent_outer_edges": true
+    },
+    {
+      "path": "png/light-4096.png",
+      "size": [
+        4096,
+        4096
+      ],
+      "alpha": true,
+      "icc_profile": true,
+      "transparent_outer_edges": true
+    },
+    {
+      "path": "png/mono-1024.png",
+      "size": [
+        1024,
+        1024
+      ],
+      "alpha": true,
+      "icc_profile": true,
+      "transparent_outer_edges": true
+    },
+    {
+      "path": "png/neon-1024.png",
+      "size": [
+        1024,
+        1024
+      ],
+      "alpha": true,
+      "icc_profile": true,
+      "transparent_outer_edges": true
+    },
+    {
+      "path": "png/neon-2048.png",
+      "size": [
+        2048,
+        2048
+      ],
+      "alpha": true,
+      "icc_profile": true,
+      "transparent_outer_edges": true
+    },
+    {
+      "path": "png/neon-4096.png",
+      "size": [
+        4096,
+        4096
+      ],
+      "alpha": true,
+      "icc_profile": true,
+      "transparent_outer_edges": true
+    },
+    {
+      "path": "png/small-1024.png",
+      "size": [
+        1024,
+        1024
+      ],
+      "alpha": true,
+      "icc_profile": true,
+      "transparent_outer_edges": true
+    },
+    {
+      "path": "png/white-1024.png",
+      "size": [
+        1024,
+        1024
+      ],
+      "alpha": true,
+      "icc_profile": true,
+      "transparent_outer_edges": true
+    },
+    {
+      "path": "web/icon-180.png",
+      "size": [
+        180,
+        180
+      ],
+      "alpha": true,
+      "icc_profile": true,
+      "transparent_outer_edges": true
+    },
+    {
+      "path": "web/icon-192.png",
+      "size": [
+        192,
+        192
+      ],
+      "alpha": true,
+      "icc_profile": true,
+      "transparent_outer_edges": true
+    },
+    {
+      "path": "web/icon-512.png",
+      "size": [
+        512,
+        512
+      ],
+      "alpha": true,
+      "icc_profile": true,
+      "transparent_outer_edges": true
+    },
+    {
+      "path": "windows/png/vlikeon-128.png",
+      "size": [
+        128,
+        128
+      ],
+      "alpha": true,
+      "icc_profile": true,
+      "transparent_outer_edges": true
+    },
+    {
+      "path": "windows/png/vlikeon-16.png",
+      "size": [
+        16,
+        16
+      ],
+      "alpha": true,
+      "icc_profile": true,
+      "transparent_outer_edges": true
+    },
+    {
+      "path": "windows/png/vlikeon-20.png",
+      "size": [
+        20,
+        20
+      ],
+      "alpha": true,
+      "icc_profile": true,
+      "transparent_outer_edges": true
+    },
+    {
+      "path": "windows/png/vlikeon-24.png",
+      "size": [
+        24,
+        24
+      ],
+      "alpha": true,
+      "icc_profile": true,
+      "transparent_outer_edges": true
+    },
+    {
+      "path": "windows/png/vlikeon-256.png",
+      "size": [
+        256,
+        256
+      ],
+      "alpha": true,
+      "icc_profile": true,
+      "transparent_outer_edges": true
+    },
+    {
+      "path": "windows/png/vlikeon-30.png",
+      "size": [
+        30,
+        30
+      ],
+      "alpha": true,
+      "icc_profile": true,
+      "transparent_outer_edges": true
+    },
+    {
+      "path": "windows/png/vlikeon-32.png",
+      "size": [
+        32,
+        32
+      ],
+      "alpha": true,
+      "icc_profile": true,
+      "transparent_outer_edges": true
+    },
+    {
+      "path": "windows/png/vlikeon-36.png",
+      "size": [
+        36,
+        36
+      ],
+      "alpha": true,
+      "icc_profile": true,
+      "transparent_outer_edges": true
+    },
+    {
+      "path": "windows/png/vlikeon-40.png",
+      "size": [
+        40,
+        40
+      ],
+      "alpha": true,
+      "icc_profile": true,
+      "transparent_outer_edges": true
+    },
+    {
+      "path": "windows/png/vlikeon-48.png",
+      "size": [
+        48,
+        48
+      ],
+      "alpha": true,
+      "icc_profile": true,
+      "transparent_outer_edges": true
+    },
+    {
+      "path": "windows/png/vlikeon-60.png",
+      "size": [
+        60,
+        60
+      ],
+      "alpha": true,
+      "icc_profile": true,
+      "transparent_outer_edges": true
+    },
+    {
+      "path": "windows/png/vlikeon-64.png",
+      "size": [
+        64,
+        64
+      ],
+      "alpha": true,
+      "icc_profile": true,
+      "transparent_outer_edges": true
+    },
+    {
+      "path": "windows/png/vlikeon-72.png",
+      "size": [
+        72,
+        72
+      ],
+      "alpha": true,
+      "icc_profile": true,
+      "transparent_outer_edges": true
+    },
+    {
+      "path": "windows/png/vlikeon-80.png",
+      "size": [
+        80,
+        80
+      ],
+      "alpha": true,
+      "icc_profile": true,
+      "transparent_outer_edges": true
+    },
+    {
+      "path": "windows/png/vlikeon-96.png",
+      "size": [
+        96,
+        96
+      ],
+      "alpha": true,
+      "icc_profile": true,
+      "transparent_outer_edges": true
+    }
+  ]
+}

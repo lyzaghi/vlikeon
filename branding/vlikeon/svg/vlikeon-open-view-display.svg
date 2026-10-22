@@ -1,0 +1,46 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="100%" height="100%" fill="none" role="img" aria-labelledby="title-display desc-display">
+  <title id="title-display">Vlikeon Browser — Open View Transparent Display (Gentle Halo)</title>
+  <desc id="desc-display">Transparent display edition for Vlikeon Gaming Superbrowser featuring a controlled two-stage neon halo. Transparent interiors, no opaque body, preserving a clean open central V and lower separation.</desc>
+  <defs>
+    <!-- Luminous Cyberpunk Neon Gradient: Electric Cyan -> Hyper Violet -> Hot Magenta -->
+    <linearGradient id="display-neon-grad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#00E5FF" />
+      <stop offset="52%" stop-color="#885CFF" />
+      <stop offset="100%" stop-color="#FF2BD6" />
+    </linearGradient>
+
+    <!-- Controlled Gentle Halo Filter with explicit feColorMatrix alpha attenuation -->
+    <filter id="gentle-halo" x="-30%" y="-30%" width="160%" height="160%">
+      <!-- Layer 1: Ambient halo (stdDeviation 4) -->
+      <feGaussianBlur in="SourceGraphic" stdDeviation="4" result="blur-soft" />
+      <feColorMatrix in="blur-soft" type="matrix"
+        values="1 0 0 0 0
+                0 1 0 0 0
+                0 0 1 0 0
+                0 0 0 0.40 0" result="halo-soft" />
+
+      <!-- Layer 2: Tight glow (stdDeviation 1.5) -->
+      <feGaussianBlur in="SourceGraphic" stdDeviation="1.5" result="blur-tight" />
+      <feColorMatrix in="blur-tight" type="matrix"
+        values="1 0 0 0 0
+                0 1 0 0 0
+                0 0 1 0 0
+                0 0 0 0.60 0" result="halo-tight" />
+
+      <!-- Merge: soft halo + tight glow + crisp unblurred outline -->
+      <feMerge>
+        <feMergeNode in="halo-soft" />
+        <feMergeNode in="halo-tight" />
+        <feMergeNode in="SourceGraphic" />
+      </feMerge>
+    </filter>
+  </defs>
+
+  <!-- Pure Outline Group with Controlled Halo Filter (fill=none, zero dark body) -->
+  <g fill="none" stroke="url(#display-neon-grad)" stroke-width="6" stroke-linejoin="round" filter="url(#gentle-halo)">
+    <!-- Left Architectural Bracket -->
+    <path d="M 48,76 L 68,56 L 100,56 L 120,156 L 120,200 L 64,200 L 48,184 Z" />
+    <!-- Right Architectural Bracket -->
+    <path d="M 208,76 L 188,56 L 156,56 L 136,156 L 136,200 L 192,200 L 208,184 Z" />
+  </g>
+</svg>

@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="100%" height="100%" fill="none" role="img" aria-labelledby="title-small desc-small">
+  <title id="title-small">Vlikeon Browser — Open View Small-Size Cut (16–32px)</title>
+  <desc id="desc-small">Optically scaled and gap-widened neon outline cut for Vlikeon Gaming Superbrowser. Scaled 1.25x around canvas center with 14px stroke and a 32-unit base channel gap to preserve clear 1.4px separation and 1.1px stroke definition at 16px raster size.</desc>
+  <defs>
+    <!-- High-Luminance Compact Neon Gradient: Electric Cyan -> Bright Violet (#5B21B6) -> Hot Magenta -->
+    <linearGradient id="small-neon-grad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#008CA3" />
+      <stop offset="50%" stop-color="#5B21B6" />
+      <stop offset="100%" stop-color="#C026D3" />
+    </linearGradient>
+  </defs>
+  <!-- Optically Tuned Brackets: fill=none, scaled 1.25x (translate(-32,-32) scale(1.25)), stroke-width 14, lower gap 32 units before stroke -->
+  <g fill="none" stroke="url(#small-neon-grad)" stroke-width="14" stroke-linejoin="round" transform="translate(-32, -32) scale(1.25)">
+    <!-- Left Bracket: inner X shifted to 112 (from 120), top inner X to 92 (from 100) -->
+    <path d="M 48,76 L 68,56 L 92,56 L 112,156 L 112,200 L 64,200 L 48,184 Z" />
+    <!-- Right Bracket: inner X shifted to 144 (from 136), top inner X to 164 (from 156) -->
+    <path d="M 208,76 L 188,56 L 164,56 L 144,156 L 144,200 L 192,200 L 208,184 Z" />
+  </g>
+</svg>
