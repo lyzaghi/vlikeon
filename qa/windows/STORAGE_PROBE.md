@@ -29,11 +29,13 @@ the fixture receives no alternative privilege or launch bypass.
 Expected stdout is exactly `storage-probe-v2 1 1 1 1 1 1 1`. The seven real operations
 are default `AC` file-write denial, package-root subdirectory-create denial,
 package-root `WRITE_DAC` handle denial, attempted label-lowering denial,
-private registry subkey-creation denial, actual RegSetValueEx write denial and
+private registry subkey-creation denial, private value-write route denial and
 successful private scratch create/write/flush/delete. Registry readonly lookup
 must succeed before either registry result can pass. RegCreateKeyEx uses the
 key's descriptor check even though its parent handle is readonly; this is an
 actual mutation attempt rather than a missing handle-rights assertion.
+For the value check, the fixture first requests KEY_SET_VALUE. If that succeeds,
+it attempts RegSetValueEx on the returned handle; either step must reject access.
 The exact host scratch identity is carried in OMNIPLAY_PRIVATE_SCRATCH: Windows
 may rewrite TEMP/TMP during AppContainer construction. Known access denial and
 privilege denial are accepted for attempted creation; positive writable scratch

@@ -1,0 +1,105 @@
+{
+  "batch_id": "vlikeon-029",
+  "source_commit": "3823f29a5df7f2ee3cf8f031ba295d06bfac83f8",
+  "executor": "antigravity",
+  "started_at": "2026-10-22T22:02:36.065Z",
+  "cases": [
+    {
+      "id": "worker-configure",
+      "args": [
+        "-S",
+        "E:\\V10\\work\\vlikeon-qa-20261023\\native-source-v50\\native",
+        "-B",
+        "E:\\V10\\work\\vlikeon-qa-20261023\\build-batch-029\\worker",
+        "-G",
+        "Visual Studio 17 2022",
+        "-A",
+        "x64",
+        "-DOMNIPLAY_SDL_SOURCE=E:\\V10\\work\\vlikeon-qa-20261023\\native-source-v50\\SDL",
+        "-DOMNIPLAY_JSON_SOURCE=E:\\V10\\work\\vlikeon-qa-20261023\\native-source-v50\\json",
+        "-DOMNIPLAY_LIBRETRO_INCLUDE=E:\\V10\\work\\vlikeon-qa-20261023\\native-source-v50\\interface\\libretro",
+        "-DOMNIPLAY_PRESENTATION_SOURCE=E:\\V10\\work\\vlikeon-qa-20261023\\native-source-v50\\presentation",
+        "-DOMNIPLAY_RUNTIME_ID=native-lifecycle-fixture",
+        "-DOMNIPLAY_CORE_FILENAME=omniplay-lifecycle-fixture.dll",
+        "-DOMNIPLAY_VIDEO_BACKEND=software",
+        "-DOMNIPLAY_BUILD_PRESENTATION_HOST=OFF",
+        "-DSDL_REVISION=SDL-3.4.18-829a65d769d935c4852f8159e964312c0957260a"
+      ],
+      "elapsed_ms": 27983,
+      "exit_code": 0,
+      "signal": null,
+      "error": null,
+      "status": "completed"
+    },
+    {
+      "id": "worker-build",
+      "args": [
+        "--build",
+        "E:\\V10\\work\\vlikeon-qa-20261023\\build-batch-029\\worker",
+        "--config",
+        "Release",
+        "--target",
+        "omniplay-native-worker",
+        "--parallel",
+        "2"
+      ],
+      "elapsed_ms": 63018,
+      "exit_code": 0,
+      "signal": null,
+      "error": null,
+      "status": "completed"
+    },
+    {
+      "id": "fixture-configure",
+      "args": [
+        "-S",
+        "E:\\V10\\work\\vlikeon-qa-20261023\\native-source-v50\\qa\\native-lifecycle",
+        "-B",
+        "E:\\V10\\work\\vlikeon-qa-20261023\\build-batch-029\\fixtures",
+        "-G",
+        "Visual Studio 17 2022",
+        "-A",
+        "x64",
+        "-DOMNIPLAY_LIBRETRO_INCLUDE=E:\\V10\\work\\vlikeon-qa-20261023\\native-source-v50\\interface\\libretro"
+      ],
+      "elapsed_ms": 5376,
+      "exit_code": 0,
+      "signal": null,
+      "error": null,
+      "status": "completed"
+    },
+    {
+      "id": "fixture-build",
+      "args": [
+        "--build",
+        "E:\\V10\\work\\vlikeon-qa-20261023\\build-batch-029\\fixtures",
+        "--config",
+        "Release",
+        "--parallel",
+        "2"
+      ],
+      "elapsed_ms": 2980,
+      "exit_code": 0,
+      "signal": null,
+      "error": null,
+      "status": "completed"
+    }
+  ],
+  "artifacts": {
+    "worker/Release/omniplay-native-worker.exe": {
+      "bytes": 3091968,
+      "sha256": "b0c7f76ce5c3babac68e9c76c72a3cf7708c32e25ee04d9db34bbc943e0640b0"
+    },
+    "fixtures/Release/omniplay-lifecycle-fixture.dll": {
+      "bytes": 18944,
+      "sha256": "29fcefd50a6636f3c6aec464aa528764683c036a3c8562ac6310bb5fac9aeb68"
+    },
+    "fixtures/Release/omniplay-lifecycle-void-fixture.dll": {
+      "bytes": 18944,
+      "sha256": "2cc7b8ac10d411858a70e3ec0323cbabe57d9cba342d73e05f1a07057e996c80"
+    }
+  },
+  "source_unchanged": true,
+  "finished_at": "2026-10-22T22:04:15.865Z",
+  "status": "completed"
+}

@@ -1,5 +1,13 @@
 # Implementation status
 
+Antigravity batch029 built the current CRT-restoration worker and both updated
+qualification DLLs on frozen v50/base3823f29. Batch030 passed all3 private scratch
+environment cases,13 lifecycle and19 wire cases on those exact hashes. Codex
+inspected all case records and unchanged inputs. ASCII/Unicode Win32/wide/narrow
+CRT observations match; relative scratch is refused before core load. Evidence:
+`qa/evidence/antigravity/batch-029/` and `batch-030/`. These direct-worker cases
+do not resolve contained USER32/SDL loader dependencies or full Windows acceptance.
+
 Antigravity batch 028 on 942cda6 passed both actual AppContainer storage cases
 with actor exit zero and unchanged source hashes. All seven observations passed
 in each case: default file/directory/DACL/label mutation denied, private registry

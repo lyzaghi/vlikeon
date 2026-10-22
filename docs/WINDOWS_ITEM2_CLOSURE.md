@@ -4,9 +4,9 @@ The owner requested finishing item 2 before moving to item 3. Item 2 is still
 open. This checklist distinguishes implementation gaps from the execution
 reserved for full final acceptance. The owner now also permits exact test
 batches by Antigravity concurrently with Codex source authoring; see
-`QA_EXECUTION_POLICY.md`. No compiler, test,
-runtime, Windows API or fixture was executed for this audit or source change.
-There is no measured completion percentage.
+`QA_EXECUTION_POLICY.md`. Earlier source-only audit notes are retained below;
+selected real Windows batches now have the explicitly scoped evidence recorded
+here. There is no measured completion percentage.
 
 ## Authored host boundaries, awaiting item 16
 
@@ -55,10 +55,27 @@ limits are not measurements of whole-machine memory or storage.
    Finish the required source contracts before claiming that Windows can admit
    every original v1 route. Package exclusion is not completion of the route.
 
+4. **Finish contained worker dependency closure.** Actual batch022 staged loading
+   reached ADVAPI32, COMBASE and USERENV but failed USER32 initialization. The
+   currently built SDL worker imports USER32/GDI32/OLE32 and other desktop DLLs.
+   Complete the device-free software actor and trusted presentation dependency
+   separation in `engines/native`, SDL build selection and package receipts;
+   retain the required actor syscall/token/job boundaries. A successful direct
+   worker with dummy SDL drivers, a passing standalone storage probe, or excluding
+   an original route from the catalog does not complete this implementation.
+
 These are implementation obligations; a selected parallel test batch does not
 close them or replace the final acceptance pass. The historical detailed notes in `WINDOWS_NATIVE_COMPLETION.md` remain
 the supporting record. This list does not remove any original system/platform
 or claim that dependencies assigned another number have been completed.
+
+Actual batch028 passed the two explicit AppContainer storage cases on 942cda6:
+both grant modes, all seven required observations, actor exit zero and unchanged
+source. This resolves those fixture observations only. It also exposed/fixed a
+real registry value-write gap: package ALLOW masks must lose mutation rights;
+medium labels or package DENY ACEs alone did not enforce the required behavior.
+See `qa/evidence/antigravity/batch-028/`. Whole-profile quotas, core/helper/cache
+writes, package decision case28 and all other original Windows cases remain due.
 
 ## Transition and verified completion
 

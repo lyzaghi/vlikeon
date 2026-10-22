@@ -1,0 +1,388 @@
+{
+  "verification": "passed",
+  "artifacts": [
+    {
+      "path": "E:\\V10\\work\\vlikeon-qa-20261023\\build-batch-029\\worker\\Release\\omniplay-native-worker.exe",
+      "sha256": "b0c7f76ce5c3babac68e9c76c72a3cf7708c32e25ee04d9db34bbc943e0640b0"
+    },
+    {
+      "path": "E:\\V10\\work\\vlikeon-qa-20261023\\build-batch-029\\fixtures\\Release\\omniplay-lifecycle-fixture.dll",
+      "sha256": "29fcefd50a6636f3c6aec464aa528764683c036a3c8562ac6310bb5fac9aeb68"
+    },
+    {
+      "path": "E:\\V10\\work\\vlikeon-qa-20261023\\build-batch-029\\fixtures\\Release\\omniplay-lifecycle-void-fixture.dll",
+      "sha256": "2cc7b8ac10d411858a70e3ec0323cbabe57d9cba342d73e05f1a07057e996c80"
+    }
+  ],
+  "cases": [
+    {
+      "scenario": "normal",
+      "passed": true,
+      "exit_code": 0,
+      "calls": [
+        {
+          "method": "hello",
+          "status": "ok",
+          "error_code": null
+        },
+        {
+          "method": "prepare",
+          "status": "ok",
+          "error_code": null
+        },
+        {
+          "method": "start",
+          "status": "ok",
+          "error_code": null
+        },
+        {
+          "method": "status",
+          "status": "ok",
+          "error_code": null
+        },
+        {
+          "method": "status",
+          "status": "ok",
+          "error_code": null
+        },
+        {
+          "method": "pause",
+          "status": "ok",
+          "error_code": null
+        },
+        {
+          "method": "save",
+          "status": "ok",
+          "error_code": null
+        },
+        {
+          "method": "stop",
+          "status": "ok",
+          "error_code": null
+        }
+      ]
+    },
+    {
+      "scenario": "init-throw",
+      "passed": true,
+      "prepare_eof": true,
+      "exit_code": 1,
+      "calls": [
+        {
+          "method": "hello",
+          "status": "ok",
+          "error_code": null
+        }
+      ]
+    },
+    {
+      "scenario": "load-throw",
+      "passed": true,
+      "prepare_eof": true,
+      "exit_code": 1,
+      "calls": [
+        {
+          "method": "hello",
+          "status": "ok",
+          "error_code": null
+        }
+      ]
+    },
+    {
+      "scenario": "run-throw",
+      "passed": true,
+      "exit_code": 1,
+      "calls": [
+        {
+          "method": "hello",
+          "status": "ok",
+          "error_code": null
+        },
+        {
+          "method": "prepare",
+          "status": "ok",
+          "error_code": null
+        },
+        {
+          "method": "start",
+          "status": "ok",
+          "error_code": null
+        }
+      ]
+    },
+    {
+      "scenario": "serialize-throw",
+      "passed": true,
+      "exit_code": 1,
+      "calls": [
+        {
+          "method": "hello",
+          "status": "ok",
+          "error_code": null
+        },
+        {
+          "method": "prepare",
+          "status": "ok",
+          "error_code": null
+        },
+        {
+          "method": "start",
+          "status": "ok",
+          "error_code": null
+        },
+        {
+          "method": "status",
+          "status": "ok",
+          "error_code": null
+        },
+        {
+          "method": "status",
+          "status": "ok",
+          "error_code": null
+        }
+      ]
+    },
+    {
+      "scenario": "unserialize-throw",
+      "passed": true,
+      "exit_code": 1,
+      "calls": [
+        {
+          "method": "hello",
+          "status": "ok",
+          "error_code": null
+        },
+        {
+          "method": "prepare",
+          "status": "ok",
+          "error_code": null
+        },
+        {
+          "method": "start",
+          "status": "ok",
+          "error_code": null
+        },
+        {
+          "method": "status",
+          "status": "ok",
+          "error_code": null
+        },
+        {
+          "method": "status",
+          "status": "ok",
+          "error_code": null
+        }
+      ]
+    },
+    {
+      "scenario": "pause-refuse",
+      "passed": true,
+      "exit_code": 1,
+      "calls": [
+        {
+          "method": "hello",
+          "status": "ok",
+          "error_code": null
+        },
+        {
+          "method": "prepare",
+          "status": "ok",
+          "error_code": null
+        },
+        {
+          "method": "start",
+          "status": "ok",
+          "error_code": null
+        },
+        {
+          "method": "status",
+          "status": "ok",
+          "error_code": null
+        },
+        {
+          "method": "status",
+          "status": "ok",
+          "error_code": null
+        },
+        {
+          "method": "pause",
+          "status": "error",
+          "error_code": "runtime_crashed"
+        }
+      ]
+    },
+    {
+      "scenario": "pause-throw",
+      "passed": true,
+      "exit_code": 1,
+      "calls": [
+        {
+          "method": "hello",
+          "status": "ok",
+          "error_code": null
+        },
+        {
+          "method": "prepare",
+          "status": "ok",
+          "error_code": null
+        },
+        {
+          "method": "start",
+          "status": "ok",
+          "error_code": null
+        },
+        {
+          "method": "status",
+          "status": "ok",
+          "error_code": null
+        },
+        {
+          "method": "status",
+          "status": "ok",
+          "error_code": null
+        }
+      ]
+    },
+    {
+      "scenario": "pause-invalid",
+      "passed": true,
+      "exit_code": 1,
+      "calls": [
+        {
+          "method": "hello",
+          "status": "ok",
+          "error_code": null
+        },
+        {
+          "method": "prepare",
+          "status": "ok",
+          "error_code": null
+        },
+        {
+          "method": "start",
+          "status": "ok",
+          "error_code": null
+        },
+        {
+          "method": "status",
+          "status": "ok",
+          "error_code": null
+        },
+        {
+          "method": "status",
+          "status": "ok",
+          "error_code": null
+        },
+        {
+          "method": "pause",
+          "status": "error",
+          "error_code": "runtime_crashed"
+        }
+      ]
+    },
+    {
+      "scenario": "unload-throw",
+      "passed": true,
+      "exit_code": 1,
+      "calls": [
+        {
+          "method": "hello",
+          "status": "ok",
+          "error_code": null
+        },
+        {
+          "method": "prepare",
+          "status": "ok",
+          "error_code": null
+        },
+        {
+          "method": "start",
+          "status": "ok",
+          "error_code": null
+        },
+        {
+          "method": "status",
+          "status": "ok",
+          "error_code": null
+        },
+        {
+          "method": "status",
+          "status": "ok",
+          "error_code": null
+        }
+      ]
+    },
+    {
+      "scenario": "deinit-throw",
+      "passed": true,
+      "exit_code": 1,
+      "calls": [
+        {
+          "method": "hello",
+          "status": "ok",
+          "error_code": null
+        },
+        {
+          "method": "prepare",
+          "status": "ok",
+          "error_code": null
+        },
+        {
+          "method": "start",
+          "status": "ok",
+          "error_code": null
+        },
+        {
+          "method": "status",
+          "status": "ok",
+          "error_code": null
+        },
+        {
+          "method": "status",
+          "status": "ok",
+          "error_code": null
+        }
+      ]
+    },
+    {
+      "scenario": "void-only",
+      "passed": true,
+      "exit_code": 1,
+      "calls": [
+        {
+          "method": "hello",
+          "status": "ok",
+          "error_code": null
+        },
+        {
+          "method": "prepare",
+          "status": "error",
+          "error_code": "runtime_crashed"
+        }
+      ]
+    },
+    {
+      "scenario": "protocol-zero",
+      "passed": true,
+      "exit_code": 0,
+      "calls": [
+        {
+          "method": "hello",
+          "status": "ok",
+          "error_code": null
+        },
+        {
+          "method": "prepare",
+          "status": "error",
+          "error_code": "unsupported_capability"
+        },
+        {
+          "method": "stop",
+          "status": "ok",
+          "error_code": null
+        }
+      ]
+    }
+  ],
+  "scope": "actual direct Windows worker and qualification DLL with SDL dummy drivers; no broker/AppContainer/real-core/device proof"
+}

@@ -6,6 +6,8 @@ actual actor exit code zero before retirement. Each required all seven booleans:
 default AC file creation denied; package directory creation, WRITE_DAC and
 label lowering denied; private registry key creation and actual value writing
 denied; explicit private scratch writable only in the assigned writable case.
+The value route requests KEY_SET_VALUE and, if admitted, attempts RegSetValueEx;
+success is refused unless one of those steps rejects mutation access.
 
 The first case creates, writes, flushes and deletes a real scratch file. The
 second uses a separate compiled readonly probe and withholds that scratch grant.
