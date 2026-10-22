@@ -1,0 +1,15 @@
+Vlikeon Browser
+Copyright 2026 the respective Vlikeon Browser contributors.
+
+Previously developed under the working name OmniPlay. Existing copyright and
+license notices using that name remain valid and are preserved.
+
+Original project material is offered under Apache License 2.0 unless a separate
+file or component notice applies. This repository also contains Chromium-derived
+reference source, copyright The Chromium Authors, under its BSD-style license.
+See licenses/Chromium-LICENSE and LICENSING.md for scope and exceptions.
+
+Third-party projects retain their own licenses and attribution requirements.
+security/dependencies.json records selected source provenance and outstanding
+distribution reviews. This notice does not approve binary distribution, assert
+a completed license audit or imply endorsement by any third party.
