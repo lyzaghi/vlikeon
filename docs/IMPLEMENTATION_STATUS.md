@@ -1,5 +1,13 @@
 # Implementation status
 
+Antigravity batch 002 reached Cargo on a8b5c4d but executed no tests: --locked
+rejected stale workspace dependency edges in Cargo.lock. Codex synchronized the
+workspace lockfile, adding broker libc/sandbox and native-runtime libc edges;
+Cargo reported zero external package updates. The exact test restriction stays
+in place for the retry. A pinned official project-local Rust 1.89.0 MSVC toolchain
+is now prepared without installer, registry or persistent PATH changes; see
+`WINDOWS_RUST_TOOLCHAIN.md`. Compilation/native test acceptance is still pending.
+
 Antigravity batch 001 has now executed on frozen commit 264d4d0: 13 Node unit
 tests passed, none failed/skipped, both exit codes zero and stderr empty.
 Codex reviewed the TAP logs and unchanged source hashes. Evidence is under

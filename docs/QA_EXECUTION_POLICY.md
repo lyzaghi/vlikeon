@@ -29,6 +29,10 @@ fixes, change tests/expectations/golden files, edit product source, install
 dependencies, weaken permissions, broaden command scope, commit/push/publish,
 declare a roadmap item finished or approve a release. A new execution batch
 requires an explicit Codex assignment within the owner's authorized scope.
+An exact released Cargo test batch may explicitly authorize normal locked
+dependency download/compilation into its isolated cache/target directory. This
+does not authorize ad hoc installs, version changes, global environment edits
+or changes to source, tests or lockfiles.
 
 ## Timing and evidence
 
@@ -69,3 +73,10 @@ empty stderr and unchanged source hashes. Codex reviewed the raw TAP logs.
 Evidence is in `qa/evidence/antigravity/batch-001/` at source commit 264d4d0.
 This resolves the initial execution blocker for that batch. It establishes only
 those unit cases, not actual Chromium, native Windows or whole-product behavior.
+
+Batch 002 attempted the native Rust control-worker filter on a8b5c4d. Cargo
+returned 101 because the committed lockfile lacked workspace dependency edges;
+no test executed and the second filter was not attempted. Codex repaired only
+the missing lock edges with `cargo update --workspace` (zero package updates).
+The retry must keep --locked and use a new frozen source/batch, not edit the
+failed snapshot or replay its evidence directory.

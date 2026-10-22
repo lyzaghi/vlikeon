@@ -1381,11 +1381,13 @@ name = "omniplay-broker"
 version = "0.1.0"
 dependencies = [
  "base64 0.22.1",
+ "libc",
  "omniplay-contracts",
  "omniplay-core",
  "omniplay-device-info",
  "omniplay-local-service",
  "omniplay-native-runtime",
+ "omniplay-sandbox",
  "omniplay-stream-input",
  "omniplay-streaming",
  "omniplay-sync-client",
@@ -1472,6 +1474,7 @@ dependencies = [
 name = "omniplay-native-runtime"
 version = "0.1.0"
 dependencies = [
+ "libc",
  "omniplay-contracts",
  "omniplay-core",
  "omniplay-sandbox",
