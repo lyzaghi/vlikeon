@@ -27,9 +27,10 @@ static std::wstring private_folder() {
   std::wstring value(path);CoTaskMemFree(path);return value;
 }
 
-static bool create_file(const std::wstring& path,bool expect_denied) {
+static bool create_file(const std::wstring& path,bool expect_denied,DWORD& error) {
   const auto file=CreateFileW(path.c_str(),GENERIC_WRITE,0,nullptr,CREATE_NEW,FILE_ATTRIBUTE_NORMAL,nullptr);
-  if(file==INVALID_HANDLE_VALUE)return expect_denied&&GetLastError()==ERROR_ACCESS_DENIED;
+  error=file==INVALID_HANDLE_VALUE?GetLastError():ERROR_SUCCESS;
+  if(file==INVALID_HANDLE_VALUE)return expect_denied&&error==ERROR_ACCESS_DENIED;
   static constexpr char contents[]="OmniPlay final storage probe";DWORD written=0;
   const auto size=static_cast<DWORD>(sizeof(contents));
   const bool wrote=WriteFile(file,contents,size,&written,nullptr)&&written==size&&FlushFileBuffers(file);
@@ -57,19 +58,22 @@ static bool lower_label_denied(const std::wstring& path) {
   LocalFree(descriptor);return result==ERROR_ACCESS_DENIED;
 }
 
-struct RegistryObservation {bool create_denied=false;bool set_denied=false;};
+struct RegistryObservation {bool create_denied=false;bool set_denied=false;HRESULT lookup=E_FAIL;DWORD create=ERROR_INVALID_FUNCTION;HRESULT write=E_FAIL;};
 static RegistryObservation registry_writes_denied(const std::wstring& name) {
   RegistryObservation observed;HKEY readonly=nullptr;
-  if(FAILED(GetAppContainerRegistryLocation(KEY_READ,&readonly))||!readonly){if(readonly)RegCloseKey(readonly);return observed;}
+  observed.lookup=GetAppContainerRegistryLocation(KEY_READ,&readonly);
+  if(FAILED(observed.lookup)||!readonly){if(readonly)RegCloseKey(readonly);return observed;}
   // RegCreateKeyEx checks the key's security descriptor, not merely the access
   // mask on this readonly handle. It can create the child if the policy leaks.
   HKEY child=nullptr;DWORD disposition=0;
   const auto created=RegCreateKeyExW(readonly,name.c_str(),0,nullptr,REG_OPTION_NON_VOLATILE,KEY_READ|KEY_WRITE,nullptr,&child,&disposition);
+  observed.create=created;
   observed.create_denied=created==ERROR_ACCESS_DENIED;
   if(child)RegCloseKey(child);
   if(created==ERROR_SUCCESS&&disposition==REG_CREATED_NEW_KEY)RegDeleteKeyW(readonly,name.c_str());
   RegCloseKey(readonly);
   HKEY writable=nullptr;const auto opened=GetAppContainerRegistryLocation(KEY_SET_VALUE,&writable);
+  observed.write=opened;
   observed.set_denied=opened==HRESULT_FROM_WIN32(ERROR_ACCESS_DENIED);
   if(writable)RegCloseKey(writable);
   return observed;
@@ -87,7 +91,8 @@ int wmain() {
   const auto name=L"omniplay-probe-"+std::to_wstring(GetCurrentProcessId());
   wchar_t temporary[32768];const auto length=GetEnvironmentVariableW(L"TMP",temporary,32768);
   if(!length||length>=32768)return invalid_observation("scratch-environment",3);
-  const bool denied_file=create_file(folder+L"\\"+name+L".tmp",true);
+  DWORD default_error=0,scratch_error=0;
+  const bool denied_file=create_file(folder+L"\\"+name+L".tmp",true,default_error);
   const bool denied_directory=create_directory_denied(package+L"\\"+name);
   const bool denied_dacl=write_dacl_denied(package);
   const bool denied_label=lower_label_denied(package);
@@ -95,13 +100,16 @@ int wmain() {
   const auto scratch_attributes=GetFileAttributesW(temporary);
   if(scratch_attributes==INVALID_FILE_ATTRIBUTES||!(scratch_attributes&FILE_ATTRIBUTE_DIRECTORY))return invalid_observation("scratch-directory",4);
 #ifdef OMNIPLAY_EXPECT_SCRATCH_DENIED
-  const bool scratch_allowed=create_file(std::wstring(temporary)+L"\\"+name+L".tmp",true);
+  const bool scratch_allowed=create_file(std::wstring(temporary)+L"\\"+name+L".tmp",true,scratch_error);
   const char* protocol="storage-probe-readonly-v1";
 #else
-  const bool scratch_allowed=create_file(std::wstring(temporary)+L"\\"+name+L".tmp",false);
+  const bool scratch_allowed=create_file(std::wstring(temporary)+L"\\"+name+L".tmp",false,scratch_error);
   const char* protocol="storage-probe-v2";
 #endif
   std::printf("%s %d %d %d %d %d %d %d\n",protocol,denied_file,denied_directory,denied_dacl,denied_label,registry.create_denied,registry.set_denied,scratch_allowed);
+  if(!denied_file||!registry.create_denied||!registry.set_denied||!scratch_allowed){
+    std::printf("storage-probe-errors default=%lu scratch=%lu registry-read=%08lx registry-create=%lu registry-write=%08lx\n",default_error,scratch_error,static_cast<unsigned long>(registry.lookup),registry.create,static_cast<unsigned long>(registry.write));
+  }
   std::fflush(stdout);
   return denied_file&&denied_directory&&denied_dacl&&denied_label&&registry.create_denied&&registry.set_denied&&scratch_allowed?0:1;
 }
