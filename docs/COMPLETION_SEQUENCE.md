@@ -13,14 +13,18 @@ copies while Codex writes source; full acceptance remains item 16. See
 `QA_EXECUTION_POLICY.md`.
 
 Current source item: **2 — Windows native runtime lifecycle and containment**.
-The current substep adds explicit retained-work reasons and localized operator
-guidance after bounded ownership of broker IPC and recovery workers. Actual
-broker/process/pipe/core/save qualification is still deferred to item 16.
+The current substep investigates real AppContainer storage and loader behavior
+after adding retained-work reasons, operator guidance and bounded broker workers.
+Selected concurrent Antigravity batches have compiled the broker/worker and
+passed the dedicated 13 lifecycle and 19 wire cases on real Windows processes.
+These use fixture DLLs/dummy drivers and do not replace the full production
+broker/process/core/save/device qualification required by item 16.
 The recovery worker also retains a process-wide single slot across broker
 replacement. `WINDOWS_ITEM2_CLOSURE.md` is the remaining source-closure list;
 no item-2 completion or transition to item 3 has been recorded.
 The five reason counters do not grant deletion authority or complete legacy
-migration. Three real Windows fixture cases are authored, not executed.
+migration. The three retained-work regression fixtures passed in batch 005;
+actual storage probes remain failing and cannot establish denial/compatibility.
 Earlier N64 source work adds bounded snapshot event queues, PIF pointer
 preflight, format-selected DD ID reads, TLB field/lookup admission and finite
 last-page map/unmap walks with an interpreter random-index guard.

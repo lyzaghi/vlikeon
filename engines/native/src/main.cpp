@@ -10,8 +10,20 @@
 #include <sys/resource.h>
 #endif
 #ifdef _WIN32
+#include <windows.h>
 #include <fcntl.h>
 #include <io.h>
+#include <vector>
+
+static bool restore_private_temporary_directory(){
+  std::vector<wchar_t> path(32768);
+  const auto length=GetEnvironmentVariableW(L"OMNIPLAY_PRIVATE_SCRATCH",path.data(),static_cast<DWORD>(path.size()));
+  if(!length)return GetLastError()==ERROR_ENVVAR_NOT_FOUND; // Standalone qualification has no host scratch contract.
+  if(length>=path.size()||!std::filesystem::path(path.data()).is_absolute())return false;
+  // AppContainer construction can rewrite TEMP/TMP. Restore only the explicit
+  // host-selected directory; its existing ACL/label controls write authority.
+  return SetEnvironmentVariableW(L"TEMP",path.data())&&SetEnvironmentVariableW(L"TMP",path.data());
+}
 #endif
 
 static std::uintptr_t endpoint(const char* text){if(!text||!*text||std::strlen(text)>20||(*text=='0'&&text[1]))throw omni::Failure("invalid_request");std::uintptr_t result=0;const auto end=text+std::strlen(text);const auto value=std::from_chars(text,end,result);if(value.ec!=std::errc{}||value.ptr!=end||!result)throw omni::Failure("invalid_request");return result;}
@@ -25,6 +37,7 @@ int main(int argc,char** argv){
   std::optional<omni::presentation::Admission> admission;
   try{if(argc<2||std::strcmp(argv[1],"--stdio-runtime-v1")!=0)return 2;if(argc==6&&std::strcmp(argv[2],"--presentation-client-v2")==0)admission=omni::presentation::Admission{omni::presentation::session_from_text(std::span<const char>(argv[3],std::strlen(argv[3]))),endpoint(argv[4]),endpoint(argv[5])};else if(argc!=2)return 2;}catch(...){return 2;}
 #ifdef _WIN32
+  if(!restore_private_temporary_directory())return 2;
   if(_setmode(_fileno(stdin),_O_BINARY)==-1||_setmode(_fileno(stdout),_O_BINARY)==-1)return 2;
 #endif
   if(!omni::initialize_transport())return 2;

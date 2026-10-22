@@ -27,10 +27,14 @@ static std::wstring private_folder() {
   std::wstring value(path);CoTaskMemFree(path);return value;
 }
 
+static bool denied_write(DWORD error) {
+  return error==ERROR_ACCESS_DENIED||error==ERROR_PRIVILEGE_NOT_HELD;
+}
+
 static bool create_file(const std::wstring& path,bool expect_denied,DWORD& error) {
   const auto file=CreateFileW(path.c_str(),GENERIC_WRITE,0,nullptr,CREATE_NEW,FILE_ATTRIBUTE_NORMAL,nullptr);
   error=file==INVALID_HANDLE_VALUE?GetLastError():ERROR_SUCCESS;
-  if(file==INVALID_HANDLE_VALUE)return expect_denied&&error==ERROR_ACCESS_DENIED;
+  if(file==INVALID_HANDLE_VALUE)return expect_denied&&denied_write(error);
   static constexpr char contents[]="OmniPlay final storage probe";DWORD written=0;
   const auto size=static_cast<DWORD>(sizeof(contents));
   const bool wrote=WriteFile(file,contents,size,&written,nullptr)&&written==size&&FlushFileBuffers(file);
@@ -98,13 +102,19 @@ static RegistryObservation registry_writes_denied(const std::wstring& name) {
   HKEY child=nullptr;DWORD disposition=0;
   const auto created=RegCreateKeyExW(readonly,name.c_str(),0,nullptr,REG_OPTION_NON_VOLATILE,KEY_READ|KEY_WRITE,nullptr,&child,&disposition);
   observed.create=created;
-  observed.create_denied=created==ERROR_ACCESS_DENIED;
+  observed.create_denied=denied_write(created);
   if(child)RegCloseKey(child);
   if(created==ERROR_SUCCESS&&disposition==REG_CREATED_NEW_KEY)RegDeleteKeyW(readonly,name.c_str());
   RegCloseKey(readonly);
   HKEY writable=nullptr;const auto opened=GetAppContainerRegistryLocation(KEY_SET_VALUE,&writable);
   observed.write=opened;
-  observed.set_denied=opened==HRESULT_FROM_WIN32(ERROR_ACCESS_DENIED);
+  observed.set_denied=opened==HRESULT_FROM_WIN32(ERROR_ACCESS_DENIED)||opened==HRESULT_FROM_WIN32(ERROR_PRIVILEGE_NOT_HELD);
+  if(SUCCEEDED(opened)&&writable){
+    const DWORD value=1;
+    const auto written=RegSetValueExW(writable,name.c_str(),0,REG_DWORD,reinterpret_cast<const BYTE*>(&value),sizeof(value));
+    observed.write=HRESULT_FROM_WIN32(written);observed.set_denied=denied_write(written);
+    if(written==ERROR_SUCCESS)RegDeleteValueW(writable,name.c_str());
+  }
   if(writable)RegCloseKey(writable);
   return observed;
 }
@@ -119,7 +129,9 @@ int wmain() {
   if(split==std::wstring::npos||_wcsicmp(folder.substr(split+1).c_str(),L"AC"))return invalid_observation("private-folder",2);
   const auto package=folder.substr(0,split);
   const auto name=L"omniplay-probe-"+std::to_wstring(GetCurrentProcessId());
-  wchar_t temporary[32768];const auto length=GetEnvironmentVariableW(L"TMP",temporary,32768);
+  // Windows may replace TMP/TEMP with its default private AC subtree while
+  // constructing the AppContainer. Test the exact host-granted work subtree.
+  wchar_t temporary[32768];const auto length=GetEnvironmentVariableW(L"OMNIPLAY_PRIVATE_SCRATCH",temporary,32768);
   if(!length||length>=32768)return invalid_observation("scratch-environment",3);
   DWORD default_error=0,scratch_error=0;
   const bool denied_file=create_file(folder+L"\\"+name+L".tmp",true,default_error);

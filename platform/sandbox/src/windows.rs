@@ -221,7 +221,7 @@ fn environment(working_directory:&Path)->Result<Vec<u16>> {
     // Supply its required known-folder location without inheriting arbitrary
     // parent variables/credentials or granting any additional filesystem access.
     let local=local_app_data()?;
-    let mut entries=vec![format!("LOCALAPPDATA={local}"),format!("PATH={system}\\System32"),format!("SystemRoot={system}"),format!("TEMP={work}\\scratch"),format!("TMP={work}\\scratch"),format!("WINDIR={system}")];entries.sort_by_key(|v|v.to_ascii_lowercase());
+    let mut entries=vec![format!("LOCALAPPDATA={local}"),format!("OMNIPLAY_PRIVATE_SCRATCH={work}\\scratch"),format!("PATH={system}\\System32"),format!("SystemRoot={system}"),format!("TEMP={work}\\scratch"),format!("TMP={work}\\scratch"),format!("WINDIR={system}")];entries.sort_by_key(|v|v.to_ascii_lowercase());
     let mut block=Vec::new();for entry in entries{block.extend(wide(OsStr::new(&entry))?);}block.push(0);Ok(block)
 }
 
