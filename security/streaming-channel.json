@@ -1,0 +1,8 @@
+{
+  "schema_version":1,
+  "enabled":false,
+  "relay_origins":[],
+  "allow_browser_host":true,
+  "allow_remote_input":false,
+  "default_profile":"p720_60"
+}

@@ -1,0 +1,9 @@
+{
+  "schema_version": 1,
+  "enabled": false,
+  "protocol": 1,
+  "wasm_path": null,
+  "wasm_bytes": 0,
+  "wasm_sha256": null,
+  "distribution_approved": false
+}

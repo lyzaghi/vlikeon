@@ -1,0 +1,12 @@
+[Unit]
+Description=OmniPlay native runtime authority socket
+
+[Socket]
+ListenStream=%t/omniplay/native-host.sock
+SocketMode=0600
+DirectoryMode=0700
+RemoveOnStop=yes
+Service=omniplay-native-host.service
+
+[Install]
+WantedBy=sockets.target

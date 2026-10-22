@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="color-scheme" content="dark light">
+  <title>OmniPlay — Thư viện game</title>
+  <link rel="stylesheet" href="styles.css">
+  <script src="app.js" type="module"></script>
+</head>
+<body>
+  <a class="skip-link" href="#main">Đi tới nội dung</a>
+  <div class="application">
+    <aside class="sidebar" aria-label="Điều hướng chính">
+      <a class="brand" href="#library" aria-label="OmniPlay"><span class="brand-mark" aria-hidden="true">O<span></span></span><span>OmniPlay<small>YOUR PLAY SPACE</small></span></a>
+      <p class="nav-caption" data-i18n="workspace">KHÔNG GIAN CỦA BẠN</p>
+      <nav>
+        <button class="nav-item selected" data-view="library" aria-current="page"><span aria-hidden="true">◫</span><span data-i18n="library">Thư viện</span><span id="library-count" class="nav-count">0</span></button>
+        <button class="nav-item" data-view="saves"><span aria-hidden="true">◷</span><span data-i18n="saves">Tiến trình đã lưu</span></button>
+        <button class="nav-item" data-view="devices"><span aria-hidden="true">⌁</span><span data-i18n="devices">Thiết bị</span></button>
+        <button class="nav-item" data-view="browser" id="browser-nav" hidden><span aria-hidden="true">◎</span><span data-i18n="browser">Trình duyệt</span></button>
+      </nav>
+      <div class="sidebar-bottom">
+        <div class="local-badge"><span class="status-dot"></span><div><strong data-i18n="localFirst">Dữ liệu trên thiết bị</strong><small data-i18n="accountOptional">Chơi không cần tài khoản</small></div></div>
+        <button class="nav-item" data-view="settings"><span aria-hidden="true">⚙</span><span data-i18n="settings">Cài đặt</span></button>
+        <button class="nav-item" id="diagnostics-button"><span aria-hidden="true">⌘</span><span data-i18n="diagnostics">Chẩn đoán</span></button>
+      </div>
+    </aside>
+    <div class="workspace">
+      <header class="topbar">
+        <div class="breadcrumb">OmniPlay <span>/</span> <strong id="breadcrumb-view" data-i18n="library">Thư viện</strong></div>
+        <div class="topbar-actions"><span id="controller-status" class="device-status" role="status">Chưa kết nối tay cầm</span><button class="button button-secondary" id="installed-button">＋ PC</button><button class="button button-primary" id="import-button"><span aria-hidden="true">＋</span><span data-i18n="addGame">Thêm game</span></button></div>
+      </header>
+      <main id="main" tabindex="-1">
+        <section id="connection-banner" class="connection-banner" hidden role="status"><strong data-i18n="connectionTitle">Kết nối thư viện cục bộ</strong><p id="connection-message"></p><button class="button button-secondary" id="reconnect-button" data-i18n="retry">Kết nối lại</button></section>
+        <section id="view-browser" class="view" hidden></section>
+        <section id="view-library" class="view">
+          <div class="page-heading"><div><p class="eyebrow" data-i18n="readyWhenYouAre">SẴN SÀNG KHI BẠN MUỐN</p><h1 data-i18n="yourLibrary">Thư viện của bạn</h1><p class="muted" data-i18n="libraryDescription">Game yêu thích, cấu hình và tiến trình chơi trong một không gian.</p></div><div class="library-symbol" aria-hidden="true">✳</div></div>
+          <div class="library-toolbar"><label class="search-box"><span aria-hidden="true">⌕</span><span class="sr-only" data-i18n="search">Tìm game</span><input id="search-input" type="search" maxlength="150" placeholder="Tìm trong thư viện…" autocomplete="off"></label><label class="filter-label"><span class="sr-only" data-i18n="system">Hệ máy</span><select id="system-filter"><option value="all">Tất cả hệ máy</option value="nes">NES</option value="gb">Game Boy</option value="gbc">Game Boy Color</option value="snes">SNES</option><option value="gba">Game Boy Advance</option><option value="mega_drive">Mega Drive</option><option value="ps1">PlayStation</option><option value="n64">Nintendo 64</option><option value="nds">Nintendo DS</option><option value="psp">PSP</option><option value="pc">PC</option></select></label></div>
+          <p class="result-count" id="result-count" role="status"></p>
+          <div id="game-grid" class="game-grid" aria-label="Game trong thư viện"></div>
+          <section id="empty-library" class="empty-state" hidden><div class="empty-art" aria-hidden="true"><span>＋</span><i></i><i></i></div><h2 data-i18n="emptyTitle">Bắt đầu một hành trình chơi mới</h2><p data-i18n="emptyDescription">Thêm game bạn có quyền sử dụng. OmniPlay lưu thư viện và tiến trình trên thiết bị của bạn.</p><button class="button button-primary" id="empty-import-button" data-i18n="addFirstGame">Thêm game đầu tiên</button><small data-i18n="noGamesIncluded">Ứng dụng không đi kèm ROM hoặc BIOS thương mại.</small></section>
+          <button id="load-more-button" class="button button-secondary load-more" hidden data-i18n="loadMore">Xem thêm</button>
+        </section>
+        <section id="view-saves" class="view" hidden><div class="page-heading"><div><p class="eyebrow">SAVE HISTORY</p><h1 data-i18n="saves">Tiến trình đã lưu</h1><p class="muted" data-i18n="savesDescription">Chọn một game để xem lịch sử lưu, kiểm tra phiên bản và xuất dữ liệu.</p></div></div><div id="save-game-list" class="list-stack"></div></section>
+        <section id="view-devices" class="view" hidden><div class="page-heading"><div><p class="eyebrow">PLAY YOUR WAY</p><h1 data-i18n="devices">Thiết bị</h1><p class="muted" data-i18n="devicesDescription">Kiểm tra tay cầm và khả năng đồ họa của thiết bị đang dùng.</p></div></div><div class="device-layout"><section class="panel"><h2 data-i18n="controllers">Tay cầm</h2><div id="controller-list"></div><p class="muted small" data-i18n="controllerHint">Kết nối tay cầm rồi nhấn một nút để trình duyệt nhận diện.</p></section><section class="panel"><h2 data-i18n="deviceCapabilities">Khả năng thiết bị</h2><dl id="capability-list" class="definition-list"></dl></section></div></section>
+        <section id="view-settings" class="view" hidden><div class="page-heading"><div><p class="eyebrow">MAKE IT YOURS</p><h1 data-i18n="settings">Cài đặt</h1><p class="muted" data-i18n="settingsDescription">Tùy chỉnh trải nghiệm, khả năng tiếp cận và quyền riêng tư.</p></div></div><form id="settings-form" class="panel settings-form"><label><span data-i18n="language">Ngôn ngữ</span><select name="locale"><option value="vi">Tiếng Việt</option><option value="en">English</option></select></label><label><span data-i18n="textScale">Cỡ chữ</span><select name="text_scale"><option value="1">100%</option><option value="1.25">125%</option><option value="1.5">150%</option><option value="2">200%</option></select></label><label><span data-i18n="reduceMotion">Giảm chuyển động</span><input name="reduce_motion" type="checkbox" role="switch"></label><label><span data-i18n="highContrast">Tương phản cao</span><input name="high_contrast" type="checkbox" role="switch"></label><p class="muted small" data-i18n="privacyDescription">Thư viện và bản lưu được giữ cục bộ. Gói chẩn đoán chỉ được xuất khi bạn chủ động chọn.</p><button class="button button-primary" type="submit" data-i18n="saveSettings">Lưu cài đặt</button></form></section>
+      </main>
+      <footer class="workspace-footer"><span>OmniPlay</span><span id="footer-status" role="status"></span><span data-i18n="localPrivacy">Thư viện riêng tư · Bạn kiểm soát dữ liệu</span></footer>
+    </div>
+  </div>
+  <dialog id="detail-dialog" class="detail-dialog"><div id="detail-content"></div></dialog>
+  <dialog id="import-dialog"><form id="import-form"><div class="dialog-heading"><h2 data-i18n="addGame">Thêm game</h2><button class="icon-button" type="button" data-close-dialog aria-label="Đóng">×</button></div><label class="field-label"><span data-i18n="gameTitle">Tên game</span><input name="title" required maxlength="150"></label><label class="field-label"><span data-i18n="system">Hệ máy</span><select name="system" required><option value="nes">NES</option><option value="gb">Game Boy</option><option value="gbc">Game Boy Color</option><option value="snes">SNES</option><option value="gba">Game Boy Advance</option><option value="mega_drive">Mega Drive</option><option value="ps1">PlayStation</option><option value="n64">Nintendo 64</option><option value="nds">Nintendo DS</option><option value="psp">PSP</option><option value="pc">PC</option></select></label><p class="muted small" data-i18n="importNotice">Chọn đúng hệ máy của tệp. Khả năng chơi phụ thuộc runtime và BIOS phù hợp.</p><button type="submit" class="button button-primary" data-i18n="importGame">Thêm vào thư viện</button></form></dialog>
+  <div id="toast-region" class="toast-region" aria-live="polite" aria-atomic="true"></div>
+  <dialog id="installed-dialog"><form id="installed-form"><div class="dialog-heading"><h2 data-i18n="installedGame">Game PC đã cài</h2><button class="icon-button" type="button" data-close-dialog aria-label="Đóng">×</button></div><label class="field-label"><span data-i18n="gameTitle">Tên game</span><input name="title" required maxlength="150"></label><p class="muted small" data-i18n="installedDescription">Chọn tệp chạy của game trên máy. Game dùng thư mục cài đặt và cách lưu tiến trình riêng của nó.</p><button type="submit" class="button button-primary" data-i18n="chooseExecutable">Chọn game đã cài</button></form></dialog>
+</body>
+</html>

@@ -1,0 +1,19 @@
+[package]
+name = "omniplay-mobile"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[lib]
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[dependencies]
+omniplay-contracts.workspace = true
+omniplay-core.workspace = true
+omniplay-local-service.workspace = true
+omniplay-sync-client.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+uuid.workspace = true
+zeroize.workspace = true

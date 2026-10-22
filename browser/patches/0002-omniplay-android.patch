@@ -1,0 +1,163 @@
+--- a/chrome/android/BUILD.gn
++++ b/chrome/android/BUILD.gn
+@@ -165,6 +165,7 @@
+ 
+   android_resources("chrome_app_java_resources") {
+     sources = chrome_java_resources
++    sources += [ "omniplay/res/values/omniplay.xml", "omniplay/res/values-vi/omniplay.xml" ]
+     sources += [
+       "//chrome/android/java/res_app/layout/main.xml",
+       "//chrome/android/java/res_app/layout/main_forked_with_secondary_ui_container.xml",
+@@ -894,6 +895,19 @@
+     # From java_sources.gni.
+     sources = chrome_java_sources
+ 
++    # OmniPlay uses this Chromium renderer and the shared local Rust host.
++    sources += [
++      "omniplay/java/org/chromium/chrome/browser/omniplay/AssetServer.java",
++      "omniplay/java/org/chromium/chrome/browser/omniplay/BackgroundSyncService.java",
++      "omniplay/java/org/chromium/chrome/browser/omniplay/DeviceSnapshot.java",
++      "omniplay/java/org/chromium/chrome/browser/omniplay/GameHubController.java",
++      "omniplay/java/org/chromium/chrome/browser/omniplay/NativeCore.java",
++      "omniplay/java/org/chromium/chrome/browser/omniplay/NativeDocuments.java",
++      "omniplay/java/org/chromium/chrome/browser/omniplay/SecureCredentials.java",
++      "omniplay/java/org/chromium/chrome/browser/omniplay/SelectedDiscTree.java",
++    ]
++    deps += [ "//chrome/android/omniplay:assets" ]
++
+     # Include sources from feed_java_sources.gni.
+     sources += feed_java_sources
+     srcjar_deps += feed_srcjar_deps
+--- a/chrome/android/chrome_public_apk_tmpl.gni
++++ b/chrome/android/chrome_public_apk_tmpl.gni
+@@ -326,7 +326,7 @@
+       }
+ 
+       proguard_enabled = true
+-      proguard_configs = [ "//chrome/android/proguard/main.flags" ]
++      proguard_configs = [ "//chrome/android/proguard/main.flags", "//chrome/android/omniplay/proguard.flags" ]
+       if (_is_test) {
+         proguard_configs += [ "//chrome/android/proguard/apk_for_test.flags" ]
+       }
+@@ -519,6 +519,9 @@
+     }
+ 
+     shared_libraries = []
++    if (!_is_test && !_is_trichrome) {
++      shared_libraries += [ "//chrome/android/omniplay:omniplay_mobile" ]
++    }
+     if (android_64bit_target_cpu) {
+       secondary_abi_shared_libraries = []
+     }
+--- a/chrome/android/java/src/org/chromium/chrome/browser/ChromeTabbedActivity.java
++++ b/chrome/android/java/src/org/chromium/chrome/browser/ChromeTabbedActivity.java
+@@ -17,6 +17,7 @@
+ import static org.chromium.chrome.browser.url_constants.UrlConstantResolver.getOriginalNativeNtpUrl;
+ 
+ import android.app.Activity;
++import org.chromium.chrome.browser.omniplay.GameHubController;
+ import android.app.ApplicationStartInfo;
+ import android.content.Context;
+ import android.content.Intent;
+@@ -1653,6 +1654,8 @@
+         }
+     }
+ 
++    private @Nullable GameHubController mOmniPlayHub;
++
+     @Override
+     public void finishNativeInitialization() {
+         try (TraceEvent te = TraceEvent.scoped("ChromeTabbedActivity.finishNativeInitialization")) {
+@@ -1722,6 +1725,7 @@
+ 
+     @Override
+     public void onResumeWithNative() {
++        if (mOmniPlayHub != null) mOmniPlayHub.onActivityResume();
+         // While the super#onResumeWithNative call below also invokes #startUmaSession, we call
+         // it here (early) as well to setup the UMA activity state for any metrics emitted prior
+         // to call to super#onResumeWithNative below. It's safe to call #startUmaSession in both
+@@ -1788,6 +1792,7 @@
+ 
+     @Override
+     public void onPauseWithNative() {
++        if (mOmniPlayHub != null) mOmniPlayHub.onActivityPause();
+         mTabModelSelector.commitAllTabClosures();
+ 
+         if (!ChromeFeatureList.isEnabled(ChromeFeatureList.UMA_SESSION_CORRECTNESS_FIXES)
+@@ -4361,6 +4366,11 @@
+             @Nullable MotionEventInfo triggeringMotion) {
+         final Tab currentTab = getActivityTab();
+         boolean currentTabIsNtp = isTabNtp(currentTab);
++        if (id == R.id.omniplay_game_hub_menu_id) {
++            if (mOmniPlayHub == null || mOmniPlayHub.isClosed()) mOmniPlayHub = new GameHubController(this);
++            mOmniPlayHub.open();
++            return true;
++        }
+         if (id == R.id.new_tab_menu_id) {
+             if (!mTabModelSelector.isTabStateInitialized()) {
+                 RecordUserAction.record("MobileMenuNewTab.BeforeTabRestore");
+@@ -5331,6 +5341,7 @@
+ 
+     @Override
+     public void onDestroyInternal() {
++        if (mOmniPlayHub != null) { mOmniPlayHub.close(); mOmniPlayHub = null; }
+ 
+         if (mPrefChangeRegistrar != null) {
+             mPrefChangeRegistrar.destroy();
+--- a/chrome/android/java/src/org/chromium/chrome/browser/app/appmenu/AppMenuPropertiesDelegateImpl.java
++++ b/chrome/android/java/src/org/chromium/chrome/browser/app/appmenu/AppMenuPropertiesDelegateImpl.java
+@@ -308,6 +308,15 @@
+         mReadAloudPos = -1;
+         mHasReadAloudInserted = false;
+         mModelList = buildMenuModelList();
++        Tab omniPlayTab = mActivityTabProvider.get();
++        if (org.chromium.base.ContextUtils.activityFromContext(mContext)
++                        instanceof org.chromium.chrome.browser.ChromeTabbedActivity
++                && (omniPlayTab == null || !omniPlayTab.isIncognito())) {
++            mModelList.add(AppMenuItemUtils.createStandardListItem(
++                    AppMenuItemUtils.buildModelForStandardMenuItem(mContext, mAppMenuItemTheme,
++                            R.id.omniplay_game_hub_menu_id, R.string.omniplay_game_hub, 0,
++                            isMenuIconAtStart()), false));
++        }
+         return mModelList;
+     }
+ 
+--- a/chrome/android/java/src/org/chromium/chrome/browser/app/ChromeActivity.java
++++ b/chrome/android/java/src/org/chromium/chrome/browser/app/ChromeActivity.java
+@@ -1176,6 +1176,7 @@
+ 
+     @Override
+     public void onStartWithNative() {
++        org.chromium.chrome.browser.omniplay.NativeCore.setApplicationForeground(this, true);
+         assert mNativeInitialized : "onStartWithNative was called before native was initialized.";
+ 
+         if (!ChromeFeatureList.isEnabled(ChromeFeatureList.UMA_SESSION_CORRECTNESS_FIXES)) {
+@@ -1631,6 +1632,7 @@
+ 
+     @Override
+     public void onStopWithNative() {
++        org.chromium.chrome.browser.omniplay.NativeCore.setApplicationForeground(this, false);
+         super.onStopWithNative();
+         if (mFullscreenVideoPictureInPictureController != null) {
+             mFullscreenVideoPictureInPictureController.onStop();
+@@ -2114,6 +2116,7 @@
+      * {@link WindowAndroid}.
+      */
+     protected void onDestroyInternal() {
++        org.chromium.chrome.browser.omniplay.NativeCore.setApplicationForeground(this, false);
+         if (mAcceleratorManager != null) {
+             mAcceleratorManager.destroy();
+             mAcceleratorManager = null;
+--- a/chrome/android/java/AndroidManifest.xml
++++ b/chrome/android/java/AndroidManifest.xml
+@@ -1557,6 +1557,10 @@
+       {% endblock %}
+       {% block extra_application_definitions_for_test %}
+       {% endblock %}
++        <!-- Bound only by Android's scheduler, with no renderer-accessible intent. -->
++        <service android:name="org.chromium.chrome.browser.omniplay.BackgroundSyncService"
++            android:permission="android.permission.BIND_JOB_SERVICE" android:exported="true"
++            android:directBootAware="false" />
+     </application>
+     {% block extra_root_definitions %}
+     {% endblock %}

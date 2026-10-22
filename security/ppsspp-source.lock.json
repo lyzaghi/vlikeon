@@ -1,0 +1,102 @@
+{
+  "schema_version": 1,
+  "core": {
+    "name": "ppsspp",
+    "repository": "https://github.com/hrydgard/ppsspp.git",
+    "revision": "a5275067b62433375bbde12921e96329a795dff0"
+  },
+  "dependencies": [
+    {
+      "name": "libretro-libretro-common",
+      "path": "libretro/libretro-common",
+      "repository": "https://github.com/libretro/libretro-common.git",
+      "revision": "76a3d54feb0ee0ce9d59b90aa24694f3782063d3"
+    },
+    {
+      "name": "ffmpeg",
+      "path": "ffmpeg",
+      "repository": "https://github.com/hrydgard/ppsspp-ffmpeg.git",
+      "revision": "b87f7c6d522d1edba77cfc4fac96ce48a236f806"
+    },
+    {
+      "name": "ext-armips",
+      "path": "ext/armips",
+      "repository": "https://github.com/Kingcom/armips.git",
+      "revision": "62adab4ef30da765f5cf22a451eb08a59c54dc8b"
+    },
+    {
+      "name": "ext-glslang",
+      "path": "ext/glslang",
+      "repository": "https://github.com/hrydgard/glslang.git",
+      "revision": "50e0708ec3a5c16020c4f845c654b80b8edb80bd"
+    },
+    {
+      "name": "ext-SPIRV-Cross",
+      "path": "ext/SPIRV-Cross",
+      "repository": "https://github.com/KhronosGroup/SPIRV-Cross.git",
+      "revision": "f11ba9f0b21ba8fc15153d50a2a1ae31ab1cf8f7"
+    },
+    {
+      "name": "ext-rapidjson",
+      "path": "ext/rapidjson",
+      "repository": "https://github.com/Tencent/rapidjson.git",
+      "revision": "73063f5002612c6bf64fe24f851cd5cc0d83eef9"
+    },
+    {
+      "name": "ext-zstd",
+      "path": "ext/zstd",
+      "repository": "https://github.com/facebook/zstd.git",
+      "revision": "f8745da6ff1ad1e7bab384bd1f9d742439278e99"
+    },
+    {
+      "name": "ext-cpu_features",
+      "path": "ext/cpu_features",
+      "repository": "https://github.com/google/cpu_features.git",
+      "revision": "fd4ffc1632db7b4e763bd28ffa6fc9d761cf3587"
+    },
+    {
+      "name": "ext-rcheevos",
+      "path": "ext/rcheevos",
+      "repository": "https://github.com/RetroAchievements/rcheevos.git",
+      "revision": "1433173220a7eaede6a9ed7a18e94117be1821e0"
+    },
+    {
+      "name": "ext-libchdr",
+      "path": "ext/libchdr",
+      "repository": "https://github.com/rtissera/libchdr.git",
+      "revision": "8bba7745d758627258b315997a860039244cedaf"
+    },
+    {
+      "name": "ext-lua",
+      "path": "ext/lua",
+      "repository": "https://github.com/hrydgard/ppsspp-lua.git",
+      "revision": "7648485f14e8e5ee45e8e39b1eb4d3206dbd405a"
+    },
+    {
+      "name": "ext-nanosvg",
+      "path": "ext/nanosvg",
+      "repository": "https://github.com/hrydgard/nanosvg.git",
+      "revision": "478dbb8f7ed11c3d9b20b3986a8ee2283f483ef7"
+    },
+    {
+      "name": "ext-aemu_postoffice",
+      "path": "ext/aemu_postoffice",
+      "repository": "https://github.com/Kethen/aemu_postoffice.git",
+      "revision": "9e533637b9a13bb0194c75cf43b0bf6d25d8101a"
+    }
+  ],
+  "excluded_optional_modules": [
+    "pspautotests",
+    "frametests",
+    "assets/debugger",
+    "ext/discord-rpc",
+    "ext/miniupnp",
+    "ext/freetype",
+    "ext/OpenXR-SDK",
+    "ext/libadrenotools",
+    "ext/oboe",
+    "ios/MoltenVK",
+    "SDL/macOS"
+  ],
+  "verification": "not_run"
+}

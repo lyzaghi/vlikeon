@@ -1,0 +1,9 @@
+{
+  "schema_version": 1,
+  "enabled": false,
+  "artifact": null,
+  "artifact_sha256": null,
+  "source_inventory_sha256": null,
+  "distribution_approved": false,
+  "verification_approved": false
+}

@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <item name="omniplay_game_hub_menu_id" type="id" />
+    <string name="omniplay_game_hub">OmniPlay Game Hub</string>
+</resources>

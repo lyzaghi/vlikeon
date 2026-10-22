@@ -1,0 +1,78 @@
+{
+  "schema_version": 1,
+  "core": {
+    "name": "melonds-ds",
+    "repository": "https://github.com/JesseTG/melonds-ds.git",
+    "revision": "f394adbacb5722ee97c1b37c8064da9a25818310"
+  },
+  "dependencies": [
+    {
+      "name": "melonDS",
+      "repository": "https://github.com/JesseTG/melonDS.git",
+      "upstream_ref": "jtg/fix-uninitialized-opengl",
+      "revision": "16f127dbb587a73371827ce79689c5d237c4b59b"
+    },
+    {
+      "name": "libretro-common",
+      "repository": "https://github.com/libretro/libretro-common.git",
+      "upstream_ref": "fa8a1b5",
+      "revision": "fa8a1b572a444fcb552007019f8caf68281108aa"
+    },
+    {
+      "name": "embed-binaries",
+      "repository": "https://github.com/andoalon/embed-binaries.git",
+      "upstream_ref": "078b62b",
+      "revision": "078b62beba97e8192c99bfb16d5e17220cfc7598"
+    },
+    {
+      "name": "glm",
+      "repository": "https://github.com/g-truc/glm.git",
+      "upstream_ref": "6f14f47",
+      "revision": "6f14f4792a0cde5d0cf2c910506724d61cb95834"
+    },
+    {
+      "name": "pntr",
+      "repository": "https://github.com/robloach/pntr.git",
+      "upstream_ref": "a47fe16",
+      "revision": "a47fe167703b0ac3bfad00785b20b0dce6712509"
+    },
+    {
+      "name": "fmt",
+      "repository": "https://github.com/fmtlib/fmt.git",
+      "upstream_ref": "12.2.0",
+      "revision": "1be298e1bd68957e4cd352e1f676f00e07dcfb57"
+    },
+    {
+      "name": "yamc",
+      "repository": "https://github.com/yohhoy/yamc.git",
+      "upstream_ref": "4e015a7",
+      "revision": "4e015a7e8eb0d61c34e6928676c8c78881a72d73"
+    },
+    {
+      "name": "span-lite",
+      "repository": "https://github.com/martinmoene/span-lite.git",
+      "upstream_ref": "f63fe29",
+      "revision": "f63fe2974943b5f555b928b10d910e457fbb93d4"
+    },
+    {
+      "name": "date",
+      "repository": "https://github.com/HowardHinnant/date.git",
+      "upstream_ref": "v3.0.5",
+      "revision": "179a6b921ccd6179b5b04dce812a89f71a51b4df"
+    },
+    {
+      "name": "zlib",
+      "repository": "https://github.com/madler/zlib.git",
+      "upstream_ref": "v1.3.2",
+      "revision": "da607da739fa6047df13e66a2af6b8bec7c2a498"
+    }
+  ],
+  "excluded_build_features": [
+    "jit",
+    "opengl",
+    "compute_renderer",
+    "networking",
+    "tracy"
+  ],
+  "verification": "not_run"
+}

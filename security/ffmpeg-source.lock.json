@@ -1,0 +1,15 @@
+{
+  "schema_version": 1,
+  "version": "9.0.2",
+  "repository": "https://github.com/FFmpeg/FFmpeg.git",
+  "upstream_repository": "https://git.ffmpeg.org/ffmpeg.git",
+  "tag": "n9.0.2",
+  "tag_object": "ce8f11b9fac4cd7ccfb41ca7c01bc17f5cda8cc3",
+  "revision": "946fcce07b6dcd0331c8cc609192aeff5e1924f8",
+  "release_date": "2026-09-18",
+  "release_reference": "https://ffmpeg.org/download.html",
+  "security_reference": "https://ffmpeg.org/security.html",
+  "signature_verification": "pending_final_consolidated_pass",
+  "build_and_runtime_verification": "not_run",
+  "distribution_approved": false
+}

@@ -1,0 +1,23 @@
+-keep class org.chromium.chrome.browser.omniplay.NativeCore {
+    private static native byte[] nativeCall(int, long, byte[]);
+    private static native byte[] nativeOpen(byte[], org.chromium.chrome.browser.omniplay.SecureCredentials);
+    private static native byte[] nativeAuthorizeMedia(long, byte[], org.chromium.chrome.browser.omniplay.SelectedDiscTree);
+    private static native void nativeSetForeground(long, boolean);
+    private static native byte[] nativeBackgroundStart(long, int);
+    private static native byte[] nativeBackgroundStatus(long, byte[], boolean);
+}
+-keep class org.chromium.chrome.browser.omniplay.BackgroundSyncService { public <init>(); }
+-keep class org.chromium.chrome.browser.omniplay.SelectedDiscTree {
+    public long[] open(byte[], byte[]);
+    public int read(long, byte[], int);
+    public void close(long);
+    public void cancel();
+    public void release();
+    public boolean retainForRust();
+}
+-keep class org.chromium.chrome.browser.omniplay.SecureCredentials {
+    public int check(byte[]);
+    public int read(byte[], byte[]);
+    public int write(byte[], byte[]);
+    public int remove(byte[]);
+}

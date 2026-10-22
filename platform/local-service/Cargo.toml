@@ -1,0 +1,18 @@
+[package]
+name = "omniplay-local-service"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[dependencies]
+omniplay-contracts.workspace = true
+omniplay-device-info.workspace = true
+omniplay-core.workspace = true
+omniplay-sync-client.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+sha2.workspace = true
+uuid.workspace = true
+base64.workspace = true
+zeroize.workspace = true

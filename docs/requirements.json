@@ -1,0 +1,30 @@
+{
+  "schema_version": 1,
+  "source_plan": "OmniPlay_Master_Plan_Chromium_First_2026.docx",
+  "objective": "Implement the complete OmniPlay product source and verify it once after implementation is complete",
+  "verification_policy": "author_all_then_one_consolidated_pass",
+  "progress_policy": "Follow numbered items 1 through 16 in order and report completed items; distinguish authored source from verified completion",
+  "completion_sequence": "docs/COMPLETION_SEQUENCE.md",
+  "requirements": [
+    {"id":"BR-01","weight":12,"description":"Maintained Chromium fork with real desktop and Android integration, reproducible builds and minimal patch queue","status":"in_progress"},
+    {"id":"BR-02","weight":8,"description":"Browser UX, private profiles, permissions, library and safe gaming mode","status":"in_progress"},
+    {"id":"CORE-01","weight":9,"description":"Versioned IPC, capability broker, isolated runtime lifecycle and local library","status":"in_progress"},
+    {"id":"CORE-02","weight":7,"description":"Controller, keyboard, touch, audio, video, fullscreen and device lifecycle","status":"in_progress"},
+    {"id":"RETRO-01","weight":10,"description":"Licensed NES GB GBC SNES GBA adapters and advanced retro integrations specified for v1","status":"in_progress"},
+    {"id":"SAVE-01","weight":8,"description":"Atomic saves, history, recovery, compatibility and account-independent import/export","status":"in_progress"},
+    {"id":"PERF-01","weight":5,"description":"Real device probes, metrics overlay, benchmark runner and bounded performance profiles","status":"in_progress"},
+    {"id":"PLAT-01","weight":5,"description":"Android Chromium product with store-appropriate distribution and lifecycle","status":"in_progress"},
+    {"id":"PLAT-02","weight":5,"description":"iOS WebKit product with shared capabilities, controls and store-appropriate runtime paths","status":"in_progress"},
+    {"id":"STREAM-01","weight":9,"description":"Authenticated host pairing, installed-game bridge, remote video/audio/input, reconnect and QoS","status":"in_progress"},
+    {"id":"AI-01","weight":4,"description":"Local rules, runtime ranking, guarded configuration and optional assistant without render-path interference","status":"in_progress"},
+    {"id":"SYNC-01","weight":5,"description":"Opt-in account and encrypted save synchronization with conflict preservation and revocation","status":"in_progress"},
+    {"id":"SEC-01","weight":6,"description":"Signing, trust, secure updater, supply-chain inventory, fuzz targets and incident controls","status":"in_progress"},
+    {"id":"QA-01","weight":4,"description":"One final comprehensive verification with real platform and compatibility evidence","status":"pending"},
+    {"id":"LEGAL-01","weight":3,"description":"Accurate pinned dependency/core license inventory, distribution policy and content handling","status":"in_progress"}
+  ],
+  "overall_percent": null,
+  "historical_authoring_estimate_percent": 88,
+  "progress_basis": "Numbered source items and actual final evidence; the historical authoring estimate is not a measured completion percentage",
+  "verification_executed": false,
+  "completion_evidence": []
+}

@@ -1,0 +1,43 @@
+{
+  "schema_version": 1,
+  "definitions": [
+    {
+      "key": "beetle_psx_skip_bios",
+      "label_vi": "Bỏ hoạt ảnh khởi động",
+      "label_en": "Skip the boot animation",
+      "description_vi": "Giữ tắt nếu game gặp lỗi khởi động hoặc kiểm tra vùng. Một số game cần trình tự khởi động đầy đủ.",
+      "description_en": "Leave disabled if the game has boot or region-check problems. Some games need the complete boot sequence.",
+      "default_value": "disabled",
+      "choices": [
+        {"value":"disabled","label_vi":"Hiển thị hoạt ảnh","label_en":"Show the animation"},
+        {"value":"enabled","label_vi":"Bỏ qua hoạt ảnh","label_en":"Skip the animation"}
+      ]
+    },
+    {
+      "key": "beetle_psx_region",
+      "label_vi": "Vùng dự phòng",
+      "label_en": "Fallback region",
+      "description_vi": "Dùng khi không nhận diện được vùng từ nội dung. Game có vùng nhận diện được vẫn dùng vùng của game; chọn firmware phù hợp.",
+      "description_en": "Used when content has no detected region. A detected disc region still takes precedence; select matching firmware.",
+      "default_value": "auto",
+      "choices": [
+        {"value":"auto","label_vi":"Tự chọn","label_en":"Automatic"},
+        {"value":"ntsc-j","label_vi":"Nhật Bản","label_en":"Japan"},
+        {"value":"ntsc-u","label_vi":"Bắc Mỹ","label_en":"North America"},
+        {"value":"pal","label_vi":"Châu Âu / PAL","label_en":"Europe / PAL"}
+      ]
+    },
+    {
+      "key": "beetle_psx_enable_memcard1",
+      "label_vi": "Thẻ nhớ thứ hai",
+      "label_en": "Second memory card",
+      "description_vi": "Chỉ bật khi game cần khe thẻ nhớ thứ hai. Một số game yêu cầu khe này tắt; tiến trình cũ vẫn được giữ trong lịch sử.",
+      "description_en": "Enable only when the game needs a second card slot. Some games require it disabled; earlier progress remains in history.",
+      "default_value": "disabled",
+      "choices": [
+        {"value":"disabled","label_vi":"Tắt khe thứ hai","label_en":"Disable the second slot"},
+        {"value":"enabled","label_vi":"Bật khe thứ hai","label_en":"Enable the second slot"}
+      ]
+    }
+  ]
+}

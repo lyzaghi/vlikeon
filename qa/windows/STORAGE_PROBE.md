@@ -1,0 +1,53 @@
+# Final-pass Windows default-storage fixture
+
+Authored only. Do not compile or execute this fixture during source authoring.
+Run as part of item 16 using the qualified Windows x64/MSVC/SDK environment and
+the complete current Cargo workspace. It is a test actor, never a production
+runtime/package/catalog entry. Record toolchain, source and executable hashes.
+
+Create an ordinary fresh `out/qualification/windows-storage` output directory.
+In a qualified MSVC developer shell, compile the copied fixture with static CRT,
+CFG, ASLR, high-entropy VA and NX, retaining the exact command and build output:
+
+```text
+cl /nologo /std:c++20 /EHsc /W4 /WX /MT /O2 /guard:cf /DUNICODE /D_UNICODE /D_WIN32_WINNT=0x0A00 /DWINVER=0x0A00 qa/windows/storage-probe.cpp /Fo:out/qualification/windows-storage/storage-probe.obj /Fe:out/qualification/windows-storage/storage-probe.exe /link /DYNAMICBASE /HIGHENTROPYVA /NXCOMPAT /GUARD:CF advapi32.lib userenv.lib ole32.lib
+```
+
+Set `OMNIPLAY_WINDOWS_STORAGE_PROBE` to that executable's absolute path, then
+explicitly select the ignored real-OS case in the final consolidated pass:
+
+```text
+cargo test --frozen -p omniplay-sandbox --target x86_64-pc-windows-msvc windows::storage_tests::actual_actor_cannot_write_its_default_storage_but_can_use_private_scratch -- --ignored --exact --nocapture
+```
+
+The test copies the exact fixture into a new isolated temporary runtime,
+grants readonly runtime/game access and a separate writable scratch directory,
+creates a fresh AppContainer and launches through the actual contained-process
+API. Product creation/job/token/default-storage policy is exercised directly;
+the fixture receives no alternative privilege or launch bypass.
+
+Expected stdout is exactly `storage-probe-v2 1 1 1 1 1 1 1`. The seven real operations
+are default `AC` file-write denial, package-root subdirectory-create denial,
+package-root `WRITE_DAC` handle denial, attempted label-lowering denial,
+private registry subkey-creation denial, KEY_SET_VALUE acquisition denial and
+successful private scratch create/write/flush/delete. Registry readonly lookup
+must succeed before either registry result can pass. RegCreateKeyEx uses the
+key's descriptor check even though its parent handle is readonly; this is an
+actual mutation attempt rather than a missing handle-rights assertion.
+Missing paths, unsupported
+APIs, arbitrary I/O errors or an unexecuted fixture are not successful denial
+evidence. A label-lowering failure is tested before any scratch success claim.
+Only the test's new OS profile is affected if the negative operation unexpectedly
+succeeds; the case must fail and retain diagnostic evidence.
+
+The harness checks that its own caller thread has no impersonation token both
+before and after launch. It caps captured output, uses a finite response wait, terminates the
+contained probe and requires confirmed process exit before reporting success.
+Missing environment/artifact input fails this explicitly selected case. An
+ordinary unit run which skips this ignored case proves no Windows behavior.
+
+Also run matrix cases 15 and 16 for default-folder layout variants, existing child ACLs,
+alternate streams, replace/delete/rename attempts, token-policy mismatches,
+partial sealing and real production core/helper/driver compatibility. A passing
+fixture does not prove hard disk quota, general registry isolation, whole-profile
+physical accounting or general sandbox completeness.

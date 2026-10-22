@@ -1,0 +1,37 @@
+{
+  "schema_version": 1,
+  "recorded_at": "2026-10-20",
+  "verification_scope": "primary-source provenance inspection during authoring; no product build or runtime verification",
+  "entries": [
+    {
+      "component": "Mupen64Plus-Next Angrylion software profile",
+      "revision": "12edd2c74a517ff86dfa8cfc71ad75e4c10486d5",
+      "evidence": [
+        "https://github.com/ata4/angrylion-rdp-plus/blob/master/MAME%20License.txt",
+        "https://github.com/ata4/angrylion-rdp-plus",
+        "third_party/sources/mupen64plus-next/mupen64plus-video-angrylion"
+      ],
+      "finding": "The related primary upstream retains a MAME license prohibiting commercial product/activity use. The selected Mupen port does not retain a component license file. Exact port provenance is unresolved; the parent core GPL notice cannot establish permission for this component.",
+      "distribution_decision": "research_only_not_release_eligible",
+      "product_candidate": "mupen64plus-gl-native",
+      "required_action": "Finish compiled inventory/content review for the separately authored GLideN64/HLE candidate, whose prepared tree excludes this component. Do not clear the research decision merely by editing a receipt."
+    },
+    {
+      "component": "PPSSPP replacement font data",
+      "revision": "a5275067b62433375bbde12921e96329a795dff0",
+      "evidence": ["https://www.ppsspp.org/docs/getting-started/using-original-fonts/"],
+      "finding": "Official documentation distinguishes supplied free replacement fonts from user-dumped original firmware fonts. This establishes their intended replacement role, but does not identify every selected binary asset's source font, version, notices or redistribution terms.",
+      "distribution_decision": "exact_asset_license_inventory_required"
+    },
+    {
+      "component": "PPSSPP PPGe atlas",
+      "revision": "a5275067b62433375bbde12921e96329a795dff0",
+      "evidence": ["third_party/sources/ppsspp/ppge_atlasscript.txt"],
+      "finding": "The pinned generator names KozGoPro-Medium.otf and ARIALUNI.ttf from a Windows font directory. Those font source references do not prove redistribution rights for the generated atlas.",
+      "distribution_decision": "open_font_rebuild_source_authored_generation_and_artifact_review_pending",
+      "source_lock": "security/ppsspp-atlas-source.lock.json",
+      "source_recipe": "tools/build_ppsspp_atlas.py",
+      "required_action": "Run the explicit pinned open-font atlas build in the final consolidated pass, inspect the real glyph/metadata output and retain the matching complete source and notices."
+    }
+  ]
+}

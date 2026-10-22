@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "definitions": [
+    {
+      "key": "omniplay_md_region",
+      "label_vi": "Vùng hệ máy",
+      "label_en": "Console region",
+      "description_vi": "Tự động chọn vùng từ nội dung. Chọn thủ công khi game cần một vùng cụ thể; lựa chọn áp dụng ở lần chơi tiếp theo.",
+      "description_en": "Automatic selects the content region. Choose a specific region when a game requires it; the change applies on the next launch.",
+      "default_value": "auto",
+      "choices": [
+        {"value":"auto","label_vi":"Tự động","label_en":"Automatic"},
+        {"value":"ntsc-u","label_vi":"Bắc Mỹ / NTSC","label_en":"North America / NTSC"},
+        {"value":"ntsc-j","label_vi":"Nhật Bản / NTSC","label_en":"Japan / NTSC"},
+        {"value":"pal","label_vi":"Châu Âu / PAL","label_en":"Europe / PAL"}
+      ]
+    },
+    {
+      "key": "omniplay_md_pad",
+      "label_vi": "Tay cầm của game",
+      "label_en": "Game controller",
+      "description_vi": "Tự động dùng tay cầm 3 nút cho các game trong danh sách không tương thích 6 nút. Chọn 6 nút khi game hỗ trợ.",
+      "description_en": "Automatic uses three buttons for games on the known six-button incompatibility list. Choose six buttons when the game supports them.",
+      "default_value": "auto",
+      "choices": [
+        {"value":"auto","label_vi":"Tự động","label_en":"Automatic"},
+        {"value":"3-button","label_vi":"Tay cầm 3 nút","label_en":"Three-button pad"},
+        {"value":"6-button","label_vi":"Tay cầm 6 nút","label_en":"Six-button pad"}
+      ]
+    }
+  ]
+}

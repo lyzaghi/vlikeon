@@ -1,0 +1,13 @@
+target_os = "android"
+target_cpu = "arm64"
+is_official_build = true
+is_debug = false
+is_component_build = false
+is_chrome_branded = false
+chrome_public_manifest_package = "org.omniplay.browser"
+symbol_level = 1
+blink_symbol_level = 0
+v8_symbol_level = 0
+use_remoteexec = false
+# Upstream Chromium sandbox, site isolation, SSL and permission defaults remain.
+# The explicit build recipe supplies an arm64 Rust archive from the selected NDK.

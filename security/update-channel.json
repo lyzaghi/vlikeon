@@ -1,0 +1,10 @@
+{
+  "schema_version": 1,
+  "enabled": false,
+  "channel": "development",
+  "platform": "windows-x64",
+  "metadata_url": "",
+  "root_url_template": null,
+  "root": null,
+  "reason": "Production builds must embed a real offline threshold public root and a controlled HTTPS metadata endpoint. No development signing key is trusted by default."
+}

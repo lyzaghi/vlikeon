@@ -1,0 +1,204 @@
+{
+  "schema_version": 1,
+  "components": [
+    {
+      "name": "Chromium",
+      "repository": "https://chromium.googlesource.com/chromium/src.git",
+      "version": "155.0.8059.85",
+      "revision": "0e66b94549a8bd85f03fbdf189b752d6e7b63c32",
+      "license": "BSD-3-Clause AND upstream third-party licenses",
+      "included_scope": "Browser source and pinned upstream dependencies",
+      "notice_source": "browser/chromium/LICENSE",
+      "distribution_status": "full_dependency_inventory_pending"
+    },
+    {
+      "name": "SameBoy",
+      "repository": "https://github.com/LIJI32/SameBoy.git",
+      "version": "1.0.4",
+      "revision": "26a56bd6a122a6318a456abd80558408742d5adf",
+      "license": "MIT",
+      "included_scope": "Core, libretro adapter and original BootROMs source only",
+      "excluded_scope": ["iOS", "HexFiend", "Cocoa", "JoyKit"],
+      "notice_source": "third_party/sources/sameboy/LICENSE",
+      "distribution_status": "source_license_inspected_build_and_verification_pending"
+    },
+    {
+      "name":"mGBA",
+      "repository":"https://github.com/mgba-emu/mgba.git",
+      "version":"0.11.0 development snapshot",
+      "revision":"fd9dc5c2cbf234365068855851107e762fc6211b",
+      "license":"MPL-2.0 AND bundled dependency licenses",
+      "included_scope":"GBA core and libretro adapter; corresponding source and any build adaptations must accompany distributions",
+      "notice_source":"third_party/sources/mgba/LICENSE",
+      "distribution_status":"source_license_inspected_build_and_dependency_inventory_pending"
+    },
+    {
+      "name":"FCEUmm",
+      "repository":"https://github.com/libretro/libretro-fceumm.git",
+      "version":"pinned source snapshot",
+      "revision":"ac0d00a7fc01166f84c7bac01d1084ebfd2b865e",
+      "license":"GPL-2.0-or-later AND bundled dependency licenses",
+      "included_scope":"NES core and libretro adapter; release requires the complete corresponding source and notices",
+      "notice_source":"third_party/sources/fceumm/COPYING",
+      "distribution_status":"source_license_inspected_copyleft_distribution_and_verification_pending"
+    },
+    {
+      "name":"bsnes",
+      "repository":"https://github.com/libretro/bsnes.git",
+      "version":"115 pinned source snapshot",
+      "revision":"63ee22f7af8f5d1ada295c2c98fd7bf261fa62a7",
+      "license":"GPL-3.0-only AND ISC AND MIT AND bundled dependency licenses",
+      "included_scope":"SNES software native source and authored single-worker Asyncify WASM candidate with bounded owned fibers, explicit result completion, synchronized state bounds and checked persistent RAM/RTC files; adapted source removes the embedded SPC IPL array and uses user-imported firmware; no built/verified binary or approval is implied",
+      "notice_source":"third_party/sources/bsnes/LICENSE.txt",
+      "additional_notices":["third_party/sources/bsnes/bsnes/gb/LICENSE","third_party/sources/bsnes/libco/doc/usage.html","engines/web/adapters/LICENSE.libco"],
+      "distribution_status":"native_and_web_source_authored_external_firmware_and_full_compiled_copyleft_inventory_verification_pending"
+    },
+    {
+      "name":"Beetle PSX",
+      "repository":"https://github.com/libretro/beetle-psx-libretro.git",
+      "version":"0.9.44.1 pinned snapshot",
+      "revision":"df2b53b306ba52d2116f8e8cc93b9ee33d239be7",
+      "license":"GPL-2.0-or-later AND MIT AND bundled dependency licenses",
+      "included_scope":"Native PS1 software source with checked memory/card-file capture and retained writer pause/restart adaptation, plus authored standalone unthreaded WASM candidate source; no Lightrec/JIT, GPU or physical optical-drive backend; Web candidate disables whole-disc precache and adds checked persistent-card barriers; upstream original MIT PCSX-Redux OpenBIOS declared separately from manufacturer firmware",
+      "notice_source":"third_party/sources/beetle-psx/COPYING",
+      "additional_notices":["third_party/sources/beetle-psx/deps/openbios/LICENSE.txt"],
+      "distribution_status":"source_pinned_software_adapter_authored_full_dependency_license_and_corresponding_source_review_pending"
+    },
+    {
+      "name":"melonDS DS",
+      "repository":"https://github.com/JesseTG/melonds-ds.git",
+      "version":"1.4.0 pinned snapshot",
+      "revision":"f394adbacb5722ee97c1b37c8064da9a25818310",
+      "license":"GPL-3.0-or-later AND embedded dependency licenses including BSD-2-Clause and OFL-1.1",
+      "included_scope":"Authored NDS native software adapter; no JIT, graphics API backend, libslirp/network stack or automatic microphone capture. Ten selected dependencies are pinned separately.",
+      "notice_source":"third_party/sources/melonds-ds/LICENSE",
+      "additional_notices":["third_party/sources/melonds-ds/cmake/melondsds-LICENSE.txt.in","third_party/sources/melonds-deps/melonDS/freebios/drastic_bios_readme.txt"],
+      "source_lock":"security/melonds-source.lock.json",
+      "distribution_status":"adapted_corresponding_source_authored_and_materialized_without_build; full binary_dependency_license_content_and_compatibility_verification_pending"
+    },
+    {
+      "name":"ares Mega Drive",
+      "repository":"https://github.com/ares-emulator/ares.git",
+      "version":"pinned snapshot with OmniPlay libretro adapter 0.3.0 and portable-file WASM source candidate",
+      "revision":"9408cb43d4948fc3ea6e152a307a34348df3fe04",
+      "license":"ISC AND MIT AND upstream selected-component licenses",
+      "included_scope":"Selected committed Mega Drive software source and adapted cartridge analysis; native stable Windows fibers and authored single-worker Asyncify WASM facade, synchronized bounded state, MDC1 loaded-game descriptor and explicitly admitted canonical SRAM/EEPROM progress across selected native/Web profiles. Source preparation excludes resource aggregator, embedded firmware, UI/media resources and dynamic-code backend; SVP content requires a selected user file. No compiled or interoperability qualification is implied.",
+      "notice_source":"third_party/sources/ares/LICENSE",
+      "additional_notices":["third_party/sources/sameboy/libretro/libretro.h","engines/native/adapters/LICENSE.libco","engines/web/adapters/LICENSE.libco"],
+      "source_recipe":"tools/build_ares_md.py",
+      "web_source_recipe":"tools/build_ares_md_web.py",
+      "distribution_status":"native_and_web_selected_corresponding_source_materialized_without_build; compiled_license_content_containment_save_device_and_compatibility_review_pending"
+    },
+    {
+      "name":"Mupen64Plus-Next",
+      "repository":"https://github.com/libretro/mupen64plus-libretro-nx.git",
+      "version":"3.0 source with OmniPlay software adaptations",
+      "revision":"12edd2c74a517ff86dfa8cfc71ad75e4c10486d5",
+      "license":"GPL-2.0-or-later root; CXD4 GPL-3.0-or-later; Angrylion exact provenance unresolved and related upstream retains commercial-use restrictions",
+      "included_scope":"Adapted software Angrylion/CXD4 and CPU interpreter source; no compiled binary. GLideN64 remains an unselected upstream build input.",
+      "notice_source":"third_party/sources/mupen64plus-next/LICENSE",
+      "source_recipe":"tools/build_mupen64plus.py",
+      "distribution_status":"research_software_profile_not_release_eligible; separately_reviewed_product_renderer_and_compatible_source_inputs_required"
+    },
+    {
+      "name":"Mupen64Plus-Next GLideN64 HLE product candidate",
+      "repository":"https://github.com/libretro/mupen64plus-libretro-nx.git",
+      "version":"3.0 source with OmniPlay OpenGL profile adaptations",
+      "revision":"12edd2c74a517ff86dfa8cfc71ad75e4c10486d5",
+      "license":"GPL-2.0-only selected profile; full compiled component license inventory pending",
+      "included_scope":"GLideN64 OpenGL RDP, HLE RSP and cached CPU interpreter source. Prepared tree excludes Angrylion, CXD4 and both parallel backends; no dynarec or executable instruction cache.",
+      "notice_source":"third_party/sources/mupen64plus-next/GLideN64/LICENSE",
+      "additional_notices":["third_party/sources/mupen64plus-next/mupen64plus-rsp-hle/LICENSES","third_party/sources/mupen64plus-next/mupen64plus-core/LICENSES"],
+      "source_recipe":"tools/build_mupen64plus_gl.py",
+      "distribution_status":"adapted_profile_source_materialized_without_build; complete_compiled_inventory_content_driver_containment_and_compatibility_review_pending"
+    },
+    {
+      "name":"PPSSPP",
+      "repository":"https://github.com/hrydgard/ppsspp.git",
+      "version":"pinned development snapshot",
+      "revision":"a5275067b62433375bbde12921e96329a795dff0",
+      "license":"GPL-2.0-or-later and selected dependency licenses; content review pending",
+      "included_scope":"Separate v3 native software/interpreter, native OpenGL 3.3/IR-bytecode-interpreter and Web software/IR-bytecode-interpreter source profiles; committed parent/dependency archives and explicit omitted-gitlink/binary inventories, twelve selected parent gitlinks plus a pinned FFmpeg 9.0.2 override, sized PCM output, required generated committed open-font atlas/source receipt, read-only system assets, bounded UI-owned Web pthreads and typed callbacks, joined persistent-file barriers; no compiled binary or native CPU JIT",
+      "product_dependency_overrides":{"ffmpeg":"946fcce07b6dcd0331c8cc609192aeff5e1924f8"},
+      "source_lock":"security/ppsspp-source.lock.json",
+      "source_recipe":"tools/build_ppsspp.py",
+      "distribution_status":"adapted_source_authored_without_build; font_atlas_provenance_compiled_notices_corresponding_source_content_and_compatibility_review_required_before_distribution_approval"
+    },
+    {
+      "name":"PSP product decoder source",
+      "repository":"https://github.com/FFmpeg/FFmpeg.git",
+      "version":"9.0.2",
+      "revision":"946fcce07b6dcd0331c8cc609192aeff5e1924f8",
+      "license":"LGPL-2.1-or-later and selected component notices; actual compiled inventory and static-link obligations pending",
+      "included_scope":"Finite H.264 AAC ATRAC3 ATRAC3+ MP3 decoder, MPEG-PS/TS OMA MP3 AAC demuxer and selected parser source policy; no network/protocol, encoder, hardware acceleration or external-library autodetection in the authored product configuration",
+      "source_lock":"security/ffmpeg-source.lock.json",
+      "source_recipe":"tools/build_ffmpeg.py",
+      "distribution_status":"source_pinned_and_adapted; tag_signature_compiler_configuration_decoder_fault_source_license_and_platform_qualification_not_run"
+    },
+    {
+      "name":"Emscripten Web PSP source contracts",
+      "repository":"https://github.com/emscripten-core/emscripten.git",
+      "version":"6.0.13",
+      "revision":"e13ee988ce3d87a738dd8f3661d02223308c412a",
+      "license":"MIT OR NCSA; complete SDK/compiled runtime dependency inventory pending",
+      "included_scope":"Selected immutable pthread worker, runtime callback/settings headers and license source contracts for the Web PSP recipe; no compiler/LLVM/Binaryen/cache binary installation or qualification",
+      "notice_source":"third_party/sources/emscripten/LICENSE",
+      "source_lock":"security/emscripten-source.lock.json",
+      "source_recipe":"tools/build_ppsspp_web.py",
+      "distribution_status":"source_contracts_selected; exact_binary_toolchain_compilation_transitive_inventory_and_runtime_security_qualification_pending"
+    },
+    {
+      "name":"Noto CJK atlas fonts",
+      "repository":"https://github.com/notofonts/noto-cjk.git",
+      "revision":"f8d157532fbfaeda587e826d4cd5b21a49186f7c",
+      "license":"OFL-1.1",
+      "included_scope":"Selected immutable Noto Sans CJK JP Regular outlines and raw committed full-notice bytes for the PSP atlas generator; schema-2 lock avoids checkout line-ending conversion; no generated atlas exists yet",
+      "notice_source":"third_party/sources/ppsspp-atlas-deps/noto-cjk/Sans/LICENSE",
+      "source_lock":"security/ppsspp-atlas-source.lock.json",
+      "distribution_status":"source_notice_inspected_generation_and_output_content_visual_inventory_review_pending"
+    },
+    {
+      "name":"Noto Sans Hebrew Thai atlas fonts",
+      "repository":"https://github.com/notofonts/noto-fonts.git",
+      "revision":"ffebf8c1ee449e544955a7e813c54f9b73848eac",
+      "license":"OFL-1.1",
+      "included_scope":"Selected immutable Regular font outlines and raw committed full-notice bytes for the PSP atlas generator; schema-2 lock avoids checkout line-ending conversion; no generated runtime asset exists yet",
+      "notice_source":"third_party/sources/ppsspp-atlas-deps/noto-fonts/LICENSE",
+      "source_lock":"security/ppsspp-atlas-source.lock.json",
+      "distribution_status":"source_notice_inspected_generation_and_output_content_visual_inventory_review_pending"
+    },
+    {
+      "name":"FreeType PSP atlas build tool dependency",
+      "repository":"https://github.com/hrydgard/freetype.git",
+      "revision":"063ed27f481f0bcd3962fd468e1546739d7d285a",
+      "license":"FTL OR GPL-2.0-or-later",
+      "included_scope":"Committed pinned generator dependency and FTL notice; optional dlg gitlink explicitly omitted with FT_DEBUG_LOGGING undefined in the fixed atlas profile; generator binary is not a runtime package file",
+      "notice_source":"third_party/sources/ppsspp-atlas-deps/freetype/docs/FTL.TXT",
+      "source_lock":"security/ppsspp-atlas-source.lock.json",
+      "distribution_status":"source_materialized_recipe_authored_no_build_or_generator_execution"
+    },
+    {
+      "name":"SDL",
+      "repository":"https://github.com/libsdl-org/SDL.git",
+      "version":"3.4.18",
+      "revision":"829a65d769d935c4852f8159e964312c0957260a",
+      "license":"Zlib AND bundled dependency licenses",
+      "included_scope":"Static native software/OpenGL window presentation, audio stream, input and opt-in frontend-clock measurement source",
+      "notice_source":"third_party/sources/sdl3/LICENSE.txt",
+      "distribution_status":"source_pinned_native_build_dependency_inventory_and_verification_pending"
+    },
+    {
+      "name":"nlohmann/json",
+      "repository":"https://github.com/nlohmann/json.git",
+      "version":"3.12.0",
+      "revision":"55f93686c01528224f448c19128836e7df245f72",
+      "license":"MIT",
+      "included_scope":"Bounded native worker control protocol parsing",
+      "notice_source":"third_party/sources/nlohmann-json/LICENSE.MIT",
+      "distribution_status":"source_pinned_native_build_and_verification_pending"
+    }
+  ],
+  "no_commercial_roms_or_manufacturer_bios_included": null,
+  "distribution_content_verification": "No game assets or standalone BIOS files supplied; upstream bsnes embedded IPL removal is authored but compiled artifact and corresponding-source content verification have not run",
+  "rust_dependency_inventory": "Cargo.lock records exact registry artifacts and checksums; final SBOM and advisory review remain pending"
+}

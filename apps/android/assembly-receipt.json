@@ -1,0 +1,12 @@
+{
+  "schema_version": 1,
+  "development_only": true,
+  "core_ids": [],
+  "resource_files": 78,
+  "supported_initial_abi": [
+    "arm64-v8a"
+  ],
+  "rust_build": "not_started",
+  "chromium_android_build": "not_started",
+  "verification": "not_run"
+}

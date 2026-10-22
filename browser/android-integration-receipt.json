@@ -1,0 +1,8 @@
+{
+  "chrome/android/BUILD.gn": "53c554756fae82521dbc6f56b5efcb6a29d43067e10d44dfd78ad31155c6c7f5",
+  "chrome/android/chrome_public_apk_tmpl.gni": "5e805136d2a244d8362a619e09753ce8495dffd9c0f8a2445c6f01dca8884898",
+  "chrome/android/java/AndroidManifest.xml": "3618120964736edd927d1c45572c7d067c430913700802f81c8647f07d1533cd",
+  "chrome/android/java/src/org/chromium/chrome/browser/ChromeTabbedActivity.java": "45a6212a935d6089025106a41ace71cbfdffa3d8062b89e9410aa67bdfdef738",
+  "chrome/android/java/src/org/chromium/chrome/browser/app/ChromeActivity.java": "6657dcbb831bed1979bde1b119d370abbb895c81cca918af797b6b6160c87634",
+  "chrome/android/java/src/org/chromium/chrome/browser/app/appmenu/AppMenuPropertiesDelegateImpl.java": "3bcb89eb7e78ed7bada8f08a5a0d8b7642be07e44d33ae02a69d031143b5b1cc"
+}

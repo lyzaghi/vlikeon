@@ -1,0 +1,25 @@
+import{WebPlatformError,checkAbort,requireValue,integer,UUID,HASH}from'./errors.js';
+import{SYNC_CRYPTO_BINARY}from'./sync-wasm-policy.js';
+
+export const exact=(value,fields)=>value&&typeof value==='object'&&!Array.isArray(value)&&Object.keys(value).length===fields.length&&fields.every(field=>Object.hasOwn(value,field));
+export function syncAudience(value){
+  requireValue(typeof value==='string'&&value.length<=512&&/^[\x21-\x7e]+$/.test(value)&&!/["'\\;?#@%]/.test(value),'invalid_request','Use a canonical HTTPS synchronization service address.');let url;try{url=new URL(value);}catch{throw new WebPlatformError('invalid_request','The synchronization service address is invalid.');}
+  requireValue(url.protocol==='https:'&&!url.username&&!url.password&&!url.search&&!url.hash&&url.origin+(url.pathname==='/'?'':url.pathname)===value&&(url.pathname==='/'||/^\/(?:[A-Za-z0-9_-]+\/)*[A-Za-z0-9_-]+$/.test(url.pathname)),'invalid_request','The synchronization service must use an exact HTTPS origin and optional plain base path.');
+  if(!url.hostname.includes(':'))requireValue(url.hostname.length<=253&&url.hostname.split('.').every(part=>/^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/.test(part))&&(!/^(?:[0-9]+|0x[0-9a-f]*)$/.test(url.hostname.split('.').at(-1))||/^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$/.test(url.hostname)),'invalid_request','The synchronization DNS or IPv4 identity is not canonical.');return value;
+}
+export function syncNetworkPolicy(value){
+  requireValue(exact(value,['schema_version','enabled','service_audiences'])&&value.schema_version===1&&typeof value.enabled==='boolean'&&Array.isArray(value.service_audiences)&&value.service_audiences.length<=8&&new Set(value.service_audiences).size===value.service_audiences.length,'untrusted_artifact','The browser synchronization service policy is invalid.');for(const audience of value.service_audiences)syncAudience(audience);requireValue(value.enabled?value.service_audiences.length>0:value.service_audiences.length===0,'untrusted_artifact','The browser synchronization origin inventory contradicts its enabled state.');return{schema_version:1,enabled:value.enabled,service_audiences:[...value.service_audiences]};
+}
+export async function readSyncNetworkPolicy({signal}={}){
+  checkAbort(signal);const response=await fetch(new URL('./sync-services.json',import.meta.url),{credentials:'omit',redirect:'error',signal});requireValue(response.ok&&response.body,'untrusted_artifact','The browser synchronization service inventory is unavailable.');const reader=response.body.getReader(),decoder=new TextDecoder('utf-8',{fatal:true});let count=0,raw='';
+  try{while(true){const part=await reader.read();if(part.done)break;count+=part.value.length;requireValue(count<=8192,'resource_limit','The browser synchronization service inventory exceeds its bound.');raw+=decoder.decode(part.value,{stream:true});}raw+=decoder.decode();}finally{await reader.cancel().catch(()=>{});}checkAbort(signal);let value;try{value=JSON.parse(raw);}catch{throw new WebPlatformError('untrusted_artifact','The browser synchronization service inventory is invalid.');}return syncNetworkPolicy(value);
+}
+export function blobHeader(value,account=null,object=null){
+  requireValue(exact(value,['binding','nonce_base64','ciphertext_sha256','ciphertext_bytes'])&&exact(value.binding,['schema_version','account_id','object_id','key_epoch'])&&value.binding.schema_version===1&&value.binding.key_epoch===1&&typeof value.binding.account_id==='string'&&HASH.test(value.binding.account_id)&&typeof value.binding.object_id==='string'&&UUID.test(value.binding.object_id)&&typeof value.nonce_base64==='string'&&/^[A-Za-z0-9_-]{32}$/.test(value.nonce_base64)&&typeof value.ciphertext_sha256==='string'&&HASH.test(value.ciphertext_sha256)&&integer(value.ciphertext_bytes,16,SYNC_CRYPTO_BINARY)&&(account===null||value.binding.account_id===account)&&(object===null||value.binding.object_id===object),'corrupt_data','The encrypted remote object header changed or exceeds its bounds.');return value;
+}
+export function uploadProgress(value,transfer,header){
+  requireValue(exact(value,['protocol','transfer_id','header','received_bytes','stored','expires_at_ms'])&&value.protocol===1&&value.transfer_id===transfer&&typeof value.stored==='boolean'&&integer(value.received_bytes,0,header.ciphertext_bytes)&&(value.received_bytes%262144===0||value.received_bytes===header.ciphertext_bytes)&&(!value.stored||value.received_bytes===header.ciphertext_bytes)&&integer(value.expires_at_ms,0,Date.now()+86400000+120000)&&(value.stored||value.expires_at_ms>0),'corrupt_data','The remote upload receipt is invalid.');
+  blobHeader(value.header,header.binding.account_id,header.binding.object_id);requireValue(sameHeader(value.header,header),'corrupt_data','The remote upload receipt belongs to different encrypted bytes.');
+  return value;
+}
+export function sameHeader(left,right){return['nonce_base64','ciphertext_sha256','ciphertext_bytes'].every(key=>left[key]===right[key])&&['schema_version','account_id','object_id','key_epoch'].every(key=>left.binding[key]===right.binding[key]);}

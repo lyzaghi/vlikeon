@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "repository": "https://chromium.googlesource.com/chromium/src.git",
+  "channel": "Stable",
+  "platform": "Windows",
+  "version": "155.0.8059.85",
+  "revision": "0e66b94549a8bd85f03fbdf189b752d6e7b63c32",
+  "observed_at": "2026-10-19",
+  "source": "https://chromiumdash.appspot.com/fetch_releases?channel=Stable&platform=Windows&num=1",
+  "checkout_state": "sparse_integration_authored",
+  "build_state": "not_started",
+  "test_state": "not_started"
+}

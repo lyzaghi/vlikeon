@@ -1,0 +1,17 @@
+{
+  "chrome/app/theme/chromium/BRANDING": "cb93a2a12d2c2e620762e471efe50675bb8ddaca3d3561675fab434c7df28316",
+  "chrome/browser/extensions/api/desktop_capture/desktop_capture_api.cc": "7f8b9089cc13c68059f71f8dffa426019e01e81bbe21cf8c3cb6de882b4983a7",
+  "chrome/browser/extensions/api/desktop_capture/desktop_capture_base.cc": "3afbd569d01f8be418cb482cb71116a2f13bd2b40f5a624d1f8a55e7444ad5a1",
+  "chrome/browser/extensions/api/desktop_capture/desktop_capture_base.h": "e7c85192e6d6fa4e9cbd6147667a1cdb348a0a416de607c34e76687c52f9969b",
+  "chrome/browser/extensions/api/messaging/launch_context_win.cc": "cfd26f9dc0480424188894a1054a7484fc9598f9b762ee8ac3c5807b82179c51",
+  "chrome/browser/extensions/component_extensions_allowlist/allowlist.cc": "2d75375226588ae8426756ba0f21de45df616e855e343847bc2cea61dedf4133",
+  "chrome/browser/extensions/component_loader.cc": "3376d911e50cea0e8205ba470600079577bf7a31c998409100137cc6c65caf83",
+  "chrome/browser/media/webrtc/desktop_media_picker.h": "23e261e24b57477c5eb76057c3312e17b7cb3ee71e32961fc9557869d8e02033",
+  "chrome/browser/resources/component_extension_resources.grd": "aaf3da68209e8c1fbe428125638a353abd47d50dc7b57165b84270a1ebac9652",
+  "chrome/browser/ui/views/desktop_capture/desktop_media_picker_views.cc": "55a7738e2c148c411675a7c827f6b963e3aa60b339cdff99ae622723e4e2adad",
+  "chrome/common/chrome_paths.cc": "db0436db7163158b7b0351b17dc486fd074818ffe380f8193e4769cfb1b8413e",
+  "chrome/common/chrome_paths_linux.cc": "67086fe5ee075a10687e66fa72dd645ff3d028a0102fc4df0fe6a4375a1fb9a5",
+  "chrome/common/chrome_paths_mac.mm": "7d5c2eeef372a4c86a93898f741fb8cd537abdabd0f89643faf60c75b77ec5ab",
+  "chrome/common/extensions/api/desktop_capture.json": "452231feb3902775d93d884604fb25a0a23b8c2184ba6f6493fb2d08a7e4c0ea",
+  "chrome/install_static/chromium_install_modes.h": "7f0a5c9401bffe7e185bb27518c61b5fe720a443cb220c7ed742c8085f903b0f"
+}

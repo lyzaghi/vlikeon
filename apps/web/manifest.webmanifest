@@ -1,0 +1,13 @@
+{
+  "id":"./",
+  "name":"OmniPlay",
+  "short_name":"OmniPlay",
+  "description":"Your game library and saved progress, with optional app installation.",
+  "start_url":"./index.html",
+  "scope":"./",
+  "display":"standalone",
+  "background_color":"#0b1218",
+  "theme_color":"#0b1218",
+  "lang":"vi",
+  "icons":[{"src":"web/icon.svg","sizes":"any","type":"image/svg+xml","purpose":"any maskable"}]
+}

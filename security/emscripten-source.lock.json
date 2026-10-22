@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "version": "6.0.13",
+  "repository": "https://github.com/emscripten-core/emscripten.git",
+  "revision": "e13ee988ce3d87a738dd8f3661d02223308c412a",
+  "emscripten_releases_revision": "eb132757325583b787fe9414b09afea9442b72ad",
+  "source_version_string": "6.0.13-git",
+  "reference": "https://github.com/emscripten-core/emsdk/blob/main/emscripten-releases-tags.json",
+  "binary_toolchain_installed": false,
+  "qualification": "not_run"
+}

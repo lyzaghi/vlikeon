@@ -1,0 +1,34 @@
+{
+  "schema_version": 1,
+  "definitions": [
+    {
+      "key": "melonds_screen_layout1",
+      "label_vi": "Sắp xếp hai màn hình",
+      "label_en": "Dual-screen layout",
+      "description_vi": "Chọn vị trí của hai màn hình. Chạm hoặc nhấp vào màn hình dưới để dùng bút cảm ứng.",
+      "description_en": "Choose the positions of both screens. Touch or click the lower screen to use the stylus.",
+      "default_value": "top-bottom",
+      "choices": [
+        {"value":"top-bottom","label_vi":"Trên / dưới","label_en":"Top / bottom"},
+        {"value":"bottom-top","label_vi":"Dưới / trên","label_en":"Bottom / top"},
+        {"value":"left-right","label_vi":"Trái / phải","label_en":"Left / right"},
+        {"value":"right-left","label_vi":"Phải / trái","label_en":"Right / left"}
+      ]
+    },
+    {
+      "key": "melonds_audio_interpolation",
+      "label_vi": "Nội suy âm thanh",
+      "label_en": "Audio interpolation",
+      "description_vi": "Tắt để giữ âm thanh gốc, hoặc chọn cách nội suy để làm mượt âm thanh.",
+      "description_en": "Disable to retain the original sound, or choose interpolation to smooth it.",
+      "default_value": "disabled",
+      "choices": [
+        {"value":"disabled","label_vi":"Tắt","label_en":"Disabled"},
+        {"value":"linear","label_vi":"Tuyến tính","label_en":"Linear"},
+        {"value":"cosine","label_vi":"Cosin","label_en":"Cosine"},
+        {"value":"cubic","label_vi":"Bậc ba","label_en":"Cubic"},
+        {"value":"gaussian","label_vi":"Gauss","label_en":"Gaussian"}
+      ]
+    }
+  ]
+}

@@ -1,0 +1,23 @@
+[package]
+name = "omniplay-sync-service"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[dependencies]
+omniplay-sync.workspace = true
+omniplay-contracts.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+rusqlite.workspace = true
+sha2.workspace = true
+uuid.workspace = true
+base64.workspace = true
+axum = "=0.8.4"
+tokio = { version = "=1.53.1", features = ["rt-multi-thread","macros","net","signal","fs","io-util","sync","time"] }
+tower = { version = "=0.5.2", features = ["limit"] }
+tokio-util = { version = "=0.7.16", features = ["io"] }
+futures-util = "=0.3.31"
+subtle = "=2.6.1"
+url.workspace = true

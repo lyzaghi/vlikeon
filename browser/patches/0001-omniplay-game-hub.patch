@@ -1,0 +1,452 @@
+--- a/chrome/browser/extensions/api/desktop_capture/desktop_capture_api.cc
++++ b/chrome/browser/extensions/api/desktop_capture/desktop_capture_api.cc
+@@ -130,10 +130,39 @@
+       params->options &&
+       params->options->suppress_local_audio_playback_intended;
+ 
++  std::optional<blink::mojom::WindowAudioPreference> window_audio_preference;
++  if (params->options) {
++    using ApiAudio = api::desktop_capture::WindowAudioPreferenceEnum;
++    if (params->options->window_audio == ApiAudio::kWindow) {
++      window_audio_preference = blink::mojom::WindowAudioPreference::kWindow;
++    } else if (params->options->window_audio == ApiAudio::kSystem) {
++      window_audio_preference = blink::mojom::WindowAudioPreference::kSystem;
++    } else if (params->options->window_audio == ApiAudio::kExclude) {
++      window_audio_preference = blink::mojom::WindowAudioPreference::kExclude;
++    }
++  }
++  const bool strict_window_audio = params->options &&
++      params->options->omniplay_strict_window_audio == true;
++  if (strict_window_audio) {
++    bool has_window = false;
++    for (auto source : params->sources) {
++      if (source == api::desktop_capture::DesktopCaptureSourceType::kWindow) {
++        has_window = true;
++      } else if (source != api::desktop_capture::DesktopCaptureSourceType::kAudio) {
++        return RespondNow(Error("Application audio requires window-only capture."));
++      }
++    }
++    if (!has_window || !exclude_system_audio ||
++        window_audio_preference != blink::mojom::WindowAudioPreference::kWindow) {
++      return RespondNow(Error("Application audio requires the strict window policy."));
++    }
++  }
++
+   return Execute(params->sources, exclude_system_audio,
+                  exclude_self_browser_surface,
+                  suppress_local_audio_playback_intended,
+-                 target_render_frame_host, origin, target_name);
++                 target_render_frame_host, origin, target_name,
++                 window_audio_preference, strict_window_audio);
+ }
+ 
+ bool DesktopCaptureChooseDesktopMediaFunction::
+--- a/chrome/browser/extensions/api/desktop_capture/desktop_capture_base.cc
++++ b/chrome/browser/extensions/api/desktop_capture/desktop_capture_base.cc
+@@ -90,8 +90,11 @@
+     bool suppress_local_audio_playback_intended,
+     content::RenderFrameHost* render_frame_host,
+     const GURL& origin,
+-    const std::u16string& target_name) {
++    const std::u16string& target_name,
++    std::optional<blink::mojom::WindowAudioPreference> window_audio_preference,
++    bool omniplay_strict_window_audio) {
+   DCHECK(!picker_controller_);
++  omniplay_strict_window_audio_ = omniplay_strict_window_audio;
+ 
+   if (!render_frame_host->IsActive()) {
+     return RespondNow(Error(kTargetNotActiveError));
+@@ -175,6 +178,10 @@
+   picker_params.target_name = target_name;
+   picker_params.request_audio = request_audio;
+   picker_params.exclude_system_audio = exclude_system_audio;
++  if (window_audio_preference) {
++    picker_params.window_audio_preference = *window_audio_preference;
++  }
++  picker_params.omniplay_strict_window_audio = omniplay_strict_window_audio_;
+   picker_params.suppress_local_audio_playback =
+       suppress_local_audio_playback_intended;
+   picker_params.includable_web_contents_filter =
+@@ -222,6 +229,16 @@
+     return;
+   }
+ 
++  // Validate before registering a consumable media token. A picker/backend
++  // result must not widen the application's explicit audio authorization.
++  if (omniplay_strict_window_audio_ &&
++      (source.type != DesktopMediaID::TYPE_WINDOW ||
++       (source.audio_share && source.window_audio_type !=
++                                  DesktopMediaID::AudioType::kApplication))) {
++    Respond(Error("The selected source cannot provide application-only audio."));
++    return;
++  }
++
+   std::string result;
+   if (source.type != DesktopMediaID::TYPE_NONE) {
+     // TODO(crbug.com/379869738) Remove GetUnsafeValue.
+@@ -233,6 +250,25 @@
+ 
+   Options options;
+   options.can_request_audio_track = source.audio_share;
++  options.omniplay_capture_protocol = 1;
++  options.audio_scope = "none";
++  if (source.audio_share) {
++    if (source.type == DesktopMediaID::TYPE_WINDOW) {
++      if (source.window_audio_type == DesktopMediaID::AudioType::kApplication) {
++        options.audio_scope = "application";
++      } else if (source.window_audio_type == DesktopMediaID::AudioType::kSystem) {
++        options.audio_scope = "system";
++      } else {
++        options.audio_scope = "unspecified";
++      }
++    } else if (source.type == DesktopMediaID::TYPE_SCREEN) {
++      options.audio_scope = "system";
++    } else if (source.type == DesktopMediaID::TYPE_WEB_CONTENTS) {
++      options.audio_scope = "tab";
++    } else {
++      options.audio_scope = "unspecified";
++    }
++  }
+   Respond(ArgumentList(Create(result, options)));
+ }
+ 
+--- a/chrome/browser/extensions/api/desktop_capture/desktop_capture_base.h
++++ b/chrome/browser/extensions/api/desktop_capture/desktop_capture_base.h
+@@ -8,6 +8,7 @@
+ #include <array>
+ #include <map>
+ #include <memory>
++#include <optional>
+ #include <string>
+ 
+ #include "base/memory/raw_ptr.h"
+@@ -66,7 +67,10 @@
+       bool suppress_local_audio_playback_intended,
+       content::RenderFrameHost* render_frame_host,
+       const GURL& origin,
+-      const std::u16string& target_name);
++      const std::u16string& target_name,
++      std::optional<blink::mojom::WindowAudioPreference> window_audio_preference =
++          std::nullopt,
++      bool omniplay_strict_window_audio = false);
+ 
+   // Returns the calling application name to show in the picker.
+   std::string GetCallerDisplayName() const;
+@@ -81,6 +85,7 @@
+       content::DesktopMediaID source);
+ 
+   std::unique_ptr<DesktopMediaPickerController> picker_controller_;
++  bool omniplay_strict_window_audio_ = false;
+ };
+ 
+ class DesktopCaptureCancelChooseDesktopMediaFunctionBase
+--- a/chrome/browser/media/webrtc/desktop_media_picker.h
++++ b/chrome/browser/media/webrtc/desktop_media_picker.h
+@@ -92,6 +92,9 @@
+     // Mutually exclusive with |force_audio_checkboxes_to_default_checked|.
+     blink::mojom::WindowAudioPreference window_audio_preference =
+         blink::mojom::WindowAudioPreference::kExclude;
++    // OmniPlay extension requests can prohibit broader system-audio fallback.
++    // Default false preserves existing getDisplayMedia and other picker callers.
++    bool omniplay_strict_window_audio = false;
+     // Normally, the media-picker sets the default states for the audio
+     // checkboxes. If |force_audio_checkboxes_to_default_checked| is |true|,
+     // it sets them all to |checked|. This is used by Chromecasting.
+--- a/chrome/browser/ui/views/desktop_capture/desktop_media_picker_views.cc
++++ b/chrome/browser/ui/views/desktop_capture/desktop_media_picker_views.cc
+@@ -357,13 +357,15 @@
+       blink::mojom::WindowAudioPreference::kWindow) {
+     if (media::IsApplicationLoopbackCaptureSupported()) {
+       return DesktopMediaID::AudioType::kApplication;
+-    } else if (DesktopMediaPickerController::IsSystemAudioCaptureSupported(
++    } else if (!params.omniplay_strict_window_audio &&
++               DesktopMediaPickerController::IsSystemAudioCaptureSupported(
+                    params.request_source)) {
+       return DesktopMediaID::AudioType::kSystem;
+     }
+   }
+ 
+-  if (params.window_audio_preference ==
++  if (!params.omniplay_strict_window_audio &&
++      params.window_audio_preference ==
+           blink::mojom::WindowAudioPreference::kSystem &&
+       DesktopMediaPickerController::IsSystemAudioCaptureSupported(
+           params.request_source)) {
+--- a/chrome/common/extensions/api/desktop_capture.json
++++ b/chrome/common/extensions/api/desktop_capture.json
+@@ -71,6 +71,11 @@
+                 "optional": true,
+                 "description": "Mirrors <a href=\"https://w3c.github.io/mediacapture-screen-share/#dom-displaymediastreamconstraints-selfbrowsersurface\">selfBrowserSurface</a>."
+               },
++              "omniplayStrictWindowAudio": {
++                "type": "boolean",
++                "optional": true,
++                "description": "OmniPlay: only window sources and application audio are admitted; no system-audio fallback. Requires windowAudio=window and systemAudio=exclude."
++              },
+               "suppressLocalAudioPlaybackIntended": {
+                 "type": "boolean",
+                 "optional": true,
+@@ -93,6 +98,16 @@
+               "type": "object",
+               "description": "Contains properties that describe the stream.",
+               "properties": {
++                 "omniplayCaptureProtocol": {
++                   "type": "integer",
++                   "optional": true,
++                   "description": "OmniPlay native picker result protocol, currently 1."
++                 },
++                 "audioScope": {
++                   "type": "string",
++                   "optional": true,
++                   "description": "Browser-selected audio classification: none, application, system, tab, or unspecified. It is not independent device qualification."
++                 },
+                  "canRequestAudioTrack": {
+                    "type": "boolean",
+                    "description": "True if \"audio\" is included in parameter sources, and the end user does not uncheck the \"Share audio\" checkbox. Otherwise false, and in this case, one should not ask for audio stream through getUserMedia call."
+--- a/chrome/browser/extensions/component_loader.cc
++++ b/chrome/browser/extensions/component_loader.cc
+@@ -750,6 +750,14 @@
+     return;
+   }
+ 
++#if BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC) || BUILDFLAG(IS_LINUX)
++  // Keep gameplay services out of private profiles and ordinary web origins.
++  if (!skip_session_components && !profile_->IsOffTheRecord()) {
++    Add(IDR_OMNIPLAY_MANIFEST,
++        base::FilePath(FILE_PATH_LITERAL("omniplay_game_hub")));
++  }
++#endif
++
+   if (!skip_session_components) {
+ #if BUILDFLAG(IS_CHROMEOS)
+     Add(IDR_ECHO_MANIFEST,
+--- a/chrome/browser/extensions/component_extensions_allowlist/allowlist.cc
++++ b/chrome/browser/extensions/component_extensions_allowlist/allowlist.cc
+@@ -40,6 +40,9 @@
+       extension_misc::kGlicExtensionId,
+       extension_misc::kInAppPaymentsSupportAppId,
+       extension_misc::kPdfExtensionId,
++#if BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC) || BUILDFLAG(IS_LINUX)
++      "knanejoacaeomhkfeciafoclmmnogdpg",
++#endif
+ #if BUILDFLAG(IS_CHROMEOS)
+       extension_misc::kAssessmentAssistantExtensionId,
+       extension_misc::kAccessibilityCommonExtensionId,
+@@ -99,6 +102,9 @@
+     case IDR_NETWORK_SPEECH_SYNTHESIS_MANIFEST:
+     case IDR_NETWORK_SPEECH_SYNTHESIS_MANIFEST_MV3:
+     case IDR_READING_MODE_GDOCS_HELPER_MANIFEST:
++#if BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC) || BUILDFLAG(IS_LINUX)
++    case IDR_OMNIPLAY_MANIFEST:
++#endif
+     case IDR_WEBSTORE_MANIFEST:
+ 
+ #if BUILDFLAG(IS_CHROMEOS)
+--- a/chrome/browser/resources/component_extension_resources.grd
++++ b/chrome/browser/resources/component_extension_resources.grd
+@@ -12,6 +12,93 @@
+   </outputs>
+   <release seq="1">
+     <includes>
++
++      <!-- OmniPlay bundled Game Hub. -->
++      <if expr="not is_android and not is_chromeos">
++        <include name="IDR_OMNIPLAY_APP_JS" file="omniplay_game_hub/app.js" resource_path="omniplay_game_hub/app.js" type="BINDATA" />
++        <include name="IDR_OMNIPLAY_APPEARANCE_JS" file="omniplay_game_hub/appearance.js" resource_path="omniplay_game_hub/appearance.js" type="BINDATA" />
++        <include name="IDR_OMNIPLAY_BACKGROUND_JS" file="omniplay_game_hub/background.js" resource_path="omniplay_game_hub/background.js" type="BINDATA" />
++        <include name="IDR_OMNIPLAY_BRIDGE_JS" file="omniplay_game_hub/bridge.js" resource_path="omniplay_game_hub/bridge.js" type="BINDATA" />
++        <include name="IDR_OMNIPLAY_BROWSER_DASHBOARD_JS" file="omniplay_game_hub/browser-dashboard.js" resource_path="omniplay_game_hub/browser-dashboard.js" type="BINDATA" />
++        <include name="IDR_OMNIPLAY_BROWSER_SERVICE_JS" file="omniplay_game_hub/browser-service.js" resource_path="omniplay_game_hub/browser-service.js" type="BINDATA" />
++        <include name="IDR_OMNIPLAY_CANVAS_POINTER_JS" file="omniplay_game_hub/canvas-pointer.js" resource_path="omniplay_game_hub/canvas-pointer.js" type="BINDATA" />
++        <include name="IDR_OMNIPLAY_COMPATIBILITY_JS" file="omniplay_game_hub/compatibility.js" resource_path="omniplay_game_hub/compatibility.js" type="BINDATA" />
++        <include name="IDR_OMNIPLAY_COMPONENT_CONTEXT_JS" file="omniplay_game_hub/component-context.js" resource_path="omniplay_game_hub/component-context.js" type="BINDATA" />
++        <include name="IDR_OMNIPLAY_COMPONENT_OWNERSHIP_JS" file="omniplay_game_hub/component-ownership.js" resource_path="omniplay_game_hub/component-ownership.js" type="BINDATA" />
++        <include name="IDR_OMNIPLAY_CONTROLLERS_JS" file="omniplay_game_hub/controllers.js" resource_path="omniplay_game_hub/controllers.js" type="BINDATA" />
++        <include name="IDR_OMNIPLAY_CORE_OPTION_SETTINGS_JS" file="omniplay_game_hub/core-option-settings.js" resource_path="omniplay_game_hub/core-option-settings.js" type="BINDATA" />
++        <include name="IDR_OMNIPLAY_CORES_CATALOG_JSON" file="omniplay_game_hub/cores/catalog.json" resource_path="omniplay_game_hub/cores/catalog.json" type="BINDATA" />
++        <include name="IDR_OMNIPLAY_DEVICE_INFORMATION_JS" file="omniplay_game_hub/device-information.js" resource_path="omniplay_game_hub/device-information.js" type="BINDATA" />
++        <include name="IDR_OMNIPLAY_FIRMWARE_CLIENT_JS" file="omniplay_game_hub/firmware-client.js" resource_path="omniplay_game_hub/firmware-client.js" type="BINDATA" />
++        <include name="IDR_OMNIPLAY_FIRMWARE_SETTINGS_JS" file="omniplay_game_hub/firmware-settings.js" resource_path="omniplay_game_hub/firmware-settings.js" type="BINDATA" />
++        <include name="IDR_OMNIPLAY_GAME_INPUT_JS" file="omniplay_game_hub/game-input.js" resource_path="omniplay_game_hub/game-input.js" type="BINDATA" />
++        <include name="IDR_OMNIPLAY_GAME_SETTINGS_JS" file="omniplay_game_hub/game-settings.js" resource_path="omniplay_game_hub/game-settings.js" type="BINDATA" />
++        <include name="IDR_OMNIPLAY_GAMEPAD_HAPTICS_JS" file="omniplay_game_hub/gamepad-haptics.js" resource_path="omniplay_game_hub/gamepad-haptics.js" type="BINDATA" />
++        <include name="IDR_OMNIPLAY_GAMEPAD_PORTS_JS" file="omniplay_game_hub/gamepad-ports.js" resource_path="omniplay_game_hub/gamepad-ports.js" type="BINDATA" />
++        <include name="IDR_OMNIPLAY_I18N_JS" file="omniplay_game_hub/i18n.js" resource_path="omniplay_game_hub/i18n.js" type="BINDATA" />
++        <include name="IDR_OMNIPLAY_INDEX_HTML" file="omniplay_game_hub/index.html" resource_path="omniplay_game_hub/index.html" type="BINDATA" />
++        <include name="IDR_OMNIPLAY_INPUT_PROFILE_JS" file="omniplay_game_hub/input-profile.js" resource_path="omniplay_game_hub/input-profile.js" type="BINDATA" />
++        <include name="IDR_OMNIPLAY_INPUT_SETTINGS_JS" file="omniplay_game_hub/input-settings.js" resource_path="omniplay_game_hub/input-settings.js" type="BINDATA" />
++        <include name="IDR_OMNIPLAY_LIBRARY_IMPORT_JS" file="omniplay_game_hub/library-import.js" resource_path="omniplay_game_hub/library-import.js" type="BINDATA" />
++        <include name="IDR_OMNIPLAY_MANIFEST" file="omniplay_game_hub/manifest.json" resource_path="omniplay_game_hub/manifest.json" type="BINDATA" />
++        <include name="IDR_OMNIPLAY_MEDIA_CLIENT_JS" file="omniplay_game_hub/media-client.js" resource_path="omniplay_game_hub/media-client.js" type="BINDATA" />
++        <include name="IDR_OMNIPLAY_NATIVE_MEDIA_CLIENT_JS" file="omniplay_game_hub/native-media-client.js" resource_path="omniplay_game_hub/native-media-client.js" type="BINDATA" />
++        <include name="IDR_OMNIPLAY_NATIVE_PLAYER_JS" file="omniplay_game_hub/native-player.js" resource_path="omniplay_game_hub/native-player.js" type="BINDATA" />
++        <include name="IDR_OMNIPLAY_NATIVE_WORK_MAINTENANCE_JS" file="omniplay_game_hub/native-work-maintenance.js" resource_path="omniplay_game_hub/native-work-maintenance.js" type="BINDATA" />
++        <include name="IDR_OMNIPLAY_PERFORMANCE_HISTORY_JS" file="omniplay_game_hub/performance-history.js" resource_path="omniplay_game_hub/performance-history.js" type="BINDATA" />
++        <include name="IDR_OMNIPLAY_PLAYER_JS" file="omniplay_game_hub/player.js" resource_path="omniplay_game_hub/player.js" type="BINDATA" />
++        <include name="IDR_OMNIPLAY_REMOTE_PLAY_JS" file="omniplay_game_hub/remote-play.js" resource_path="omniplay_game_hub/remote-play.js" type="BINDATA" />
++        <include name="IDR_OMNIPLAY_REMOTE_TOUCH_JS" file="omniplay_game_hub/remote-touch.js" resource_path="omniplay_game_hub/remote-touch.js" type="BINDATA" />
++        <include name="IDR_OMNIPLAY_RUNTIME_AUDIO_WORKLET_JS" file="omniplay_game_hub/runtime/audio-worklet.js" resource_path="omniplay_game_hub/runtime/audio-worklet.js" type="BINDATA" />
++        <include name="IDR_OMNIPLAY_RUNTIME_BENCHMARK_JS" file="omniplay_game_hub/runtime/benchmark.js" resource_path="omniplay_game_hub/runtime/benchmark.js" type="BINDATA" />
++        <include name="IDR_OMNIPLAY_RUNTIME_CORE_ASSETS_JS" file="omniplay_game_hub/runtime/core-assets.js" resource_path="omniplay_game_hub/runtime/core-assets.js" type="BINDATA" />
++        <include name="IDR_OMNIPLAY_RUNTIME_CORE_OPTIONS_JS" file="omniplay_game_hub/runtime/core-options.js" resource_path="omniplay_game_hub/runtime/core-options.js" type="BINDATA" />
++        <include name="IDR_OMNIPLAY_RUNTIME_CORE_RESOURCES_JS" file="omniplay_game_hub/runtime/core-resources.js" resource_path="omniplay_game_hub/runtime/core-resources.js" type="BINDATA" />
++        <include name="IDR_OMNIPLAY_RUNTIME_DISC_CONTROL_JS" file="omniplay_game_hub/runtime/disc-control.js" resource_path="omniplay_game_hub/runtime/disc-control.js" type="BINDATA" />
++        <include name="IDR_OMNIPLAY_RUNTIME_FIRMWARE_JS" file="omniplay_game_hub/runtime/firmware.js" resource_path="omniplay_game_hub/runtime/firmware.js" type="BINDATA" />
++        <include name="IDR_OMNIPLAY_RUNTIME_HARDWARE_VIDEO_JS" file="omniplay_game_hub/runtime/hardware-video.js" resource_path="omniplay_game_hub/runtime/hardware-video.js" type="BINDATA" />
++        <include name="IDR_OMNIPLAY_RUNTIME_LIBRETRO_CALLS_JS" file="omniplay_game_hub/runtime/libretro-calls.js" resource_path="omniplay_game_hub/runtime/libretro-calls.js" type="BINDATA" />
++        <include name="IDR_OMNIPLAY_RUNTIME_LIBRETRO_WORKER_JS" file="omniplay_game_hub/runtime/libretro-worker.js" resource_path="omniplay_game_hub/runtime/libretro-worker.js" type="BINDATA" />
++        <include name="IDR_OMNIPLAY_RUNTIME_MD_PORTABLE_JS" file="omniplay_game_hub/runtime/md-portable.js" resource_path="omniplay_game_hub/runtime/md-portable.js" type="BINDATA" />
++        <include name="IDR_OMNIPLAY_RUNTIME_MEDIA_FILESYSTEM_JS" file="omniplay_game_hub/runtime/media-filesystem.js" resource_path="omniplay_game_hub/runtime/media-filesystem.js" type="BINDATA" />
++        <include name="IDR_OMNIPLAY_RUNTIME_MEDIA_MANIFEST_JS" file="omniplay_game_hub/runtime/media-manifest.js" resource_path="omniplay_game_hub/runtime/media-manifest.js" type="BINDATA" />
++        <include name="IDR_OMNIPLAY_RUNTIME_MEDIA_STAGE_JS" file="omniplay_game_hub/runtime/media-stage.js" resource_path="omniplay_game_hub/runtime/media-stage.js" type="BINDATA" />
++        <include name="IDR_OMNIPLAY_RUNTIME_MEMORY_POLICY_JS" file="omniplay_game_hub/runtime/memory-policy.js" resource_path="omniplay_game_hub/runtime/memory-policy.js" type="BINDATA" />
++        <include name="IDR_OMNIPLAY_RUNTIME_NATIVE_MEDIA_JS" file="omniplay_game_hub/runtime/native-media.js" resource_path="omniplay_game_hub/runtime/native-media.js" type="BINDATA" />
++        <include name="IDR_OMNIPLAY_RUNTIME_RUNTIME_JS" file="omniplay_game_hub/runtime/runtime.js" resource_path="omniplay_game_hub/runtime/runtime.js" type="BINDATA" />
++        <include name="IDR_OMNIPLAY_RUNTIME_SAVED_FILE_CODEC_JS" file="omniplay_game_hub/runtime/saved-file-codec.js" resource_path="omniplay_game_hub/runtime/saved-file-codec.js" type="BINDATA" />
++        <include name="IDR_OMNIPLAY_RUNTIME_SAVED_FILE_SESSION_JS" file="omniplay_game_hub/runtime/saved-file-session.js" resource_path="omniplay_game_hub/runtime/saved-file-session.js" type="BINDATA" />
++        <include name="IDR_OMNIPLAY_RUNTIME_SAVED_FILES_JS" file="omniplay_game_hub/runtime/saved-files.js" resource_path="omniplay_game_hub/runtime/saved-files.js" type="BINDATA" />
++        <include name="IDR_OMNIPLAY_RUNTIME_SHA256_JS" file="omniplay_game_hub/runtime/sha256.js" resource_path="omniplay_game_hub/runtime/sha256.js" type="BINDATA" />
++        <include name="IDR_OMNIPLAY_RUNTIME_THREAD_CALLBACKS_JS" file="omniplay_game_hub/runtime/thread-callbacks.js" resource_path="omniplay_game_hub/runtime/thread-callbacks.js" type="BINDATA" />
++        <include name="IDR_OMNIPLAY_RUNTIME_THREAD_MESSAGES_JS" file="omniplay_game_hub/runtime/thread-messages.js" resource_path="omniplay_game_hub/runtime/thread-messages.js" type="BINDATA" />
++        <include name="IDR_OMNIPLAY_RUNTIME_THREAD_POLICY_JS" file="omniplay_game_hub/runtime/thread-policy.js" resource_path="omniplay_game_hub/runtime/thread-policy.js" type="BINDATA" />
++        <include name="IDR_OMNIPLAY_RUNTIME_THREAD_RELAY_JS" file="omniplay_game_hub/runtime/thread-relay.js" resource_path="omniplay_game_hub/runtime/thread-relay.js" type="BINDATA" />
++        <include name="IDR_OMNIPLAY_RUNTIME_THREAD_WASM_JS" file="omniplay_game_hub/runtime/thread-wasm.js" resource_path="omniplay_game_hub/runtime/thread-wasm.js" type="BINDATA" />
++        <include name="IDR_OMNIPLAY_SAVE_CLIENT_JS" file="omniplay_game_hub/save-client.js" resource_path="omniplay_game_hub/save-client.js" type="BINDATA" />
++        <include name="IDR_OMNIPLAY_SAVE_HISTORY_JS" file="omniplay_game_hub/save-history.js" resource_path="omniplay_game_hub/save-history.js" type="BINDATA" />
++        <include name="IDR_OMNIPLAY_SAVE_MAINTENANCE_JS" file="omniplay_game_hub/save-maintenance.js" resource_path="omniplay_game_hub/save-maintenance.js" type="BINDATA" />
++        <include name="IDR_OMNIPLAY_SAVE_ORIGIN_JS" file="omniplay_game_hub/save-origin.js" resource_path="omniplay_game_hub/save-origin.js" type="BINDATA" />
++        <include name="IDR_OMNIPLAY_STREAMING_CAPTURE_JS" file="omniplay_game_hub/streaming/capture.js" resource_path="omniplay_game_hub/streaming/capture.js" type="BINDATA" />
++        <include name="IDR_OMNIPLAY_STREAMING_CONFIG_JSON" file="omniplay_game_hub/streaming/config.json" resource_path="omniplay_game_hub/streaming/config.json" type="BINDATA" />
++        <include name="IDR_OMNIPLAY_STREAMING_CONTROL_PROFILE_JS" file="omniplay_game_hub/streaming/control-profile.js" resource_path="omniplay_game_hub/streaming/control-profile.js" type="BINDATA" />
++        <include name="IDR_OMNIPLAY_STREAMING_CRYPTO_JS" file="omniplay_game_hub/streaming/crypto.js" resource_path="omniplay_game_hub/streaming/crypto.js" type="BINDATA" />
++        <include name="IDR_OMNIPLAY_STREAMING_INPUT_JS" file="omniplay_game_hub/streaming/input.js" resource_path="omniplay_game_hub/streaming/input.js" type="BINDATA" />
++        <include name="IDR_OMNIPLAY_STREAMING_MEDIA_POLICY_JS" file="omniplay_game_hub/streaming/media-policy.js" resource_path="omniplay_game_hub/streaming/media-policy.js" type="BINDATA" />
++        <include name="IDR_OMNIPLAY_STREAMING_NATIVE_INPUT_JS" file="omniplay_game_hub/streaming/native-input.js" resource_path="omniplay_game_hub/streaming/native-input.js" type="BINDATA" />
++        <include name="IDR_OMNIPLAY_STREAMING_PAIRING_JS" file="omniplay_game_hub/streaming/pairing.js" resource_path="omniplay_game_hub/streaming/pairing.js" type="BINDATA" />
++        <include name="IDR_OMNIPLAY_STREAMING_QOS_JS" file="omniplay_game_hub/streaming/qos.js" resource_path="omniplay_game_hub/streaming/qos.js" type="BINDATA" />
++        <include name="IDR_OMNIPLAY_STREAMING_RELAY_JS" file="omniplay_game_hub/streaming/relay.js" resource_path="omniplay_game_hub/streaming/relay.js" type="BINDATA" />
++        <include name="IDR_OMNIPLAY_STREAMING_RTC_JS" file="omniplay_game_hub/streaming/rtc.js" resource_path="omniplay_game_hub/streaming/rtc.js" type="BINDATA" />
++        <include name="IDR_OMNIPLAY_STREAMING_STORAGE_JS" file="omniplay_game_hub/streaming/storage.js" resource_path="omniplay_game_hub/streaming/storage.js" type="BINDATA" />
++        <include name="IDR_OMNIPLAY_STREAMING_TRANSPORT_JS" file="omniplay_game_hub/streaming/transport.js" resource_path="omniplay_game_hub/streaming/transport.js" type="BINDATA" />
++        <include name="IDR_OMNIPLAY_STYLES_CSS" file="omniplay_game_hub/styles.css" resource_path="omniplay_game_hub/styles.css" type="BINDATA" />
++        <include name="IDR_OMNIPLAY_SYNC_SETTINGS_JS" file="omniplay_game_hub/sync-settings.js" resource_path="omniplay_game_hub/sync-settings.js" type="BINDATA" />
++        <include name="IDR_OMNIPLAY_TOUCH_CONTROLS_JS" file="omniplay_game_hub/touch-controls.js" resource_path="omniplay_game_hub/touch-controls.js" type="BINDATA" />
++        <include name="IDR_OMNIPLAY_TOUCH_PROFILE_JS" file="omniplay_game_hub/touch-profile.js" resource_path="omniplay_game_hub/touch-profile.js" type="BINDATA" />
++        <include name="IDR_OMNIPLAY_TOUCH_SETTINGS_JS" file="omniplay_game_hub/touch-settings.js" resource_path="omniplay_game_hub/touch-settings.js" type="BINDATA" />
++        <include name="IDR_OMNIPLAY_UPDATE_SETTINGS_JS" file="omniplay_game_hub/update-settings.js" resource_path="omniplay_game_hub/update-settings.js" type="BINDATA" />
++      </if>
+       <include name="IDR_NETWORK_SPEECH_SYNTHESIS_JS" file="network_speech_synthesis/tts_extension.js" type="BINDATA" />
+ 
+       <include name="IDR_NETWORK_SPEECH_SYNTHESIS_MV3_AUDIO_HTML" file="network_speech_synthesis/mv3/audio.html" type="BINDATA" />
+--- a/chrome/app/theme/chromium/BRANDING
++++ b/chrome/app/theme/chromium/BRANDING
+@@ -1,10 +1,10 @@
+-COMPANY_FULLNAME=The Chromium Authors
+-COMPANY_SHORTNAME=The Chromium Authors
+-PRODUCT_FULLNAME=Chromium
+-PRODUCT_SHORTNAME=Chromium
+-PRODUCT_INSTALLER_FULLNAME=Chromium Installer
+-PRODUCT_INSTALLER_SHORTNAME=Chromium Installer
++COMPANY_FULLNAME=OmniPlay
++COMPANY_SHORTNAME=OmniPlay
++PRODUCT_FULLNAME=OmniPlay
++PRODUCT_SHORTNAME=OmniPlay
++PRODUCT_INSTALLER_FULLNAME=OmniPlay Installer
++PRODUCT_INSTALLER_SHORTNAME=OmniPlay Installer
+ COPYRIGHT=Copyright @LASTCHANGE_YEAR@ The Chromium Authors. All rights reserved.
+-MAC_BUNDLE_ID=org.chromium.Chromium
++MAC_BUNDLE_ID=app.omniplay.browser
+ MAC_CREATOR_CODE=Cr24
+ MAC_TEAM_ID=
+--- a/chrome/common/chrome_paths_linux.cc
++++ b/chrome/common/chrome_paths_linux.cc
+@@ -95,7 +95,7 @@
+ #elif BUILDFLAG(GOOGLE_CHROME_BRANDING)
+   std::string data_dir_basename = "google-chrome";
+ #else
+-  std::string data_dir_basename = "chromium";
++  std::string data_dir_basename = "omniplay";
+ #endif
+   *result = config_dir.Append(data_dir_basename + GetChannelSuffixForDataDir());
+   return true;
+--- a/chrome/common/chrome_paths_mac.mm
++++ b/chrome/common/chrome_paths_mac.mm
+@@ -37,7 +37,7 @@
+ #elif BUILDFLAG(GOOGLE_CHROME_BRANDING)
+       product_dir_name = "Google/Chrome";
+ #else
+-      product_dir_name = "Chromium";
++      product_dir_name = "OmniPlay";
+ #endif
+     }
+ 
+--- a/chrome/common/chrome_paths.cc
++++ b/chrome/common/chrome_paths.cc
+@@ -460,7 +460,7 @@
+           "/Library/Google/ChromeForTesting/NativeMessagingHosts"));
+ #else
+       cur = base::FilePath(FILE_PATH_LITERAL(
+-          "/Library/Application Support/Chromium/NativeMessagingHosts"));
++          "/Library/Application Support/OmniPlay/NativeMessagingHosts"));
+ #endif
+ #else  // BUILDFLAG(IS_MAC)
+ #if BUILDFLAG(GOOGLE_CHROME_BRANDING)
+@@ -471,7 +471,7 @@
+           "/etc/opt/chrome_for_testing/native-messaging-hosts"));
+ #else
+       cur = base::FilePath(
+-          FILE_PATH_LITERAL("/etc/chromium/native-messaging-hosts"));
++          FILE_PATH_LITERAL("/etc/omniplay/native-messaging-hosts"));
+ #endif
+ #endif  // !BUILDFLAG(IS_MAC)
+       break;
+--- a/chrome/install_static/chromium_install_modes.h
++++ b/chrome/install_static/chromium_install_modes.h
+@@ -21,7 +21,7 @@
+ 
+ // The brand-specific product name to be included as a component of the install
+ // and user data directory paths.
+-inline constexpr wchar_t kProductPathName[] = L"Chromium";
++inline constexpr wchar_t kProductPathName[] = L"OmniPlay";
+ 
+ // The brand-specific safe browsing client name.
+ inline constexpr char kSafeBrowsingName[] = "chromium";
+@@ -54,15 +54,15 @@
+         .logo_suffix = L"",  // No logo suffix for the primary install mode.
+         .app_guid =
+             L"",  // Empty app_guid since no integration with Google Update.
+-        .base_app_name = L"Chromium",              // A distinct base_app_name.
+-        .base_app_id = L"Chromium",                // A distinct base_app_id.
+-        .browser_prog_id_prefix = L"ChromiumHTM",  // Browser ProgID prefix.
++        .base_app_name = L"OmniPlay",              // A distinct base_app_name.
++        .base_app_id = L"OmniPlay",                // A distinct base_app_id.
++        .browser_prog_id_prefix = L"OmniPlayHTM",  // Browser ProgID prefix.
+         .browser_prog_id_description =
+-            L"Chromium HTML Document",  // Browser ProgID description.
+-        .direct_launch_url_scheme = "chromium",
+-        .pdf_prog_id_prefix = L"ChromiumPDF",  // PDF ProgID prefix.
++            L"OmniPlay HTML Document",  // Browser ProgID description.
++        .direct_launch_url_scheme = "omniplay",
++        .pdf_prog_id_prefix = L"OmniPlayPDF",  // PDF ProgID prefix.
+         .pdf_prog_id_description =
+-            L"Chromium PDF Document",  // PDF ProgID description.
++            L"OmniPlay PDF Document",  // PDF ProgID description.
+         .active_setup_guid =
+             L"{7D2B3E1D-D096-4594-9D8F-A6667F12E0AC}",  // Active Setup
+                                                         // GUID.
+--- a/chrome/browser/extensions/api/messaging/launch_context_win.cc
++++ b/chrome/browser/extensions/api/messaging/launch_context_win.cc
+@@ -62,6 +62,13 @@
+                               const std::wstring& host_name,
+                               std::wstring* result) {
+ #if BUILDFLAG(CHROMIUM_BRANDING)
++  // OmniPlay's privileged broker is registered only in its own product hive.
++  // Other extension hosts retain upstream compatibility discovery.
++  if (host_name == L"com.omniplay.broker") {
++    return GetManifestPathWithFlagsFromSubkey(
++        root_key, flags, L"SOFTWARE\\OmniPlay\\NativeMessagingHosts",
++        host_name, result);
++  }
+   static constexpr wchar_t kChromiumNativeMessagingRegistryKey[] =
+       L"SOFTWARE\\Chromium\\NativeMessagingHosts";
+ 

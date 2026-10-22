@@ -1,0 +1,11 @@
+[
+  "_malloc", "_free", "_om_web_fs_constant", "_retro_api_version", "_retro_init", "_retro_deinit",
+  "_om_web_disc_clear", "_om_web_disc_register", "_om_web_disc_count", "_om_web_disc_index", "_om_web_disc_ejected", "_om_web_disc_set_ejected", "_om_web_disc_set_index",
+  "_om_web_flush_files",
+  "_retro_set_environment", "_retro_set_video_refresh", "_retro_set_audio_sample",
+  "_retro_set_audio_sample_batch", "_retro_set_input_poll", "_retro_set_input_state",
+  "_retro_get_system_info", "_retro_get_system_av_info", "_retro_set_controller_port_device",
+  "_retro_load_game", "_retro_unload_game", "_retro_run", "_retro_reset",
+  "_retro_serialize_size", "_retro_serialize", "_retro_unserialize",
+  "_retro_get_memory_data", "_retro_get_memory_size"
+]

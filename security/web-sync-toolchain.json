@@ -1,0 +1,16 @@
+{
+  "schema_version": 1,
+  "target": "wasm32-wasip1",
+  "rust_release": "1.98.0",
+  "rust_commit_prefix": "88d9e12ae",
+  "distribution_date": "2026-08-20",
+  "standard_library_url": "https://static.rust-lang.org/dist/2026-08-20/rust-std-1.98.0-wasm32-wasip1.tar.xz",
+  "standard_library_archive_sha256": "07af7da4d9e943226c438cd5b60ba2b1f23a88c077eb09ccb227a385529c8b08",
+  "pin_source": "installed Rust distribution channel manifest; archive/signature not independently qualified",
+  "memory_initial_pages": 512,
+  "memory_maximum_pages": 16384,
+  "stack_bytes": 2097152,
+  "protocol": 1,
+  "distribution_approved": false,
+  "verification": "not_run"
+}

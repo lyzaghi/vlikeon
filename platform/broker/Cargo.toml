@@ -1,0 +1,36 @@
+[package]
+name = "omniplay-broker"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[dependencies]
+omniplay-updater.workspace = true
+omniplay-native-runtime.workspace = true
+omniplay-sandbox.workspace = true
+omniplay-stream-input.workspace = true
+omniplay-streaming.workspace = true
+omniplay-contracts.workspace = true
+omniplay-device-info.workspace = true
+omniplay-core.workspace = true
+omniplay-local-service.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+uuid.workspace = true
+sha2.workspace = true
+base64.workspace = true
+omniplay-sync-client.workspace = true
+zeroize.workspace = true
+rfd = "=0.17.2"
+
+[target.'cfg(target_os="linux")'.dependencies]
+libc = "=0.2.191"
+
+[[bin]]
+name = "omniplay-broker"
+path = "src/main.rs"
+
+[[bin]]
+name = "omniplay-native-host"
+path = "src/linux_host_main.rs"

@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "definitions": [
+    {
+      "key": "mupen64plus-BilinearMode",
+      "label_vi": "Lọc hình ảnh",
+      "label_en": "Image filtering",
+      "description_vi": "Chọn cách lọc điểm ảnh. Ba điểm mô phỏng cách lọc của hệ máy gốc.",
+      "description_en": "Choose pixel filtering. Three-point filtering follows the original console's method.",
+      "default_value": "3point",
+      "choices": [
+        {"value":"3point","label_vi":"Ba điểm","label_en":"Three point"},
+        {"value":"standard","label_vi":"Thông thường","label_en":"Standard"}
+      ]
+    }
+  ]
+}

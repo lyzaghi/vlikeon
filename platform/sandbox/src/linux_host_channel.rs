@@ -1,0 +1,43 @@
+//! Fixed local channel between the browser-spawned broker and the trusted user
+//! service. The only transferred authority is one exact profile cgroup O_PATH fd.
+use crate::linux_host::NativeHostRoot;
+use omniplay_contracts::{ErrorCode,PlatformError,Result};
+use std::{fs::{File,OpenOptions},io::{Read,Write},mem::{size_of,zeroed},os::{fd::{AsRawFd,FromRawFd,RawFd},unix::{fs::{FileTypeExt,MetadataExt,OpenOptionsExt},net::{UnixListener,UnixStream},ffi::OsStrExt}},path::Path};
+
+const REQUEST_MAGIC:&[u8;8]=b"OPHREQ01";const RESPONSE_MAGIC:&[u8;8]=b"OPHRES01";const REQUEST_BYTES:usize=48;const RESPONSE_BYTES:usize=16;
+fn unavailable()->PlatformError{PlatformError::new(ErrorCode::RuntimeUnavailable,"The trusted Linux native-host channel is unavailable")}
+fn private_parent(path:&Path)->Result<()> {let parent=path.parent().ok_or_else(unavailable)?;let directory=OpenOptions::new().read(true).custom_flags(libc::O_PATH|libc::O_DIRECTORY|libc::O_NOFOLLOW|libc::O_CLOEXEC).open(parent).map_err(|_|unavailable())?;let value=directory.metadata().map_err(|_|unavailable())?;if unsafe{libc::geteuid()}==0||!value.is_dir()||value.uid()!=unsafe{libc::geteuid()}||value.mode()&0o7777!=0o700{return Err(unavailable());}Ok(())}
+fn peer(descriptor:RawFd)->Result<libc::ucred>{let mut value:libc::ucred=unsafe{zeroed()};let mut bytes=size_of::<libc::ucred>()as libc::socklen_t;if unsafe{libc::getsockopt(descriptor,libc::SOL_SOCKET,libc::SO_PEERCRED,(&mut value as*mut libc::ucred).cast(),&mut bytes)}!=0||bytes as usize!=size_of::<libc::ucred>()||value.uid!=unsafe{libc::geteuid()}||value.uid==0||value.pid<=1{return Err(unavailable());}Ok(value)}
+fn response(status:u32)->[u8;RESPONSE_BYTES]{let mut raw=[0u8;RESPONSE_BYTES];raw[..8].copy_from_slice(RESPONSE_MAGIC);raw[8..12].copy_from_slice(&status.to_le_bytes());raw}
+fn send(stream:&UnixStream,status:u32,file:Option<&File>)->Result<()> {
+    let raw=response(status),mut io=libc::iovec{iov_base:raw.as_ptr().cast_mut().cast(),iov_len:raw.len()};let mut control=[0u8;64];let mut message:libc::msghdr=unsafe{zeroed()};message.msg_iov=&mut io;message.msg_iovlen=1;
+    if let Some(file)=file{message.msg_control=control.as_mut_ptr().cast();message.msg_controllen=control.len();let header=unsafe{libc::CMSG_FIRSTHDR(&message)};if header.is_null(){return Err(unavailable());}unsafe{(*header).cmsg_level=libc::SOL_SOCKET;(*header).cmsg_type=libc::SCM_RIGHTS;(*header).cmsg_len=libc::CMSG_LEN(size_of::<RawFd>()as u32)as usize;*(libc::CMSG_DATA(header)as*mut RawFd)=file.as_raw_fd();message.msg_controllen=(*header).cmsg_len;}}
+    let count=unsafe{libc::sendmsg(stream.as_raw_fd(),&message,libc::MSG_NOSIGNAL)};if count!=raw.len()as isize{return Err(unavailable());}Ok(())
+}
+fn receive(stream:&UnixStream)->Result<File>{
+    let mut raw=[0u8;RESPONSE_BYTES];let mut io=libc::iovec{iov_base:raw.as_mut_ptr().cast(),iov_len:raw.len()};let mut control=[0u8;32];let mut message:libc::msghdr=unsafe{zeroed()};message.msg_iov=&mut io;message.msg_iovlen=1;message.msg_control=control.as_mut_ptr().cast();message.msg_controllen=libc::CMSG_SPACE(size_of::<RawFd>()as u32)as usize;
+    if message.msg_controllen>control.len(){return Err(unavailable());}let count=unsafe{libc::recvmsg(stream.as_raw_fd(),&mut message,libc::MSG_CMSG_CLOEXEC)};let header=unsafe{libc::CMSG_FIRSTHDR(&message)};
+    // Adopt the one descriptor before validating any other response field.  A
+    // malformed same-user response can therefore never leak an installed fd.
+    let file=if !header.is_null()&&unsafe{(*header).cmsg_level}==libc::SOL_SOCKET&&unsafe{(*header).cmsg_type}==libc::SCM_RIGHTS&&unsafe{(*header).cmsg_len}==libc::CMSG_LEN(size_of::<RawFd>()as u32)as usize{let descriptor=unsafe{*(libc::CMSG_DATA(header)as*const RawFd)};if descriptor<0{None}else{Some(unsafe{File::from_raw_fd(descriptor)})}}else{None};
+    if count!=raw.len()as isize||message.msg_flags&(libc::MSG_TRUNC|libc::MSG_CTRUNC)!=0||&raw[..8]!=RESPONSE_MAGIC||u32::from_le_bytes(raw[8..12].try_into().map_err(|_|unavailable())?)!=0||raw[12..].iter().any(|byte|*byte!=0)||header.is_null()||!unsafe{libc::CMSG_NXTHDR(&message,header)}.is_null(){return Err(unavailable());}
+    let file=file.ok_or_else(unavailable)?;let value=file.metadata().map_err(|_|unavailable())?;let mut shape=std::mem::MaybeUninit::<libc::statfs>::uninit();if !value.is_dir()||value.uid()!=unsafe{libc::geteuid()}||value.mode()&0o7777!=0o700||unsafe{libc::fstatfs(file.as_raw_fd(),shape.as_mut_ptr())}!=0||unsafe{shape.assume_init()}.f_type!=libc::CGROUP2_SUPER_MAGIC{return Err(unavailable());}Ok(file)
+}
+pub fn bind(path:&Path)->Result<UnixListener>{
+    private_parent(path)?;if path.as_os_str().as_bytes().len()>100{return Err(unavailable());}let listener=UnixListener::bind(path).map_err(|_|unavailable())?;std::fs::set_permissions(path,std::os::unix::fs::PermissionsExt::from_mode(0o600)).map_err(|_|unavailable())?;let value=std::fs::symlink_metadata(path).map_err(|_|unavailable())?;if !value.file_type().is_socket()||value.uid()!=unsafe{libc::geteuid()}||value.mode()&0o7777!=0o600{return Err(unavailable());}Ok(listener)
+}
+pub fn systemd_listener(expected:&Path)->Result<UnixListener>{
+    private_parent(expected)?;let pid=std::env::var("LISTEN_PID").ok().and_then(|value|value.parse::<u32>().ok()),fds=std::env::var("LISTEN_FDS").ok().and_then(|value|value.parse::<u32>().ok());if pid!=Some(std::process::id())||fds!=Some(1){return Err(unavailable());}
+    let descriptor=3;if unsafe{libc::fcntl(descriptor,libc::F_SETFD,libc::FD_CLOEXEC)}!=0{return Err(unavailable());}let mut kind=0;let mut bytes=size_of::<libc::c_int>()as libc::socklen_t;if unsafe{libc::getsockopt(descriptor,libc::SOL_SOCKET,libc::SO_TYPE,(&mut kind as*mut libc::c_int).cast(),&mut bytes)}!=0||bytes as usize!=size_of::<libc::c_int>()||kind!=libc::SOCK_STREAM{return Err(unavailable());}let mut accepting=0;bytes=size_of::<libc::c_int>()as libc::socklen_t;if unsafe{libc::getsockopt(descriptor,libc::SOL_SOCKET,libc::SO_ACCEPTCONN,(&mut accepting as*mut libc::c_int).cast(),&mut bytes)}!=0||accepting!=1{return Err(unavailable());}
+    let listener=unsafe{UnixListener::from_raw_fd(descriptor)};if listener.local_addr().ok().and_then(|value|value.as_pathname().map(Path::to_owned)).as_deref()!=Some(expected){return Err(unavailable());}let value=std::fs::symlink_metadata(expected).map_err(|_|unavailable())?;if !value.file_type().is_socket()||value.uid()!=unsafe{libc::geteuid()}||value.mode()&0o7777!=0o600{return Err(unavailable());}std::env::remove_var("LISTEN_PID");std::env::remove_var("LISTEN_FDS");Ok(listener)
+}
+pub fn serve_one(listener:&UnixListener,host:&NativeHostRoot)->Result<()> {
+    let(mut stream,_)=listener.accept().map_err(|_|unavailable())?;peer(stream.as_raw_fd())?;stream.set_read_timeout(Some(std::time::Duration::from_secs(5))).map_err(|_|unavailable())?;stream.set_write_timeout(Some(std::time::Duration::from_secs(5))).map_err(|_|unavailable())?;
+    let mut raw=[0u8;REQUEST_BYTES];if stream.read_exact(&mut raw).is_err()||&raw[..8]!=REQUEST_MAGIC||raw[44..].iter().any(|byte|*byte!=0){let _=send(&stream,1,None);return Err(unavailable());}let profile=std::str::from_utf8(&raw[8..44]).map_err(|_|unavailable())?;
+    match host.provision_profile(profile){Ok(file)=>send(&stream,0,Some(&file)),Err(error)=>{let _=send(&stream,1,None);Err(error)}}
+}
+pub fn wait(listener:&UnixListener,timeout:std::time::Duration)->Result<bool>{let milliseconds=timeout.as_millis().min(i32::MAX as u128)as i32;let mut descriptor=libc::pollfd{fd:listener.as_raw_fd(),events:libc::POLLIN,revents:0};loop{let value=unsafe{libc::poll(&mut descriptor,1,milliseconds)};if value>0{if descriptor.revents&libc::POLLIN!=0{return Ok(true);}return Err(unavailable());}if value==0{return Ok(false);}if std::io::Error::last_os_error().kind()!=std::io::ErrorKind::Interrupted{return Err(unavailable());}}}
+pub fn request(path:&Path,profile:&str)->Result<File>{
+    crate::linux_plan::session(profile)?;private_parent(path)?;let value=std::fs::symlink_metadata(path).map_err(|_|unavailable())?;if !value.file_type().is_socket()||value.uid()!=unsafe{libc::geteuid()}||value.mode()&0o7777!=0o600{return Err(unavailable());}
+    let mut stream=UnixStream::connect(path).map_err(|_|unavailable())?;peer(stream.as_raw_fd())?;stream.set_read_timeout(Some(std::time::Duration::from_secs(5))).map_err(|_|unavailable())?;stream.set_write_timeout(Some(std::time::Duration::from_secs(5))).map_err(|_|unavailable())?;let mut raw=[0u8;REQUEST_BYTES];raw[..8].copy_from_slice(REQUEST_MAGIC);raw[8..44].copy_from_slice(profile.as_bytes());stream.write_all(&raw).map_err(|_|unavailable())?;receive(&stream)
+}

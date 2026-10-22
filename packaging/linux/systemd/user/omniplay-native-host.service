@@ -1,0 +1,35 @@
+[Unit]
+Description=OmniPlay delegated native runtime authority
+After=omniplay-native-host.socket
+RefuseManualStart=yes
+RefuseManualStop=yes
+
+[Service]
+Type=simple
+ExecStart=@OMNIPLAY_LAUNCHER@ --linux-native-host-service
+RuntimeDirectory=omniplay
+RuntimeDirectoryMode=0700
+Delegate=cpu memory pids
+UMask=0077
+NoNewPrivileges=yes
+PrivateDevices=yes
+PrivateTmp=yes
+ProtectClock=yes
+ProtectControlGroups=no
+ProtectHome=read-only
+ProtectHostname=yes
+ProtectKernelLogs=yes
+ProtectKernelModules=yes
+ProtectKernelTunables=yes
+ProtectProc=invisible
+ProtectSystem=strict
+RestrictAddressFamilies=AF_UNIX
+RestrictNamespaces=yes
+RestrictRealtime=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+CapabilityBoundingSet=
+AmbientCapabilities=
+SystemCallArchitectures=native
+Restart=on-failure
+RestartSec=2s

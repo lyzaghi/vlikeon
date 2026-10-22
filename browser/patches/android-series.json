@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "upstream_revision": "0e66b94549a8bd85f03fbdf189b752d6e7b63c32",
+  "patches": [
+    {
+      "file": "0002-omniplay-android.patch",
+      "owner": "android",
+      "reason": "Explicit Game Hub tab with origin-bound port, SAF and shared Rust service"
+    }
+  ],
+  "modified_files": [
+    "chrome/android/BUILD.gn",
+    "chrome/android/chrome_public_apk_tmpl.gni",
+    "chrome/android/java/AndroidManifest.xml",
+    "chrome/android/java/src/org/chromium/chrome/browser/ChromeTabbedActivity.java",
+    "chrome/android/java/src/org/chromium/chrome/browser/app/ChromeActivity.java",
+    "chrome/android/java/src/org/chromium/chrome/browser/app/appmenu/AppMenuPropertiesDelegateImpl.java"
+  ],
+  "development_only": true
+}

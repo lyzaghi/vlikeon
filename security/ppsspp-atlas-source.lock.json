@@ -1,0 +1,79 @@
+{
+  "schema_version": 2,
+  "core_revision": "a5275067b62433375bbde12921e96329a795dff0",
+  "sources": [
+    {
+      "name": "noto-cjk",
+      "repository": "https://github.com/notofonts/noto-cjk.git",
+      "revision": "f8d157532fbfaeda587e826d4cd5b21a49186f7c",
+      "files": [
+        "Sans/LICENSE",
+        "Sans/OTF/Japanese/NotoSansCJKjp-Regular.otf"
+      ],
+      "checkout_path": "third_party/sources/ppsspp-atlas-deps/noto-cjk",
+      "inventory": [
+        {
+          "path": "Sans/LICENSE",
+          "blob": "d952d62c065f3f35fb83a173496e90b21525aef3",
+          "sha256": "6a73f9541c2de74158c0e7cf6b0a58ef774f5a780bf191f2d7ec9cc53efe2bf2",
+          "bytes": 4301
+        },
+        {
+          "path": "Sans/OTF/Japanese/NotoSansCJKjp-Regular.otf",
+          "blob": "f56224957fb13a81b4c14bac34f2f058a017f9fb",
+          "sha256": "68a3fc98800b2a27b371f2fb79991daf3633bd89309d4ffaa6946fd587f375b5",
+          "bytes": 16467736
+        }
+      ],
+      "inventory_encoding": "raw_committed_git_blob"
+    },
+    {
+      "name": "noto-fonts",
+      "repository": "https://github.com/notofonts/noto-fonts.git",
+      "revision": "ffebf8c1ee449e544955a7e813c54f9b73848eac",
+      "files": [
+        "LICENSE",
+        "hinted/ttf/NotoSans/NotoSans-Regular.ttf",
+        "hinted/ttf/NotoSansHebrew/NotoSansHebrew-Regular.ttf",
+        "hinted/ttf/NotoSansThai/NotoSansThai-Regular.ttf"
+      ],
+      "checkout_path": "third_party/sources/ppsspp-atlas-deps/noto-fonts",
+      "inventory": [
+        {
+          "path": "LICENSE",
+          "blob": "c82d72e422e2d08c5ab439b6bac7c2177ea0c565",
+          "sha256": "0dab92d0544f7b233403f14b84a663bdbfa746982eda629e7f4f9ffe1b036feb",
+          "bytes": 4377
+        },
+        {
+          "path": "hinted/ttf/NotoSans/NotoSans-Regular.ttf",
+          "blob": "d55220958aa51eeeb85048d746eabe43d2cd9f14",
+          "sha256": "b85c38ecea8a7cfb39c24e395a4007474fa5a4fc864f6ee33309eb4948d232d5",
+          "bytes": 569208
+        },
+        {
+          "path": "hinted/ttf/NotoSansHebrew/NotoSansHebrew-Regular.ttf",
+          "blob": "5b43c56fa688b0ff9302a82cbebb1dae1201cf7f",
+          "sha256": "a7fa16fffb27bedb060a0866267c29e9859aeb9c21cc33f5b3aaf6eb062eca85",
+          "bytes": 26900
+        },
+        {
+          "path": "hinted/ttf/NotoSansThai/NotoSansThai-Regular.ttf",
+          "blob": "47c3fa8d536c10c2fd170e0cfe215fbbf0815e08",
+          "sha256": "404ddfb5ed0aaa6b6ec8a85700d682978992062d67da93903967b56cbd9a4acc",
+          "bytes": 37752
+        }
+      ],
+      "inventory_encoding": "raw_committed_git_blob"
+    },
+    {
+      "name": "freetype",
+      "repository": "https://github.com/hrydgard/freetype.git",
+      "revision": "063ed27f481f0bcd3962fd468e1546739d7d285a",
+      "checkout_path": "third_party/sources/ppsspp-atlas-deps/freetype"
+    }
+  ],
+  "font_license": "OFL-1.1; full pinned raw-blob notices retained",
+  "freetype_license": "FTL or GPL-2.0-or-later; selected FTL notices retained with build-tool provenance",
+  "verification": "not_run"
+}

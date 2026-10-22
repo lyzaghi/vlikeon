@@ -1,0 +1,56 @@
+{
+  "schema_version": 1,
+  "definitions": [
+    {
+      "key": "bsnes_aspect_ratio",
+      "label_vi": "Tỷ lệ khung hình",
+      "label_en": "Aspect ratio",
+      "description_vi": "Chọn hình dạng màn hình phù hợp với game. Tự động dùng thông tin vùng của nội dung.",
+      "description_en": "Choose the screen shape for this game. Automatic uses the content region.",
+      "default_value": "Auto",
+      "choices": [
+        {"value":"Auto","label_vi":"Tự động","label_en":"Automatic"},
+        {"value":"8:7","label_vi":"8:7","label_en":"8:7"},
+        {"value":"4:3","label_vi":"4:3","label_en":"4:3"},
+        {"value":"NTSC","label_vi":"Theo NTSC","label_en":"NTSC shape"},
+        {"value":"PAL","label_vi":"Theo PAL","label_en":"PAL shape"}
+      ]
+    },
+    {
+      "key": "bsnes_blur_emulation",
+      "label_vi": "Làm mềm điểm ảnh",
+      "label_en": "Pixel smoothing",
+      "description_vi": "Mô phỏng làm mềm hình ảnh của hệ máy. Tắt để giữ các cạnh điểm ảnh rõ nét.",
+      "description_en": "Simulate the console's image blending. Disable for sharp pixel edges.",
+      "default_value": "OFF",
+      "choices": [
+        {"value":"OFF","label_vi":"Tắt","label_en":"Off"},
+        {"value":"ON","label_vi":"Bật","label_en":"On"}
+      ]
+    },
+    {
+      "key": "bsnes_ppu_show_overscan",
+      "label_vi": "Hiển thị vùng viền",
+      "label_en": "Show overscan",
+      "description_vi": "Hiện thêm vùng viền trên và dưới nếu game sử dụng vùng này.",
+      "description_en": "Show the extra top and bottom border area when the game uses it.",
+      "default_value": "OFF",
+      "choices": [
+        {"value":"OFF","label_vi":"Ẩn vùng viền","label_en":"Hide the border"},
+        {"value":"ON","label_vi":"Hiện vùng viền","label_en":"Show the border"}
+      ]
+    },
+    {
+      "key": "bsnes_hotfixes",
+      "label_vi": "Sửa lỗi game được nhận diện",
+      "label_en": "Known game fixes",
+      "description_vi": "Áp dụng các sửa lỗi theo game có sẵn trong lõi. Thử đổi lựa chọn này nếu game gặp lỗi tương thích.",
+      "description_en": "Apply the core's known game-specific fixes. Review this choice if the game has compatibility problems.",
+      "default_value": "OFF",
+      "choices": [
+        {"value":"OFF","label_vi":"Tắt","label_en":"Off"},
+        {"value":"ON","label_vi":"Bật","label_en":"On"}
+      ]
+    }
+  ]
+}

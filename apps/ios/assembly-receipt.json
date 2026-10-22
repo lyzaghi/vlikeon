@@ -1,0 +1,9 @@
+{
+  "schema_version": 1,
+  "development_only": true,
+  "core_ids": [],
+  "resource_files": 78,
+  "rust_build": "not_started",
+  "xcode_build": "not_started",
+  "verification": "not_run"
+}
