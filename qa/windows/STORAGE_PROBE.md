@@ -10,7 +10,7 @@ In a qualified MSVC developer shell, compile the copied fixture with static CRT,
 CFG, ASLR, high-entropy VA and NX, retaining the exact command and build output:
 
 ```text
-cl /nologo /std:c++20 /EHsc /W4 /WX /MT /O2 /guard:cf /DUNICODE /D_UNICODE /D_WIN32_WINNT=0x0A00 /DWINVER=0x0A00 qa/windows/storage-probe.cpp /Fo:out/qualification/windows-storage/storage-probe.obj /Fe:out/qualification/windows-storage/storage-probe.exe /link /DYNAMICBASE /HIGHENTROPYVA /NXCOMPAT /GUARD:CF advapi32.lib userenv.lib ole32.lib
+cl /nologo /std:c++20 /EHsc /W4 /WX /MT /O2 /guard:cf /DUNICODE /D_UNICODE /D_WIN32_WINNT=0x0A00 /DWINVER=0x0A00 qa/windows/storage-probe.cpp /Fo:out/qualification/windows-storage/storage-probe.obj /Fe:out/qualification/windows-storage/storage-probe.exe /link /DYNAMICBASE /HIGHENTROPYVA /NXCOMPAT /GUARD:CF advapi32.lib userenv.lib windowsapp.lib
 ```
 
 Set `OMNIPLAY_WINDOWS_STORAGE_PROBE` to that executable's absolute path, then
@@ -60,6 +60,14 @@ The harness deletes its temporary tree only after confirmed process exit,
 expected observations and successful profile retirement. An uncertain or failed
 run retains the tree and prints its location. Reader joins require actual held
 Windows thread completion, including TLS teardown.
+
+The fixture links CoTaskMemFree through WindowsApp.lib's API-set import, avoiding
+an unnecessary static OLE32 desktop dependency in this headless actor. The same
+seven OS operations and expected results remain required. Microsoft lists the
+allocator in its [WindowsApp API set](https://learn.microsoft.com/en-us/uwp/win32-and-com/win32-apis).
+Batch 020's separate kernel32-only staged probe reached entry and loaded ADVAPI32
+but reported OLE32 initialization error 1114; it did not pass the storage cases.
+Full worker/helper/core dependency compatibility remains a separate requirement.
 
 Also run matrix cases 15 and 16 for default-folder layout variants, existing child ACLs,
 alternate streams, replace/delete/rename attempts, token-policy mismatches,

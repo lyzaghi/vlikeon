@@ -9,8 +9,10 @@ int wmain() {
   std::puts("storage-loader-start");std::fflush(stdout);
   const struct {const wchar_t* library;const char* observation;} steps[]={
     {L"advapi32.dll","storage-loader-advapi32"},
-    {L"ole32.dll","storage-loader-ole32"},
+    {L"combase.dll","storage-loader-combase"},
     {L"userenv.dll","storage-loader-userenv"},
+    {L"user32.dll","storage-loader-user32"},
+    {L"ole32.dll","storage-loader-ole32"},
   };
   for(const auto& step:steps){
     if(!LoadLibraryExW(step.library,nullptr,LOAD_LIBRARY_SEARCH_SYSTEM32)){

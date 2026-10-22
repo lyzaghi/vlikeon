@@ -47,7 +47,7 @@ fn run_probe(variable:&str,writable_scratch:bool,expected:&str){
     assert!(ended,"the real probe process must be confirmed ended");
     let bytes=result.expect("storage probe response deadline").expect("storage probe read");
     assert!(bytes.len()<=4096);
-    assert_eq!(std::str::from_utf8(&bytes).unwrap().trim(),expected);
+    assert_eq!(std::str::from_utf8(&bytes).unwrap().replace("\r\n","\n").trim(),expected);
     assert_eq!(exit_code,0,"the real actor must exit successfully before retirement");
     identity.retire().unwrap();
     fixture.retired=true;
@@ -68,5 +68,5 @@ fn actual_actor_without_scratch_grant_cannot_write_private_scratch(){
 #[test]
 #[ignore="explicit Windows loader diagnostic batch: compile kernel32-only probe"]
 fn actual_actor_reports_staged_system_dll_initialization(){
-    run_probe("OMNIPLAY_WINDOWS_LOADER_PROBE",false,"storage-loader-start\nstorage-loader-advapi32\nstorage-loader-ole32\nstorage-loader-userenv\nstorage-loader-complete");
+    run_probe("OMNIPLAY_WINDOWS_LOADER_PROBE",false,"storage-loader-start\nstorage-loader-advapi32\nstorage-loader-combase\nstorage-loader-userenv\nstorage-loader-user32\nstorage-loader-ole32\nstorage-loader-complete");
 }
