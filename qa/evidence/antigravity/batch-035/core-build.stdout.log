@@ -1,0 +1,78 @@
+MSBuild version 17.14.51+25f168cee for .NET Framework
+
+  1>Checking Build System
+  Building Custom Rule E:/V10/work/vlikeon-qa-20261023/source-04cbd74/qa/native-lifecycle/CMakeLists.txt
+  Building Custom Rule E:/V10/work/vlikeon-qa-20261023/source-04cbd74/qa/native-lifecycle/CMakeLists.txt
+  fixture_core.cpp
+  fixture_core.cpp
+E:\V10\work\vlikeon-qa-20261023\source-04cbd74\qa\native-lifecycle\fixture_core.cpp(31,12): warning C4996: 'getenv': This function or variable may be unsafe. Consider using _dupenv_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details. [E:\V10\work\vlikeon-qa-20261023\build-batch-035\fixtures\omniplay-lifecycle-void-fixture.vcxproj]
+E:\V10\work\vlikeon-qa-20261023\source-04cbd74\qa\native-lifecycle\fixture_core.cpp(38,25): warning C4996: '_wgetenv': This function or variable may be unsafe. Consider using _wdupenv_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details. [E:\V10\work\vlikeon-qa-20261023\build-batch-035\fixtures\omniplay-lifecycle-void-fixture.vcxproj]
+E:\V10\work\vlikeon-qa-20261023\source-04cbd74\qa\native-lifecycle\fixture_core.cpp(41,27): warning C4996: 'getenv': This function or variable may be unsafe. Consider using _dupenv_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details. [E:\V10\work\vlikeon-qa-20261023\build-batch-035\fixtures\omniplay-lifecycle-void-fixture.vcxproj]
+E:\V10\work\vlikeon-qa-20261023\source-04cbd74\qa\native-lifecycle\fixture_core.cpp(42,25): warning C4996: 'getenv': This function or variable may be unsafe. Consider using _dupenv_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details. [E:\V10\work\vlikeon-qa-20261023\build-batch-035\fixtures\omniplay-lifecycle-void-fixture.vcxproj]
+E:\V10\work\vlikeon-qa-20261023\source-04cbd74\qa\native-lifecycle\fixture_core.cpp(92,246): warning C4996: 'strcpy': This function or variable may be unsafe. Consider using strcpy_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details. [E:\V10\work\vlikeon-qa-20261023\build-batch-035\fixtures\omniplay-lifecycle-void-fixture.vcxproj]
+E:\V10\work\vlikeon-qa-20261023\source-04cbd74\qa\native-lifecycle\fixture_core.cpp(92,338): warning C4297: 'retro_init': function assumed not to throw an exception but does [E:\V10\work\vlikeon-qa-20261023\build-batch-035\fixtures\omniplay-lifecycle-void-fixture.vcxproj]
+      E:\V10\work\vlikeon-qa-20261023\source-04cbd74\qa\native-lifecycle\fixture_core.cpp(92,338):
+      The function is extern "C" and /EHc was specified
+  
+E:\V10\work\vlikeon-qa-20261023\source-04cbd74\qa\native-lifecycle\fixture_core.cpp(93,117): warning C4297: 'retro_deinit': function assumed not to throw an exception but does [E:\V10\work\vlikeon-qa-20261023\build-batch-035\fixtures\omniplay-lifecycle-void-fixture.vcxproj]
+      E:\V10\work\vlikeon-qa-20261023\source-04cbd74\qa\native-lifecycle\fixture_core.cpp(93,117):
+      The function is extern "C" and /EHc was specified
+  
+E:\V10\work\vlikeon-qa-20261023\source-04cbd74\qa\native-lifecycle\fixture_core.cpp(97,154): warning C4297: 'retro_load_game': function assumed not to throw an exception but does [E:\V10\work\vlikeon-qa-20261023\build-batch-035\fixtures\omniplay-lifecycle-void-fixture.vcxproj]
+      E:\V10\work\vlikeon-qa-20261023\source-04cbd74\qa\native-lifecycle\fixture_core.cpp(97,154):
+      The function is extern "C" and /EHc was specified
+  
+E:\V10\work\vlikeon-qa-20261023\source-04cbd74\qa\native-lifecycle\fixture_core.cpp(98,122): warning C4297: 'retro_unload_game': function assumed not to throw an exception but does [E:\V10\work\vlikeon-qa-20261023\build-batch-035\fixtures\omniplay-lifecycle-void-fixture.vcxproj]
+      E:\V10\work\vlikeon-qa-20261023\source-04cbd74\qa\native-lifecycle\fixture_core.cpp(98,122):
+      The function is extern "C" and /EHc was specified
+  
+E:\V10\work\vlikeon-qa-20261023\source-04cbd74\qa\native-lifecycle\fixture_core.cpp(99,164): warning C4297: 'retro_run': function assumed not to throw an exception but does [E:\V10\work\vlikeon-qa-20261023\build-batch-035\fixtures\omniplay-lifecycle-void-fixture.vcxproj]
+      E:\V10\work\vlikeon-qa-20261023\source-04cbd74\qa\native-lifecycle\fixture_core.cpp(99,164):
+      The function is extern "C" and /EHc was specified
+  
+E:\V10\work\vlikeon-qa-20261023\source-04cbd74\qa\native-lifecycle\fixture_core.cpp(102,145): warning C4297: 'retro_serialize': function assumed not to throw an exception but does [E:\V10\work\vlikeon-qa-20261023\build-batch-035\fixtures\omniplay-lifecycle-void-fixture.vcxproj]
+      E:\V10\work\vlikeon-qa-20261023\source-04cbd74\qa\native-lifecycle\fixture_core.cpp(102,145):
+      The function is extern "C" and /EHc was specified
+  
+E:\V10\work\vlikeon-qa-20261023\source-04cbd74\qa\native-lifecycle\fixture_core.cpp(103,102): warning C4297: 'retro_unserialize': function assumed not to throw an exception but does [E:\V10\work\vlikeon-qa-20261023\build-batch-035\fixtures\omniplay-lifecycle-void-fixture.vcxproj]
+      E:\V10\work\vlikeon-qa-20261023\source-04cbd74\qa\native-lifecycle\fixture_core.cpp(103,102):
+      The function is extern "C" and /EHc was specified
+  
+E:\V10\work\vlikeon-qa-20261023\source-04cbd74\qa\native-lifecycle\fixture_core.cpp(31,12): warning C4996: 'getenv': This function or variable may be unsafe. Consider using _dupenv_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details. [E:\V10\work\vlikeon-qa-20261023\build-batch-035\fixtures\omniplay-lifecycle-fixture.vcxproj]
+E:\V10\work\vlikeon-qa-20261023\source-04cbd74\qa\native-lifecycle\fixture_core.cpp(38,25): warning C4996: '_wgetenv': This function or variable may be unsafe. Consider using _wdupenv_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details. [E:\V10\work\vlikeon-qa-20261023\build-batch-035\fixtures\omniplay-lifecycle-fixture.vcxproj]
+E:\V10\work\vlikeon-qa-20261023\source-04cbd74\qa\native-lifecycle\fixture_core.cpp(41,27): warning C4996: 'getenv': This function or variable may be unsafe. Consider using _dupenv_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details. [E:\V10\work\vlikeon-qa-20261023\build-batch-035\fixtures\omniplay-lifecycle-fixture.vcxproj]
+E:\V10\work\vlikeon-qa-20261023\source-04cbd74\qa\native-lifecycle\fixture_core.cpp(42,25): warning C4996: 'getenv': This function or variable may be unsafe. Consider using _dupenv_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details. [E:\V10\work\vlikeon-qa-20261023\build-batch-035\fixtures\omniplay-lifecycle-fixture.vcxproj]
+E:\V10\work\vlikeon-qa-20261023\source-04cbd74\qa\native-lifecycle\fixture_core.cpp(92,246): warning C4996: 'strcpy': This function or variable may be unsafe. Consider using strcpy_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details. [E:\V10\work\vlikeon-qa-20261023\build-batch-035\fixtures\omniplay-lifecycle-fixture.vcxproj]
+E:\V10\work\vlikeon-qa-20261023\source-04cbd74\qa\native-lifecycle\fixture_core.cpp(92,338): warning C4297: 'retro_init': function assumed not to throw an exception but does [E:\V10\work\vlikeon-qa-20261023\build-batch-035\fixtures\omniplay-lifecycle-fixture.vcxproj]
+      E:\V10\work\vlikeon-qa-20261023\source-04cbd74\qa\native-lifecycle\fixture_core.cpp(92,338):
+      The function is extern "C" and /EHc was specified
+  
+E:\V10\work\vlikeon-qa-20261023\source-04cbd74\qa\native-lifecycle\fixture_core.cpp(93,117): warning C4297: 'retro_deinit': function assumed not to throw an exception but does [E:\V10\work\vlikeon-qa-20261023\build-batch-035\fixtures\omniplay-lifecycle-fixture.vcxproj]
+      E:\V10\work\vlikeon-qa-20261023\source-04cbd74\qa\native-lifecycle\fixture_core.cpp(93,117):
+      The function is extern "C" and /EHc was specified
+  
+E:\V10\work\vlikeon-qa-20261023\source-04cbd74\qa\native-lifecycle\fixture_core.cpp(97,154): warning C4297: 'retro_load_game': function assumed not to throw an exception but does [E:\V10\work\vlikeon-qa-20261023\build-batch-035\fixtures\omniplay-lifecycle-fixture.vcxproj]
+      E:\V10\work\vlikeon-qa-20261023\source-04cbd74\qa\native-lifecycle\fixture_core.cpp(97,154):
+      The function is extern "C" and /EHc was specified
+  
+E:\V10\work\vlikeon-qa-20261023\source-04cbd74\qa\native-lifecycle\fixture_core.cpp(98,122): warning C4297: 'retro_unload_game': function assumed not to throw an exception but does [E:\V10\work\vlikeon-qa-20261023\build-batch-035\fixtures\omniplay-lifecycle-fixture.vcxproj]
+      E:\V10\work\vlikeon-qa-20261023\source-04cbd74\qa\native-lifecycle\fixture_core.cpp(98,122):
+      The function is extern "C" and /EHc was specified
+  
+E:\V10\work\vlikeon-qa-20261023\source-04cbd74\qa\native-lifecycle\fixture_core.cpp(99,164): warning C4297: 'retro_run': function assumed not to throw an exception but does [E:\V10\work\vlikeon-qa-20261023\build-batch-035\fixtures\omniplay-lifecycle-fixture.vcxproj]
+      E:\V10\work\vlikeon-qa-20261023\source-04cbd74\qa\native-lifecycle\fixture_core.cpp(99,164):
+      The function is extern "C" and /EHc was specified
+  
+E:\V10\work\vlikeon-qa-20261023\source-04cbd74\qa\native-lifecycle\fixture_core.cpp(102,145): warning C4297: 'retro_serialize': function assumed not to throw an exception but does [E:\V10\work\vlikeon-qa-20261023\build-batch-035\fixtures\omniplay-lifecycle-fixture.vcxproj]
+      E:\V10\work\vlikeon-qa-20261023\source-04cbd74\qa\native-lifecycle\fixture_core.cpp(102,145):
+      The function is extern "C" and /EHc was specified
+  
+E:\V10\work\vlikeon-qa-20261023\source-04cbd74\qa\native-lifecycle\fixture_core.cpp(103,102): warning C4297: 'retro_unserialize': function assumed not to throw an exception but does [E:\V10\work\vlikeon-qa-20261023\build-batch-035\fixtures\omniplay-lifecycle-fixture.vcxproj]
+      E:\V10\work\vlikeon-qa-20261023\source-04cbd74\qa\native-lifecycle\fixture_core.cpp(103,102):
+      The function is extern "C" and /EHc was specified
+  
+     Creating library E:/V10/work/vlikeon-qa-20261023/build-batch-035/fixtures/Release/omniplay-lifecycle-void-fixture.lib and object E:/V10/work/vlikeon-qa-20261023/build-batch-035/fixtures/Release/omniplay-lifecycle-void-fixture.exp
+     Creating library E:/V10/work/vlikeon-qa-20261023/build-batch-035/fixtures/Release/omniplay-lifecycle-fixture.lib and object E:/V10/work/vlikeon-qa-20261023/build-batch-035/fixtures/Release/omniplay-lifecycle-fixture.exp
+  omniplay-lifecycle-void-fixture.vcxproj -> E:\V10\work\vlikeon-qa-20261023\build-batch-035\fixtures\Release\omniplay-lifecycle-void-fixture.dll
+  omniplay-lifecycle-fixture.vcxproj -> E:\V10\work\vlikeon-qa-20261023\build-batch-035\fixtures\Release\omniplay-lifecycle-fixture.dll
+  Building Custom Rule E:/V10/work/vlikeon-qa-20261023/source-04cbd74/qa/native-lifecycle/CMakeLists.txt

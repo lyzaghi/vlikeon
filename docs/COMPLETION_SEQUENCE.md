@@ -22,6 +22,12 @@ broker/process/core/save/device qualification required by item 16.
 The recovery worker also retains a process-wide single slot across broker
 replacement. `WINDOWS_ITEM2_CLOSURE.md` is the remaining source-closure list;
 no item-2 completion or transition to item 3 has been recorded.
+Batch034 on source04cbd74 now passes one actual device-free actor media case
+under production Win32k/AppContainer/job launch with a fixture core and headless
+presentation peer. Static actor imports are KERNEL32 only. Batch035 rebuilds
+the direct SDL mode on the same source and passes its 35 existing regression
+cases. Production helper/core/device and the remaining closure obligations stay
+open; these results do not complete item 2.
 The five reason counters do not grant deletion authority or complete legacy
 migration. The three retained-work regression fixtures passed in batch 005;
 actual batch028 now passes the two assigned storage probes; this establishes

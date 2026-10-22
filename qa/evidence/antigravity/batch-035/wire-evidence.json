@@ -1,0 +1,103 @@
+{
+  "verification": "passed",
+  "worker_sha256": "52fbcf4a0a4aaa202277a8ad5b4e491ff8f9d2b2693629040273d8fe9fad1282",
+  "core_sha256": "8dbb1056ef69dd2f9045558ad32a6883147dd4b3cf12e6bc439aeff870530f62",
+  "cases": [
+    {
+      "name": "unknown-method",
+      "passed": true,
+      "exit_code": 1
+    },
+    {
+      "name": "zero-id",
+      "passed": true,
+      "exit_code": 1
+    },
+    {
+      "name": "skipped-id",
+      "passed": true,
+      "exit_code": 1
+    },
+    {
+      "name": "oversized-id",
+      "passed": true,
+      "exit_code": 1
+    },
+    {
+      "name": "boolean-protocol",
+      "passed": true,
+      "exit_code": 1
+    },
+    {
+      "name": "extra-header-key",
+      "passed": true,
+      "exit_code": 1
+    },
+    {
+      "name": "duplicate-header-key",
+      "passed": true,
+      "exit_code": 1
+    },
+    {
+      "name": "duplicate-parameter-key",
+      "passed": true,
+      "exit_code": 1
+    },
+    {
+      "name": "excessive-depth",
+      "passed": true,
+      "exit_code": 1
+    },
+    {
+      "name": "oversized-header",
+      "passed": true,
+      "exit_code": 1
+    },
+    {
+      "name": "empty-header",
+      "passed": true,
+      "exit_code": 1
+    },
+    {
+      "name": "forbidden-payload",
+      "passed": true,
+      "exit_code": 1
+    },
+    {
+      "name": "oversized-load-payload",
+      "passed": true,
+      "exit_code": 1
+    },
+    {
+      "name": "truncated-prefix",
+      "passed": true,
+      "exit_code": 1
+    },
+    {
+      "name": "truncated-header",
+      "passed": true,
+      "exit_code": 1
+    },
+    {
+      "name": "truncated-body-length",
+      "passed": true,
+      "exit_code": 1
+    },
+    {
+      "name": "truncated-load-body",
+      "passed": true,
+      "exit_code": 1
+    },
+    {
+      "name": "replayed-id-after-hello",
+      "passed": true,
+      "exit_code": 1
+    },
+    {
+      "name": "clean-boundary-eof",
+      "passed": true,
+      "exit_code": 0
+    }
+  ],
+  "scope": "actual direct Windows worker/qualification DLL and pipes with dummy SDL drivers; no broker/AppContainer/physical-memory proof"
+}

@@ -1,0 +1,23 @@
+{
+  "verification": "passed",
+  "worker_sha256": "52fbcf4a0a4aaa202277a8ad5b4e491ff8f9d2b2693629040273d8fe9fad1282",
+  "core_sha256": "8dbb1056ef69dd2f9045558ad32a6883147dd4b3cf12e6bc439aeff870530f62",
+  "cases": [
+    {
+      "name": "ascii",
+      "passed": true,
+      "exit_code": 0
+    },
+    {
+      "name": "unicode",
+      "passed": true,
+      "exit_code": 0
+    },
+    {
+      "name": "relative-refused",
+      "passed": true,
+      "exit_code": 2
+    }
+  ],
+  "scope": "direct worker and fixture DLL, Win32 and shared CRT environment; no AppContainer/core filesystem/device proof"
+}
