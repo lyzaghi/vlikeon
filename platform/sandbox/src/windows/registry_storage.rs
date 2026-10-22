@@ -3,12 +3,14 @@ use super::{handle,storage,unavailable};
 use omniplay_contracts::Result;
 use windows_sys::Win32::System::SystemServices::ACCESS_ALLOWED_ACE_TYPE;
 use std::{ffi::c_void,os::windows::io::{AsRawHandle,OwnedHandle},ptr::{null,null_mut}};
-use windows_sys::Win32::{Foundation::{ERROR_FILE_NOT_FOUND,ERROR_MORE_DATA,ERROR_NO_MORE_ITEMS,ERROR_SUCCESS,LocalFree},Security::{ACCESS_ALLOWED_ACE,ACE_HEADER,CopySid,DACL_SECURITY_INFORMATION,GetAce,GetLengthSid,ImpersonateLoggedOnUser,INHERIT_ONLY_ACE,IsValidAcl,IsValidSid,PSID,RevertToSelf,TOKEN_DUPLICATE,TOKEN_QUERY,Authorization::{GetSecurityInfo,SE_REGISTRY_KEY},Isolation::GetAppContainerRegistryLocation},System::{Registry::*,Threading::{GetCurrentThread,OpenProcessToken,OpenThreadToken}}};
+use windows_sys::Win32::{Foundation::{ERROR_FILE_NOT_FOUND,ERROR_MORE_DATA,ERROR_NO_MORE_ITEMS,ERROR_SUCCESS,LocalFree},Security::{ACCESS_ALLOWED_ACE,ACE_HEADER,CopySid,DACL_SECURITY_INFORMATION,GetAce,GetLengthSid,ImpersonateLoggedOnUser,INHERIT_ONLY_ACE,IsValidAcl,IsValidSid,PSID,RevertToSelf,TOKEN_DUPLICATE,TOKEN_QUERY,Authorization::{GetSecurityInfo,SetSecurityInfo,SetEntriesInAclW,EXPLICIT_ACCESS_W,TRUSTEE_W,TRUSTEE_IS_SID,TRUSTEE_IS_UNKNOWN,NO_MULTIPLE_TRUSTEE,DENY_ACCESS,SE_REGISTRY_KEY},Isolation::GetAppContainerRegistryLocation},System::{Registry::*,Threading::{GetCurrentThread,OpenProcessToken,OpenThreadToken}}};
 
 const READ_CONTROL_ACCESS:u32=0x0002_0000;
 const WRITE_OWNER_ACCESS:u32=0x0008_0000;
+const WRITE_DACL_ACCESS:u32=0x0004_0000;
+const DELETE_ACCESS:u32=0x0001_0000;
 const GENERIC_READ_OR_ALL_ACCESS:u32=0x9000_0000;
-const SEAL_ACCESS:u32=KEY_QUERY_VALUE|KEY_ENUMERATE_SUB_KEYS|READ_CONTROL_ACCESS|WRITE_OWNER_ACCESS;
+const SEAL_ACCESS:u32=KEY_QUERY_VALUE|KEY_ENUMERATE_SUB_KEYS|READ_CONTROL_ACCESS|WRITE_OWNER_ACCESS|WRITE_DACL_ACCESS;
 const MAX_KEYS:usize=256;
 const MAX_DEPTH:u8=16;
 
@@ -21,6 +23,21 @@ struct RegistryKey(HKEY);
 // clone implementation exposes concurrent or predefined-hive ownership.
 unsafe impl Send for RegistryKey {}
 impl RegistryKey {
+    fn deny_actor_mutation(&self,sid:PSID)->Result<()>{
+        let mut old=null_mut();let mut descriptor=null_mut();
+        if unsafe{GetSecurityInfo(self.0,SE_REGISTRY_KEY,DACL_SECURITY_INFORMATION,null_mut(),null_mut(),&mut old,null_mut(),&mut descriptor)}!=ERROR_SUCCESS{return Err(unavailable());}
+        let _descriptor=Descriptor(descriptor);
+        if old.is_null()||unsafe{IsValidAcl(old)}==0||unsafe{(*old).AceCount}>256{return Err(unavailable());}
+        // Do not use KEY_WRITE: it also includes READ_CONTROL. Preserve readonly
+        // lookup and broker/user access, denying mutation only to this fresh SID.
+        let rights=KEY_SET_VALUE|KEY_CREATE_SUB_KEY|KEY_CREATE_LINK|DELETE_ACCESS|WRITE_DACL_ACCESS|WRITE_OWNER_ACCESS;
+        let entry=EXPLICIT_ACCESS_W{grfAccessPermissions:rights,grfAccessMode:DENY_ACCESS,grfInheritance:2,Trustee:TRUSTEE_W{pMultipleTrustee:null_mut(),MultipleTrusteeOperation:NO_MULTIPLE_TRUSTEE,TrusteeForm:TRUSTEE_IS_SID,TrusteeType:TRUSTEE_IS_UNKNOWN,ptstrName:sid.cast()}};
+        let mut updated=null_mut();
+        if unsafe{SetEntriesInAclW(1,&entry,old,&mut updated)}!=ERROR_SUCCESS{return Err(unavailable());}
+        let _updated=Descriptor(updated.cast());
+        if updated.is_null()||unsafe{SetSecurityInfo(self.0,SE_REGISTRY_KEY,DACL_SECURITY_INFORMATION,null_mut(),null_mut(),updated,null())}!=ERROR_SUCCESS{return Err(unavailable());}
+        Ok(())
+    }
     fn own(raw:HKEY)->Result<Self>{
         // Predefined hive pseudo-handles are negative values on the supported
         // Windows x64 target. Never accept one as a private storage root.
@@ -126,6 +143,11 @@ pub(super) fn seal(process:&OwnedHandle,expected_sid:PSID)->Result<()>{
     // Full bounded/link-refusing preflight precedes inheritable label changes.
     // The actor has never resumed and inherits no registry handles.
     let label=storage::MandatoryLabel::registry()?;
-    for key in keys.iter().rev(){label.apply_object(key.0,SE_REGISTRY_KEY)?;}
+    for key in keys.iter().rev(){
+        // A mandatory label alone did not deny RegSetValueEx in the actual
+        // actor (batch024). Enforce the exact SID's access mask as well.
+        key.deny_actor_mutation(expected_sid)?;
+        label.apply_object(key.0,SE_REGISTRY_KEY)?;
+    }
     Ok(())
 }
