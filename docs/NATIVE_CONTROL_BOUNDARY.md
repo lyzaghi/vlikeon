@@ -50,9 +50,10 @@ Cancellation, timeout, queue failure, sequence exhaustion and terminal response/
 I/O failure invalidate the channel before requesting owned-process termination.
 Future commands cannot be admitted even if termination is refused. Invalidation
 is not proof that an already admitted call did nothing or that a thread/process
-has exited. Caller process/job ownership, uncertain-exit work/debt retention and
-the existing channel abandonment/join rules still apply. Actual blocked kernel
-I/O, broker thread accounting and every original cleanup requirement remain due.
+has exited. Channel destruction now transfers its worker handle/permit into the
+bounded retirement pool in `NATIVE_CONTROL_WORKERS.md`. Caller process/job and
+uncertain-exit work/debt ownership remain separate. Actual blocked kernel I/O,
+whole-broker resource accounting and every original cleanup requirement remain due.
 
 ## Borrowed core buffers on exceptions
 

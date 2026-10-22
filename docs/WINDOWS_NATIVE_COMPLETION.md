@@ -6,6 +6,18 @@ deletion, filesystem cleanup or test has been executed during this work.
 
 ## Source changes in this pass
 
+Native IPC worker ownership now has 16 process-wide reserved/active/retiring
+slots. Windows preparation reserves before work/process staging; closing a
+channel transfers its thread handle into fixed retirement storage without
+joining a running I/O worker. Windows collection polls the actual held OS thread
+object, then joins outside the registry lock before refunding capacity. Failed
+queries and unexpected owner loss retain their charge. The existing actor/job/
+container/work-retirement proofs remain separate. Eight real-thread/pool/TLS
+case sources and Windows case 27 are authored, not run. The recovery collector
+has its own process-wide single slot with retained ownership across broker
+replacement; terminal result publication no longer admits an early join. See
+`NATIVE_CONTROL_WORKERS.md`; no whole-RAM, SDK or process behavior is qualified.
+
 Native control now validates the bounded/depth-limited/duplicate-free header,
 closed method and consecutive identity before reading a payload length. The
 reader admits one outstanding command until main releases its input buffer.
@@ -240,6 +252,11 @@ not prove full core/GPU/worker/process/restore behavior or close item 2; exact
 package admission, remaining writers/resources and original qualification stay.
 
 ## Remaining source and final qualification
+
+`WINDOWS_ITEM2_CLOSURE.md` is the source-closure checklist for the requested
+transition to item 3. It separates unfinished implementation from the single
+deferred execution pass, without moving open Windows obligations out of this
+item or treating source snapshots as completion.
 
 - Interrupted profile creation without an ownership acknowledgement and launch
   intent without a durable process acknowledgement still retain work/debt. The

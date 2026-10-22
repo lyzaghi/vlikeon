@@ -6,9 +6,12 @@ instruction remains in force. Source work, executed verification and release
 approval are tracked separately. A source snapshot alone cannot close an item.
 
 Current source item: **2 — Windows native runtime lifecycle and containment**.
-The current substep closes native control framing, single-command payload
-ownership and terminal-channel admission after timeout/cancellation. Actual
+The current substep adds bounded ownership of active/reserved/retiring broker
+IPC workers, after native framing and terminal-channel admission work. Actual
 broker/process/pipe/core/save qualification is still deferred to item 16.
+The recovery worker also retains a process-wide single slot across broker
+replacement. `WINDOWS_ITEM2_CLOSURE.md` is the remaining source-closure list;
+no item-2 completion or transition to item 3 has been recorded.
 Earlier N64 source work adds bounded snapshot event queues, PIF pointer
 preflight, format-selected DD ID reads, TLB field/lookup admission and finite
 last-page map/unmap walks with an interpreter random-index guard.

@@ -93,6 +93,8 @@ def prepare(project):
     extras+=['engines/native/src/audio_ring.hpp','qa/native-audio/CMakeLists.txt','qa/native-audio/audio_ring_cases.cpp','qa/native-audio/ACCEPTANCE.md']
     extras+=['engines/native/src/owned_actor_exit.h','engines/native/src/main.cpp','docs/NATIVE_GUEST_PAUSE.md','qa/native-lifecycle/CMakeLists.txt','qa/native-lifecycle/fixture_core.cpp','qa/native-lifecycle/run_cases.py','qa/native-lifecycle/ACCEPTANCE.md','tools/build_ppsspp.py']
     extras+=['engines/native/src/protocol.hpp','engines/native/src/protocol.cpp','docs/NATIVE_CONTROL_BOUNDARY.md','qa/native-lifecycle/wire_cases.py']
+    extras+=['docs/NATIVE_CONTROL_WORKERS.md','qa/native-lifecycle/CONTROL_WORKERS.md']
+    extras+=['docs/WINDOWS_ITEM2_CLOSURE.md']
     paths.extend(ROOT/name for name in extras);total=0
     for path in paths:
         regular(path,ROOT);total+=path.stat().st_size

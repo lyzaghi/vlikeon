@@ -16,7 +16,8 @@ commands. The versioned request envelope remains control protocol 1.0.
   profile owner and rejects inconsistent/out-of-policy records. It returns no
   path, game title, process ID or secret. `physical_bytes` stays null; the values
   are reserved copy budgets, not allocated disk measurements. `recovery_running`
-  comes from the owned worker's actual `JoinHandle::is_finished` state.
+  comes from the held Windows thread object's actual completion state, including
+  a still-retiring worker whose original broker owner has closed.
 - `native_work_recover_start` starts one bounded recovery pass using the
   broker's own root/profile identity. The renderer supplies no path, process,
   work UUID or deletion list. A fresh job UUID is returned.
@@ -33,12 +34,17 @@ to an unrelated document.
 
 ## Worker and lifetime
 
-The broker retains at most one recovery worker and one result snapshot. A new
-worker cannot start until the previous actual thread has finished; cancellation
-or a terminal-looking flag alone is insufficient. Only a finished thread is
-joined before replacement. Closing the broker requests cancellation. An
-unreturned kernel call retains its single worker/collector slot rather than
-allowing unbounded replacements or claiming shutdown completion.
+The native-runtime library retains one process-wide recovery slot, separate
+from its 16 IPC slots; each broker retains at most one result snapshot. A new
+worker cannot start until the previous actual OS thread has ended, including
+TLS destruction. Cancellation, thread-body return and a terminal-looking result
+are insufficient. A nonblocking Windows handle poll precedes any join, which
+occurs outside the retirement mutex. Status polling never joins a thread.
+Closing the broker requests cancellation and transfers the handle/permit into
+fixed retirement storage. A replacement broker cannot bypass that owner or
+start another collector while the earlier OS thread remains live. An unreturned
+kernel call retains its slot; unexpected owner loss retains the charge rather
+than claiming shutdown completion. See `NATIVE_CONTROL_WORKERS.md`.
 
 The recovery owner checks cancellation during bounded inventories and between
 entries, attempts at most 32 UUIDs and stops starting more entries after a

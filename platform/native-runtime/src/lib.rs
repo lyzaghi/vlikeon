@@ -1,5 +1,7 @@
 #![forbid(unsafe_code)]
 mod channel;
+mod control_workers;
+pub use control_workers::NativeRecoveryWorker;
 mod registry;
 mod runtime;
 mod work;

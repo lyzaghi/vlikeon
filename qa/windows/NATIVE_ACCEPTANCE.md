@@ -211,6 +211,22 @@ the required OS/process/filesystem evidence.
     Unit cursors/process counters do not establish real pipes, no-op outcomes,
     thread termination, hardware playback or physical resource bounds.
 
+27. Execute `qa/native-lifecycle/CONTROL_WORKERS.md` using the exact broker,
+    SDK and native worker artifacts. Fill reservation/active/retiring capacity,
+    block actual pipe I/O and hold TLS cleanup after body return. No channel
+    destruction may join a running I/O worker, and no capacity refund may occur
+    before held Windows thread completion plus join. Inject spawn/query/owner
+    transfer failure and race reservations/collection/close. Exhaustion must
+    reject Windows preparation before new work/debt/container/process staging.
+    Observe real thread/handle counts, memory and responsiveness separately
+    from slot/stack declarations. Keep actor/helper/process/job/container and
+    work-retirement proofs independent; final-save and physical-accounting
+    requirements remain due even after IPC worker retirement succeeds.
+    The independent recovery pool must retain its one process-wide worker
+    across broker close/replacement, terminal-result publication and delayed
+    TLS teardown. Status must not join it; no second collector may start until
+    the original held thread object ended and its owner was joined.
+
 Record target OS/build, toolchain/SDK, source/artifact hashes, exact failure
 injection point, observed process/job/profile state, disk/ledger/proof state,
 expected outcome and evidence location for every case. No item-2 completion is

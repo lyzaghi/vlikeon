@@ -40,6 +40,8 @@ impl RuntimeAdapter for NativeAdapter {
     fn prepare(&mut self,game:&GameManifest,asset:File,config:&SessionConfig)->Result<()> {
         if self.prepared||self.process.is_some()||self.presentation.is_some(){return Err(PlatformError::new(ErrorCode::InvalidState,"The native runtime is already prepared"));}
         self.package.manifest.validate()?;game.validate()?;config.validate()?;
+        check_cancel(self.cancel.as_deref().unwrap_or(&NEVER_CANCELLED))?;
+        let control_reservation=WorkerChannel::reserve()?;
         let mut input_profile={let database=omniplay_core::Database::open(&self.profile_root)?;
             let profile=omniplay_core::core_options::load(&database,game.id,&self.package.manifest.id)?;
             let policy=CoreOptionPolicy{schema_version:1,definitions:self.package.user_core_options.clone()};
@@ -113,7 +115,7 @@ impl RuntimeAdapter for NativeAdapter {
             let pair=identity.launch_presented(&worker,&work,&limits,&spec,|process|crate::work::process(&work,work_id,process),|process|crate::work::presentation_process(&work,work_id,process))?;
             self.presentation=Some(pair.presentation);pair.actor
         }else{identity.launch(&worker,&work,&limits,|process|crate::work::process(&work,work_id,process))?};
-        self.process=Some(launched.process);self.channel=Some(WorkerChannel::new(launched.input,launched.output)?);
+        self.process=Some(launched.process);self.channel=Some(WorkerChannel::new_reserved(launched.input,launched.output,control_reservation)?);
         let hello=self.call("hello",json!({}),Vec::new(),10)?;
         if hello.result["runtime_id"].as_str()!=Some(self.package.manifest.id.as_str())||hello.result["library_name"].as_str()!=Some(self.package.expected_library_name.as_str())||hello.result["library_version"].as_str()!=Some(self.package.expected_library_version.as_str())||hello.result["video_backend"].as_str()!=Some(self.package.video_backend.as_str()){return Err(unavailable("The native core identity or video policy differs from its approved catalog"));}
         if hello.result["input_profile_protocol"].as_u64()!=Some(3){return Err(unavailable("The installed native worker does not support validated input profiles"));}

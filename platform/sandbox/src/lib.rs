@@ -1,4 +1,4 @@
-// Unsafe FFI is confined to target-specific launch code. Callers own safe Files and
+// Unsafe FFI is confined to target-specific launch/lifecycle code. Callers own safe Files and
 // a process guard; dropping the guard terminates its entire contained process tree.
 #![deny(unsafe_op_in_unsafe_fn)]
 use omniplay_contracts::{ErrorCode,PlatformError,Result};
@@ -26,6 +26,12 @@ pub struct ProcessIdentity{pub process_id:u32,pub creation_time:u64}
 
 pub fn supported()->bool {cfg!(windows)}
 pub fn presentation_supported()->bool{cfg!(windows)}
+/// Completion observation for a broker-owned thread, never an actor exit
+/// or work-retirement receipt. Callers retain its handle and still join it.
+pub fn owned_thread_ended(thread:&std::thread::JoinHandle<()>)->bool{
+    #[cfg(windows)]{windows::owned_thread_ended(thread)}
+    #[cfg(not(windows))]{thread.is_finished()}
+}
 pub(crate) fn unavailable()->PlatformError {PlatformError::new(ErrorCode::RuntimeUnavailable,"The required native runtime isolation could not be established").recover("Use an approved web runtime while native isolation is unavailable")}
 
 #[cfg(not(windows))]

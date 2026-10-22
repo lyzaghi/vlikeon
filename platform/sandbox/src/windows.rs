@@ -7,6 +7,11 @@ mod storage;
 mod registry_storage;
 #[cfg(test)]mod storage_tests;
 pub use presentation::PresentationHost;
+pub(crate) fn owned_thread_ended(thread:&std::thread::JoinHandle<()>)->bool{
+    // Poll the held OS thread object, including its TLS/destructor lifetime;
+    // JoinHandle::is_finished alone may precede actual thread termination.
+    unsafe{WaitForSingleObject(thread.as_raw_handle(),0)==WAIT_OBJECT_0}
+}
 
 fn wide(value:&OsStr)->Result<Vec<u16>> {let mut out=value.encode_wide().collect::<Vec<_>>();if out.contains(&0){return Err(unavailable());}out.push(0);Ok(out)}
 fn handle(value:HANDLE)->Result<OwnedHandle>{if value.is_null()||value==INVALID_HANDLE_VALUE{return Err(unavailable());}Ok(unsafe{OwnedHandle::from_raw_handle(value)})}

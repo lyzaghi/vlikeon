@@ -2,7 +2,8 @@ use omniplay_contracts::{ErrorCode,PlatformError,Result,MAX_SAVE_BYTES};
 use omniplay_sandbox::ContainedProcess;
 use serde::{Deserialize,Serialize};
 use serde_json::Value;
-use std::{fs::File,io::{Read,Write},sync::{mpsc::{self,SyncSender},atomic::{AtomicBool,Ordering}},thread::JoinHandle,time::{Duration,Instant}};
+use crate::control_workers::{ChannelReservation,OwnedControlWorker};
+use std::{fs::File,io::{Read,Write},sync::{mpsc::{self,SyncSender},atomic::{AtomicBool,Ordering}},time::{Duration,Instant}};
 
 #[derive(Serialize)]
 struct Request {protocol:u16,id:u64,method:String,params:Value}
@@ -17,7 +18,7 @@ enum Response {
 enum ChildError{UnsupportedCapability,IncompatibleSave,InvalidState,ResourceLimit,StorageFailure,PermissionDenied,RuntimeUnavailable,ContentMismatch,RuntimeCrashed}
 pub struct Reply {pub result:Value,pub payload:Vec<u8>}
 struct Call {id:u64,method:String,encoded:Vec<u8>,payload:Vec<u8>,reply:SyncSender<Result<Reply>>}
-pub struct WorkerChannel {sender:Option<SyncSender<Call>>,thread:Option<JoinHandle<()>>,sequence:u64}
+pub struct WorkerChannel {sender:Option<SyncSender<Call>>,worker:Option<OwnedControlWorker>,sequence:u64}
 
 fn failed()->PlatformError{PlatformError::new(ErrorCode::RuntimeCrashed,"The contained native runtime stopped responding").recover("Continue from the most recent compatible save")}
 const MAX_HEADER:usize=64*1024;
@@ -54,16 +55,17 @@ impl WorkerProcess for ContainedProcess{fn has_exited(&self)->bool{ContainedProc
 #[cfg(all(target_os="linux",target_arch="x86_64",target_env="gnu"))]
 impl WorkerProcess for omniplay_sandbox::linux_launch::LinuxChild{fn has_exited(&self)->bool{omniplay_sandbox::linux_launch::LinuxChild::has_exited(self)}fn terminate(&self){omniplay_sandbox::linux_launch::LinuxChild::terminate(self)}}
 impl WorkerChannel {
-    pub fn abandon(&mut self){self.sender.take();self.thread.take();}
+    pub fn abandon(&mut self){self.sender.take();drop(self.worker.take());}
+    pub fn reserve()->Result<ChannelReservation>{crate::control_workers::reserve()}
     fn invalidate(&mut self,process:&impl WorkerProcess){self.sender.take();process.terminate();}
-    pub fn new(mut input:File,mut output:File)->Result<Self> {
+    pub fn new_reserved(mut input:File,mut output:File,reservation:ChannelReservation)->Result<Self> {
         let(sender,receiver)=mpsc::sync_channel::<Call>(4);
-        let thread=std::thread::Builder::new().name("omniplay-native-ipc".into()).spawn(move||{
+        let worker=reservation.spawn(move||{
             while let Ok(call)=receiver.recv(){
                 let result=exchange(&mut input,&mut output,call.id,&call.method,&call.encoded,&call.payload);let terminal=result.as_ref().err().is_some_and(terminal_error);let _=call.reply.send(result);if terminal{break;}
             }
-        }).map_err(|_|failed())?;
-        Ok(Self{sender:Some(sender),thread:Some(thread),sequence:0})
+        })?;
+        Ok(Self{sender:Some(sender),worker:Some(worker),sequence:0})
     }
     pub fn call(&mut self,process:&impl WorkerProcess,method:&str,params:Value,payload:Vec<u8>,timeout:Duration)->Result<Reply> {
         self.call_cancellable(process,method,params,payload,timeout,&AtomicBool::new(false))
@@ -87,7 +89,7 @@ impl WorkerChannel {
     }
 }
 fn terminal_error(error:&PlatformError)->bool{!matches!(error.code,ErrorCode::UnsupportedCapability|ErrorCode::IncompatibleSave|ErrorCode::InvalidState|ErrorCode::ResourceLimit|ErrorCode::StorageFailure|ErrorCode::PermissionDenied)}
-impl Drop for WorkerChannel {fn drop(&mut self){self.sender.take();if let Some(thread)=self.thread.take(){let _=thread.join();}}}
+impl Drop for WorkerChannel {fn drop(&mut self){self.sender.take();drop(self.worker.take());}}
 
 fn exchange(input:&mut impl Write,output:&mut impl Read,id:u64,method:&str,encoded:&[u8],payload:&[u8])->Result<Reply> {
     input.write_all(&(encoded.len()as u32).to_le_bytes()).and_then(|_|input.write_all(encoded)).and_then(|_|input.write_all(&(payload.len()as u32).to_le_bytes())).and_then(|_|input.write_all(payload)).and_then(|_|input.flush()).map_err(|_|failed())?;

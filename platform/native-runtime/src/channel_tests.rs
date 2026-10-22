@@ -58,23 +58,23 @@ struct ProcessCounter{terminations:AtomicUsize}
 impl WorkerProcess for ProcessCounter{fn has_exited(&self)->bool{false}fn terminate(&self){self.terminations.fetch_add(1,Ordering::SeqCst);}}
 #[test]
 fn cancellation_latches_channel_without_admitting_a_future_command(){
-    let(sender,receiver)=mpsc::sync_channel(1);let mut channel=WorkerChannel{sender:Some(sender),thread:None,sequence:0};let process=ProcessCounter{terminations:AtomicUsize::new(0)};
+    let(sender,receiver)=mpsc::sync_channel(1);let mut channel=WorkerChannel{sender:Some(sender),worker:None,sequence:0};let process=ProcessCounter{terminations:AtomicUsize::new(0)};
     let error=channel.call_cancellable(&process,"status",json!({}),Vec::new(),Duration::from_secs(1),&AtomicBool::new(true)).err().expect("cancel");assert_eq!(error.code,ErrorCode::Cancelled);assert!(channel.sender.is_none());assert_eq!(channel.sequence,0);assert!(receiver.try_recv().is_err());
     assert!(channel.call(&process,"status",json!({}),Vec::new(),Duration::from_secs(1)).is_err());assert_eq!(process.terminations.load(Ordering::SeqCst),1);
 }
 #[test]
 fn local_rejection_preserves_sequence_but_timeout_is_terminal(){
-    let(sender,receiver)=mpsc::sync_channel(1);let mut channel=WorkerChannel{sender:Some(sender),thread:None,sequence:0};let process=ProcessCounter{terminations:AtomicUsize::new(0)};
+    let(sender,receiver)=mpsc::sync_channel(1);let mut channel=WorkerChannel{sender:Some(sender),worker:None,sequence:0};let process=ProcessCounter{terminations:AtomicUsize::new(0)};
     assert!(channel.call(&process,"status",json!({}),vec![1],Duration::from_secs(1)).is_err());assert_eq!(channel.sequence,0);assert!(channel.sender.is_some());assert!(receiver.try_recv().is_err());assert_eq!(process.terminations.load(Ordering::SeqCst),0);
     assert!(channel.call(&process,"status",json!({}),Vec::new(),Duration::from_millis(2)).is_err());assert!(channel.sender.is_none());assert_eq!(channel.sequence,1);assert_eq!(receiver.try_recv().expect("queued before timeout").id,1);assert_eq!(process.terminations.load(Ordering::SeqCst),1);
 }
 #[test]
 fn exhausted_sequence_cannot_wrap_or_queue_another_call(){
-    let(sender,receiver)=mpsc::sync_channel(1);let mut channel=WorkerChannel{sender:Some(sender),thread:None,sequence:MAX_SEQUENCE};let process=ProcessCounter{terminations:AtomicUsize::new(0)};
+    let(sender,receiver)=mpsc::sync_channel(1);let mut channel=WorkerChannel{sender:Some(sender),worker:None,sequence:MAX_SEQUENCE};let process=ProcessCounter{terminations:AtomicUsize::new(0)};
     assert!(channel.call(&process,"status",json!({}),Vec::new(),Duration::from_secs(1)).is_err());assert!(channel.sender.is_none());assert_eq!(channel.sequence,MAX_SEQUENCE);assert!(receiver.try_recv().is_err());assert_eq!(process.terminations.load(Ordering::SeqCst),1);
 }
 #[test]
 fn queue_refusal_invalidates_without_consuming_the_identity(){
-    let(sender,_receiver)=mpsc::sync_channel(0);let mut channel=WorkerChannel{sender:Some(sender),thread:None,sequence:0};let process=ProcessCounter{terminations:AtomicUsize::new(0)};
+    let(sender,_receiver)=mpsc::sync_channel(0);let mut channel=WorkerChannel{sender:Some(sender),worker:None,sequence:0};let process=ProcessCounter{terminations:AtomicUsize::new(0)};
     assert!(channel.call(&process,"status",json!({}),Vec::new(),Duration::from_secs(1)).is_err());assert!(channel.sender.is_none());assert_eq!(channel.sequence,0);assert_eq!(process.terminations.load(Ordering::SeqCst),1);
 }

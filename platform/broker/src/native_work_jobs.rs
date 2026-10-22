@@ -1,6 +1,7 @@
 use omniplay_contracts::{ErrorCode,NativeWorkRecoverySummary,PlatformError,Result};
 use serde::Serialize;
-use std::{path::Path,sync::{Arc,Mutex,atomic::{AtomicBool,Ordering}},thread::JoinHandle};
+use std::{path::Path,sync::{Arc,Mutex,atomic::{AtomicBool,Ordering}}};
+use omniplay_native_runtime::NativeRecoveryWorker;
 use uuid::Uuid;
 
 #[derive(Clone,Serialize)]
@@ -17,25 +18,27 @@ pub struct JobSnapshot {
     pub error:Option<PlatformError>,
 }
 
-struct Active {snapshot:Arc<Mutex<JobSnapshot>>,cancel:Arc<AtomicBool>,thread:JoinHandle<()>}
+struct Active {snapshot:Arc<Mutex<JobSnapshot>>,cancel:Arc<AtomicBool>,worker:NativeRecoveryWorker}
 #[derive(Default)]
 pub struct NativeWorkJobs {current:Option<Active>}
 pub fn enabled()->bool{cfg!(windows)}
 fn unsupported()->PlatformError{PlatformError::new(ErrorCode::UnsupportedCapability,"Native temporary-session recovery is not available on this platform")}
 
 impl NativeWorkJobs {
-    pub fn busy(&self)->bool{self.current.as_ref().is_some_and(|active|!active.thread.is_finished())}
+    pub fn busy(&self)->bool{self.current.as_ref().map(|active|!active.worker.has_ended()).unwrap_or_else(NativeRecoveryWorker::pending)}
     pub fn start(&mut self,root:&Path,profile_id:Uuid)->Result<JobSnapshot>{
         if !enabled(){return Err(unsupported());}
         if profile_id.is_nil(){return Err(PlatformError::new(ErrorCode::PermissionDenied,"Native recovery requires an exact profile owner"));}
         if self.busy(){
             return Err(PlatformError::new(ErrorCode::Busy,"A native temporary-session recovery is still finishing").recover("Wait for the current recovery operation to finish"));
         }
-        if let Some(previous)=self.current.take(){let _=previous.thread.join();}
+        // Drop transfers the held handle into fixed retirement storage. The
+        // process-wide owner reclaims it only after actual OS thread exit.
+        drop(self.current.take());
         let started=JobSnapshot{id:Uuid::new_v4(),state:JobState::Running,summary:NativeWorkRecoverySummary::default(),started_at_ms:omniplay_core::now_ms(),finished_at_ms:None,error:None};
         let snapshot=Arc::new(Mutex::new(started.clone()));let cancel=Arc::new(AtomicBool::new(false));
         let worker_snapshot=snapshot.clone();let worker_cancel=cancel.clone();let root=root.to_owned();
-        let thread=std::thread::Builder::new().name("omniplay-native-recovery".into()).spawn(move||{
+        let worker=NativeRecoveryWorker::spawn(move||{
             let result:Result<NativeWorkRecoverySummary>=std::panic::catch_unwind(std::panic::AssertUnwindSafe(||{
                 #[cfg(windows)]{
                     omniplay_native_runtime::recover_windows_work(&root,profile_id,&worker_cancel,|summary|{
@@ -51,8 +54,8 @@ impl NativeWorkJobs {
                     Err(error)=>{value.state=JobState::Failed;value.error=Some(error);}
                 }
             }
-        }).map_err(|_|PlatformError::new(ErrorCode::ResourceLimit,"Native temporary-session recovery worker could not start"))?;
-        self.current=Some(Active{snapshot,cancel,thread});Ok(started)
+        })?;
+        self.current=Some(Active{snapshot,cancel,worker});Ok(started)
     }
 
     pub fn status(&self,id:Uuid)->Result<JobSnapshot>{

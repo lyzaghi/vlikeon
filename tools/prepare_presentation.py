@@ -88,6 +88,9 @@ def main():
         inputs.append((ordinary(ROOT/'docs'/name,ROOT,True),PurePosixPath('docs')/name,{}))
     for name in ['Cargo.toml','Cargo.lock','platform/core/src/sessions.rs','platform/contracts/src/session.rs','platform/broker/Cargo.toml','platform/broker/src/main.rs','platform/broker/src/linux_host_main.rs','packaging/linux/systemd/user/omniplay-native-host.service','packaging/linux/systemd/user/omniplay-native-host.socket','tools/install_user_release_posix.py','tools/unregister_user_release_posix.py','tools/replace_user_bootstrap_posix.py','apps/game-hub/native-player.js']:
         inputs.append((ordinary(ROOT/name,ROOT,True),PurePosixPath('broker')/name,{}))
+    for path in sorted((ROOT/'platform/broker/src').rglob('*.rs')):
+        if path.name in {'main.rs','linux_host_main.rs'}:continue
+        inputs.append((ordinary(path,ROOT,True),PurePosixPath('broker')/path.relative_to(ROOT).as_posix(),{}))
     inputs.append((ordinary(ROOT/'tools/build_native_runtime.py',ROOT,True),PurePosixPath('tools/build_native_runtime.py'),{}))
     for name in ['platform/updater/Cargo.toml','platform/updater/src/package.rs','platform/updater/src/launcher.rs']:
         inputs.append((ordinary(ROOT/name,ROOT,True),PurePosixPath('broker')/name,{}))
@@ -108,6 +111,9 @@ def main():
         inputs.append((ordinary(ROOT/name,ROOT,True),PurePosixPath(name),{}))
     for name in ['docs/NATIVE_CONTROL_BOUNDARY.md','qa/native-lifecycle/wire_cases.py']:
         inputs.append((ordinary(ROOT/name,ROOT,True),PurePosixPath(name),{}))
+    for name in ['docs/NATIVE_CONTROL_WORKERS.md','qa/native-lifecycle/CONTROL_WORKERS.md']:
+        inputs.append((ordinary(ROOT/name,ROOT,True),PurePosixPath(name),{}))
+    inputs.append((ordinary(ROOT/'docs/WINDOWS_ITEM2_CLOSURE.md',ROOT,True),PurePosixPath('docs/WINDOWS_ITEM2_CLOSURE.md'),{}))
     for name in ['qa/native-memory/CMakeLists.txt','qa/native-memory/memory_files_cases.cpp','qa/native-memory/ACCEPTANCE.md','engines/ares-md/adapter.cpp','engines/ares-md/web-files.hpp','engines/ares-md/save-memory.inc','tools/build_ares_md.py','tools/build_ares_md_web.py']:
         inputs.append((ordinary(ROOT/name,ROOT,True),PurePosixPath(name),{}))
     for name in ['beetle-save-io.c.inc','beetle-memory-files.c','beetle-memory-files.h','beetle-memory-frontio.c.inc']:
@@ -159,7 +165,7 @@ def main():
         inputs.append((ordinary(ROOT/name,ROOT,True),PurePosixPath(name),{}))
     for name in ['docs/N64_MEMORY_IO.md','qa/n64-memory/CMakeLists.txt','qa/n64-memory/n64_memory_cases.cpp','qa/n64-memory/fiber_fixture.c','qa/n64-memory/fiber_cases.cpp','qa/n64-memory/texture_core_cases.cpp','qa/n64-memory/texture_fixture.cpp','qa/n64-memory/texture_pool_core_fixture.cpp','qa/n64-memory/texture_pool_cases.cpp','qa/n64-memory/ACCEPTANCE.md','tools/prepare_n64_memory_io.py','tools/prepare_n64_memory_core.py','tools/n64_source_adaptations.py','tools/build_mupen64plus.py','tools/pinned_core_source.py']:
         inputs.append((ordinary(ROOT/name,ROOT,True),PurePosixPath(name),{}))
-    for name in ['platform/contracts/src/lib.rs','platform/contracts/src/ipc.rs','platform/contracts/src/native_work.rs','platform/broker/src/service.rs','platform/broker/src/native_work_jobs.rs','apps/game-hub/app.js','apps/game-hub/background.js','apps/game-hub/component-ownership.js','apps/game-hub/native-work-maintenance.js']:
+    for name in ['platform/contracts/src/lib.rs','platform/contracts/src/ipc.rs','platform/contracts/src/native_work.rs','apps/game-hub/app.js','apps/game-hub/background.js','apps/game-hub/component-ownership.js','apps/game-hub/native-work-maintenance.js']:
         inputs.append((ordinary(ROOT/name,ROOT,True),PurePosixPath('broker')/name,{}))
     inputs.append((ordinary(Path(__file__).resolve(),ROOT,True),PurePosixPath('tools/prepare_presentation.py'),{}))
     if len(inputs)>MAX_FILES:raise ValueError('Presentation source file count exceeds its budget')
@@ -223,6 +229,8 @@ def main():
     receipt.update({'native_checked_guest_pause_source_protocol':1,'native_pause_and_retirement_unknown_lifetime_source_authored':True,'windows_owned_actor_no_dll_detach_source_authored':True,'native_lifecycle_actual_worker_fixture_source_authored':True,'native_checked_pause_and_retirement_verified':False})
     receipt.update({'native_core_api_unknown_exception_guard_source_authored':True,'native_public_ready_phase_admission_source_authored':True})
     receipt.update({'native_control_header_before_binary_source_authored':True,'native_control_single_outstanding_payload_source_authored':True,'native_broker_closed_response_and_channel_invalidation_source_authored':True,'native_core_exception_before_host_buffer_unwind_source_authored':True,'native_control_boundary_verified':False})
+    receipt.update({'native_control_worker_source_slot_limit':16,'native_control_worker_retained_handle_and_prelaunch_reservation_source_authored':True,'windows_control_thread_os_completion_before_join_source_authored':True,'native_control_worker_retirement_verified':False})
+    receipt.update({'native_recovery_worker_process_wide_source_limit':1,'native_recovery_worker_retained_across_broker_replacement_source_authored':True,'native_recovery_worker_retirement_verified':False,'windows_item2_source_complete':False})
     (project/'preparation-receipt.json').write_bytes(encoded(receipt));(project/'recipe.json').write_bytes(encoded({'schema_version':4,'source_only':True,'configuration':'not_started','source':'source/presentation','sdl_source':'source/SDL','build_directory':'build','targets':['omniplay-presentation-host','omniplay-presentation-client'],'native_frontend':{'source':'source/native','presentation_source':'source/presentation','json_source':'source/json','libretro_include':'source/interface/libretro','core_binary_identity':'explicit compiled core receipt and its runtime identity/filename required','default_mode':'direct','brokered_mode':'private inherited pipes and session under --presentation-client-v2'},'linux_bootstrap':{'source':'source/isolation-linux','separate_cmake_project':True,'target':'omniplay-linux-bootstrap','linkage':'static-pie','toolchain':'qualified Linux static libc/runtime/sysroot required','trusted_ui':'dynamic PIE without RPATH; qualified desktop/driver dependencies required','registry_integration':False,'image_package_source':'source/broker/platform/native-runtime/src/linux_package.rs','shared_cache_source':'source/broker/platform/native-runtime/src/linux_image_cache.rs','input_staging_source':'source/broker/platform/native-runtime/src/linux_staging.rs'},'broker_source_selection':{'source':'source/broker','complete_workspace':False,'requires':'the complete product Cargo workspace and qualified dependencies/SDK for actual broker builds','authored_target':'windows-x86_64','linux_lower_level_owned_pair_source_authored':True,'database_source_schema':15,'catalog':'optional signed presentation protocol 2; source alone enables no runtime'},'generator':'Ninja','compiler_and_sdk':'explicit qualified target toolchain required after all product authoring','tests':'not_run'}))
     print('Froze presentation and selected SDL source. No build, helper, OS API or test was started.')
 

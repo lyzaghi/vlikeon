@@ -7,6 +7,23 @@ authoring estimate and is retained only as historical metadata, not a live
 progress or release-readiness claim. Numbered source work and actual final
 verification evidence are tracked in `COMPLETION_SEQUENCE.md`.
 
+The next item-2 source pass owns reserved/attached/retiring native IPC workers
+under a single 16-slot process-wide pool. Prelaunch capacity, fixed retirement
+storage, channel destruction without a running-thread join, held Windows thread
+completion checks and post-join refunds are authored. Unexpected ownership loss
+retains its slot; actor/job/container and work/debt proofs are unchanged. Eight
+pool/thread/TLS case sources and actual blocked-I/O/process acceptance are
+authored, not executed. See `NATIVE_CONTROL_WORKERS.md` and Windows case 27.
+The recovery collector now retains a separate process-wide single slot across
+broker close/replacement, with actual Windows thread completion before join;
+terminal result publication is not sufficient. `WINDOWS_ITEM2_CLOSURE.md`
+records the remaining source obligations before item 3. Item 2 remains open.
+The fresh local `out/presentation/item2-v43-control-worker-ownership-source`
+copy contains 1,937 files / 35,702,951 bytes, with configuration/compiler not
+started and verification not run. It includes all broker Rust sources and
+the closure checklist. The earlier partial v42 copy has no success receipt
+and is not a completed checkpoint. No generated directory is published.
+
 Native control framing source now validates headers before binary allocation,
 rejects duplicate/deep/unknown/replayed requests, retains one outstanding input
 buffer and distinguishes malformed termination from boundary EOF. Broker request
