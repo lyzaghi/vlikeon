@@ -56,6 +56,10 @@
     "antigravity.result": {
       "bytes": 5857,
       "sha256": "7e4107d689096b1f3b276c9634d05557149cf35c69593bd6cd19f36b3cb3d5c2"
+    },
+    "antigravity.acceptance-report-original": {
+      "bytes": 1468,
+      "sha256": "702191dd144b037f9209bf384502af2461923221df2e917a5335ea12b92dc864"
     }
   },
   "published_files": {
@@ -76,8 +80,8 @@
       "sha256": "cbd3ced9993adb46935d35088ad2fbe04dcd6bbe9d8b03a54c0e4a55cad04606"
     },
     "acceptance.json": {
-      "bytes": 1468,
-      "sha256": "702191dd144b037f9209bf384502af2461923221df2e917a5335ea12b92dc864"
+      "bytes": 1428,
+      "sha256": "6d1e6d926ee38203b56d7aca0f877176bc46a9ba69f16000c2ae4d60485634aa"
     },
     "acceptance-checker.py": {
       "bytes": 3982,
