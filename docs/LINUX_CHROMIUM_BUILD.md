@@ -86,3 +86,11 @@ and executable. Antigravity executes the independently assigned Linux output
 checks; Codex reviews raw execution, ELF x86-64 identity, artifact hashes and
 unchanged frozen inputs. Runtime browser/native bridge, release signing,
 production cores and clean-clone reproducibility retain their separate tasks.
+
+The authored checker is `qa/linux/accept-chromium-build.py`. It requires the
+actual Linux x64 host, a successful item-4 batch bound to the preparation,
+completed journal/receipt, dependency/GN digest bindings, unchanged prepared
+inputs, ELF64 x86-64 executable header/mode and selected nonempty output hashes.
+Its exclusive output creation preserves earlier reports. The checker has not
+been executed or qualified; Antigravity must run it against the actual successful
+Linux build before its result can establish task-4 acceptance.
