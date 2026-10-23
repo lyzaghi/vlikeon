@@ -1,5 +1,9 @@
 # Android product source
 
+The item-9 source audit, request-lifetime/backlog fixes and remaining obligations
+are recorded in `ITEM9_ANDROID_PRODUCT.md`. No new Android qualification is
+implied by those changes or by the separately qualified Windows demo.
+
 The Android product extends the pinned Chromium Android browser. Game Hub opens
 from its native menu in an actual Chromium tab; the source does not substitute
 the device's Android System WebView for the planned Chromium engine. The fork's

@@ -18,10 +18,12 @@ final class HubBridge: NSObject, WKScriptMessageHandlerWithReply, UIDocumentPick
     private var exports: [String: Export] = [:]
     private var pending:[String:Pending]=[:]
     private var generation:UInt64=0
+    private var documentLifetime=NativeDocumentLifetime()
     private var preparingFolder=false
     private weak var picker:UIDocumentPickerViewController?
     private let folders=DiscFolderRegistry()
     private let io = DispatchQueue(label: "com.omniplay.ios.documents", qos: .userInitiated)
+    private let documentPermit=DispatchSemaphore(value:4)
     private func documentError(_ error:Error)->String{if error is OmniFailure{return error.localizedDescription};return "The selected document could not be read or stored. Check access and available space, then retry."}
 
     init(core: NativeCore, server: AssetServer, presenter: UIViewController) { self.core=core;self.server=server;self.presenter=presenter }
@@ -55,7 +57,7 @@ final class HubBridge: NSObject, WKScriptMessageHandlerWithReply, UIDocumentPick
         case "file_select_export": createExport(request,params:params,reply:reply)
         case "disc_select_folder":selectDisc(request,reply:reply)
         default:
-            core.request(request) { [weak self] value in
+            core.request(request,owner:documentLifetime) { [weak self] value in
                 guard let self=self else{reply(nil,"The Game Hub closed.");return}
                 guard epoch==self.generation,self.alive(request) else{self.reject(request,reply,code:"cancelled",message:"The operation belongs to an expired Game Hub request.");return}
                 switch value {
@@ -86,8 +88,11 @@ final class HubBridge: NSObject, WKScriptMessageHandlerWithReply, UIDocumentPick
         let epoch=generation
         guard let name=params["suggested_name"] as? String, !name.isEmpty,name != ".",name != "..",name.utf8.count<=128,name.utf8.allSatisfy({(48...57).contains($0)||(65...90).contains($0)||(97...122).contains($0)||[45,95,46].contains($0)}),exports.count<16 else{reject(request,reply,code:"invalid_request",message:"The export name or pending export count is invalid.");return}
         let directory=core.root.appendingPathComponent("NativeExports",isDirectory:true).appendingPathComponent(UUID().uuidString,isDirectory:true),url=directory.appendingPathComponent(name)
+        guard documentPermit.wait(timeout:.now()) == .success else{reject(request,reply,code:"busy",message:"Document I/O is still finishing.");return}
+        let lifetime=documentLifetime
         io.async {
-            do {try FileManager.default.createDirectory(at:directory,withIntermediateDirectories:true,attributes:[.protectionKey:FileProtectionType.completeUntilFirstUserAuthentication])
+            defer{self.documentPermit.signal()}
+            do {guard lifetime.active,((request["deadline_ms"] as? NSNumber)?.doubleValue ?? 0) > Date().timeIntervalSince1970*1000 else{throw OmniFailure.message("Document operation expired.")};try FileManager.default.createDirectory(at:directory,withIntermediateDirectories:true,attributes:[.protectionKey:FileProtectionType.completeUntilFirstUserAuthentication])
                 DispatchQueue.main.async {
                     guard epoch==self.generation,self.alive(request) else{self.removePrivateExport(url);self.reject(request,reply,code:"cancelled",message:"Export selection expired.");return}
                     self.core.authorize(["kind":"export","path":url.path]){result in
@@ -162,6 +167,7 @@ final class HubBridge: NSObject, WKScriptMessageHandlerWithReply, UIDocumentPick
         if case .exportFile(_,_,let source)=current{removePrivateExport(source)}
     }
     func resetDocument(){
+        documentLifetime.invalidate();documentLifetime=NativeDocumentLifetime()
         generation &+= 1;folders.cancelAll();preparingFolder=false
         if case .exportFile(_,_,let source)?=selection{removePrivateExport(source)}
         selection=nil;picker?.dismiss(animated:false);picker=nil
@@ -173,12 +179,15 @@ final class HubBridge: NSObject, WKScriptMessageHandlerWithReply, UIDocumentPick
         let root=core.root,originalTitle=String(source.deletingPathExtension().lastPathComponent.prefix(120))
         let epoch=generation,deadline=(request["deadline_ms"] as? NSNumber)?.doubleValue ?? 0
         let maximum:UInt64=firmware==nil ? 4*1024*1024*1024:128*1024*1024
+        guard documentPermit.wait(timeout:.now()) == .success else{reject(request,reply,code:"busy",message:"Document I/O is still finishing.");return}
+        let lifetime=documentLifetime
         io.async {
+            defer{self.documentPermit.signal()}
             let scoped=source.startAccessingSecurityScopedResource();defer{if scoped{source.stopAccessingSecurityScopedResource()}}
             let extensionName=source.pathExtension.lowercased().filter{$0.isASCII&&($0.isLetter||$0.isNumber)}
             let target=root.appendingPathComponent("NativeInbox",isDirectory:true).appendingPathComponent(UUID().uuidString.lowercased()+"."+String(extensionName.prefix(12)))
             do {
-                guard scoped,deadline>Date().timeIntervalSince1970*1000 else{throw OmniFailure.message("Document access was denied or expired.")}
+                guard scoped,lifetime.active,deadline>Date().timeIntervalSince1970*1000 else{throw OmniFailure.message("Document access was denied or expired.")}
                 try FileManager.default.createDirectory(at:target.deletingLastPathComponent(),withIntermediateDirectories:true,attributes:[.protectionKey:FileProtectionType.completeUntilFirstUserAuthentication])
                 var coordinationError:NSError?,copyError:Error?
                 NSFileCoordinator().coordinate(readingItemAt:source,options:[],error:&coordinationError){ readable in
@@ -188,7 +197,7 @@ final class HubBridge: NSObject, WKScriptMessageHandlerWithReply, UIDocumentPick
                         guard FileManager.default.createFile(atPath:target.path,contents:nil,attributes:[.protectionKey:FileProtectionType.completeUntilFirstUserAuthentication])else{throw OmniFailure.message("The private import staging file could not be created.")}
                         let input=try FileHandle(forReadingFrom:readable),output=try FileHandle(forWritingTo:target);defer{try? input.close();try? output.close()}
                         var total:UInt64=0
-                        while let block=try input.read(upToCount:256*1024),!block.isEmpty{total+=UInt64(block.count);guard total<=maximum,deadline>Date().timeIntervalSince1970*1000 else{throw OmniFailure.message("The selected file exceeds its import size or time limit.")};try output.write(contentsOf:block)}
+                        while let block=try input.read(upToCount:256*1024),!block.isEmpty{total+=UInt64(block.count);guard lifetime.active,total<=maximum,deadline>Date().timeIntervalSince1970*1000 else{throw OmniFailure.message("The selected file exceeds its import size or time limit.")};try output.write(contentsOf:block)}
                         guard total==UInt64(values.fileSize ?? 0)else{throw OmniFailure.message("The document changed during import.")};try output.synchronize()
                     }catch{copyError=error}
                 }

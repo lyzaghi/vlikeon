@@ -1,5 +1,12 @@
 # iOS and shared mobile source
 
+See `ITEM10_IOS_IPADOS_PRODUCT.md` for the current queue/lifecycle/recovery,
+browser data/download management and build-admission changes. Development builds
+now require `tools/build_ios.py --development`; `--destination simulator` selects
+the simulator product build. Archives require release resources, a signing team
+and an explicit reviewed `--export-compliance` classification. These changes do
+not establish Apple SDK/device/store readiness or close the remaining source.
+
 The resource assembly shares the explicit desktop/Android core inventory. It removes stale generated assets before copying the current set, so retired cores cannot remain bundled through the Xcode folder reference. Manifest-declared artifacts require matching WASM size/hash and accompanying license notices; release assembly still requires explicit distribution approval.
 
 The iOS product now has authored Swift/UIKit/WebKit source, a native Rust static-library boundary and a generated Xcode project. It has not been built, launched in a simulator, signed or exercised on a device. The current resource assembly is explicitly a development assembly with no emulator binary. This is implementation progress, not a claim of App Store readiness.

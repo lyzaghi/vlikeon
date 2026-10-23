@@ -32,6 +32,13 @@ public final class NativeCore {
     private final ExecutorService mLifecycle = Executors.newSingleThreadExecutor();
     private final java.util.concurrent.ThreadPoolExecutor mRangeIo=new java.util.concurrent.ThreadPoolExecutor(1,1,0,java.util.concurrent.TimeUnit.MILLISECONDS,new java.util.concurrent.ArrayBlockingQueue<>(1));
     private final java.util.concurrent.atomic.AtomicBoolean mRangeBusy=new java.util.concurrent.atomic.AtomicBoolean();
+    // Count executing/queued work, not renderer reply slots: a timed-out reply
+    // must not release admission while its native operation is still blocked.
+    private final java.util.concurrent.atomic.AtomicInteger mRequests=new java.util.concurrent.atomic.AtomicInteger();
+    private final java.util.concurrent.atomic.AtomicInteger mWorkPending=new java.util.concurrent.atomic.AtomicInteger();
+    private final java.util.concurrent.atomic.AtomicBoolean mMaintenanceQueued=new java.util.concurrent.atomic.AtomicBoolean();
+    private final java.util.concurrent.atomic.AtomicBoolean mNeedsSuspend=new java.util.concurrent.atomic.AtomicBoolean();
+    private final java.util.concurrent.atomic.AtomicBoolean mNeedsDetach=new java.util.concurrent.atomic.AtomicBoolean();
     private final Handler mMain = new Handler(Looper.getMainLooper());
     private final File mBase;
     private final Context mContext;
@@ -161,21 +168,28 @@ public final class NativeCore {
     }
     /** Work is native-owned and serialized with requests and file authorization. */
     public void work(Work operation, Reply reply) {
+        if(mWorkPending.incrementAndGet()>32){mWorkPending.decrementAndGet();reply.accept(failure("","busy","Local document operations are still finishing."));return;}
         mIo.execute(() -> {
             JSONObject value;
             try {
                 if (mFailed || mHandle == 0) throw new IllegalStateException();
                 value = operation.run();
             } catch (Exception | LinkageError error) { value = failure("", "storage_failure", "The local operation could not be completed. Check storage and access, then retry."); }
+            finally {mWorkPending.decrementAndGet();}
             final JSONObject response = value;
             mMain.post(() -> reply.accept(response));
         });
     }
     public void request(JSONObject request, Reply reply) {
+        request(request, () -> true, reply);
+    }
+    public void request(JSONObject request, java.util.function.BooleanSupplier ownerAlive, Reply reply) {
         final String id = request.optString("id");
         JSONObject selectedCommand=request.optJSONObject("command");
-        if(selectedCommand!=null&&"asset_range_read".equals(selectedCommand.optString("method"))){rangeRequest(request,reply);return;}
+        if(selectedCommand!=null&&"asset_range_read".equals(selectedCommand.optString("method"))){rangeRequest(request,ownerAlive,reply);return;}
+        if(mRequests.incrementAndGet()>16){mRequests.decrementAndGet();reply.accept(failure(id,"busy","Native operations are still finishing. Please retry."));return;}
         work(() -> {
+            if(!ownerAlive.getAsBoolean()||request.optLong("deadline_ms",0)<=System.currentTimeMillis())return failure(id,"cancelled","The request expired or its document closed.");
             request.put("profile_id", mProfile);JSONObject response=call(1,request);JSONObject command=request.optJSONObject("command");
             String method = command == null ? "" : command.optString("method");
             if ("ok".equals(response.optString("status")) && ("hello".equals(method) || "sync_status".equals(method) || "sync_background_configure".equals(method) || "settings_set".equals(method) || method.startsWith("sync_"))) {
@@ -190,16 +204,17 @@ public final class NativeCore {
             }
             return command!=null&&"device_snapshot".equals(command.optString("method"))?DeviceSnapshot.augment(mContext,response):response;
         }, response -> {
+            mRequests.decrementAndGet();
             try { response.put("id", id); } catch (Exception ignored) {}
             reply.accept(response);
         });
     }
-    private void rangeRequest(JSONObject request,Reply reply){
+    private void rangeRequest(JSONObject request,java.util.function.BooleanSupplier ownerAlive,Reply reply){
         final String id=request.optString("id");
         if(!mRangeBusy.compareAndSet(false,true)){reply.accept(failure(id,"busy","A native media read is still finishing."));return;}
         try{mRangeIo.execute(()->{
             JSONObject value;
-            try{if(mHandle==0||mFailed)throw new IllegalStateException();request.put("profile_id",mProfile);value=call(1,request);}
+            try{if(mHandle==0||mFailed)throw new IllegalStateException();if(!ownerAlive.getAsBoolean()||request.optLong("deadline_ms",0)<=System.currentTimeMillis())value=failure(id,"cancelled","The media request expired or its document closed.");else{request.put("profile_id",mProfile);value=call(1,request);}}
             catch(Exception|LinkageError error){value=failure(id,"storage_failure","The native game asset could not be read.");}
             finally{mRangeBusy.set(false);}
             final JSONObject response=value;mMain.post(()->reply.accept(response));
@@ -237,8 +252,18 @@ public final class NativeCore {
             synchronized(mLifecycleLock){if(revision==mLifecycleRevision){mLifecycleScheduled=false;return;}}
         }
     }
-    public void suspend() { work(() -> call(3, null), ignored -> {}); }
-    public void detach() { setForeground(false); work(() -> call(4, null), ignored -> {}); }
+    private void scheduleMaintenance(){
+        if(!mMaintenanceQueued.compareAndSet(false,true))return;
+        mIo.execute(()->{
+            try{
+                boolean detach=mNeedsDetach.getAndSet(false),suspend=mNeedsSuspend.getAndSet(false);
+                if(!mFailed&&mHandle!=0){if(detach)call(4,null);if(suspend)call(3,null);}
+            }catch(Exception|LinkageError error){/* Keep local data; no synthetic successful save receipt. */}
+            finally{mMaintenanceQueued.set(false);if(mNeedsDetach.get()||mNeedsSuspend.get())scheduleMaintenance();}
+        });
+    }
+    public void suspend() { mNeedsSuspend.set(true);scheduleMaintenance(); }
+    public void detach() { setForeground(false);mNeedsDetach.set(true);scheduleMaintenance(); }
     public static JSONObject success(JSONObject request, Object result) {
         try { return new JSONObject().put("protocol_major", 1).put("protocol_minor", 0).put("id", request.optString("id")).put("status", "ok").put("result", result); }
         catch (Exception impossible) { throw new IllegalStateException(impossible); }

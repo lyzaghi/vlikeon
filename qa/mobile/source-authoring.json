@@ -1,0 +1,66 @@
+{
+  "schema_version": 1,
+  "scope": "items9-10 mobile source authoring",
+  "date": "2026-10-23",
+  "verification": "not_run",
+  "android_build": "not_run",
+  "ios_build": "not_run",
+  "source_generation": [
+    "assemble_android.py --without-cores",
+    "assemble_ios.py --without-cores"
+  ],
+  "files": [
+    {
+      "path": "apps/android/java/org/chromium/chrome/browser/omniplay/GameHubController.java",
+      "sha256": "a06330b4a8db1575fe5015c72bb3cbd3901b607e19dee0a5d9b8938495db30e6"
+    },
+    {
+      "path": "apps/android/java/org/chromium/chrome/browser/omniplay/NativeCore.java",
+      "sha256": "76b97c26a822a3544247bf7aea81f6f0a4eca1a59ab348c67700ef153e4f8566"
+    },
+    {
+      "path": "apps/android/res/values/omniplay.xml",
+      "sha256": "c19f958b9d9281bc56f46d608d663eaeae3709a687fb11f5e7c26dad47e6bab9"
+    },
+    {
+      "path": "apps/android/res/values-vi/omniplay.xml",
+      "sha256": "3fb2588f7af6c0c7d8780abf157359eb7ee701f5ee70dd8112deec1355f4949e"
+    },
+    {
+      "path": "apps/ios/OmniPlay/App.swift",
+      "sha256": "64d987706a8d99e6af1beca179eb25958386f45f0dcc2a8aa6d6f700dba2a7e3"
+    },
+    {
+      "path": "apps/ios/OmniPlay/AssetServer.swift",
+      "sha256": "17dc7531359fef40b5686d1723849808ceb8f998ad0c2f743f96f0ad71e76880"
+    },
+    {
+      "path": "apps/ios/OmniPlay/BrowserStore.swift",
+      "sha256": "74799525e759da78c48d1cc6e7d74db5874a72d2cf9300bd0e59e88f4ee43a27"
+    },
+    {
+      "path": "apps/ios/OmniPlay/BrowserViewController.swift",
+      "sha256": "8f61e81821a20eda483c9eb1ab346373801adf0c6f270701d4985bd3403fa703"
+    },
+    {
+      "path": "apps/ios/OmniPlay/GameHubViewController.swift",
+      "sha256": "8463017c3f8e090d39e68d6837145138c4b7c872a32c30a353970146134934fa"
+    },
+    {
+      "path": "apps/ios/OmniPlay/HubBridge.swift",
+      "sha256": "d11d93cafa33cc29779b0431abf158a0b5cfbc4774df3db4cc595b97df52ae6f"
+    },
+    {
+      "path": "apps/ios/OmniPlay/Info.plist",
+      "sha256": "17c7bfd2d7144c4cdd2650bf5a278a2ef5b7cde6cfaaf546391d450a1377d83d"
+    },
+    {
+      "path": "apps/ios/OmniPlay/NativeCore.swift",
+      "sha256": "cdf752af3df730afab11854b4054ffb3ee77482c8642b202c76ef2693c2611fd"
+    },
+    {
+      "path": "tools/build_ios.py",
+      "sha256": "781efc2a8b62ae80107fbba6e820fd78b4b6e622f2bcbc8d90ee3d70ef65edd3"
+    }
+  ]
+}

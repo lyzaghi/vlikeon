@@ -44,7 +44,7 @@ final class AssetServer {
     }
     func owns(_ url: URL?) -> Bool {
         guard let url = url, let base = baseURL else { return false }
-        return url.scheme == "http" && url.host == "127.0.0.1" && url.port == base.port && url.user == nil && url.password == nil && url.path.hasPrefix(routePrefix)
+        return url.scheme == "http" && url.host == "127.0.0.1" && url.port == base.port && url.user == nil && url.password == nil && url.path == routePrefix+"index.html" && url.query == nil
     }
     func start(completion: @escaping (Result<URL, Error>) -> Void) {
         queue.async {

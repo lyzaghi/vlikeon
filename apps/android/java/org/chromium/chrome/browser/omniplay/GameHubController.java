@@ -21,6 +21,8 @@ import org.json.JSONObject;
 import java.nio.charset.StandardCharsets;
 import java.util.HashSet;
 import java.util.Set;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.UUID;
 
 /** One explicitly opened Chromium tab owns a port; ordinary browsing has no native bridge. */
@@ -29,7 +31,8 @@ public final class GameHubController implements AutoCloseable {
     private static final class Channel {
         final MessagePort port; final WebContents contents;
         final Set<String> requests=new HashSet<>();
-        boolean closed;
+        final Map<String,Runnable> expiries=new HashMap<>();
+        volatile boolean closed;
         Channel(MessagePort value,WebContents owner){port=value;contents=owner;}
     }
     private final ChromeTabbedActivity mActivity;
@@ -131,11 +134,12 @@ public final class GameHubController implements AutoCloseable {
         if(!(request.get("deadline_ms") instanceof Number)||((Number)request.get("deadline_ms")).doubleValue()!=deadline||deadline<=now||deadline-now>120_000||request.getInt("protocol_major")!=1||request.getInt("protocol_minor")!=0||request.optJSONObject("command")==null)throw new IllegalArgumentException();
         if(channel.requests.size()>=16||!channel.requests.add(id)){send(channel,NativeCore.failure(id,"busy","Wait for the current native operations."));return;}
         final boolean[] finished={false};
-        Runnable expiry=()->{if(!finished[0]){finished[0]=true;channel.requests.remove(id);send(channel,NativeCore.failure(id,"deadline_exceeded","The native operation deadline expired."));}};
+        Runnable expiry=()->{channel.expiries.remove(id);if(!finished[0]){finished[0]=true;channel.requests.remove(id);send(channel,NativeCore.failure(id,"deadline_exceeded","The native operation deadline expired."));}};
+        channel.expiries.put(id,expiry);
         mMain.postDelayed(expiry,deadline-now);
-        NativeCore.Reply reply=response->{if(finished[0])return;finished[0]=true;mMain.removeCallbacks(expiry);channel.requests.remove(id);send(channel,response);};
+        NativeCore.Reply reply=response->{if(finished[0]||!owns(channel))return;finished[0]=true;mMain.removeCallbacks(expiry);channel.expiries.remove(id);channel.requests.remove(id);try{response.put("id",id);}catch(Exception ignored){}send(channel,response);};
         if(mDocuments.intercept(request,reply))return;
-        mCore.request(request,response->{if(!owns(channel))return;if(!mDocuments.finishExport(request,response,reply))reply.accept(response);});
+        mCore.request(request,()->!channel.closed,response->{if(!owns(channel)||finished[0])return;if(!mDocuments.finishExport(request,response,reply))reply.accept(response);});
     }
     private void send(Channel channel,JSONObject response){if(owns(channel))channel.port.postMessage(new MessagePayload(response.toString()),null);}
     public void suspend(){
@@ -152,7 +156,7 @@ public final class GameHubController implements AutoCloseable {
         mCore.setForeground(false);
         ++mHandshake;
         Channel previous=mChannel;mChannel=null;
-        if(previous!=null){previous.closed=true;previous.port.close();previous.requests.clear();mCore.detach();}
+        if(previous!=null){previous.closed=true;previous.port.close();for(Runnable expiry:previous.expiries.values())mMain.removeCallbacks(expiry);previous.expiries.clear();previous.requests.clear();mCore.detach();}
         if(mDocuments!=null){mDocuments.close();mDocuments=null;}
         if(!mClosed&&mServer!=null)mDocuments=new NativeDocuments(mActivity,mActivity.getWindowAndroid(),mCore);
         mMain.removeCallbacks(mPauseFallback);mSuspension=null;

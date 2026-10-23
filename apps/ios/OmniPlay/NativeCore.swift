@@ -5,6 +5,15 @@ enum OmniFailure: Error, LocalizedError {
     var errorDescription: String? { if case let .message(value) = self { return value }; return nil }
 }
 
+/// Safe to inspect from the serialized native queue after a WebKit document
+/// has been replaced on the main queue. Already-running I/O is cooperative.
+final class NativeDocumentLifetime {
+    private let lock=NSLock()
+    private var alive=true
+    var active:Bool{lock.lock();defer{lock.unlock()};return alive}
+    func invalidate(){lock.lock();alive=false;lock.unlock()}
+}
+
 /// Only this native object can call path-bearing authorization APIs. Each profile's
 /// SQLite handle is serialized off the main thread; WebKit never sees its root path.
 final class NativeCore {
@@ -25,12 +34,15 @@ final class NativeCore {
     private let lifecycleQueue = DispatchQueue(label: "com.omniplay.mobile.lifecycle", qos: .userInitiated)
     private let mediaQueue=DispatchQueue(label:"com.omniplay.mobile.media",qos:.userInitiated)
     private let mediaPermit=DispatchSemaphore(value:1)
+    private let requestPermit=DispatchSemaphore(value:16)
+    private let authorizationPermit=DispatchSemaphore(value:16)
     private let stateLock = NSLock()
     private var storedHandle: UInt64 = 0
     private var desiredForeground = false
     private var lifecycleScheduled = false
     private var lifecycleNeedsCancel = false
     private var lifecycleRevision: UInt64 = 0
+    private var detachQueued=false
     private var handle: UInt64 {
         get { stateLock.lock(); defer { stateLock.unlock() }; return storedHandle }
         set { stateLock.lock(); storedHandle = newValue; stateLock.unlock() }
@@ -77,10 +89,13 @@ final class NativeCore {
             } catch { DispatchQueue.main.async { completion(.failure(error)) } }
         }
     }
-    func request(_ message: [String: Any], completion: @escaping (Result<[String: Any], Error>) -> Void) {
-        if (message["command"] as? [String:Any])?["method"] as? String == "asset_range_read"{rangeRequest(message,completion:completion);return}
+    func request(_ message: [String: Any], owner:NativeDocumentLifetime? = nil, completion: @escaping (Result<[String: Any], Error>) -> Void) {
+        if (message["command"] as? [String:Any])?["method"] as? String == "asset_range_read"{rangeRequest(message,owner:owner,completion:completion);return}
+        guard requestPermit.wait(timeout:.now()) == .success else{completion(.failure(OmniFailure.message("Native operations are still finishing. Please retry.")));return}
         queue.async {
+            defer{self.requestPermit.signal()}
             do {
+                try self.admit(message,owner:owner)
                 guard self.handle != 0 else { throw OmniFailure.message("The local profile is closed.") }
                 var request = message; request["profile_id"] = self.profileID.uuidString.lowercased()
                 var value = try self.call(request) { om_mobile_request(self.handle, $0, $1) }
@@ -105,11 +120,14 @@ final class NativeCore {
             } catch { DispatchQueue.main.async { completion(.failure(error)) } }
         }
     }
-    private func rangeRequest(_ message:[String:Any],completion:@escaping(Result<[String:Any],Error>)->Void){
+    private func admit(_ message:[String:Any],owner:NativeDocumentLifetime?)throws{
+        guard owner?.active != false,let deadline=message["deadline_ms"] as? NSNumber,deadline.doubleValue.isFinite,deadline.doubleValue>Date().timeIntervalSince1970*1000 else{throw OmniFailure.message("The request expired or its document closed.")}
+    }
+    private func rangeRequest(_ message:[String:Any],owner:NativeDocumentLifetime?,completion:@escaping(Result<[String:Any],Error>)->Void){
         guard mediaPermit.wait(timeout:.now()) == .success else{completion(.failure(OmniFailure.message("A native media read is still finishing.")));return}
         mediaQueue.async{
             let result:Result<[String:Any],Error>
-            do{guard self.handle != 0 else{throw OmniFailure.message("The local profile is closed.")};var request=message;request["profile_id"]=self.profileID.uuidString.lowercased();result = .success(try self.call(request){om_mobile_request(self.handle,$0,$1)})}catch{result = .failure(error)}
+            do{try self.admit(message,owner:owner);guard self.handle != 0 else{throw OmniFailure.message("The local profile is closed.")};var request=message;request["profile_id"]=self.profileID.uuidString.lowercased();result = .success(try self.call(request){om_mobile_request(self.handle,$0,$1)})}catch{result = .failure(error)}
             self.mediaPermit.signal();DispatchQueue.main.async{completion(result)}
         }
     }
@@ -134,7 +152,9 @@ final class NativeCore {
         }
     }
     func authorize(_ nativeSelection: [String: Any], completion: @escaping (Result<[String: Any], Error>) -> Void) {
+        guard authorizationPermit.wait(timeout:.now()) == .success else{completion(.failure(OmniFailure.message("Native document operations are still finishing.")));return}
         queue.async {
+            defer{self.authorizationPermit.signal()}
             do {
                 guard self.handle != 0 else { throw OmniFailure.message("The local profile is closed.") }
                 let value = try self.unwrap(self.call(nativeSelection) { om_mobile_authorize(self.handle, $0, $1) })
@@ -143,13 +163,17 @@ final class NativeCore {
         }
     }
     func expireCapabilities(completion: @escaping (Result<Void, Error>) -> Void) {
+        guard authorizationPermit.wait(timeout:.now()) == .success else{completion(.failure(OmniFailure.message("Native document operations are still finishing.")));return}
         queue.async {
+            defer{self.authorizationPermit.signal()}
             do {guard self.handle != 0 else{throw OmniFailure.message("The local profile is closed.")};_=try self.unwrap(self.consume(om_mobile_expire_capabilities(self.handle)));DispatchQueue.main.async{completion(.success(()))}}
             catch{DispatchQueue.main.async{completion(.failure(error))}}
         }
     }
     func authorizeMedia(_ metadata: [String:Any], folder: SelectedDiscFolder, completion: @escaping (Result<[String:Any], Error>) -> Void) {
+        guard authorizationPermit.wait(timeout:.now()) == .success else{folder.cancel();completion(.failure(OmniFailure.message("Native document operations are still finishing.")));return}
         queue.async {
+            defer{self.authorizationPermit.signal()}
             do {
                 guard self.handle != 0 else{throw OmniFailure.message("The local profile is closed.")}
                 let value=try self.unwrap(self.call(metadata){data,length in om_mobile_authorize_media(self.handle,data,length,SelectedDiscFolder.callbacks(folder))})
@@ -159,7 +183,8 @@ final class NativeCore {
     }
     func detach() {
         setForeground(false)
-        queue.async{if self.handle != 0{let value=om_mobile_detach(self.handle);om_mobile_free(value)}}
+        stateLock.lock();guard !detachQueued else{stateLock.unlock();return};detachQueued=true;stateLock.unlock()
+        queue.async{defer{self.stateLock.lock();self.detachQueued=false;self.stateLock.unlock()};if self.handle != 0{let value=om_mobile_detach(self.handle);om_mobile_free(value)}}
     }
     func suspend(completion: @escaping () -> Void = {}) {
         queue.async { if self.handle != 0 { let response = om_mobile_suspend(self.handle); om_mobile_free(response) }; DispatchQueue.main.async(execute: completion) }
