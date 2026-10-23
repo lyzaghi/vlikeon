@@ -4,7 +4,7 @@ use std::io::{Read,Write};
 use uuid::Uuid;
 pub const MAX_FRAME:usize=16*1024;
 #[derive(Clone,Serialize,Deserialize)]#[serde(deny_unknown_fields)]
-pub struct Target{pub process_id:u32,pub creation_time:u64}
+pub struct Target{pub process_id:u32,pub creation_time:u64,#[serde(default)]pub window:Option<u64>}
 #[derive(Serialize,Deserialize)]#[serde(deny_unknown_fields)]
 pub struct Request{pub protocol:u16,pub id:u64,pub grant_id:Uuid,pub session_id:Uuid,pub action:Action}
 #[derive(Serialize,Deserialize)]#[serde(tag="method",rename_all="snake_case",deny_unknown_fields)]

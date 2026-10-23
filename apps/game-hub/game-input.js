@@ -1,4 +1,5 @@
 import{PHYSICAL_BUTTONS}from'./input-profile.js';
+import{defaultAxisTuning,tuneAxis}from'./controller-profile.js';
 const axis=value=>Number.isFinite(value)?Math.max(-1,Math.min(1,value)):0;
 const signed=value=>{const scaled=Math.max(-1,Math.min(1,value))*32767;return scaled<0?-Math.floor(-scaled+.5):Math.floor(scaled+.5);};
 export function radialStick(rawX,rawY,deadzonePercent){
@@ -11,7 +12,9 @@ export function gameInput(pads,profile,heldButtons,touchButtons,analogKeys,analo
   for(const id of heldButtons)ports[0][id]=1;for(const id of touchButtons)ports[0][id]=1;
   for(let port=0;port<4;port++){
     const pad=pads[port];if(!pad||pad.mapping!=='standard')continue;
-    const left=radialStick(pad.axes[0],pad.axes[1],profile.analog_deadzone_percent),right=radialStick(pad.axes[2],pad.axes[3],profile.analog_deadzone_percent);analogPorts[port]=[...left,...right];
+    const tuning=profile.axis_tuning??defaultAxisTuning(),mapped=tuning.map(v=>axis(pad.axes[v.source]));
+    const radial=[...radialStick(mapped[0],mapped[1],profile.analog_deadzone_percent),...radialStick(mapped[2],mapped[3],profile.analog_deadzone_percent)];
+    const tuned=radial.map((v,i)=>signed(tuneAxis(v/32767,tuning[i]))),left=tuned.slice(0,2),right=tuned.slice(2,4);analogPorts[port]=tuned;
     for(let id=0;id<16;id++){const source=profile.button_sources[id];if(pad.buttons[PHYSICAL_BUTTONS[source]]?.pressed)ports[port][id]=1;if(!analogMode&&!(port===0&&virtualSticks[0]?.active)&&((source===6&&left[0]<-13107)||(source===7&&left[0]>13107)||(source===4&&left[1]<-13107)||(source===5&&left[1]>13107)))ports[port][id]=1;}
   }
   if(analogMode){const pressed=index=>profile.analog_keyboard[index]!==null&&analogKeys.has(profile.analog_keyboard[index]);for(let id=0;id<2;id++){const negative=pressed(id===0?2:0),positive=pressed(id===0?3:1);if(negative||positive)analogPorts[0][id]=(Number(positive)-Number(negative))*32767;}}

@@ -1,5 +1,6 @@
 import{currentLocale}from'./i18n.js';
 import{BUTTON_NAMES,defaultInputProfile,allowedGameKey,validateInputProfile}from'./input-profile.js';
+import{mountControllerSettings}from'./controller-settings.js';
 const text=(vi,en)=>currentLocale()==='vi'?vi:en;
 const node=(tag,className,value)=>{const item=document.createElement(tag);if(className)item.className=className;if(value!==undefined)item.textContent=value;return item;};
 let activeCapture=null;
@@ -7,11 +8,11 @@ export async function mountInputSettings(container,bridge,game,notify){
   activeCapture?.();
   container.replaceChildren(node('p','muted small',text('Đang lấy cấu hình điều khiển…','Loading input settings…')));let profile;
   try{profile=validateInputProfile(await bridge.request('game_input_get',{game_id:game.id}));}catch(error){container.replaceChildren(node('p','muted small',error.message));return;}
-  if(!container.isConnected)return;let recording=null,busy=false;const buttons=[],selectors=[];const title=node('h3','',text('Điều khiển cho game này','Controls for this game')),status=node('p','muted small');status.setAttribute('role','status');
-  const description=node('p','muted small',text('Lưu để áp dụng ở lần mở game tiếp theo. Escape tạm dừng, F11 toàn màn hình và phím hệ thống được giữ riêng. Đổi nút tay cầm chỉ áp dụng cho gamepad chuẩn; màn hình cảm ứng giữ nhãn nút trong game.','Save to apply on the next launch. Escape/pause, F11/fullscreen and system shortcuts retain their own controls. Button remapping applies to standard gamepads; touch controls keep their game-button labels.'));
+  if(!container.isConnected)return;let recording=null,busy=false,advanced=null;const buttons=[],selectors=[];const title=node('h3','',text('Điều khiển cho game này','Controls for this game')),status=node('p','muted small');status.setAttribute('role','status');
+  const description=node('p','muted small',text('Lưu để áp dụng ở lần mở game tiếp theo. Escape tạm dừng, F11 toàn màn hình và phím hệ thống được giữ riêng. Đổi nút áp dụng cho tay cầm chuẩn hoặc đã hiệu chỉnh; cảm ứng giữ nhãn nút trong game.','Save to apply on the next launch. Escape/pause, F11/fullscreen and system shortcuts retain their own controls. Button remapping applies to standard or calibrated controllers; touch controls keep their game-button labels.'));
   const keys=node('fieldset','input-mapping-grid');keys.append(node('legend','',text('Bàn phím','Keyboard')));const analog=node('fieldset','input-mapping-grid');analog.append(node('legend','',text('Cần trái bằng bàn phím · N64 / PSP','Keyboard left stick · N64 / PSP')));
   function cancel(){if(recording){recording.abort();recording=null;}if(activeCapture===cancel)activeCapture=null;paint();}
-  function paint(){feedbackCheck.checked=profile.haptics_enabled;feedbackCheck.disabled=busy;deadzoneInput.value=String(profile.analog_deadzone_percent);deadzoneInput.disabled=busy;deadzoneValue.textContent=profile.analog_deadzone_percent+'%';for(const item of buttons){item.bind.textContent=profile[item.field][item.index]??text('Chưa gán','Unassigned');item.bind.disabled=busy;item.clear.disabled=busy||profile[item.field][item.index]===null;}for(let index=0;index<selectors.length;index++){selectors[index].value=String(profile.button_sources[index]);selectors[index].disabled=busy;}}
+  function paint(){feedbackCheck.checked=profile.haptics_enabled;feedbackCheck.disabled=busy;deadzoneInput.value=String(profile.analog_deadzone_percent);deadzoneInput.disabled=busy;deadzoneValue.textContent=profile.analog_deadzone_percent+'%';for(const item of buttons){item.bind.textContent=profile[item.field][item.index]??text('Chưa gán','Unassigned');item.bind.disabled=busy;item.clear.disabled=busy||profile[item.field][item.index]===null;}for(let index=0;index<selectors.length;index++){selectors[index].value=String(profile.button_sources[index]);selectors[index].disabled=busy;}advanced?.paint();}
   function bind(field,index,button){
     if(busy)return;activeCapture?.();cancel();const abort=new AbortController();recording=abort;activeCapture=cancel;button.textContent=text('Nhấn phím…','Press a key…');status.textContent=text('Nhấn một phím cho game. Escape để huỷ.','Press a game key. Escape cancels.');
     window.addEventListener('blur',cancel,{once:true,signal:abort.signal});container.closest('dialog')?.addEventListener('close',cancel,{once:true,signal:abort.signal});
@@ -31,5 +32,6 @@ export async function mountInputSettings(container,bridge,game,notify){
   const actions=node('div','detail-actions'),save=node('button','button button-primary',text('Lưu điều khiển','Save controls')),reset=node('button','button button-secondary',text('Nạp cấu hình mặc định','Load default mappings'));save.type=reset.type='button';
   reset.addEventListener('click',()=>{cancel();profile=defaultInputProfile();paint();status.textContent=text('Đã nạp mặc định vào bản nháp. Nhấn Lưu để giữ lại.','Defaults loaded into the draft. Save to keep them.');});
   save.addEventListener('click',()=>void(async()=>{if(busy)return;cancel();busy=true;save.disabled=reset.disabled=true;paint();try{profile=validateInputProfile(await bridge.request('game_input_set',{game_id:game.id,input:validateInputProfile(profile)}));status.textContent=text('Đã lưu điều khiển cho lần chơi tới.','Controls saved for the next launch.');}catch(error){notify(error.message,true);}finally{busy=false;save.disabled=reset.disabled=false;paint();}})());
-  actions.append(save,reset);container.replaceChildren(title,description,keys,analog,pads,deadzone,feedback,actions,status);paint();
+  const controller=node('section','controller-settings');advanced=mountControllerSettings(controller,()=>profile,()=>busy,paint);
+  actions.append(save,reset);container.replaceChildren(title,description,keys,analog,pads,deadzone,feedback,controller,actions,status);paint();
 }

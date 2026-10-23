@@ -95,7 +95,7 @@ impl Broker {
             Command::GameCoreOptionsSet{game_id,runtime_id,options}=>encode(omniplay_core::core_options::store(&self.database,game_id,&runtime_id,options)?),
             Command::RuntimeOptionsGet{runtime_id}=>encode(self.runtimes.option_policy(&runtime_id)?),
             Command::DeviceSnapshot=>encode(self.device_probe.sample()?),
-            Command::Hello => Ok(json!({"application":"OmniPlay","version":env!("CARGO_PKG_VERSION"),"protocol_major":PROTOCOL_MAJOR,"protocol_minor":PROTOCOL_MINOR,"save_origin_protocol":1,"save_repair_protocol":1,"save_cloud_recovery_protocol":1,"encrypted_sync":true,"native_asset_ranges":1,"native_work_maintenance_protocol":if crate::native_work_jobs::enabled(){1}else{0},"client_id":self.client_id,"device_id":self.database.device_id,"platform":std::env::consts::OS,"capabilities":["local_library","file_dialog","save_history","save_export","asset_transfer","save_transfer","diagnostics_preview","local_settings","disc_import","firmware_vault","local_assistance","performance_measurements"],"native_remote_input":crate::stream_input::available(),"runtime_capabilities_require_manifest":true})),
+            Command::Hello => Ok(json!({"application":"OmniPlay","version":env!("CARGO_PKG_VERSION"),"protocol_major":PROTOCOL_MAJOR,"protocol_minor":PROTOCOL_MINOR,"storage_unused_protocol":1,"save_backup_protocol":1,"library_recovery_protocol":1,"save_orphan_protocol":1,"save_origin_protocol":1,"save_repair_protocol":1,"save_cloud_recovery_protocol":1,"encrypted_sync":true,"native_asset_ranges":1,"native_work_maintenance_protocol":if crate::native_work_jobs::enabled(){1}else{0},"client_id":self.client_id,"device_id":self.database.device_id,"platform":std::env::consts::OS,"capabilities":["local_library","file_dialog","save_history","save_export","asset_transfer","save_transfer","diagnostics_preview","local_settings","disc_import","firmware_vault","local_assistance","performance_measurements"],"native_remote_input":crate::stream_input::available(),"native_owned_capture":crate::stream_input::capture_available(),"runtime_capabilities_require_manifest":true})),
             Command::NativeWorkStatus=>{
                 if !crate::native_work_jobs::enabled(){return Err(PlatformError::new(ErrorCode::UnsupportedCapability,"Native temporary-session recovery is not available on this platform"));}
                 let mut status=omniplay_core::native_work_storage::status(&self.database,self.profile_id)?;
@@ -104,7 +104,9 @@ impl Broker {
             Command::NativeWorkRecoverStart=>encode(self.native_work_jobs.start(&self.database.root,self.profile_id)?),
             Command::NativeWorkRecoverStatus{job_id}=>encode(self.native_work_jobs.status(job_id)?),
             Command::NativeWorkRecoverCancel{job_id}=>encode(self.native_work_jobs.cancel(job_id)?),
-            Command::StreamInputArm{game_id,pair_id,session_id,host_public_key,grant}=>encode(self.stream_inputs.arm(&self.database,&mut self.installed,game_id,pair_id,session_id,host_public_key,grant,deadline_ms)?),
+            Command::StreamCapturePrepare{game_id,pair_id,session_id,host_public_key,grant}=>self.stream_inputs.prepare_capture(&self.database,&mut self.installed,game_id,pair_id,session_id,host_public_key,grant),
+            Command::StreamCaptureRelease{capture_id,session_id}=>self.stream_inputs.release_capture(capture_id,session_id),
+            Command::StreamInputArm{game_id,pair_id,session_id,host_public_key,grant,capture_id,capture_window}=>encode(self.stream_inputs.arm(&self.database,&mut self.installed,game_id,pair_id,session_id,host_public_key,grant,capture_id,capture_window,deadline_ms)?),
             Command::StreamInputFrame{grant_id,session_id,sequence,frame}=>encode(self.stream_inputs.frame(grant_id,session_id,sequence,frame)?),
             Command::StreamInputRelease{grant_id,session_id}=>encode(self.stream_inputs.release(grant_id,session_id)?),
             Command::StreamInputStatus{grant_id,session_id}=>encode(self.stream_inputs.status(grant_id,session_id)?),
@@ -264,6 +266,8 @@ impl Broker {
             Command::SavePurge{game_id,expected_revision}=>encode(omniplay_core::save_maintenance::purge(&mut self.database,game_id,expected_revision)?),
             Command::SaveCleanup=>encode(omniplay_core::save_maintenance::cleanup(&self.database,128)?),
             Command::SaveCleanupStatus=>encode(omniplay_core::save_maintenance::cleanup_status(&self.database)?),
+            Command::StorageUnusedPreview{after_hash}=>{if self.installed.list(&self.database)?.iter().any(|session|session.running){return Err(PlatformError::new(ErrorCode::Busy,"Exit installed games before collecting unused content"));}encode(omniplay_core::asset_storage::preview(&self.database,after_hash.as_deref())?)},
+            Command::StorageUnusedRemove{after_hash,revision}=>{if self.installed.list(&self.database)?.iter().any(|session|session.running){return Err(PlatformError::new(ErrorCode::Busy,"Exit installed games before collecting unused content"));}encode(omniplay_core::asset_storage::remove(&self.database,after_hash.as_deref(),&revision)?)},
             Command::SaveImport {grant_id,game_id} => {
                 let mut source=self.permissions.take(self.client_id,grant_id,FileAccess::ImportRead)?;
                 encode(SaveStore::new(&mut self.database).import_export(game_id,&mut source)?)
@@ -298,6 +302,12 @@ impl Broker {
                 SaveStore::new(&mut self.database).export(save_id,&mut file)?;
                 Ok(json!({"exported":true}))
             }
+            Command::SaveBackupExport{save_ids,destination_grant_id}=>{let mut file=self.permissions.take(self.client_id,destination_grant_id,FileAccess::ExportWrite)?;encode(omniplay_core::save_backup::export(&mut self.database,&save_ids,&mut file)?)},
+            Command::SaveBackupRestore{grant_id}=>{let mut file=self.permissions.take(self.client_id,grant_id,FileAccess::ImportRead)?;encode(omniplay_core::save_backup::restore(&mut self.database,&mut file)?)},
+            Command::LibraryRecoveryList{after}=>encode(omniplay_core::library_recovery::list(&self.database,after.as_deref())?),
+            Command::LibraryRecoveryImport{candidate_id,revision,title,system}=>encode(omniplay_core::library_recovery::recover(&self.database,&candidate_id,&revision,title,system)?),
+            Command::SaveOrphanPreview{save_id,after}=>encode(omniplay_core::save_orphan_recovery::preview(&self.database,save_id,after.as_deref())?),
+            Command::SaveOrphanRecover{save_id,candidate_id,revision}=>encode(omniplay_core::save_orphan_recovery::recover(&mut self.database,save_id,&candidate_id,&revision)?),
             Command::PermissionRevoke { grant_id } => { self.permissions.revoke(self.client_id,grant_id)?;self.directory_grants.revoke(self.client_id,grant_id)?;Ok(json!({"revoked":true})) }
             Command::DiagnosticsPreview => encode(self.diagnostic_preview()?),
             Command::DiagnosticsExport { destination_grant_id } => {

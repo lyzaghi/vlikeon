@@ -1,10 +1,14 @@
 # Per-game input profile source
 
-Game details now expose next-session keyboard and standard-gamepad customization
+Current extension: `ADVANCED_INPUT_CUSTOMIZATION.md` adds Web raw-controller
+calibration, four-axis customization and custom touch placement. These are
+authored source, not executed verification. The older baseline below is retained
+with its current protocol and scope clarified.
+
+Game details now expose next-session keyboard and gamepad customization
 for emulator games. This is authored source; no keyboard/gamepad, native worker,
 browser, settings transaction, compiler or test has run. The feature does not
-complete raw-device calibration, touch-layout customization or the full
-input/platform epic.
+complete the full input/platform epic or native raw SDL provider editing.
 
 The schema-1 profile has sixteen optional physical keyboard bindings for virtual
 game buttons, four optional left-stick keyboard directions, a sixteen-button
@@ -58,7 +62,8 @@ negotiate emulated controller/accessory types. See `ANALOG_INPUT.md`.
 
 The native preparation path reads the profile from the broker-owned library,
 transmits it in the bounded prepare request and requires input-profile handshake
-version 3. The contained worker validates again before the core runs. Older
+version 4. Web-only raw profiles are removed before native IPC. The contained
+worker validates again before the core runs. Older
 workers that cannot acknowledge the profile are rejected rather than silently
 ignoring saved controls. Worker/core packages therefore need rebuilt artifacts and
 their normal signed inventories before this path can execute. No such binary
@@ -77,14 +82,14 @@ cross-language malformed shapes/numbers, draft/default/save behavior, focus and
 listener cleanup, four controllers, trigger/face-position semantics, source swaps,
 disconnect/reconnect, held-key pause/blur, N64/PSP analog separation, unchanged
 snapshot compatibility, old-worker rejection and actual platform/device layouts.
-Additional touch/axis-remapping/provider controls and the complete remaining
-product scope remain required; no compatibility or latency result is claimed.
+Native raw provider controls and the complete remaining product scope remain
+required; no compatibility or latency result is claimed.
 
 A separate six-field local touch profile now has its own strict commands and
 draft editor, without extending the native keyboard/gamepad packet. Full virtual
 buttons/sticks and the Web NDS pointer adapter are described in `TOUCH_CONTROLS.md`
-and `WEB_CANVAS_POINTER.md`; arbitrary layout placement, native overlays and
-platform evidence remain required.
+and `WEB_CANVAS_POINTER.md`. The optional custom layout is described in
+`ADVANCED_INPUT_CUSTOMIZATION.md`; native overlays and platform evidence remain required.
 
 Contracts: [Gamepad standard mapping](https://w3c.github.io/gamepad/),
 [SDL gamepad positions](https://wiki.libsdl.org/SDL3/SDL_GamepadButton),

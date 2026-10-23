@@ -72,13 +72,22 @@ def main():
         ordinary(path,native,True)
         if path.suffix not in {'.cpp','.hpp','.h','.in','.txt','.manifest','.entitlements'}:raise ValueError('Unexpected native frontend source input')
         inputs.append((path,PurePosixPath('native')/path.relative_to(native).as_posix(),{}))
+    for name in ['engines/macos-guest/CMakeLists.txt','engines/macos-guest/init.c','engines/macos-guest/kernel.config','tools/author_macos_guest.py','tools/author_macos_runtime_catalog.py','docs/MACOS_DISKLESS_GUEST.md']:
+        relative = name.removeprefix('engines/')
+        inputs.append((ordinary(ROOT/name,ROOT,True),PurePosixPath(relative),{}))
     mac_owner=ROOT/'engines/macos-owner'
+    inputs.append((ordinary(ROOT/'engines/common/macos_child.hpp',ROOT,True),PurePosixPath('common/macos_child.hpp'),{}))
+    inputs.append((ordinary(ROOT/'tools/assemble_macos_broker.py',ROOT,True),PurePosixPath('tools/assemble_macos_broker.py'),{}))
+    inputs.append((ordinary(ROOT/'docs/MACOS_BOOT_RECOVERY.md',ROOT,True),PurePosixPath('docs/MACOS_BOOT_RECOVERY.md'),{}))
     inputs.append((ordinary(ROOT/'docs/MACOS_ITEM4_CLOSURE.md',ROOT,True),PurePosixPath('docs/MACOS_ITEM4_CLOSURE.md'),{}))
     for path in sorted(mac_owner.rglob('*')):
         if path.is_file():inputs.append((ordinary(path,mac_owner,True),PurePosixPath('macos-owner')/path.relative_to(mac_owner).as_posix(),{}))
     for name in ['sandbox','native-runtime']:
         base=ROOT/'platform'/name
         for path in[base/'Cargo.toml',*sorted((base/'src').rglob('*.rs'))]:inputs.append((ordinary(path,base,True),PurePosixPath('broker/platform')/name/path.relative_to(base).as_posix(),{}))
+        if name=='sandbox':
+            for relative in ['build.rs','native/macos_xpc.h','native/macos_xpc.mm']:
+                inputs.append((ordinary(base/relative,base,True),PurePosixPath('broker/platform/sandbox')/relative,{}))
     isolation=ROOT/'engines/isolation-linux'
     for path in sorted(isolation.iterdir()):
         if not path.is_file():continue
@@ -172,6 +181,12 @@ def main():
         inputs.append((ordinary(ROOT/name,ROOT,True),PurePosixPath(name),{}))
     for name in ['platform/contracts/src/lib.rs','platform/contracts/src/ipc.rs','platform/contracts/src/native_work.rs','apps/game-hub/app.js','apps/game-hub/background.js','apps/game-hub/component-ownership.js','apps/game-hub/native-work-maintenance.js']:
         inputs.append((ordinary(ROOT/name,ROOT,True),PurePosixPath('broker')/name,{}))
+    for name in ['runtime.js','libretro-worker.js','audio-worklet.js','hardware-video.js']:
+        inputs.append((ordinary(ROOT/'engines/web'/name,ROOT,True),PurePosixPath('web')/name,{}))
+    for name in ['engines/web/adapters/webgl2-frontend.c','tools/build_mupen64plus_web.py','docs/GRAPHICS_AUDIO_INPUT_ITEM6.md']:
+        inputs.append((ordinary(ROOT/name,ROOT,True),PurePosixPath(name),{}))
+    for name in ['platform/contracts/src/input.rs','platform/core/src/input.rs','apps/game-hub/controller-profile.js','apps/game-hub/controller-settings.js','apps/game-hub/input-profile.js','apps/game-hub/input-settings.js','apps/game-hub/gamepad-ports.js','apps/game-hub/game-input.js','apps/game-hub/touch-profile.js','apps/game-hub/touch-layout-editor.js','apps/game-hub/touch-controls.js','apps/game-hub/touch-settings.js','apps/game-hub/styles.css','docs/ADVANCED_INPUT_CUSTOMIZATION.md']:
+        inputs.append((ordinary(ROOT/name,ROOT,True),PurePosixPath(name),{}))
     inputs.append((ordinary(Path(__file__).resolve(),ROOT,True),PurePosixPath('tools/prepare_presentation.py'),{}))
     if len(inputs)>MAX_FILES:raise ValueError('Presentation source file count exceeds its budget')
     source=project/'source';source.mkdir(parents=True);inventory=[];total=0;targets=set()

@@ -1,6 +1,6 @@
 use crate::{Database, now_ms, util::{PendingFile, storage_error}};
 use omniplay_contracts::{ContentHash,ContentFormat,GameMedia,MediaAsset,ImportProgress,ErrorCode,GameManifest,GameSystem,PlatformError,Result};
-use rusqlite::{OptionalExtension, params};
+use rusqlite::{OptionalExtension,Transaction,TransactionBehavior,params};
 use sha2::{Digest, Sha256};
 use std::{fs::File, io::{Read, Seek, SeekFrom, Write}, path::PathBuf};
 use uuid::Uuid;
@@ -20,6 +20,7 @@ impl<'a> Library<'a> {
     pub fn import(&self,source:File,title:String,system:GameSystem)->Result<GameManifest>{self.import_controlled(source,title,system,None,&AtomicBool::new(false),|_|{})}
 
     pub fn import_controlled(&self,mut source:File,title:String,system:GameSystem,format_hint:Option<ContentFormat>,cancel:&AtomicBool,mut progress:impl FnMut(ImportProgress))->Result<GameManifest>{
+        let _asset_lease=crate::asset_storage::AssetLease::acquire(self.database)?;
         if title.trim().is_empty() || title.len() > 512 { return Err(PlatformError::new(ErrorCode::InvalidRequest, "Game title is required and must fit within 512 bytes")); }
         let format=detect_format(&mut source)?.or(format_hint).unwrap_or(ContentFormat::RawRom);
         let extension=format.extension(system)?;
@@ -59,13 +60,17 @@ impl<'a> Library<'a> {
 
     pub(crate) fn insert_manifest(&self,manifest:GameManifest)->Result<GameManifest>{
         manifest.validate()?;
+        // Serialize deduplication with publication across import workers and
+        // brokers. The unique hash constraint is the final invariant, not the
+        // normal conflict resolution after a stale pre-insert lookup.
+        let tx=Transaction::new_unchecked(&self.database.connection,TransactionBehavior::Immediate).map_err(storage_error)?;
         if let Some(mut existing)=self.by_hash(&manifest.content_hash)?{
             if existing.system!=manifest.system{return Err(PlatformError::new(ErrorCode::Conflict,"The same content is already registered for another system"));}
             if existing.media.is_none()&&manifest.media.is_some(){existing.media=manifest.media;existing.validate()?;self.database.connection.execute("UPDATE games SET manifest_json=?1 WHERE id=?2",params![serde_json::to_string(&existing).map_err(storage_error)?,existing.id.to_string()]).map_err(storage_error)?;}
-            return Ok(existing);
+            tx.commit().map_err(storage_error)?;return Ok(existing);
         }
         self.database.connection.execute("INSERT INTO games(id,content_hash,title,search_title,system,manifest_json,created_at_ms) VALUES(?1,?2,?3,?4,?5,?6,?7)",params![manifest.id.to_string(),manifest.content_hash.0,manifest.title,manifest.title.to_lowercase(),serde_json::to_string(&manifest.system).map_err(storage_error)?,serde_json::to_string(&manifest).map_err(storage_error)?,manifest.created_at_ms]).map_err(storage_error)?;
-        self.database.record_audit("library.import",Some(manifest.id))?;Ok(manifest)
+        self.database.record_audit("library.import",Some(manifest.id))?;tx.commit().map_err(storage_error)?;Ok(manifest)
     }
 
     pub fn get(&self, id: Uuid) -> Result<GameManifest> {
@@ -136,7 +141,9 @@ impl<'a> Library<'a> {
     }
 
     pub fn remove(&self, id: Uuid) -> Result<()> {
-        let tx=self.database.connection.unchecked_transaction().map_err(storage_error)?;
+        let tx=Transaction::new_unchecked(&self.database.connection,TransactionBehavior::Immediate).map_err(storage_error)?;
+        let active:bool=tx.query_row("SELECT EXISTS(SELECT 1 FROM sessions WHERE game_id=?1 AND state NOT IN ('stopped','failed'))",[id.to_string()],|row|row.get(0)).map_err(storage_error)?;
+        if active{return Err(PlatformError::new(ErrorCode::Busy,"Stop the game before removing this library entry"));}
         let saves: i64 = tx.query_row("SELECT count(*) FROM saves WHERE game_id=?1", [id.to_string()], |row| row.get(0)).map_err(storage_error)?;
         if saves > 0 { return Err(PlatformError::new(ErrorCode::Conflict, "Export or retain game saves before removing this game").recover("Manage saved progress first")); }
         let changed = tx.execute("DELETE FROM games WHERE id=?1", [id.to_string()]).map_err(storage_error)?;

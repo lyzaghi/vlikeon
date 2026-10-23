@@ -2,6 +2,8 @@
 #import <Security/Security.h>
 #include "catalog.hpp"
 #include <cctype>
+#include <cerrno>
+#include <CommonCrypto/CommonDigest.h>
 #include <cstring>
 #include <fcntl.h>
 #include <mach-o/loader.h>
@@ -148,69 +150,117 @@ bool signed_code(NSURL* url, NSString* signing_id, NSString* team, bool child) {
 std::string text(NSString* value) { return std::string(value.UTF8String ?: ""); }
 }
 
+namespace {
+bool integer(id value, uint64_t minimum, uint64_t maximum) {
+  return [value isKindOfClass:NSNumber.class] &&
+      CFGetTypeID((__bridge CFTypeRef)value) != CFBooleanGetTypeID() &&
+      !CFNumberIsFloatType((__bridge CFNumberRef)value) &&
+      [value longLongValue] >= 0 && [value unsignedLongLongValue] >= minimum &&
+      [value unsignedLongLongValue] <= maximum;
+}
+bool hash_text(NSString* value) {
+  if (![value isKindOfClass:NSString.class] || value.length != 64) return false;
+  return [value rangeOfCharacterFromSet:[NSCharacterSet characterSetWithCharactersInString:
+      @"0123456789abcdef"].invertedSet].location == NSNotFound;
+}
+bool guest_file(NSURL* root, NSString* name, NSString* hash, uint64_t bytes, bool kernel, NSURL** result) {
+  if (!basename(name) || !hash_text(hash)) return false;
+  NSURL* path = [root URLByAppendingPathComponent:name];
+  int fd = open(path.fileSystemRepresentation, O_RDONLY | O_CLOEXEC | O_NOFOLLOW);
+  if (fd < 0) return false;
+  struct stat shape{};
+  bool valid = fstat(fd, &shape) == 0 && S_ISREG(shape.st_mode) && shape.st_nlink == 1 &&
+      (shape.st_mode & (S_ISUID | S_ISGID)) == 0 && shape.st_size >= 64 &&
+      static_cast<uint64_t>(shape.st_size) == bytes;
+  unsigned char header[64]{};
+  if (valid) valid = pread(fd, header, sizeof(header), 0) == sizeof(header) &&
+      (kernel ? (header[56] == 'A' && header[57] == 'R' && header[58] == 'M' && header[59] == 0x64)
+              : memcmp(header, "070701", 6) == 0);
+  CC_SHA256_CTX context; CC_SHA256_Init(&context);
+  unsigned char block[65536], digest[CC_SHA256_DIGEST_LENGTH];
+  uint64_t length = 0;
+  while (valid) {
+    ssize_t count = read(fd, block, sizeof(block));
+    if (count < 0 && errno == EINTR) continue;
+    if (count < 0) { valid = false; break; }
+    if (!count) break;
+    length += count;
+    if (length > bytes) { valid = false; break; }
+    CC_SHA256_Update(&context, block, static_cast<CC_LONG>(count));
+  }
+  CC_SHA256_Final(digest, &context); close(fd);
+  char hexadecimal[65]; constexpr char digits[] = "0123456789abcdef";
+  for (size_t i = 0; i < sizeof(digest); ++i) {
+    hexadecimal[i * 2] = digits[digest[i] >> 4]; hexadecimal[i * 2 + 1] = digits[digest[i] & 15];
+  }
+  hexadecimal[64] = 0;
+  if (!valid || length != bytes || strcmp(hexadecimal, hash.UTF8String)) return false;
+  *result = path; return true;
+}
+}
 std::optional<RuntimeSpec> admit_runtime(const char* requested) {
   if (!runtime_id(requested)) return std::nullopt;
-  NSURL* catalog = [NSBundle.mainBundle.resourceURL
-      URLByAppendingPathComponent:@"runtime-catalog.json" isDirectory:NO];
-  NSData* raw = [NSData dataWithContentsOfURL:catalog options:NSDataReadingMappedIfSafe error:nil];
-  if (!raw || raw.length == 0 || raw.length > 1024 * 1024) return std::nullopt;
-  id decoded = [NSJSONSerialization JSONObjectWithData:raw options:0 error:nil];
-  if (![decoded isKindOfClass:NSDictionary.class]) return std::nullopt;
-  NSDictionary* root = decoded;
+  NSURL* catalog = [NSBundle.mainBundle.resourceURL URLByAppendingPathComponent:@"runtime-catalog.json"];
+  struct stat catalog_shape{};
+  if (lstat(catalog.fileSystemRepresentation, &catalog_shape) ||
+      !S_ISREG(catalog_shape.st_mode) || catalog_shape.st_nlink != 1 ||
+      catalog_shape.st_size <= 0 || catalog_shape.st_size > 1024 * 1024) return std::nullopt;
+  NSData* raw = [NSData dataWithContentsOfURL:catalog options:0 error:nil];
+  id decoded = raw ? [NSJSONSerialization JSONObjectWithData:raw options:0 error:nil] : nil;
   NSSet* root_keys = [NSSet setWithArray:@[@"schema_version", @"runtimes"]];
-  NSArray* runtimes = root[@"runtimes"];
-  if (!exact(root, root_keys) || ![root[@"schema_version"] isEqual:@1] ||
-      ![runtimes isKindOfClass:NSArray.class] || runtimes.count == 0 || runtimes.count > 32)
-    return std::nullopt;
-  NSDictionary* selected = nil;
-  std::set<std::string> ids, signing_ids;
-  NSSet* keys = [NSSet setWithArray:@[
-      @"id", @"team_identifier", @"actor", @"actor_identifier",
-      @"presentation", @"presentation_identifier", @"core", @"core_identifier"]];
-  for (id item in runtimes) {
-    if (!exact(item, keys)) return std::nullopt;
-    NSString* identity = item[@"id"];
+  if (!exact(decoded, root_keys) || !integer(decoded[@"schema_version"], 2, 2)) return std::nullopt;
+  NSArray* entries = decoded[@"runtimes"];
+  if (![entries isKindOfClass:NSArray.class] || !entries.count || entries.count > 32) return std::nullopt;
+  NSSet* keys = [NSSet setWithArray:@[@"id", @"team_identifier", @"presentation",
+      @"presentation_identifier", @"presentation_memory_mb", @"kernel", @"kernel_sha256",
+      @"kernel_bytes", @"initrd", @"initrd_sha256", @"initrd_bytes", @"guest_memory_mb",
+      @"guest_cpu_count", @"scratch_mb"]];
+  std::set<std::string> ids, identities; NSDictionary* selected = nil;
+  for (id entry in entries) {
+    if (!exact(entry, keys)) return std::nullopt;
+    NSString* identity = entry[@"id"];
     if (![identity isKindOfClass:NSString.class] || !runtime_id(identity.UTF8String) ||
-        !ids.insert(text(identity)).second || !team_identifier(item[@"team_identifier"]))
+        !ids.insert(text(identity)).second || !team_identifier(entry[@"team_identifier"]) ||
+        !identifier(entry[@"presentation_identifier"]) ||
+        !identities.insert(text(entry[@"presentation_identifier"])).second) return std::nullopt;
+    for (NSString* name in @[@"presentation", @"kernel", @"initrd"])
+      if (!basename(entry[name])) return std::nullopt;
+    if ([NSSet setWithArray:@[entry[@"presentation"], entry[@"kernel"], entry[@"initrd"]]].count != 3 ||
+        !hash_text(entry[@"kernel_sha256"]) || !hash_text(entry[@"initrd_sha256"]) ||
+        !integer(entry[@"kernel_bytes"], 64, 128 * 1024 * 1024) ||
+        !integer(entry[@"initrd_bytes"], 64, 256 * 1024 * 1024) ||
+        !integer(entry[@"guest_memory_mb"], 256, 8192) ||
+        !integer(entry[@"presentation_memory_mb"], 256, 8192) ||
+        !integer(entry[@"guest_cpu_count"], 1, 4) ||
+        !integer(entry[@"scratch_mb"], 16, 512) ||
+        [entry[@"scratch_mb"] unsignedIntValue] > [entry[@"guest_memory_mb"] unsignedIntValue] / 2 ||
+        [entry[@"initrd_bytes"] unsignedLongLongValue] > [entry[@"guest_memory_mb"] unsignedLongLongValue] * 1024 * 1024 / 2)
       return std::nullopt;
-    NSSet* files = [NSSet setWithArray:@[item[@"actor"], item[@"presentation"], item[@"core"]]];
-    if (files.count != 3 || !basename(item[@"actor"]) || !basename(item[@"presentation"]) ||
-        !basename(item[@"core"])) return std::nullopt;
-    for (NSString* code_id in @[
-        item[@"actor_identifier"], item[@"presentation_identifier"], item[@"core_identifier"]]) {
-      if (!identifier(code_id) || !signing_ids.insert(text(code_id)).second) return std::nullopt;
-    }
-    if (strcmp(identity.UTF8String, requested) == 0) selected = item;
+    if (!strcmp(identity.UTF8String, requested)) selected = entry;
   }
   if (!selected) return std::nullopt;
-  NSString* identity = selected[@"id"];
-  NSURL* runtimes_root = [NSBundle.mainBundle.resourceURL
-      URLByAppendingPathComponent:@"Runtimes" isDirectory:YES].URLByStandardizingPath;
-  NSURL* runtime_root = [runtimes_root
-      URLByAppendingPathComponent:identity isDirectory:YES].URLByStandardizingPath;
-  if (!safe_directory(runtimes_root) || !safe_directory(runtime_root) ||
-      ![runtime_root.URLByDeletingLastPathComponent isEqual:runtimes_root]) return std::nullopt;
-  NSURL* actor = nil;
-  NSURL* presentation = nil;
-  NSURL* core = nil;
-  if (!safe_file(runtime_root, selected[@"actor"], MH_EXECUTE, &actor) ||
-      !safe_file(runtime_root, selected[@"presentation"], MH_EXECUTE, &presentation) ||
-      !safe_file(runtime_root, selected[@"core"], MH_DYLIB, &core)) return std::nullopt;
-  NSString* team = selected[@"team_identifier"];
-  if (!signed_code(actor, selected[@"actor_identifier"], team, true) ||
-      !signed_code(presentation, selected[@"presentation_identifier"], team, true) ||
-      !signed_code(core, selected[@"core_identifier"], team, false)) return std::nullopt;
-  return RuntimeSpec{
-      text(identity), text(team), actor.fileSystemRepresentation,
-      text(selected[@"actor_identifier"]), presentation.fileSystemRepresentation,
-      text(selected[@"presentation_identifier"]), core.fileSystemRepresentation,
-      text(selected[@"core_identifier"])};
+  NSURL* runtimes = [NSBundle.mainBundle.resourceURL URLByAppendingPathComponent:@"Runtimes" isDirectory:YES];
+  NSURL* directory = [runtimes URLByAppendingPathComponent:selected[@"id"] isDirectory:YES];
+  if (!safe_directory(runtimes) || !safe_directory(directory)) return std::nullopt;
+  NSURL *helper = nil, *kernel = nil, *initrd = nil;
+  if (!safe_file(directory, selected[@"presentation"], MH_EXECUTE, &helper) ||
+      !signed_code(helper, selected[@"presentation_identifier"], selected[@"team_identifier"], true) ||
+      !guest_file(directory, selected[@"kernel"], selected[@"kernel_sha256"],
+          [selected[@"kernel_bytes"] unsignedLongLongValue], true, &kernel) ||
+      !guest_file(directory, selected[@"initrd"], selected[@"initrd_sha256"],
+          [selected[@"initrd_bytes"] unsignedLongLongValue], false, &initrd)) return std::nullopt;
+  return RuntimeSpec{text(selected[@"id"]), text(selected[@"team_identifier"]),
+      helper.fileSystemRepresentation, text(selected[@"presentation_identifier"]),
+      GuestImage{kernel.fileSystemRepresentation, initrd.fileSystemRepresentation,
+          [selected[@"guest_memory_mb"] unsignedIntValue], [selected[@"guest_cpu_count"] unsignedIntValue],
+          [selected[@"scratch_mb"] unsignedIntValue]},
+      text(selected[@"kernel_sha256"]), text(selected[@"initrd_sha256"]),
+      [selected[@"presentation_memory_mb"] unsignedIntValue]};
 }
-
-bool admit_owned_child(const RuntimeSpec& runtime, bool presentation, pid_t pid) {
+bool admit_owned_child(const RuntimeSpec& runtime, pid_t pid) {
   if (pid <= 1) return false;
   NSString* signing = [NSString stringWithUTF8String:
-      (presentation ? runtime.presentation_identifier : runtime.actor_identifier).c_str()];
+      runtime.presentation_identifier.c_str()];
   NSString* team = [NSString stringWithUTF8String:runtime.team_identifier.c_str()];
   if (!identifier(signing) || !team_identifier(team)) return false;
   NSDictionary* attributes = @{(__bridge id)kSecGuestAttributePid: @(pid)};

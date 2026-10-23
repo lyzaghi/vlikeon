@@ -52,6 +52,8 @@ fn encode_request(request:&Request,payload_bytes:usize)->Result<Vec<u8>>{
 }
 pub(crate) trait WorkerProcess{fn has_exited(&self)->bool;fn terminate(&self);}
 impl WorkerProcess for ContainedProcess{fn has_exited(&self)->bool{ContainedProcess::has_exited(self)}fn terminate(&self){ContainedProcess::terminate(self)}}
+#[cfg(all(target_os="macos",target_arch="aarch64"))]
+impl WorkerProcess for omniplay_sandbox::macos::MacPair{fn has_exited(&self)->bool{self.has_exited()}fn terminate(&self){self.terminate()}}
 #[cfg(all(target_os="linux",target_arch="x86_64",target_env="gnu"))]
 impl WorkerProcess for omniplay_sandbox::linux_launch::LinuxChild{fn has_exited(&self)->bool{omniplay_sandbox::linux_launch::LinuxChild::has_exited(self)}fn terminate(&self){omniplay_sandbox::linux_launch::LinuxChild::terminate(self)}}
 impl WorkerChannel {

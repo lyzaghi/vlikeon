@@ -27,11 +27,11 @@ def main():
     for relative,path in sources.items():
         target=assets/relative;target.parent.mkdir(parents=True,exist_ok=True);shutil.copy2(path,target)
     catalog=assets/'cores/catalog.json';catalog.parent.mkdir(parents=True,exist_ok=True)
-    catalog.write_text(json.dumps({'schema_version':1,'cores':cores,'development_only':args.without_cores},indent=2)+'\n',encoding='utf-8')
+    catalog.write_text(json.dumps({'schema_version':1,'cores':cores,'development_only':args.without_cores},indent=2)+'\n',encoding='utf-8',newline='\n')
     routes=set(sources)|{'cores/catalog.json'}
     types={'.html':'text/html; charset=utf-8','.css':'text/css; charset=utf-8','.js':'application/javascript; charset=utf-8','.json':'application/json; charset=utf-8','.wasm':'application/wasm','.txt':'text/plain; charset=utf-8'}
     streaming=configuration()
-    (assets/'asset-index.json').write_text(json.dumps({'schema_version':1,'streaming_origins':streaming['relay_origins'] if streaming['enabled'] else [],'assets':[{'path':p,'bytes':(assets/p).stat().st_size,'mime':types.get(Path(p).suffix,'application/octet-stream')} for p in sorted(routes)]},indent=2)+'\n',encoding='utf-8')
+    (assets/'asset-index.json').write_text(json.dumps({'schema_version':1,'streaming_origins':streaming['relay_origins'] if streaming['enabled'] else [],'assets':[{'path':p,'bytes':(assets/p).stat().st_size,'mime':types.get(Path(p).suffix,'application/octet-stream')} for p in sorted(routes)]},indent=2)+'\n',encoding='utf-8',newline='\n')
     for name in ['java','native','res']:
         shutil.copytree(ROOT/'apps/android'/name,MODULE/name,dirs_exist_ok=True)
     shutil.copy2(ROOT/'apps/android/proguard.flags',MODULE/'proguard.flags')
@@ -56,7 +56,7 @@ shared_library("omniplay_mobile") {{
   ldflags = [ "-Wl,--exclude-libs,ALL", "-Wl,-z,max-page-size=16384" ]
 }}
 '''
-    (MODULE/'BUILD.gn').write_text(gn,encoding='utf-8')
+    (MODULE/'BUILD.gn').write_text(gn,encoding='utf-8',newline='\n')
     changes={}
     build='chrome/android/BUILD.gn';text=(UPSTREAM/build).read_text(encoding='utf-8')
     text=replace(text,'    sources = chrome_java_resources\n','    sources = chrome_java_resources\n    sources += [ "omniplay/res/values/omniplay.xml", "omniplay/res/values-vi/omniplay.xml" ]\n')
@@ -104,7 +104,7 @@ shared_library("omniplay_mobile") {{
         patch.extend(difflib.unified_diff(original.splitlines(keepends=True),updated.splitlines(keepends=True),fromfile='a/'+relative,tofile='b/'+relative))
         target=OUTPUT/relative;target.parent.mkdir(parents=True,exist_ok=True);target.write_text(updated,encoding='utf-8',newline='\n')
     (ROOT/'browser/patches/0002-omniplay-android.patch').write_text(''.join(patch),encoding='utf-8',newline='\n')
-    (ROOT/'browser/patches/android-series.json').write_text(json.dumps({'schema_version':1,'upstream_revision':revision,'patches':[{'file':'0002-omniplay-android.patch','owner':'android','reason':'Explicit Game Hub tab with origin-bound port, SAF and shared Rust service'}],'modified_files':sorted(changes),'development_only':args.without_cores},indent=2)+'\n',encoding='utf-8')
-    (ROOT/'apps/android/assembly-receipt.json').write_text(json.dumps({'schema_version':1,'development_only':args.without_cores,'core_ids':[c['id'] for c in cores],'resource_files':len(routes),'supported_initial_abi':['arm64-v8a'],'rust_build':'not_started','chromium_android_build':'not_started','verification':'not_run'},indent=2)+'\n',encoding='utf-8')
+    (ROOT/'browser/patches/android-series.json').write_text(json.dumps({'schema_version':1,'upstream_revision':revision,'patches':[{'file':'0002-omniplay-android.patch','owner':'android','reason':'Explicit Game Hub tab with origin-bound port, SAF and shared Rust service'}],'modified_files':sorted(changes),'development_only':args.without_cores},indent=2)+'\n',encoding='utf-8',newline='\n')
+    (ROOT/'apps/android/assembly-receipt.json').write_text(json.dumps({'schema_version':1,'development_only':args.without_cores,'core_ids':[c['id'] for c in cores],'resource_files':len(routes),'supported_initial_abi':['arm64-v8a'],'rust_build':'not_started','chromium_android_build':'not_started','verification':'not_run'},indent=2)+'\n',encoding='utf-8',newline='\n')
     print('Authored Chromium Android module, APK asset inventory and source patch. No build or test was started.')
 if __name__=='__main__':main()

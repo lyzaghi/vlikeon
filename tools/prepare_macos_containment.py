@@ -7,6 +7,9 @@ import shutil
 
 ROOT = Path(__file__).resolve().parents[1]
 FILES = [
+    "platform/contracts/src/input.rs", "engines/native/src/input_profile.hpp",
+    "engines/native/src/presentation_input.hpp", "engines/native/src/engine.cpp",
+    "docs/ADVANCED_INPUT_CUSTOMIZATION.md",
     "Cargo.toml", "Cargo.lock", "platform/sandbox/Cargo.toml",
     "platform/sandbox/src/lib.rs", "platform/native-runtime/Cargo.toml",
     "platform/native-runtime/src/lib.rs", "platform/native-runtime/src/registry.rs",
@@ -21,6 +24,23 @@ FILES = [
     "engines/macos-owner/src/process.mm", "tools/author_macos_runtime_catalog.py",
     "docs/MACOS_NATIVE_CONTAINMENT.md", "tools/prepare_macos_containment.py",
     "docs/MACOS_ITEM4_CLOSURE.md",
+    "engines/common/macos_child.hpp", "platform/sandbox/build.rs",
+    "platform/sandbox/native/macos_xpc.h", "platform/sandbox/native/macos_xpc.mm",
+    "platform/sandbox/src/macos.rs", "platform/native-runtime/src/mac_package.rs",
+    "platform/native-runtime/src/mac_staging.rs", "platform/native-runtime/src/mac_session.rs",
+    "platform/native-runtime/src/mac_adapter.rs", "platform/native-runtime/src/channel.rs",
+    "platform/broker/src/main.rs", "engines/native/src/main.cpp",
+    "engines/presentation/src/main.cpp", "engines/presentation/src/owner.cpp",
+    "tools/assemble_macos_broker.py",
+    "engines/native/src/core_module.hpp", "engines/native/src/core_module.cpp",
+    "tools/package_release.py",
+    "platform/native-runtime/src/mac_work.rs", "platform/core/src/native_work_storage.rs",
+    "engines/macos-owner/src/boot.hpp", "engines/macos-owner/src/boot.mm",
+    "docs/MACOS_BOOT_RECOVERY.md",
+    "engines/macos-owner/src/virtual_machine.hpp", "engines/macos-owner/src/virtual_machine.mm",
+    "engines/macos-guest/CMakeLists.txt", "engines/macos-guest/init.c", "engines/macos-guest/kernel.config",
+    "tools/author_macos_guest.py", "platform/native-runtime/src/mac_guest.rs",
+    "docs/MACOS_DISKLESS_GUEST.md",
 ]
 
 
@@ -71,14 +91,22 @@ def main():
         "authenticated_xpc_endpoint_source_authored": True,
         "bounded_xpc_session_staging_source_authored": True,
         "signed_bundle_runtime_admission_source_authored": True,
-        "xpc_session_launch_authored": False, "sandbox_launch_authored": False,
+        "xpc_session_launch_authored": True, "sandbox_launch_authored": True,
+        "xpc_session_launch_enabled": True, "profile_binding_source_authored": True,
+        "bounded_save_channel_source_authored": True,
+        "macos_adapter_source_authored": True,
+        "protected_boot_journal_source_authored": True,
+        "previous_boot_recovery_source_authored": True,
+        "same_boot_independent_child_termination_authored": False,
         "suspended_pair_owner_source_authored": True,
-        "staged_receipt_schema": 2, "staged_owner_lease_source_authored": True,
+        "staged_receipt_schema": 3, "staged_owner_lease_source_authored": True,
         "durable_launch_fence_source_authored": True,
         "product_enabled": False, "configuration": "not_started",
         "compiler": "not_started", "codesign": "not_started",
         "notarization": "not_started", "verification": "not_run",
-        "remaining": "authenticated sandboxed XPC owner and session byte protocol, audit-token/code-requirement checks, bounded launch/recovery/presentation lifecycle, signed Mach-O/package/notarization evidence and final complete qualification",
+        "diskless_guest_source_authored": True, "runtime_catalog_schema": 2,
+        "activation_authorized_before_qualification": True,
+        "remaining": "target build/signing/notarization/qualification; actual guest/core artifacts (item 5); unknown legacy metadata retained by policy",
     }
     (project / "preparation-receipt.json").write_text(
         json.dumps(receipt, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")

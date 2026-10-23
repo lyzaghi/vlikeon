@@ -3,6 +3,12 @@
 #include <atomic>
 #include <chrono>
 #include <thread>
+#ifdef __APPLE__
+#include <cerrno>
+#include <fcntl.h>
+#include <sys/stat.h>
+#include <unistd.h>
+#endif
 #if defined(__linux__) && !defined(__ANDROID__)
 #include <cerrno>
 #include <fcntl.h>
@@ -18,6 +24,21 @@
 namespace omni::presentation {
 struct Owner::State{
   std::atomic_bool stop=false,focus=false;
+#ifdef __APPLE__
+  int descriptor=-1;Session session;std::uint64_t sequence=0;
+  explicit State(Session value):session(value){}
+  ~State(){if(descriptor>=0)::close(descriptor);}
+  void receive(){
+    try{for(;;){std::array<std::uint8_t,40> raw{};size_t offset=0;
+      while(offset<raw.size()){const auto count=read(descriptor,raw.data()+offset,raw.size()-offset);if(count<0&&errno==EINTR)continue;check(count>0);offset+=static_cast<size_t>(count);}
+      const std::array<std::uint8_t,8> magic{'O','P','O','W','N','E','R','1'};
+      check(std::equal(magic.begin(),magic.end(),raw.begin())&&std::equal(session.begin(),session.end(),raw.begin()+8));
+      const auto next=u64(raw,24);const auto action=u32(raw,32);
+      check(next>sequence&&next<=kMaxSequence&&(action==1||action==2)&&u32(raw,36)==0);
+      sequence=next;if(action==2){stop.store(true);return;}focus.store(true);
+    }}catch(...){}stop.store(true);
+  }
+#endif
 #if defined(__linux__) && !defined(__ANDROID__)
   int descriptor=-1;Session session;std::uint64_t sequence=0;
   explicit State(Session value):session(value){}
@@ -34,7 +55,14 @@ static void authorize(){
 }
 #endif
 Owner Owner::gated(Session session,std::uint32_t expected_parent){
-#if defined(__linux__) && !defined(__ANDROID__)
+#ifdef __APPLE__
+  check(expected_parent>1&&expected_parent<=0x7fffffffu&&getppid()==static_cast<pid_t>(expected_parent));
+  struct stat shape{};const int flags=fcntl(5,F_GETFL);
+  check(flags>=0&&(flags&O_ACCMODE)==O_RDONLY&&fstat(5,&shape)==0&&S_ISFIFO(shape.st_mode));
+  Owner result;result.state_=std::make_shared<State>(session);
+  result.state_->descriptor=fcntl(5,F_DUPFD_CLOEXEC,7);check(result.state_->descriptor>=7&&::close(5)==0);
+  const auto state=result.state_;std::thread([state]{state->receive();}).detach();return result;
+#elif defined(__linux__) && !defined(__ANDROID__)
   check(expected_parent>1&&expected_parent<=0x7fffffffu&&getppid()==static_cast<pid_t>(expected_parent)&&prctl(PR_GET_NO_NEW_PRIVS,0UL,0UL,0UL,0UL)==1);uid_t real,effective,saved;gid_t group_real,group_effective,group_saved;check(getresuid(&real,&effective,&saved)==0&&getresgid(&group_real,&group_effective,&group_saved)==0&&real!=0&&real==effective&&real==saved&&group_real==group_effective&&group_real==group_saved);
   peer(3,static_cast<pid_t>(expected_parent));peer(5,static_cast<pid_t>(expected_parent));const int parent=static_cast<int>(syscall(SYS_pidfd_open,expected_parent,0));check(parent>=0);alive(parent);check(prctl(PR_SET_PDEATHSIG,static_cast<unsigned long>(SIGKILL),0UL,0UL,0UL)==0&&getppid()==static_cast<pid_t>(expected_parent));alive(parent);check(::close(4)==0);authorize();alive(parent);check(::close(3)==0&&::close(parent)==0);
   const int adjustment=open("/proc/self/oom_score_adj",O_WRONLY|O_CLOEXEC|O_NOFOLLOW);check(adjustment>=0);check(write(adjustment,"0",1)==1&&::close(adjustment)==0);const rlimit zero{0,0};check(setrlimit(RLIMIT_CORE,&zero)==0&&setrlimit(RLIMIT_MEMLOCK,&zero)==0&&setrlimit(RLIMIT_RTPRIO,&zero)==0);

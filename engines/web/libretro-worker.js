@@ -28,9 +28,37 @@ let threadPool=null,threadCallbacks=null;
 let activeGameInfo=0,romPointer=0,pathPointer=0,romPath='',callbackPointers=[],persistentStrings=[];
 const stringCache=new Map();
 let sampleRate=48000,frames=0,droppedFrames=0,lastMetrics=0,frameTimes=[],previousFrameAt=0;
+let audioSequence=0,audioPending=new Set(),sampleBatch=new Float32Array(2048),sampleCount=0,audioDroppedFrames=0;
+let videoSequence=0,videoPending=0;
+let metricsSequence=0,metricsPending=0,avSequence=0,avPending=0,avQueued=null;
+function publishAv(value){
+  if(avPending){avQueued=value;return;}
+  if(avSequence>=Number.MAX_SAFE_INTEGER)fail('AV sequence exhausted.');
+  avPending=++avSequence;emit('av_info',{...value,sequence:avPending});
+}
+function sendAudio(samples){
+  if(!running)return;
+  if(audioPending.size>=4){audioDroppedFrames+=samples.length/2;return;}
+  if(audioSequence>=Number.MAX_SAFE_INTEGER)fail('Audio sequence exhausted.');
+  const sequence=++audioSequence;audioPending.add(sequence);
+  emit('audio',{sequence,samples: samples.buffer,sampleRate},[samples.buffer]);
+}
+function flushSamples(){if(!sampleCount)return;const samples=sampleBatch.slice(0,sampleCount);sampleCount=0;sendAudio(samples);}
+function audioSample(left,right){
+  if(!running)return;
+  sampleBatch[sampleCount++]=left/32768;sampleBatch[sampleCount++]=right/32768;
+  if(sampleCount===sampleBatch.length)flushSamples();
+}
 let input=Array.from({length:4},()=>new Int16Array(16));
 let analogInput=Array.from({length:4},()=>new Int16Array(4)),lastInputAt=-1;
 let pointerEnabled=false,pointerInput={x:0,y:0,pressed:false,inside:false},videoWidth=0,videoHeight=0;
+let displayAspect=0;
+function displaySize(width,height){
+  const ratio=displayAspect>0?displayAspect:width/height;
+  let w=Math.max(1,Math.round(height*ratio)),h=height;
+  const scale=Math.min(1,(hardwarePolicy?.maximum_width??4096)/w,(hardwarePolicy?.maximum_height??4096)/h);
+  return{width:Math.max(1,Math.floor(w*scale)),height:Math.max(1,Math.floor(h*scale))};
+}
 let presentationMaxHz=0,nextPresentationAt=0,framesEmulated=0,coreRunTimes=[];
 let collectMeasurement=false;
 const coreVariables=new Map(),variableDefinitions=new Map();
@@ -90,7 +118,7 @@ function environment(command,data){
     case 30:core.HEAPU32[data>>>2]=allocateString('/assets');return 1;
     case 31:core.HEAPU32[data>>>2]=allocateString('/saves');return 1;
     case 32:readAvInfo(data);return 1;
-    case 37:return 1;
+    case 37:readGeometry(data);return 1;
     case 39:core.HEAPU32[data>>>2]=0;return 1;
     case 47:core.HEAPU32[data>>>2]=3;return 1;
     case 49:core.HEAPU8[data]=0;return 1;
@@ -114,7 +142,7 @@ function environment(command,data){
 }
 
 function video(data,width,height,pitch){
-  if(!data)return;
+  if(!data||!running)return;
   const hardwareFrame=(data>>>0)===0xffffffff;
   if(Boolean(hardwareVideo)!==hardwareFrame)fail('The emulator returned a frame for an undeclared video backend.');
   if(!Number.isInteger(width)||!Number.isInteger(height)||width<1||height<1||width*height>MAX_PIXELS||width>4096||height>4096)fail('Runtime video dimensions exceed policy.');
@@ -122,36 +150,51 @@ function video(data,width,height,pitch){
   const at=performance.now();
   if(presentationMaxHz&&at+1<nextPresentationAt)return;
   if(presentationMaxHz){nextPresentationAt=Math.max(nextPresentationAt+1000/presentationMaxHz,at);}
-  if(hardwareVideo){hardwareVideo.present(width,height);if(videoWidth!==width||videoHeight!==height)pointerInput={x:0,y:0,pressed:false,inside:false};videoWidth=width;videoHeight=height;frames++;return;}
+  const display=displaySize(width,height),outputWidth=display.width,outputHeight=display.height;
+  if(hardwareVideo){if(canvas.width!==outputWidth)canvas.width=outputWidth;if(canvas.height!==outputHeight)canvas.height=outputHeight;hardwareVideo.present(width,height);if(videoWidth!==outputWidth||videoHeight!==outputHeight)pointerInput={x:0,y:0,pressed:false,inside:false};videoWidth=outputWidth;videoHeight=outputHeight;frames++;return;}
   const bytesPerPixel=pixelFormat===1?4:2;
-  if(pitch<width*bytesPerPixel||data+pitch*height>core.HEAPU8.length)fail('Runtime video buffer is outside its memory.');
-  const output=new Uint8ClampedArray(width*height*4);
-  for(let y=0;y<height;y++)for(let x=0;x<width;x++){
-    const source=data+y*pitch+x*bytesPerPixel,offset=(y*width+x)*4;
-    if(pixelFormat===1){const value=core.HEAPU32[source>>>2];output[offset]=(value>>>16)&255;output[offset+1]=(value>>>8)&255;output[offset+2]=value&255;}
-    else{const value=core.HEAPU16[source>>>1];if(pixelFormat===2){output[offset]=Math.round(((value>>>11)&31)*255/31);output[offset+1]=Math.round(((value>>>5)&63)*255/63);output[offset+2]=Math.round((value&31)*255/31);}else{output[offset]=Math.round(((value>>>10)&31)*255/31);output[offset+1]=Math.round(((value>>>5)&31)*255/31);output[offset+2]=Math.round((value&31)*255/31);}}
+  if(!Number.isInteger(data)||data<=0||!Number.isInteger(pitch)||pitch<width*bytesPerPixel||pitch>64*1024*1024/height||data>core.HEAPU8.length-(height-1)*pitch-width*bytesPerPixel)fail('Runtime video buffer is outside its memory.');
+  if(!context&&videoPending){droppedFrames++;return;} // One fallback frame in flight; no growing UI queue.
+  const output=new Uint8ClampedArray(outputWidth*outputHeight*4),sourceView=new DataView(core.HEAPU8.buffer);
+  for(let y=0;y<outputHeight;y++)for(let x=0;x<outputWidth;x++){
+    const source=data+Math.floor(y*height/outputHeight)*pitch+Math.floor(x*width/outputWidth)*bytesPerPixel,offset=(y*outputWidth+x)*4;
+    if(pixelFormat===1){const value=sourceView.getUint32(source,true);output[offset]=(value>>>16)&255;output[offset+1]=(value>>>8)&255;output[offset+2]=value&255;}
+    else{const value=sourceView.getUint16(source,true);if(pixelFormat===2){output[offset]=Math.round(((value>>>11)&31)*255/31);output[offset+1]=Math.round(((value>>>5)&63)*255/63);output[offset+2]=Math.round((value&31)*255/31);}else{output[offset]=Math.round(((value>>>10)&31)*255/31);output[offset+1]=Math.round(((value>>>5)&31)*255/31);output[offset+2]=Math.round((value&31)*255/31);}}
     output[offset+3]=255;
   }
-  if(context){if(canvas.width!==width)canvas.width=width;if(canvas.height!==height)canvas.height=height;context.putImageData(new ImageData(output,width,height),0,0);}
-  else emit('video',{width,height,rgba:output.buffer},[output.buffer]);
-  if(videoWidth!==width||videoHeight!==height)pointerInput={x:0,y:0,pressed:false,inside:false};videoWidth=width;videoHeight=height;frames++;
+  if(context){if(canvas.width!==outputWidth)canvas.width=outputWidth;if(canvas.height!==outputHeight)canvas.height=outputHeight;context.putImageData(new ImageData(output,outputWidth,outputHeight),0,0);}
+  else if(!videoPending){if(videoSequence>=Number.MAX_SAFE_INTEGER)fail('Video sequence exhausted.');videoPending=++videoSequence;emit('video',{sequence:videoPending,width:outputWidth,height:outputHeight,rgba:output.buffer},[output.buffer]);}
+  if(videoWidth!==outputWidth||videoHeight!==outputHeight)pointerInput={x:0,y:0,pressed:false,inside:false};videoWidth=outputWidth;videoHeight=outputHeight;if(context)frames++;
 }
 
 function audioBatch(data,count){
+  if(!Number.isInteger(count)||count<0||count>16384)fail('Runtime audio batch exceeds policy.');
   if(!count)return 0;
-  if(count>16384||data+count*4>core.HEAPU8.length)fail('Runtime audio buffer exceeds policy.');
+  if(!Number.isInteger(data)||data<=0||data%2||data>core.HEAPU8.length-count*4)fail('Runtime audio buffer exceeds policy.');
+  if(!running)return count;
+  flushSamples();
+  if(audioPending.size>=4){audioDroppedFrames+=count;return count;} // Never block guest retirement.
   const output=new Float32Array(count*2),offset=data>>>1;
   for(let index=0;index<output.length;index++)output[index]=core.HEAP16[offset+index]/32768;
-  emit('audio',{samples:output.buffer,sampleRate},[output.buffer]);
+  sendAudio(output);
   return count;
 }
 
+function readGeometry(pointer){
+  if(!Number.isInteger(pointer)||pointer<=0||pointer%4||pointer>core.HEAPU8.length-20)fail('Runtime geometry storage is invalid.');
+  const width=core.HEAPU32[pointer>>>2],height=core.HEAPU32[(pointer+4)>>>2],aspect=core.HEAPF32[(pointer+16)>>>2];
+  if(width<1||height<1||width>4096||height>4096||!Number.isFinite(aspect)||aspect<0||aspect>10)fail('Runtime video geometry is invalid.');
+  displayAspect=aspect>.1?aspect:0;
+}
 function readAvInfo(pointer){
+  if(!Number.isInteger(pointer)||pointer<=0||pointer%8||pointer>core.HEAPU8.length-40)fail('Runtime AV storage is invalid.');
+  readGeometry(pointer);
   // retro_system_av_info: geometry occupies 20 bytes, then ABI alignment
   // places the two doubles in retro_system_timing at offsets 24 and 32.
   const fps=core.HEAPF64[(pointer+24)>>>3],rate=core.HEAPF64[(pointer+32)>>>3];
   if(!Number.isFinite(fps)||fps<20||fps>240||!Number.isFinite(rate)||rate<8000||rate>192000)fail('Runtime audio/video timing is invalid.');
-  framePeriod=1000/fps;sampleRate=rate;emit('av_info',{fps,sampleRate});
+  if(sampleRate!==rate){flushSamples();sampleCount=0;}
+  framePeriod=1000/fps;sampleRate=rate;publishAv({fps,sampleRate});
 }
 
 async function prepare(params){
@@ -184,14 +227,17 @@ async function prepare(params){
   if(params.savedFiles)savedFileSession=new SavedFileSession(core,params.savedFiles,()=>guestCalls.flushSaveIo(),params.portableFiles??null);
   if(params.firmware)unmountFirmware=await mountFirmware(core,params.firmware);
   if(params.systemAssets){if(params.firmware)fail('System assets and user firmware cannot share a mountpoint.');unmountFirmware=await mountCoreAssets(core,params.systemAssets);}
-  if(params.canvas){canvas=params.canvas;if(!hardwarePolicy){context=canvas.getContext('2d',{alpha:false,desynchronized:true});if(!context)fail('Canvas renderer could not be initialized.');}}
+  if(params.canvas){canvas=params.canvas;if(!hardwarePolicy){
+    context=canvas.getContext('2d',{alpha:false,desynchronized:true});if(!context)fail('Canvas renderer could not be initialized.');
+    canvas.addEventListener('contextlost',event=>{event.preventDefault();if(terminal)return;terminal=true;running=false;clearTimeout(timer);sampleCount=0;clearInput();emit('runtime_error',{code:'runtime_crashed',message:'The video surface was lost. Reopen the game before continuing.'});});
+  }}
   if(hardwarePolicy)hardwareVideo=new HardwareVideo(core,hardwarePolicy,canvas,()=>{terminal=true;running=false;clearTimeout(timer);timer=null;clearInput();emit('runtime_error',{code:'runtime_crashed',message:'The graphics context was lost. Reopen the game before continuing.'});},playbackPreset);
   const effectiveOptions=resolveCoreOptions(params.optionPolicy??{schema_version:1,definitions:[]},{schema_version:1,values:params.options??{}});
   if(Object.hasOwn(effectiveOptions,'beetle_psx_enable_memcard1')&&!savedFileSession)fail('A selectable second card requires persistent-file saves.');
   for(const[key,value]of Object.entries(effectiveOptions))coreVariables.set(key,value);
   function callback(fn,signature){const pointer=core.addFunction(fn,signature);callbackPointers.push(pointer);return pointer;}
   hapticsEnabled=params.hapticsEnabled===true;pointerEnabled=params.pointerEnabled===true;
-  const callbacks={environment,video_refresh:video,audio_sample:(left,right)=>{const samples=new Float32Array([left/32768,right/32768]);emit('audio',{samples:samples.buffer,sampleRate},[samples.buffer]);},audio_sample_batch:audioBatch,input_poll:()=>{},input_state:inputState};
+  const callbacks={environment,video_refresh:video,audio_sample:audioSample,audio_sample_batch:audioBatch,input_poll:()=>{},input_state:inputState};
   if(threadPolicy){
     threadCallbacks=new ThreadCallbacks(core,threadPolicy,{...callbacks,rumble:setRumble},threadMemory.minimum_bytes);
     frontendCallbacks=Object.fromEntries(Object.keys(callbacks).map(name=>[name,threadCallbacks.pointers[name]]));rumblePointer=hapticsEnabled?threadCallbacks.pointers.rumble:0;
@@ -216,7 +262,7 @@ async function prepare(params){
   core.HEAPU32[activeGameInfo>>>2]=pathPointer;core.HEAPU32[(activeGameInfo+4)>>>2]=romPointer;core.HEAPU32[(activeGameInfo+8)>>>2]=memory?.byteLength??0;core.HEAPU32[(activeGameInfo+12)>>>2]=0;
   const discs=loadPreparedGame();
   if(savedFileSession){savedFileSession.flush();const rollbackBytes=guestCalls.serializeSize();if(!rollbackBytes||rollbackBytes>MAX_SAVE-(discControl.enabled?24:0))fail('Persistent-file saves require an available bounded rollback snapshot.');}
-  frames=0;framesEmulated=0;droppedFrames=0;frameTimes=[];coreRunTimes=[];lastMetrics=performance.now();previousFrameAt=0;
+  frames=0;framesEmulated=0;droppedFrames=0;audioDroppedFrames=0;frameTimes=[];coreRunTimes=[];lastMetrics=performance.now();previousFrameAt=0;
   const saveRamBytes=core._retro_get_memory_size(0),saveRtcBytes=core._retro_get_memory_size(1),inGameSupported=Boolean(saveRamBytes||saveRtcBytes||savedFileSession?.inGameAvailable);
   threadCallbacks?.check();
   return{name,version,systemAssetsProtocol:params.systemAssets?1:0,threadProtocol:threadCallbacks?1:0,hardwareVideoProtocol:hardwareVideo?1:0,inputProtocol:3,coreOptionsProtocol:1,libretroResultProtocol:guestCalls.protocol,systemMemoryProtocol:1,systemRamBytes:observedSystemRam,fileBackedContent:staged&&fullpath,mediaProtocol:1,nativeReadProtocol:1,firmwareProtocol:1,discProtocol:discControl.enabled?1:0,savedFilesProtocol:savedFileSession?1:0,saveFilesSupported:Boolean(savedFileSession),inGameSupported,portableInGameFormat:savedFileSession?.portableFormat??null,discs,nominalRefreshHz:1000/framePeriod,sampleRate,saveRamBytes,saveRtcBytes,saveStateBytes:guestCalls.serializeSize(),variables:Object.fromEntries(variableDefinitions)};
@@ -243,11 +289,11 @@ function tick(){
   try{
     if(!guestCalls?.healthy)throw new Error('The emulator call state is no longer usable.');
     const before=performance.now();if(lastInputAt>=0&&before-lastInputAt>250)clearInput();if(previousFrameAt)frameTimes.push(before-previousFrameAt);previousFrameAt=before;
-    hardwareVideo?.beforeRun();guestCalls.run();
+    hardwareVideo?.beforeRun();guestCalls.run();flushSamples();
     coreRunTimes.push(performance.now()-before);framesEmulated++;
     const now=performance.now();flushRumble(now);deadline+=framePeriod;
     if(now-deadline>framePeriod*2){droppedFrames+=Math.floor((now-deadline)/framePeriod);deadline=now;}
-    if(now-lastMetrics>=1000){const sorted=frameTimes.filter(Number.isFinite).sort((a,b)=>a-b),runs=coreRunTimes.sort((a,b)=>a-b);const q=(values,percent)=>values.length?values[Math.min(values.length-1,Math.floor((values.length-1)*percent))]:0;const samples=collectMeasurement?Float32Array.from(frameTimes).buffer:null;emit('metrics',{framesPresented:frames,framesEmulated,droppedFrames,nominalRefreshHz:1000/framePeriod,presentationMaxHz,windowDurationMs:now-lastMetrics,frameTimeP50Ms:q(sorted,.5),frameTimeP95Ms:q(sorted,.95),frameTimeP99Ms:q(sorted,.99),coreRunP95Ms:q(runs,.95),frameIntervalsMs:samples},samples?[samples]:[]);frames=0;framesEmulated=0;droppedFrames=0;frameTimes=[];coreRunTimes=[];lastMetrics=now;}
+    if(now-lastMetrics>=1000){const sorted=frameTimes.filter(Number.isFinite).sort((a,b)=>a-b),runs=coreRunTimes.sort((a,b)=>a-b);const q=(values,percent)=>values.length?values[Math.min(values.length-1,Math.floor((values.length-1)*percent))]:0;const samples=collectMeasurement?Float32Array.from(frameTimes).buffer:null;if(!metricsPending&&metricsSequence<Number.MAX_SAFE_INTEGER){metricsPending=++metricsSequence;emit('metrics',{sequence:metricsPending,framesPresented:frames,framesEmulated,droppedFrames,audioDroppedFrames,nominalRefreshHz:1000/framePeriod,presentationMaxHz,windowDurationMs:now-lastMetrics,frameTimeP50Ms:q(sorted,.5),frameTimeP95Ms:q(sorted,.95),frameTimeP99Ms:q(sorted,.99),coreRunP95Ms:q(runs,.95),frameIntervalsMs:samples},samples?[samples]:[]);}frames=0;framesEmulated=0;droppedFrames=0;audioDroppedFrames=0;frameTimes=[];coreRunTimes=[];lastMetrics=now;}
     timer=setTimeout(tick,Math.max(0,deadline-performance.now()));
   }catch(error){terminal=true;running=false;clearRumble();emit('runtime_error',{code:error.code||'runtime_crashed',message:error.message||'The emulator stopped unexpectedly.'});}
 }
@@ -337,6 +383,10 @@ async function stop(){
 
 async function handleMessage(message){
   const{id,method,params={}}=message||{};
+  if(method==='audio_ack'){if(Number.isSafeInteger(params.sequence))audioPending.delete(params.sequence);return;}
+  if(method==='video_ack'){if(params.sequence===videoPending&&typeof params.presented==='boolean'){videoPending=0;if(params.presented)frames++;else droppedFrames++;}return;}
+  if(method==='metrics_ack'){if(params.sequence===metricsPending)metricsPending=0;return;}
+  if(method==='av_ack'){if(params.sequence===avPending){avPending=0;const next=avQueued;avQueued=null;if(next)publishAv(next);}return;}
   if(method==='haptics_ack'){
     if(params&&Number.isSafeInteger(params.sequence)&&params.sequence===hapticsPending){hapticsPending=0;const next=hapticsQueued;hapticsQueued=null;if(next)publishRumble(next.values,next.at);}return;
   }
@@ -352,8 +402,8 @@ async function handleMessage(message){
       case'media_seal':if(!mediaStage||core)fail('Media staging is unavailable.');result=mediaStage.seal(params);break;
       case'prepare':result=await prepare(params);break;
       case'measurement':if(typeof params.enabled!=='boolean')fail('Measurement selection is invalid.');collectMeasurement=params.enabled;break;
-      case'start':case'resume':if(!core)fail('Runtime is not prepared.');if(!running){running=true;deadline=performance.now();previousFrameAt=0;nextPresentationAt=0;lastMetrics=deadline;frames=0;framesEmulated=0;droppedFrames=0;frameTimes=[];coreRunTimes=[];tick();}break;
-      case'pause':running=false;clearInput();clearTimeout(timer);timer=null;break;
+      case'start':case'resume':if(!core)fail('Runtime is not prepared.');if(!running){running=true;deadline=performance.now();previousFrameAt=0;nextPresentationAt=0;lastMetrics=deadline;frames=0;framesEmulated=0;droppedFrames=0;audioDroppedFrames=0;frameTimes=[];coreRunTimes=[];tick();}break;
+      case'pause':running=false;sampleCount=0;clearInput();clearTimeout(timer);timer=null;break;
       case'stop':result=await stop();break;
       case'input':{
         if(!Array.isArray(params.hapticsAvailable)||params.hapticsAvailable.length!==4||params.hapticsAvailable.some(v=>typeof v!=='boolean')||!Array.isArray(params.ports)||params.ports.length!==4||params.ports.some(values=>!Array.isArray(values)||values.length!==16||values.some(value=>value!==0&&value!==1))||!Array.isArray(params.analogPorts)||params.analogPorts.length!==4||params.analogPorts.some(values=>!Array.isArray(values)||values.length!==4||values.some(value=>!Number.isInteger(value)||value< -32767||value>32767))||!Number.isFinite(params.observed_at_ms))fail('Input timestamp, capability, axis or button shape is invalid.');
@@ -377,7 +427,7 @@ let commands=Promise.resolve(),queuedCommands=0;
 self.onmessage=event=>{
   const message=event.data;
   if(message?.method==='pthread_message_v1'){threadPool?.receive(message.params);return;}
-  if(message?.method==='haptics_ack'){void handleMessage(message);return;}
+  if(['haptics_ack','audio_ack','video_ack','metrics_ack','av_ack'].includes(message?.method)){void handleMessage(message);return;}
   if(typeof message?.id!=='string'||typeof message?.method!=='string')return;
   if(queuedCommands>=32){self.postMessage({id:message.id,status:'error',error:{code:'resource_limit',message:'The isolated runtime command queue is full.'}});return;}
   queuedCommands++;commands=commands.then(()=>handleMessage(message)).catch(()=>{}).finally(()=>{queuedCommands--;});

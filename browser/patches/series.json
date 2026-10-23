@@ -6,6 +6,11 @@
       "file": "0001-omniplay-game-hub.patch",
       "owner": "browser",
       "reason": "Bundle Game Hub and isolate product profiles/native host; retain upstream sandbox and browser UI"
+    },
+    {
+      "file": "0003-owned-game-capture.patch",
+      "owner": "browser",
+      "reason": "Bind native window capture to the broker-owned game process and exact creation identity before registering a media token"
     }
   ],
   "modified_files": [
@@ -36,6 +41,8 @@
     "compatibility.js",
     "component-context.js",
     "component-ownership.js",
+    "controller-profile.js",
+    "controller-settings.js",
     "controllers.js",
     "core-option-settings.js",
     "cores/catalog.json",
@@ -51,6 +58,7 @@
     "input-profile.js",
     "input-settings.js",
     "library-import.js",
+    "library-recovery.js",
     "manifest.json",
     "media-client.js",
     "native-media-client.js",
@@ -106,8 +114,10 @@
     "styles.css",
     "sync-settings.js",
     "touch-controls.js",
+    "touch-layout-editor.js",
     "touch-profile.js",
     "touch-settings.js",
+    "unused-content.js",
     "update-settings.js"
   ],
   "development_only": true

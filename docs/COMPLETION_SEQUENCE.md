@@ -11,6 +11,37 @@ review/fixes/acceptance. `ITEM15_SECURITY_LICENSE_RELEASE.md` and
 `ITEM16_VERIFICATION.md` track this assignment. Other concurrent assignments
 and their outstanding implementation below remain preserved.
 
+## This chat's latest transition — item 13, then item 14
+
+On 2026-10-23 the owner explicitly requested retaining the item-6 gaps and moving
+this chat to performance/routing/optional assistance (13), then installation,
+repair/uninstallation/updates (14). `ITEM6_REMAINING_WORK.md` records the missing
+implementation and deferred evidence. This does not complete item 6, close
+intervening items or replace the concurrent chat assignment recorded below.
+Source authoring remains first; no new build/test batch is released.
+
+## Current assignment in this chat — items 11 then 12
+
+The owner now defers the outstanding item-7/8 work and directs source work on
+Web/PWA (11), then accounts and encrypted save synchronization (12). Retained
+gaps are listed in `DEFERRED_ITEMS_7_8.md`; neither item is marked complete.
+Source work for 11/12 is tracked in `ITEM11_WEB_PWA_PRODUCT.md` and
+`ITEM12_ACCOUNTS_ENCRYPTED_SYNC.md`. Build/test execution remains deferred.
+
+## Earlier assignment — items 9 then 10
+
+The owner now requests source completion of Android (9) then iOS/iPadOS (10).
+Current changes and outstanding implementation are recorded in
+`ITEM9_ANDROID_PRODUCT.md` and `ITEM10_IOS_IPADOS_PRODUCT.md`. This does not
+close items 7/8 or release a new build/test batch. The following 7/8 assignment
+note is historical; its uncompleted obligations remain tracked.
+
+The owner requests completing item 7 (saves/library/storage) and then item 8
+(Remote Play/installed PC bridge). Their source changes and remaining gates
+are tracked in `ITEM7_SAVE_LIBRARY_STORAGE.md` and `ITEM8_REMOTE_PC_BRIDGE.md`.
+Other ongoing item-4/item-6 source below is preserved and is not marked complete.
+Practical verification remains deferred: no new build/test/Antigravity batch is
+released by this assignment. Missing implementation stays in its own item.
 
 The user requested work on items 1 through 17 and a report when each
 item is finished. On 2026-10-23 the owner explicitly deferred the remaining
@@ -20,7 +51,8 @@ not mark item 2 complete or remove it from the final review.
 Source authoring and the final comprehensive qualification
 remain separate; the newer concurrent-test instruction below supersedes the
 earlier deferral for explicitly released batches. Source work, executed verification and release
-approval are tracked separately. A source snapshot alone cannot close an item.
+approval are tracked separately. Source completion requires the entire item's
+implementation; practical acceptance remains separately deferred by the owner.
 
 The owner assigns Antigravity test execution only. Codex and the owner retain
 result review, diagnosis, fix decisions and source edits. The owner now requests
@@ -28,7 +60,17 @@ concurrent work: Antigravity may run exact released test batches on frozen
 copies while Codex writes source; full acceptance remains item 16. See
 `QA_EXECUTION_POLICY.md`.
 
-Current source item: **4 — macOS native runtime lifecycle and containment**.
+Current work: **item 6 source fixes; item 4 source activation authorized**.
+The latest requested sequence is to finish the remaining item-4 work, then item 6;
+item 5 stays pending. Following the earlier automatic rejection, the user
+explicitly approved activation before qualification. The diskless guest gate is
+now true in source; no binary was built, installed or run. Verified item-4
+completion is not claimed. See `MACOS_DISKLESS_GUEST.md` and
+`GRAPHICS_AUDIO_INPUT_ITEM6.md`. The following older ordering note is historical:
+The owner's newest correction is explicit: finish all required source within
+the current item before moving to the next. Do not park missing source in item
+17 to advance the sequence. `MACOS_ITEM4_CLOSURE.md` records the current open
+implementation obligations; item 4 is not source complete.
 The owner's latest direction is source authoring first, practical verification
 later. No new build/test/workflow batch is released in this phase. The former
 concurrent-test timing is historical and superseded by `QA_EXECUTION_POLICY.md`.
@@ -146,17 +188,17 @@ verified completion has not been claimed.
 | 1 | Desktop Chromium, Game Hub, profiles, permissions and build/update integration | Source authored; current desktop overlay and build/upgrade recipes retained | Pending final pass; remains open |
 | 2 | Windows native runtime lifecycle and containment | Deferred by owner; remaining source obligations retained | Partial fixture evidence; full acceptance pending |
 | 3 | Linux native runtime lifecycle and containment | Remaining source obligations retained; owner directed next item | Eight socket cases, runtime/broker check and bootstrap build passed; full acceptance pending |
-| 4 | macOS native runtime lifecycle and containment | In progress; source authoring only | Deferred per latest owner direction |
-| 5 | v1 retro systems and core adapters | Pending sequential completion audit | Pending final pass |
-| 6 | Graphics, audio and input | Pending sequential completion audit | Pending final pass |
-| 7 | Saves, library and storage | Pending sequential completion audit | Pending final pass |
-| 8 | Remote Play and installed PC/AAA bridge | Pending sequential completion audit | Pending final pass |
+| 4 | macOS native runtime lifecycle and containment | Diskless guest source authored; source activation explicitly authorized and enabled | Deferred per latest owner direction |
+| 5 | v1 retro systems and core adapters | Pending; latest requested next item is 6 | Pending final pass |
+| 6 | Graphics, audio and input | Adapter fixes plus Web raw calibration, Web/SDL axis tuning and custom touch editor/runtime authored; native raw providers/overlays and broader backend scope remain open | Pending final build/device/fault pass; see ADVANCED_INPUT_CUSTOMIZATION.md |
+| 7 | Saves, library and storage | Remaining work deferred by owner; authored backup/recovery source retained; see DEFERRED_ITEMS_7_8.md | Source unverified; remains open |
+| 8 | Remote Play and installed PC/AAA bridge | Remaining work deferred by owner; authored Windows binding/lifecycle source retained; see DEFERRED_ITEMS_7_8.md | Source unverified; remains open |
 | 9 | Android product | Deferred by owner; remaining source in DEFERRED_ITEMS_9_10.md | Android SDK/device qualification pending |
 | 10 | iOS/iPadOS product | Deferred by owner; remaining source in DEFERRED_ITEMS_9_10.md | Apple SDK/device qualification pending |
-| 11 | Web/PWA product | Pending sequential completion audit | Pending final pass |
-| 12 | Accounts and encrypted save synchronization | Pending sequential completion audit | Pending final pass |
-| 13 | Performance, routing and optional assistance | Pending sequential completion audit | Pending final pass |
-| 14 | Install, repair, uninstall and updates | Pending sequential completion audit | Pending final pass |
+| 11 | Web/PWA product | Cached-resource verification and reviewed offline-core preparation authored; see ITEM11_WEB_PWA_PRODUCT.md | No new build/test; remains open |
+| 12 | Accounts and encrypted save synchronization | Startup cancellation and guarded credential/vault publication authored; see ITEM12_ACCOUNTS_ENCRYPTED_SYNC.md | No new build/test; remains open |
+| 13 | Performance, routing and optional assistance | Transactional advice acceptance, policy checks and measurement-origin fixes authored; full scope remains open (ITEM13_PERFORMANCE_ROUTING_ASSISTANCE.md) | Source review only; final pass pending |
+| 14 | Install, repair, uninstall and updates | Extraction cancellation, inventory verify CLI, path checks and schema-floor fixes authored; repair/uninstall/release scope open (ITEM14_INSTALL_REPAIR_UPDATES.md) | Source review only; final pass pending |
 | 15 | Security, licensing and release preparation | Release attribution/privacy gate and dependency review inventory authored; production reviews open | Scoped release/updater cases passed; full release approval pending |
 | 16 | Consolidated build, integration, device and fault verification | Active frozen verification batches; original source gaps retained | Initial Windows/shared-source cases passed; platform/device/fault qualification open |
 | 17 | Overall review and closure of outstanding work | Owner-selected final review, including deferred item 2 | Not started |

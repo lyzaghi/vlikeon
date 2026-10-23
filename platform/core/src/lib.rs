@@ -22,6 +22,13 @@ pub mod performance;
 pub mod firmware;
 pub mod native_work_storage;
 pub mod media_import;
+pub mod asset_storage;
+pub mod save_backup;
+pub mod library_recovery;
+pub mod save_orphan_recovery;
+
+#[cfg(test)]
+mod backup_recovery_tests;
 
 pub use database::Database;
 

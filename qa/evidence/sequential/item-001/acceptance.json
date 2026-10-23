@@ -1,0 +1,37 @@
+{
+  "schema_version": 1,
+  "item": 1,
+  "scope": "Integrated source checkpoint only",
+  "rust": {
+    "passed": 53,
+    "failed": 0,
+    "ignored": 4
+  },
+  "python_patch_cases": 6,
+  "python_release_cases": 13,
+  "javascript_browser_cases": 13,
+  "native_audio_contract": "passed; synthetic ring contract, not a real device test",
+  "native_build": "device-free worker and separate trusted SDL presentation helper built; no game/core/device launched",
+  "actor_imports": [
+    "kernel32.dll"
+  ],
+  "source_generation": {
+    "repeatable": true,
+    "generated_files": 435,
+    "relative_imports": {
+      "resolved_or_platform_gated": 816,
+      "web_only_native_exclusions": [
+        "out/browser-integration/chrome/browser/resources/omniplay_game_hub/bridge.js",
+        "out/browser-android-integration/chrome/android/omniplay/assets/omniplay/bridge.js",
+        "apps/ios/GameHub/bridge.js"
+      ]
+    },
+    "stale_generated_sources": []
+  },
+  "secret_review": "No selected GitHub/OpenAI token or private-key markers found in the frozen source. Bounded marker scan, not a comprehensive secret audit.",
+  "open_gates": [
+    "Four explicit Windows fixture cases ignored",
+    "Full Chromium/core/platform/device/build acceptance remains in subsequent numbered items",
+    "No production binary or release approval"
+  ]
+}

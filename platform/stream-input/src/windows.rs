@@ -8,7 +8,7 @@ pub fn target_identity(process:BorrowedHandle<'_>)->Result<Target>{identity(proc
 fn identity(handle:HANDLE)->Result<Target>{
     let process_id=unsafe{GetProcessId(handle)};let mut created=FILETIME::default();let mut exited=FILETIME::default();let mut kernel=FILETIME::default();let mut user=FILETIME::default();
     if process_id==0||unsafe{WaitForSingleObject(handle,0)}!=WAIT_TIMEOUT||unsafe{GetProcessTimes(handle,&mut created,&mut exited,&mut kernel,&mut user)}==0{return Err(failure());}
-    Ok(Target{process_id,creation_time:(u64::from(created.dwHighDateTime)<<32)|u64::from(created.dwLowDateTime)})
+    Ok(Target{process_id,creation_time:(u64::from(created.dwHighDateTime)<<32)|u64::from(created.dwLowDateTime),window:None})
 }
 #[derive(Clone,Copy,PartialEq,Eq,PartialOrd,Ord)]struct Key{scan:u16,extended:bool,vk:u16}
 fn key(value:&str)->Option<Key>{
@@ -47,7 +47,7 @@ impl TargetInput{
     }
     fn foreground(&self)->Option<HWND>{
         if unsafe{WaitForSingleObject(self.process.as_raw_handle(),0)}!=WAIT_TIMEOUT{return None;}
-        let window=unsafe{GetForegroundWindow()};if window.is_null()||unsafe{IsIconic(window)}!=0||unsafe{IsWindowVisible(window)}==0{return None;}let mut pid=0;if unsafe{GetWindowThreadProcessId(window,&mut pid)}==0||pid!=self.target.process_id{return None;}Some(window)
+        let window=unsafe{GetForegroundWindow()};if window.is_null()||unsafe{IsIconic(window)}!=0||unsafe{IsWindowVisible(window)}==0||self.target.window.is_some_and(|expected|window as usize as u64!=expected){return None;}let mut pid=0;if unsafe{GetWindowThreadProcessId(window,&mut pid)}==0||pid!=self.target.process_id{return None;}Some(window)
     }
     fn override_active()->bool{[VK_LWIN,VK_RWIN,VK_LCONTROL,VK_RCONTROL,VK_LMENU,VK_RMENU,VK_F12].into_iter().any(pressed)}
     pub fn tick(&mut self){

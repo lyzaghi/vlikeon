@@ -1,5 +1,9 @@
 # Shared analog input source
 
+Current extension: `ADVANCED_INPUT_CUSTOMIZATION.md` documents Web raw-device
+calibration and shared Web/SDL axis source, inversion, gain and response exponent.
+These stages now wrap the radial baseline below. Source only; no device evidence.
+
 Per-game input schema 1 now accepts optional integer `analog_deadzone_percent`
 between 0 and 50, defaulting to 15. Rust, Web and contained C++ parsing reject
 unknown fields, null, fractional, negative and out-of-range values. Four/five-field
@@ -23,7 +27,7 @@ D-pad fallback uses its processed +/-13107 threshold. N64/PSP keeps physical
 D-pad separate and supports the saved four keyboard directions for left stick.
 Opposing keyboard directions cancel on that axis; an unpressed keyboard axis
 keeps the physical stick value. The native worker requires input-profile protocol
-3, so an older binary cannot silently ignore the new policy.
+4, so an older binary cannot silently ignore the new policy.
 
 The Web player now sends four fixed button arrays (16 zero/one values each), four
 fixed stick arrays (left X/Y, right X/Y; signed integers -32767..32767), four
@@ -47,8 +51,9 @@ current device observations. A core's actual controller port, accessory and
 multitap policy remains a separate explicit emulation configuration.
 
 No new advanced WASM runtime/core artifact has been supplied by this transport.
-Raw-device calibration, arbitrary axis remapping/inversion, response curves,
-analog pressure buttons, arbitrary touch layout placement, per-core accessory
+Web raw calibration, bounded axis remapping/inversion/response curves and custom
+touch placement are now authored; see the extension above. Native raw SDL
+provider editing, analog pressure buttons, per-core accessory
 selection, platform-native mobile adapters, remote virtual controllers and the
 complete remaining product scope still require implementation/qualification.
 No stick/gamepad, worker, SDL API, browser, compiler or test has been executed.

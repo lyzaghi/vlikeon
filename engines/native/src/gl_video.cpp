@@ -64,7 +64,7 @@ bool GlVideo::negotiate(retro_hw_render_callback& callback){
   // CPU pacing follows the core clock; a second blocking swap clock is avoided.
   if(!SDL_GL_SetSwapInterval(0))throw Failure("runtime_unavailable");return true;
 }
-void GlVideo::make_current(){if(!window_||!context_)throw Failure("runtime_unavailable");if((SDL_GL_GetCurrentContext()!=context_||SDL_GL_GetCurrentWindow()!=window_)&&!SDL_GL_MakeCurrent(window_,context_))throw Failure("runtime_unavailable");}
+void GlVideo::make_current(){if(!window_||!context_)throw Failure("runtime_unavailable");if((SDL_GL_GetCurrentContext()!=context_||SDL_GL_GetCurrentWindow()!=window_)&&!SDL_GL_MakeCurrent(window_,context_))throw Failure("runtime_unavailable");if(gl_.reset_status&&gl_.reset_status()!=GL_NO_ERROR)throw Failure("runtime_crashed");}
 void GlVideo::reset_core(){
   if(!negotiated_||reset_called_||core_callback_active()||core_callback_failed())throw Failure("runtime_crashed");
   make_current();gl_.bind_framebuffer(GL_FRAMEBUFFER,framebuffer_);

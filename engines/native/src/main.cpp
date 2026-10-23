@@ -8,7 +8,7 @@
 #include <charconv>
 #include <optional>
 #ifdef __APPLE__
-#include <sys/resource.h>
+#include "../../common/macos_child.hpp"
 #endif
 #ifdef _WIN32
 #include <windows.h>
@@ -31,12 +31,9 @@ static bool restore_private_temporary_directory(){
 #endif
 
 static std::uintptr_t endpoint(const char* text){if(!text||!*text||std::strlen(text)>20||(*text=='0'&&text[1]))throw omni::Failure("invalid_request");std::uintptr_t result=0;const auto end=text+std::strlen(text);const auto value=std::from_chars(text,end,result);if(value.ec!=std::errc{}||value.ptr!=end||!result)throw omni::Failure("invalid_request");return result;}
-#ifdef __APPLE__
-static bool apply_macos_limits(){const rlimit core{0,0},files{64,64},memory{10ULL*1024*1024*1024,10ULL*1024*1024*1024};return setrlimit(RLIMIT_CORE,&core)==0&&setrlimit(RLIMIT_NOFILE,&files)==0&&setrlimit(RLIMIT_AS,&memory)==0;}
-#endif
 int main(int argc,char** argv){
 #ifdef __APPLE__
-  if(!apply_macos_limits())return 2;
+  if(!omni::macos::establish_child())return 2;
 #endif
   std::optional<omni::presentation::Admission> admission;
   try{if(argc<2||std::strcmp(argv[1],"--stdio-runtime-v1")!=0)return 2;if(argc==6&&std::strcmp(argv[2],"--presentation-client-v2")==0)admission=omni::presentation::Admission{omni::presentation::session_from_text(std::span<const char>(argv[3],std::strlen(argv[3]))),endpoint(argv[4]),endpoint(argv[5])};else if(argc!=2)return 2;}catch(...){return 2;}

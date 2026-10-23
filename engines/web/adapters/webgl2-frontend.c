@@ -37,6 +37,7 @@ EM_JS(void, om_hw_unmap_canvas, (), {
 });
 
 unsigned om_web_hw_callback_bytes(void) { return sizeof(struct retro_hw_render_callback); }
+unsigned om_web_hw_display_protocol(void) { return 1; }
 int om_web_hw_alive(void) {
     return om_context && !emscripten_is_webgl_context_lost(om_context) &&
         emscripten_webgl_make_context_current(om_context) == EMSCRIPTEN_RESULT_SUCCESS;
@@ -136,13 +137,14 @@ static int om_present(unsigned width, unsigned height) {
     glGetIntegerv(GL_DRAW_FRAMEBUFFER_BINDING, &saved_draw);
     int canvas_width = 0, canvas_height = 0;
     if (emscripten_get_canvas_element_size(om_target, &canvas_width, &canvas_height) != EMSCRIPTEN_RESULT_SUCCESS) return 0;
-    if ((unsigned)canvas_width != width || (unsigned)canvas_height != height) {
-        if (emscripten_set_canvas_element_size(om_target, (int)width, (int)height) != EMSCRIPTEN_RESULT_SUCCESS) return 0;
-    }
+    // The Worker chooses a bounded display surface for the declared aspect
+    // ratio. The core framebuffer keeps its independent raw pixel dimensions.
+    if (canvas_width <= 0 || canvas_height <= 0 || (unsigned)canvas_width > om_width ||
+        (unsigned)canvas_height > om_height) return 0;
     glDisable(GL_SCISSOR_TEST);
     glBindFramebuffer(GL_READ_FRAMEBUFFER, om_framebuffer);
     glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
-    glBlitFramebuffer(0, 0, (GLint)width, (GLint)height, 0, 0, (GLint)width, (GLint)height, GL_COLOR_BUFFER_BIT, GL_NEAREST);
+    glBlitFramebuffer(0, 0, (GLint)width, (GLint)height, 0, 0, canvas_width, canvas_height, GL_COLOR_BUFFER_BIT, GL_NEAREST);
     const int accepted = glGetError() == GL_NO_ERROR && emscripten_webgl_commit_frame() == EMSCRIPTEN_RESULT_SUCCESS;
     glBindFramebuffer(GL_READ_FRAMEBUFFER, (GLuint)saved_read);
     glBindFramebuffer(GL_DRAW_FRAMEBUFFER, (GLuint)saved_draw);

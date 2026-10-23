@@ -12,7 +12,9 @@ export class NativeInputForwarder extends EventTarget{
   async arm(gameId){
     requireValue(!this.#closed&&!this.#arming&&!this.#grant&&this.#session.active&&this.#session.role==='host'&&this.#pair.input_allowed&&this.#session.id,'invalid_state','Native game control cannot be authorized in this state.');this.#arming=true;const session_id=this.#session.id,generation=++this.#armGeneration;
     try{
-      const grant=await this.#bridge.request('stream_input_arm',{game_id:gameId,pair_id:this.#pair.id,session_id,host_public_key:this.#identity.public_key,grant:this.#pair.grant},120000);
+      const capture=this.#session.captureSnapshot?.owned_capture;
+      requireValue(capture?.protocol===1&&capture.game_id===gameId&&capture.session_id===session_id,'permission_denied','Capture this owned game window before authorizing its input.');
+      const grant=await this.#bridge.request('stream_input_arm',{game_id:gameId,pair_id:this.#pair.id,session_id,host_public_key:this.#identity.public_key,grant:this.#pair.grant,capture_id:capture.capture_id},120000);
       if(this.#closed||generation!==this.#armGeneration||!this.#session.active||session_id!==this.#session.id){await this.#bridge.request('stream_input_revoke',{grant_id:grant.grant_id,session_id},15000).catch(()=>{});return;}
       requireValue(grant.session_id===session_id&&grant.pair_id===this.#pair.id&&grant.game_id===gameId&&grant.keyboard_mouse===true&&grant.gamepad===false,'unauthorized','Native input grant identity is invalid.');
       this.#grant=grant;this.#sequence=0;this.#session.armInput(true);this.dispatchEvent(new CustomEvent('status',{detail:grant}));this.#timer=setInterval(()=>void this.#status(),1000);

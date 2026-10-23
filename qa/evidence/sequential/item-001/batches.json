@@ -1,0 +1,215 @@
+{
+  "schema_version": 1,
+  "item": 1,
+  "batches": [
+    {
+      "batch": "001a",
+      "executor": "antigravity",
+      "git_tree": "3b990874a52e08a28ebdffc5b7d4bdc9e2f5353e",
+      "source_manifest_sha256": "cfb60568c00d5bf6ea721a06d863c6b383072898884c2e9d718fe1f783e07c69",
+      "started_at": "2026-10-23T05:38:04.521Z",
+      "finished_at": "2026-10-23T05:41:14.543Z",
+      "status": "failed",
+      "source_unchanged": true,
+      "dependencies_unchanged": true,
+      "tools": {
+        "python.exe": "7c4ee3011932a75b30db176f35fb91b28f0b299e608eaf643fb1bf36ed5ace99",
+        "node.exe": "3602f2bb1a10f2cbab4c36886218a33c1ab3db87290e73b033c46c77147d0237",
+        "cargo.exe": "d953858241c1a0aee28e712681dde68e59946375ecabfc3bead2a152e6d7ec2b",
+        "cmake.exe": "3fe22eb02e1c6184ec207366ed21a6f2f9c3828c1e9f3324546befadfb362be3",
+        "omniplay-native-audio-cases.exe": "7afdd18dc1bd34412084dbc510bbd114641b18021d16f1291dcb5f50796c1f56"
+      },
+      "cases": [
+        {
+          "id": "source-languages",
+          "exit_code": 1,
+          "elapsed_ms": 5936,
+          "status": "failed"
+        },
+        {
+          "id": "source-generation",
+          "exit_code": 1,
+          "elapsed_ms": 7295,
+          "status": "failed"
+        },
+        {
+          "id": "exact-source-patch",
+          "exit_code": 0,
+          "elapsed_ms": 371,
+          "status": "passed"
+        },
+        {
+          "id": "release-inventory",
+          "exit_code": 0,
+          "elapsed_ms": 1109,
+          "status": "passed"
+        },
+        {
+          "id": "browser-unit",
+          "exit_code": 0,
+          "elapsed_ms": 306,
+          "status": "passed"
+        },
+        {
+          "id": "rust-workspace",
+          "exit_code": 0,
+          "elapsed_ms": 87968,
+          "status": "passed"
+        },
+        {
+          "id": "native-configure",
+          "exit_code": 0,
+          "elapsed_ms": 40691,
+          "status": "passed"
+        },
+        {
+          "id": "native-build",
+          "exit_code": 1,
+          "elapsed_ms": 35514,
+          "status": "failed"
+        },
+        {
+          "id": "audio-configure",
+          "exit_code": 0,
+          "elapsed_ms": 6100,
+          "status": "passed"
+        },
+        {
+          "id": "audio-build",
+          "exit_code": 0,
+          "elapsed_ms": 3133,
+          "status": "passed"
+        },
+        {
+          "id": "audio-contract",
+          "exit_code": 0,
+          "elapsed_ms": 234,
+          "status": "passed"
+        }
+      ],
+      "raw_evidence_sha256": {
+        "audio-build.stderr.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "audio-build.stdout.log": "89e920084c4b757532b9f3ac13352971c3a1bcc4074a0e503b8167c33605d601",
+        "audio-configure.stderr.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "audio-configure.stdout.log": "a9c84e3ded9443d3625886d23e2e2718d5481614a95b88bf687f01cc2162a240",
+        "audio-contract.stderr.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "audio-contract.stdout.log": "7ff5b4f68c457d7d7b2d06623e534aa5984da7323b3b704de2ac6ef75e940a0d",
+        "browser-unit.stderr.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "browser-unit.stdout.log": "852e1286aa6a3f3706479f3da222f577418f99af402c7c10eefc0f77f9c6cf5b",
+        "exact-source-patch.stderr.log": "2e0659ebbce819ee272e54e64ead4c3198084a41ec122ee91a5eaf648ab79877",
+        "exact-source-patch.stdout.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "native-build.stderr.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "native-build.stdout.log": "663b2d598eb91848d7864d8f0c1e7cc10e1b0252643a2e8401e045040ff9a1dc",
+        "native-configure.stderr.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "native-configure.stdout.log": "51a98a39f30bbe66ed258b8791aa2e8135c2836f89b74ff6c2bd9d5c392e6e99",
+        "progress.json": "f0a563037cdb6f8dee9a93c694685552ccd92cf53fdc9c832e61d649424621c9",
+        "release-inventory.stderr.log": "f590a7ca825f747f43549c6c9971c3b06bf106f982013a6f02d98206eca6cd0e",
+        "release-inventory.stdout.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "result.json": "284c148a8c1f9e2eb3dcf09ed9cce92628554476bc8f1bc622b147a843e5178f",
+        "rust-workspace.stderr.log": "180fc24ea1c9603c253f0aaa15658ad21d9204f23f422d1a2300a847ad60c898",
+        "rust-workspace.stdout.log": "35d4e05bfb18fa396f76fa157dfd1822e99c9e3c8cd670196eca032603282e1d",
+        "source-generation.stderr.log": "ec022b1bc6455017408a30e795b8a29c529160fdcc792675ec0405fed045ef8a",
+        "source-generation.stdout.log": "8468a0290a6f0e173b6b9fa530898c56d5b8b8388492c7aae1f8ba125f18f6be",
+        "source-languages.stderr.log": "3682db8206299e4632fe39bf3d913d96ee4418e058f8fe137784e20a8e80dbe7",
+        "source-languages.stdout.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "batch": "001b",
+      "executor": "antigravity",
+      "git_tree": "7f51ba2d001705dae40330f20abdca5e69851589",
+      "source_manifest_sha256": "62eaca3b7861af5b06ad860035aea03cfd1977e647dfdc7701e7bb377adf6d82",
+      "started_at": "2026-10-23T05:43:31.352Z",
+      "finished_at": "2026-10-23T05:45:14.685Z",
+      "status": "failed",
+      "source_unchanged": true,
+      "dependencies_unchanged": true,
+      "tools": {
+        "python.exe": "7c4ee3011932a75b30db176f35fb91b28f0b299e608eaf643fb1bf36ed5ace99",
+        "cmake.exe": "3fe22eb02e1c6184ec207366ed21a6f2f9c3828c1e9f3324546befadfb362be3"
+      },
+      "cases": [
+        {
+          "id": "source-languages",
+          "exit_code": 0,
+          "elapsed_ms": 10779,
+          "status": "passed"
+        },
+        {
+          "id": "source-generation",
+          "exit_code": 1,
+          "elapsed_ms": 13254,
+          "status": "failed"
+        },
+        {
+          "id": "native-configure",
+          "exit_code": 0,
+          "elapsed_ms": 30771,
+          "status": "passed"
+        },
+        {
+          "id": "native-build",
+          "exit_code": 0,
+          "elapsed_ms": 47206,
+          "status": "passed"
+        },
+        {
+          "id": "actor-imports",
+          "exit_code": 0,
+          "elapsed_ms": 155,
+          "status": "passed"
+        }
+      ],
+      "raw_evidence_sha256": {
+        "actor-imports.stderr.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "actor-imports.stdout.log": "c2f8f932c5e2b8509ffe64ff56b4fbf8717f43396e24a14c8248a3c4f1414d3a",
+        "native-build.stderr.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "native-build.stdout.log": "307e7d35446f58cc2a05675660986f40d7796a39e5d0f360f08667efcddcf215",
+        "native-configure.stderr.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "native-configure.stdout.log": "fb2059a64b481fdc9eea0853b2b005bcbc42473f3e72e58de3a0a2ede2614b76",
+        "progress.json": "3a8c1131172721798e393c46857979d29bd0dbdc35c442d7b58fe93e86a95cd7",
+        "result.json": "4b3d64d835713138bb6c0275ba3a0945925b5717331995b90dbc4e66c127a7a4",
+        "source-generation.stderr.log": "7738bfc807cc832a7c0d8ec5666ed8c208956b0c7ffdcd4ed4bab9acec30ee90",
+        "source-generation.stdout.log": "7c06cff55d754047de8c09657284acf55410af01d78f03dce359fa70f17f5052",
+        "source-languages.stderr.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "source-languages.stdout.log": "c6ab10c553f3afb3fd5fbd79fc6e0e8138c1ef9a0439e27acf368779743f569a"
+      }
+    },
+    {
+      "batch": "001c",
+      "executor": "antigravity",
+      "git_tree": "b48294d1a685ba669b996cd51f1de3e9d085d48f",
+      "source_manifest_sha256": "f01f246f4b9cf1b0094631aa314ff4ce671e91987dd5d29887422083826663c8",
+      "started_at": "2026-10-23T05:49:51.786Z",
+      "finished_at": "2026-10-23T05:50:16.272Z",
+      "status": "passed",
+      "source_unchanged": true,
+      "dependencies_unchanged": true,
+      "tools": {
+        "python.exe": "7c4ee3011932a75b30db176f35fb91b28f0b299e608eaf643fb1bf36ed5ace99"
+      },
+      "cases": [
+        {
+          "id": "source-languages",
+          "exit_code": 0,
+          "elapsed_ms": 10172,
+          "status": "passed"
+        },
+        {
+          "id": "source-generation",
+          "exit_code": 0,
+          "elapsed_ms": 13245,
+          "status": "passed"
+        }
+      ],
+      "raw_evidence_sha256": {
+        "progress.json": "fee9f0324752c22635fbc39363eb228b3c276fc20881817725fc12fdbf1f7b8c",
+        "result.json": "1fa6510f6b8aa413fae30c79e7411c874fdd65510723cc6e8068ece3be7c5e35",
+        "source-generation.stderr.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "source-generation.stdout.log": "c28137a5641972ff4f1b559833be003271cb0d99031911eee7f2e8e7d39667e2",
+        "source-languages.stderr.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "source-languages.stdout.log": "c6ab10c553f3afb3fd5fbd79fc6e0e8138c1ef9a0439e27acf368779743f569a"
+      }
+    }
+  ]
+}

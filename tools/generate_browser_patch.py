@@ -13,6 +13,7 @@ import re
 import shutil
 from game_hub_assets import collect,prepare
 from desktop_capture_audio_patch import author as author_capture_audio
+from source_patch import apply_exact
 
 ROOT=Path(__file__).resolve().parents[1]
 SNAPSHOTS=ROOT/"browser/upstream-snapshots"
@@ -44,7 +45,7 @@ def main():
     prepare(resource_output,set(sources)|{"cores/catalog.json"})
     catalog_path=resource_output/"cores/catalog.json"
     catalog_path.parent.mkdir(parents=True,exist_ok=True)
-    catalog_path.write_text(json.dumps({"schema_version":1,"cores":catalog,"development_only":args.without_cores},indent=2)+"\n",encoding="utf-8")
+    catalog_path.write_text(json.dumps({"schema_version":1,"cores":catalog,"development_only":args.without_cores},indent=2)+"\n",encoding="utf-8",newline="\n")
     files=[]
     for relative,path in sorted(sources.items()):
         target=resource_output/relative
@@ -130,7 +131,16 @@ def main():
     patch_dir=ROOT/"browser/patches"
     patch_dir.mkdir(parents=True,exist_ok=True)
     (patch_dir/"0001-omniplay-game-hub.patch").write_text("".join(patch),encoding="utf-8",newline="\n")
-    (patch_dir/"series.json").write_text(json.dumps({"schema_version":1,"upstream_revision":upstream['revision'],"patches":[{"file":"0001-omniplay-game-hub.patch","owner":"browser","reason":"Bundle Game Hub and isolate product profiles/native host; retain upstream sandbox and browser UI"}],"modified_files":sorted(changes),"resource_files":sorted(files),"development_only":args.without_cores},indent=2)+"\n",encoding="utf-8")
+    # This reviewed patch is relative to the generated audio-aware base, not to
+    # Chromium itself. Rebuilding resources must never silently drop its native
+    # capture identity checks or omit it from the frozen patch queue.
+    owned_name="0003-owned-game-capture.patch"
+    owned=apply_exact(changes,(patch_dir/owned_name).read_text(encoding="utf-8"))
+    for relative,updated in owned.items():
+        (output/relative).write_text(updated,encoding="utf-8",newline="\n")
+    queue=[{"file":"0001-omniplay-game-hub.patch","owner":"browser","reason":"Bundle Game Hub and isolate product profiles/native host; retain upstream sandbox and browser UI"},
+           {"file":owned_name,"owner":"browser","reason":"Bind native window capture to the broker-owned game process and exact creation identity before registering a media token"}]
+    (patch_dir/"series.json").write_text(json.dumps({"schema_version":1,"upstream_revision":upstream['revision'],"patches":queue,"modified_files":sorted(changes),"resource_files":sorted(files),"development_only":args.without_cores},indent=2)+"\n",encoding="utf-8",newline="\n")
     print("Authored Chromium integration patch and staged product component.")
 
 if __name__=="__main__":

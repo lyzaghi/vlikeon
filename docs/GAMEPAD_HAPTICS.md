@@ -8,7 +8,7 @@ value. This preference stays local and outside save compatibility, diagnostics
 and save synchronization. No keyboard/controller, browser, device effect,
 compiler, runtime or test has been executed.
 
-Native worker input-profile protocol is now 3, with a distinct haptics protocol 1.
+Native worker input-profile protocol is now 4, with a distinct haptics protocol 1.
 The broker intersects the stored opt-in with the admitted package's haptics
 capability and acknowledged worker protocol before preparation. Explicit native
 and Web build recipes now declare the common frontend capability. Such a

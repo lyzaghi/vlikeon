@@ -7,8 +7,11 @@
 
 namespace omniplay::macos {
 enum class StageStatus { ok, rejected, storage_failure };
-StageStatus stage_session(xpc_object_t request);
-StageStatus discard_session(xpc_object_t request);
+StageStatus stage_session(xpc_object_t request, const std::string& profile);
+StageStatus discard_session(xpc_object_t request, const std::string& profile);
+// Only an authenticated broker's protected work journal supplies prior_boot.
+// A boot UUID read from the writable child container is NOT retirement proof.
+StageStatus recover_session(xpc_object_t request, const std::string& profile);
 class SessionLease {
  public:
   ~SessionLease();
@@ -30,9 +33,9 @@ class SessionLease {
   uint64_t device_ = 0, inode_ = 0, lease_device_ = 0, lease_inode_ = 0;
   uint64_t marker_device_ = 0, marker_inode_ = 0;
   bool marked_ = false, marker_unlinked_ = false;
-  std::string session_, runtime_;
+  std::string session_, runtime_, profile_;
   std::filesystem::path path_;
-  friend std::optional<SessionLease> admit_staged_session(const std::string&, const std::string&);
+  friend std::optional<SessionLease> admit_staged_session(const std::string&, const std::string&, const std::string&);
 };
-std::optional<SessionLease> admit_staged_session(const std::string& session, const std::string& runtime);
+std::optional<SessionLease> admit_staged_session(const std::string& session, const std::string& runtime, const std::string& profile);
 }

@@ -14,15 +14,15 @@ fn plain(metadata:&fs::Metadata,directory:bool)->bool{
     #[cfg(windows)]{use std::os::windows::fs::MetadataExt;if metadata.file_attributes()&0x400!=0{return false;}}
     !metadata.file_type().is_symlink()&&if directory{metadata.is_dir()}else{metadata.is_file()}
 }
-fn directory(path:&Path)->Result<()>{if !plain(&fs::symlink_metadata(path).map_err(storage_error)?,true){return Err(corrupt());}Ok(())}
-fn open_file(path:&Path)->Result<File>{
+pub(crate) fn directory(path:&Path)->Result<()>{if !plain(&fs::symlink_metadata(path).map_err(storage_error)?,true){return Err(corrupt());}Ok(())}
+pub(crate) fn open_file(path:&Path)->Result<File>{
     let mut options=OpenOptions::new();options.read(true);
     #[cfg(unix)]{use std::os::unix::fs::OpenOptionsExt;options.custom_flags(libc::O_NOFOLLOW|libc::O_CLOEXEC);}
     #[cfg(windows)]{use std::os::windows::fs::OpenOptionsExt;options.custom_flags(0x00200000).share_mode(1);}
     let file=options.open(path).map_err(|error|if error.kind()==std::io::ErrorKind::NotFound{PlatformError::new(ErrorCode::NotFound,"Saved progress payload is missing")}else{storage_error(error)})?;
     if !plain(&file.metadata().map_err(storage_error)?,false){return Err(corrupt());}Ok(file)
 }
-fn lease(root:&Path)->Result<File>{
+pub(crate) fn lease(root:&Path)->Result<File>{
     directory(root)?;let mut options=OpenOptions::new();options.read(true).write(true).create(true);
     #[cfg(unix)]{use std::os::unix::fs::OpenOptionsExt;options.mode(0o600).custom_flags(libc::O_NOFOLLOW|libc::O_CLOEXEC);}
     #[cfg(windows)]{use std::os::windows::fs::OpenOptionsExt;options.custom_flags(0x00200000).share_mode(3);}

@@ -57,7 +57,16 @@ bool Duplex::initialize_inherited(std::uintptr_t input,std::uintptr_t output){
   const auto source_in=reinterpret_cast<HANDLE>(input),source_out=reinterpret_cast<HANDLE>(output);if(!source_in||!source_out||GetFileType(source_in)!=FILE_TYPE_PIPE||GetFileType(source_out)!=FILE_TYPE_PIPE)return false;HANDLE in=nullptr,out=nullptr;const auto process=GetCurrentProcess();if(!DuplicateHandle(process,source_in,process,&in,0,FALSE,DUPLICATE_SAME_ACCESS))return false;if(!DuplicateHandle(process,source_out,process,&out,0,FALSE,DUPLICATE_SAME_ACCESS)){CloseHandle(in);return false;}
   const int in_fd=_open_osfhandle(reinterpret_cast<intptr_t>(in),_O_RDONLY|_O_BINARY|_O_NOINHERIT),out_fd=_open_osfhandle(reinterpret_cast<intptr_t>(out),_O_WRONLY|_O_BINARY|_O_NOINHERIT);if(in_fd<0||out_fd<0){if(in_fd>=0)_close(in_fd);else CloseHandle(in);if(out_fd>=0)_close(out_fd);else CloseHandle(out);return false;}input_=_fdopen(in_fd,"rb");output_=_fdopen(out_fd,"wb");if(!input_)_close(in_fd);if(!output_)_close(out_fd);if(!input_||!output_)return false;CloseHandle(source_in);CloseHandle(source_out);
 #else
-  if(input<3||output<3||input>1048575||output>1048575||std::signal(SIGPIPE,SIG_IGN)==SIG_ERR)return false;const auto source_in=static_cast<int>(input),source_out=static_cast<int>(output);struct stat in_info{},out_info{};if(fstat(source_in,&in_info)<0||fstat(source_out,&out_info)<0||!S_ISFIFO(in_info.st_mode)||!S_ISFIFO(out_info.st_mode)||(fcntl(source_in,F_GETFL)&O_ACCMODE)!=O_RDONLY||(fcntl(source_out,F_GETFL)&O_ACCMODE)!=O_WRONLY)return false;
+  if(input<3||output<3||input>1048575||output>1048575||std::signal(SIGPIPE,SIG_IGN)==SIG_ERR)return false;const auto source_in=static_cast<int>(input),source_out=static_cast<int>(output);struct stat in_info{},out_info{};
+  if(fstat(source_in,&in_info)<0||fstat(source_out,&out_info)<0)return false;
+#ifdef OMNIPLAY_GUEST_ACTOR
+  // Only the explicitly selected diskless guest target uses a bidirectional
+  // virtio character port. Native host actors still require separate FIFOs.
+  if(!S_ISCHR(in_info.st_mode)||!S_ISCHR(out_info.st_mode)||in_info.st_rdev!=out_info.st_rdev||
+      (fcntl(source_in,F_GETFL)&O_ACCMODE)!=O_RDWR||(fcntl(source_out,F_GETFL)&O_ACCMODE)!=O_RDWR)return false;
+#else
+  if(!S_ISFIFO(in_info.st_mode)||!S_ISFIFO(out_info.st_mode)||(fcntl(source_in,F_GETFL)&O_ACCMODE)!=O_RDONLY||(fcntl(source_out,F_GETFL)&O_ACCMODE)!=O_WRONLY)return false;
+#endif
   const auto in=fcntl(source_in,F_DUPFD_CLOEXEC,3);if(in<0)return false;const auto out=fcntl(source_out,F_DUPFD_CLOEXEC,3);if(out<0){close(in);return false;}input_=fdopen(in,"rb");output_=fdopen(out,"wb");if(!input_)close(in);if(!output_)close(out);if(!input_||!output_)return false;close(source_in);close(source_out);
 #endif
   return true;

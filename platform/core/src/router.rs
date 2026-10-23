@@ -7,7 +7,7 @@ pub fn rank(game:&GameManifest,device:&DeviceCapabilities,candidates:&[RuntimeCa
     if candidates.len()>32||policy.device_class.len()>128{return Err(PlatformError::new(ErrorCode::ResourceLimit,"Runtime routing input exceeds its bound"));}
     let mut ids=std::collections::BTreeSet::new();let mut ranked=Vec::new();
     for candidate in candidates {
-        if !valid_identifier(&candidate.id)||!ids.insert(&candidate.id)||candidate.systems.len()>32{return Err(PlatformError::new(ErrorCode::InvalidRequest,"Runtime routing identity is invalid"));}
+        if !valid_identifier(&candidate.id)||!ids.insert(&candidate.id)||candidate.systems.len()>32||candidate.minimum_memory_mb.is_some_and(|v|v==0||v>4*1024*1024){return Err(PlatformError::new(ErrorCode::InvalidRequest,"Runtime routing identity or memory requirement is invalid"));}
         let mut reasons=Vec::new();let mut eligible=true;let mut score=match candidate.kind{RuntimeKind::WebWasm=>100,RuntimeKind::NativeEmulator=>110,RuntimeKind::Remote=>60,RuntimeKind::InstalledGame=>120};
         if !candidate.available{eligible=false;reasons.push(RouteReason::NotInstalled);}
         if !candidate.distribution_approved{eligible=false;reasons.push(RouteReason::Unapproved);}
@@ -22,7 +22,7 @@ pub fn rank(game:&GameManifest,device:&DeviceCapabilities,candidates:&[RuntimeCa
             if !policy.paired_host_available{eligible=false;reasons.push(RouteReason::RemoteRequiresPairedHost);}
         }else if eligible {reasons.push(RouteReason::AvailableLocalRuntime);}
         let benchmark=candidate.benchmark.as_ref().filter(|b|{
-            b.device_class==policy.device_class&&b.game_content_hash==game.content_hash&&b.source_revision.len()==40&&b.source_revision.bytes().all(|c|c.is_ascii_hexdigit())&&b.measured_at_ms<=now&&now-b.measured_at_ms<=90*24*60*60*1000&&b.sustained_seconds>=120&&b.frame_time_p95_ms.is_finite()&&b.frame_time_p95_ms>0.0&&b.nominal_refresh_hz.is_finite()&&(20.0..=240.0).contains(&b.nominal_refresh_hz)
+            !policy.device_class.is_empty()&&policy.device_class!="unclassified"&&b.device_class==policy.device_class&&b.game_content_hash==game.content_hash&&b.source_revision.len()==40&&b.source_revision.bytes().all(|c|c.is_ascii_hexdigit()&&!c.is_ascii_uppercase())&&b.measured_at_ms<=now&&now-b.measured_at_ms<=90*24*60*60*1000&&b.sustained_seconds>=120&&b.frame_time_p95_ms.is_finite()&&b.frame_time_p95_ms>0.0&&b.nominal_refresh_hz.is_finite()&&(20.0..=240.0).contains(&b.nominal_refresh_hz)
         });
         match benchmark {
             Some(b)if b.frame_time_p95_ms<=1000.0/b.nominal_refresh_hz*1.10&&b.audio_underruns==0=>{score+=50;reasons.push(RouteReason::MeasuredFrameBudgetMet);}

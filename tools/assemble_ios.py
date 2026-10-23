@@ -61,13 +61,13 @@ def project():
     target=item("target",f"isa = PBXNativeTarget; buildConfigurationList = {tc}; buildPhases = ({source_phase},{framework_phase},{resource_phase},); buildRules = (); dependencies = (); name = OmniPlay; productName = OmniPlay; productReference = {product}; productType = \"com.apple.product-type.application\";")
     root=item("project",f"isa = PBXProject; attributes = {{LastUpgradeCheck = 1600;}}; buildConfigurationList = {pc}; compatibilityVersion = \"Xcode 14.0\"; developmentRegion = vi; knownRegions = (vi,en,Base,); mainGroup = {main}; productRefGroup = {products}; projectDirPath = \"\"; projectRoot = \"\"; targets = ({target},);")
     directory=APP/"OmniPlay.xcodeproj";directory.mkdir(parents=True,exist_ok=True)
-    (directory/"project.pbxproj").write_text("// !$*UTF8*$!\n{archiveVersion = 1; classes = {}; objectVersion = 56; objects = {\n"+"\n".join(objects)+f"\n}}; rootObject = {root};}}\n",encoding="utf-8")
+    (directory/"project.pbxproj").write_text("// !$*UTF8*$!\n{archiveVersion = 1; classes = {}; objectVersion = 56; objects = {\n"+"\n".join(objects)+f"\n}}; rootObject = {root};}}\n",encoding="utf-8",newline="\n")
     schemes=directory/"xcshareddata/xcschemes";schemes.mkdir(parents=True,exist_ok=True)
     reference=f'<BuildableReference BuildableIdentifier="primary" BlueprintIdentifier="{target}" BuildableName="OmniPlay.app" BlueprintName="OmniPlay" ReferencedContainer="container:OmniPlay.xcodeproj"/>'
     scheme=f'''<?xml version="1.0" encoding="UTF-8"?>
 <Scheme LastUpgradeVersion="1600" version="1.3"><BuildAction parallelizeBuildables="YES" buildImplicitDependencies="YES"><BuildActionEntries><BuildActionEntry buildForTesting="NO" buildForRunning="YES" buildForProfiling="YES" buildForArchiving="YES" buildForAnalyzing="YES">{reference}</BuildActionEntry></BuildActionEntries></BuildAction><LaunchAction buildConfiguration="Debug" selectedDebuggerIdentifier="Xcode.DebuggerFoundation.Debugger.LLDB" selectedLauncherIdentifier="Xcode.IDEFoundation.Launcher.LLDB" launchStyle="0" useCustomWorkingDirectory="NO" ignoresPersistentStateOnLaunch="NO" debugDocumentVersioning="YES" allowLocationSimulation="YES"><BuildableProductRunnable runnableDebuggingMode="0">{reference}</BuildableProductRunnable></LaunchAction><ProfileAction buildConfiguration="Release" shouldUseLaunchSchemeArgsEnv="YES" savedToolIdentifier="" useCustomWorkingDirectory="NO" debugDocumentVersioning="YES"><BuildableProductRunnable runnableDebuggingMode="0">{reference}</BuildableProductRunnable></ProfileAction><AnalyzeAction buildConfiguration="Debug"/><ArchiveAction buildConfiguration="Release" revealArchiveInOrganizer="YES"/></Scheme>
 '''
-    (schemes/"OmniPlay.xcscheme").write_text(scheme,encoding="utf-8")
+    (schemes/"OmniPlay.xcscheme").write_text(scheme,encoding="utf-8",newline="\n")
 
 def main():
     parser=argparse.ArgumentParser(description=__doc__);parser.add_argument("--without-cores",action="store_true");args=parser.parse_args()
@@ -75,14 +75,14 @@ def main():
     prepare(assets,set(sources)|{"cores/catalog.json","asset-index.json"})
     for relative,path in sources.items():
         target=assets/relative;target.parent.mkdir(parents=True,exist_ok=True);shutil.copy2(path,target)
-    catalog=assets/"cores/catalog.json";catalog.parent.mkdir(parents=True,exist_ok=True);catalog.write_text(json.dumps({"schema_version":1,"cores":cores,"development_only":args.without_cores},indent=2)+"\n",encoding="utf-8")
+    catalog=assets/"cores/catalog.json";catalog.parent.mkdir(parents=True,exist_ok=True);catalog.write_text(json.dumps({"schema_version":1,"cores":cores,"development_only":args.without_cores},indent=2)+"\n",encoding="utf-8",newline="\n")
     routes=set(sources)|{"cores/catalog.json"}
     mime={".js":"application/javascript; charset=utf-8",".wasm":"application/wasm",".css":"text/css; charset=utf-8",".html":"text/html; charset=utf-8",".json":"application/json; charset=utf-8",".txt":"text/plain; charset=utf-8"}
     streaming=configuration()
     inventory={"schema_version":1,"streaming_origins":streaming['relay_origins'] if streaming['enabled'] else [],"assets":[{"path":relative,"bytes":(assets/relative).stat().st_size,"mime":mime.get(Path(relative).suffix,"application/octet-stream")} for relative in sorted(routes)]}
-    (assets/"asset-index.json").write_text(json.dumps(inventory,indent=2)+"\n",encoding="utf-8")
+    (assets/"asset-index.json").write_text(json.dumps(inventory,indent=2)+"\n",encoding="utf-8",newline="\n")
     project()
-    (APP/"assembly-receipt.json").write_text(json.dumps({"schema_version":1,"development_only":args.without_cores,"core_ids":[c["id"] for c in cores],"resource_files":len(routes),"rust_build":"not_started","xcode_build":"not_started","verification":"not_run"},indent=2)+"\n",encoding="utf-8")
+    (APP/"assembly-receipt.json").write_text(json.dumps({"schema_version":1,"development_only":args.without_cores,"core_ids":[c["id"] for c in cores],"resource_files":len(routes),"rust_build":"not_started","xcode_build":"not_started","verification":"not_run"},indent=2)+"\n",encoding="utf-8",newline="\n")
     print("iOS resources and Xcode project authored. No build, simulator or test was started.")
 
 if __name__=="__main__":main()

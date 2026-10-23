@@ -45,7 +45,7 @@ Engine::~Engine(){shutdown();}
 bool Engine::process(const Packet& packet){
   const auto id=packet.header.at("id").get<std::uint64_t>();const auto method=packet.header.at("method").get<std::string>();const auto& params=packet.header.at("params");
   if(method!="load"&&!packet.payload.empty())throw Failure("invalid_state");
-  if(method=="hello")reply(id,{{"runtime_id",OMNIPLAY_RUNTIME_ID},{"library_name",info_.library_name},{"library_version",info_.library_version},{"video_backend",OMNIPLAY_VIDEO_BACKEND},{"presentation_protocol",presentation::kProtocol},{"presentation_mode",presentation_?"brokered_rgba":"direct"},{"measurement_protocol",presentation_?0:1},{"input_profile_protocol",3},{"haptics_protocol",1},{"persistent_files_protocol",2},{"checked_file_io_protocol",1},{"combined_in_game_protocol",1},{"portable_file_protocol",1},{"writable_files_protocol",1},{"pause_barrier_protocol",1}});
+  if(method=="hello")reply(id,{{"runtime_id",OMNIPLAY_RUNTIME_ID},{"library_name",info_.library_name},{"library_version",info_.library_version},{"video_backend",OMNIPLAY_VIDEO_BACKEND},{"presentation_protocol",presentation::kProtocol},{"presentation_mode",presentation_?"brokered_rgba":"direct"},{"measurement_protocol",presentation_?0:1},{"input_profile_protocol",4},{"haptics_protocol",1},{"persistent_files_protocol",2},{"checked_file_io_protocol",1},{"combined_in_game_protocol",1},{"portable_file_protocol",1},{"writable_files_protocol",1},{"pause_barrier_protocol",1}});
   else if(method=="prepare"){
     prepare(params);reply(id,{{"nominal_refresh_hz",nominal_hz_},{"sample_rate",sample_rate_},{"save_ram_bytes",call_core(api_.memory_size,RETRO_MEMORY_SAVE_RAM)},{"save_rtc_bytes",call_core(api_.memory_size,RETRO_MEMORY_RTC)},{"save_files_supported",saved_files_.enabled()},{"save_memory_files",filesystem_save_memory_},{"writable_files_protocol",memory_files_installed_?1:0},{"save_state_bytes",call_core(api_.serialize_size)},{"portable_files_profile",md_portable_?"ares_md_v1":""},{"portable_progress_available",md_contract_&&(md_contract_->words[2]||md_contract_->words[3])},{"disc",disc_status()}});
   }else if(method=="start"||method=="resume"){if(!loaded_||core_phase_.load()!=CorePhase::Ready)throw Failure("invalid_state");resume();reply(id,Json::object());}
@@ -135,7 +135,7 @@ void Engine::prepare(const Json& params){
     window_=SDL_CreateWindow(("OmniPlay — "+title_).c_str(),768,672,SDL_WINDOW_RESIZABLE|(hardware_video_?SDL_WINDOW_OPENGL:0));if(!window_)throw Failure("runtime_unavailable");
     if(hardware_video_)gl_video_.configure(window_,params.at("gpu_max_width").get<unsigned>(),params.at("gpu_max_height").get<unsigned>());
     else{renderer_=SDL_CreateRenderer(window_,"software");if(!renderer_)throw Failure("runtime_unavailable");}
-    if(config.value("fullscreen",false))SDL_SetWindowFullscreen(window_,true);
+    if(config.value("fullscreen",false)&&!SDL_SetWindowFullscreen(window_,true))throw Failure("runtime_unavailable");
 #endif
   }
   core_phase_=CorePhase::Loading;call_core(api_.set_environment,environment);call_core(api_.set_video,video);call_core(api_.set_audio,audio_sample);call_core(api_.set_audio_batch,audio_batch);call_core(api_.set_input_poll,input_poll);call_core(api_.set_input_state,input_state);call_core(api_.init);initialized_=true;if(fault_)throw Failure(fault_code_.load());
@@ -174,6 +174,10 @@ void Engine::complete_preparation(){
 }
 bool Engine::valid_av(const retro_system_av_info& av)const{
   if(!std::isfinite(av.timing.fps)||av.timing.fps<1||av.timing.fps>240||!std::isfinite(av.timing.sample_rate)||av.timing.sample_rate<8000||av.timing.sample_rate>192000)return false;
+  const auto& geometry=av.geometry;
+  if(!geometry.base_width||!geometry.base_height||geometry.base_width>4096||geometry.base_height>4096||
+      geometry.max_width<geometry.base_width||geometry.max_height<geometry.base_height||geometry.max_width>4096||geometry.max_height>4096||
+      !std::isfinite(geometry.aspect_ratio)||geometry.aspect_ratio<0||geometry.aspect_ratio>10)return false;
   return !hardware_video_||(av.geometry.base_width&&av.geometry.base_height&&av.geometry.max_width>=av.geometry.base_width&&av.geometry.max_height>=av.geometry.base_height&&av.geometry.max_width<=gl_video_.width()&&av.geometry.max_height<=gl_video_.height());
 }
 bool Engine::consume_av_changes(){
@@ -283,6 +287,7 @@ void Engine::resume(){
   }
   reset_audio();
 #ifndef OMNIPLAY_DEVICE_FREE_ACTOR
+  if(audio_){SDL_AudioSpec device{};const auto id=SDL_GetAudioStreamDevice(audio_);if(!id||!SDL_GetAudioDeviceFormat(id,&device,nullptr))throw Failure("runtime_unavailable");}
   if(audio_&&!SDL_ResumeAudioStreamDevice(audio_)){fault_=true;throw Failure("runtime_crashed");}
 #endif
   close_requested_=false;core_paused_=false;running_=true;started_=true;audio_running_.store(true);deadline_=Clock::now();previous_frame_=Clock::time_point{};metrics_start_=deadline_;intervals_.clear();presented_=0;dropped_=0;underruns_.store(0);presentation_due_=Clock::time_point{};
@@ -327,24 +332,36 @@ void Engine::poll(){
     if(!view.fresh||!view.focused){presentation_escape_=false;presentation_input_seen_=false;if(running_)pause();return;}
     if(presentation_input_seen_&&escape&&!presentation_escape_&&!close_requested_&&loaded_){if(running_)pause();else resume();}presentation_escape_=escape;presentation_input_seen_=true;
     if(view.presented<presentation_count_)throw Failure("runtime_crashed");const auto count=view.presented-presentation_count_;presentation_count_=view.presented;total_presented_.store(view.presented);presented_+=static_cast<std::uint32_t>(std::min<std::uint64_t>(count,std::numeric_limits<std::uint32_t>::max()-presented_));
+    if(view.dropped_video<presentation_dropped_)throw Failure("runtime_crashed");
+    const auto replaced=view.dropped_video-presentation_dropped_;presentation_dropped_=view.dropped_video;
+    dropped_+=static_cast<std::uint32_t>(std::min<std::uint64_t>(replaced,std::numeric_limits<std::uint32_t>::max()-dropped_));total_dropped_+=replaced;
     for(unsigned port=0;port<4;port++){auto& value=rumble_[port];std::lock_guard lock(value.mutex);value.available=view.haptics_admitted&&view.input[64+port*20+1]!=0;if(!value.available)value.strong=value.weak=0;}
     flush_rumble();return;
   }
 #ifndef OMNIPLAY_DEVICE_FREE_ACTOR
   SDL_Event event;while(SDL_PollEvent(&event)){
-  if(event.type==SDL_EVENT_QUIT||event.type==SDL_EVENT_WINDOW_CLOSE_REQUESTED){close_requested_=true;pause();}
-  else if(event.type==SDL_EVENT_WINDOW_FOCUS_LOST||event.type==SDL_EVENT_WINDOW_MINIMIZED||event.type==SDL_EVENT_WINDOW_HIDDEN)pause();
+  if(event.type==SDL_EVENT_QUIT||(event.type==SDL_EVENT_WINDOW_CLOSE_REQUESTED&&window_&&event.window.windowID==SDL_GetWindowID(window_))){close_requested_=true;pause();}
+  else if((event.type==SDL_EVENT_WINDOW_FOCUS_LOST||event.type==SDL_EVENT_WINDOW_MINIMIZED||event.type==SDL_EVENT_WINDOW_HIDDEN)&&window_&&event.window.windowID==SDL_GetWindowID(window_))pause();
+  else if((event.type==SDL_EVENT_RENDER_DEVICE_LOST||event.type==SDL_EVENT_RENDER_DEVICE_RESET||event.type==SDL_EVENT_RENDER_TARGETS_RESET)&&window_&&event.render.windowID==SDL_GetWindowID(window_)){fault_=true;throw Failure("runtime_unavailable");}
   else if(event.type==SDL_EVENT_GAMEPAD_ADDED)pad_added(event.gdevice.which);
   else if(event.type==SDL_EVENT_GAMEPAD_REMOVED)pad_removed(event.gdevice.which);
   else if(event.type==SDL_EVENT_FINGER_DOWN&&running_&&!finger_down_&&window_&&event.tfinger.windowID==SDL_GetWindowID(window_)){
     finger_=event.tfinger.fingerID;finger_down_=true;finger_x_=event.tfinger.x;finger_y_=event.tfinger.y;
   }else if(event.type==SDL_EVENT_FINGER_MOTION&&finger_down_&&event.tfinger.fingerID==finger_){finger_x_=event.tfinger.x;finger_y_=event.tfinger.y;}
   else if((event.type==SDL_EVENT_FINGER_UP||event.type==SDL_EVENT_FINGER_CANCELED)&&finger_down_&&event.tfinger.fingerID==finger_){finger_down_=false;pointer_down_=false;}
-  else if(event.type==SDL_EVENT_KEY_DOWN&&!event.key.repeat){
+  else if(event.type==SDL_EVENT_KEY_DOWN&&!event.key.repeat&&window_&&event.key.windowID==SDL_GetWindowID(window_)&&SDL_GetKeyboardFocus()==window_){
     if(event.key.scancode==SDL_SCANCODE_ESCAPE&&!close_requested_){if(running_)pause();else if(loaded_)resume();}
-    if(event.key.scancode==SDL_SCANCODE_F11&&window_)SDL_SetWindowFullscreen(window_,!(SDL_GetWindowFlags(window_)&SDL_WINDOW_FULLSCREEN));
+    if(event.key.scancode==SDL_SCANCODE_F11&&window_&&!SDL_SetWindowFullscreen(window_,!(SDL_GetWindowFlags(window_)&SDL_WINDOW_FULLSCREEN)))throw Failure("runtime_unavailable");
   }
-}flush_rumble();
+}
+  if(running_&&window_&&(SDL_GetKeyboardFocus()!=window_||(SDL_GetWindowFlags(window_)&(SDL_WINDOW_HIDDEN|SDL_WINDOW_MINIMIZED))))pause();
+  const auto health_now=Clock::now();
+  if(audio_&&health_now>=audio_health_due_){
+    audio_health_due_=health_now+std::chrono::seconds(1);SDL_AudioSpec spec{};
+    const auto device=SDL_GetAudioStreamDevice(audio_);
+    if(!device||!SDL_GetAudioDeviceFormat(device,&spec,nullptr)){close_requested_=true;pause();}
+  }
+  flush_rumble();
 #endif
 }
 void Engine::tick(){
@@ -399,7 +416,7 @@ void Engine::video_impl(const void* data,unsigned width,unsigned height,std::siz
   }
   const int logical_width=e->aspect_ratio_>0?static_cast<int>(std::lround(height*e->aspect_ratio_)):static_cast<int>(width);
 #ifndef OMNIPLAY_DEVICE_FREE_ACTOR
-  if(!e->presentation_)SDL_SetRenderLogicalPresentation(e->renderer_,logical_width,static_cast<int>(height),SDL_LOGICAL_PRESENTATION_LETTERBOX);
+  if(!e->presentation_&&(logical_width<1||!SDL_SetRenderLogicalPresentation(e->renderer_,logical_width,static_cast<int>(height),SDL_LOGICAL_PRESENTATION_LETTERBOX)))throw Failure("runtime_crashed");
 #endif
   const auto* source=static_cast<const std::uint8_t*>(data);
   for(unsigned y=0;y<height;++y)for(unsigned x=0;x<width;++x){std::uint32_t out=0xff000000u;if(bytes==4){std::uint32_t value=0;std::memcpy(&value,source+y*pitch+x*4,4);out|=value&0x00ffffffu;}else{std::uint16_t value=0;std::memcpy(&value,source+y*pitch+x*2,2);unsigned r=0,g=0,b=0;if(e->pixel_format_==RETRO_PIXEL_FORMAT_RGB565){r=((value>>11)&31)*255/31;g=((value>>5)&63)*255/63;b=(value&31)*255/31;}else{r=((value>>10)&31)*255/31;g=((value>>5)&31)*255/31;b=(value&31)*255/31;}out|=(r<<16)|(g<<8)|b;}e->pixels_[std::size_t(y)*width+x]=out;}
@@ -480,6 +497,7 @@ std::int16_t Engine::input_state(unsigned port,unsigned device,unsigned index,un
   auto* e=active_;if(!e||!e->running_||port>=4)return 0;device&=RETRO_DEVICE_MASK;
   if(e->presentation_)return presentation_input(e->presentation_->snapshot(),e->input_profile_,e->analog_controls_,port,device,index,id);
 #ifndef OMNIPLAY_DEVICE_FREE_ACTOR
+  if(!e->window_||SDL_GetKeyboardFocus()!=e->window_||(SDL_GetWindowFlags(e->window_)&(SDL_WINDOW_HIDDEN|SDL_WINDOW_MINIMIZED)))return 0;
   if(device==RETRO_DEVICE_POINTER){if(port||index)return 0;if(id==RETRO_DEVICE_ID_POINTER_X)return e->pointer_x_;if(id==RETRO_DEVICE_ID_POINTER_Y)return e->pointer_y_;if(id==RETRO_DEVICE_ID_POINTER_PRESSED)return e->pointer_down_?1:0;if(id==RETRO_DEVICE_ID_POINTER_COUNT)return e->pointer_down_?1:0;
 #ifdef RETRO_DEVICE_ID_POINTER_IS_OFFSCREEN
     if(id==RETRO_DEVICE_ID_POINTER_IS_OFFSCREEN)return e->pointer_inside_?0:1;

@@ -1,5 +1,11 @@
 # Game routing and optional local recommendations
 
+Current item-13 fixes and open scope: `ITEM13_PERFORMANCE_ROUTING_ASSISTANCE.md`.
+Assistant acceptance is transactional with its audit and retains proposals after
+failed commits; Web checks expiry inside its storage transaction. Web ranking now
+checks catalog hardware/thread policies and strict device fields. Unknown device
+classes cannot confer benchmark ranking credit. Source review only, no tests.
+
 The router in `platform/core/src/router.rs` filters runtime availability, systems, distribution approval, revocation, WASM/GPU/memory requirements and platform consent before ranking. It never changes runtime inside a live game. Unknown memory, battery or thermal values remain unknown. A benchmark can affect ranking only when its game hash, device class, source revision, age, sustained duration and measured frame budget are applicable. The broker currently discards renderer-supplied benchmark claims and marks all native and remote candidates unavailable until their real registries exist. No synthetic benchmark or assumed FPS result is populated.
 
 The current privileged Game Hub requests a choice among its bundled web-core catalog. Core execution independently checks module origin, WASM byte length, SHA-256, system and runtime version. A routing recommendation does not grant a filesystem capability or approve a native executable. Native sandbox and streaming registries remain outstanding.

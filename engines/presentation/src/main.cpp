@@ -15,7 +15,7 @@
 #include <optional>
 #include <thread>
 #ifdef __APPLE__
-#include <sys/resource.h>
+#include "../../common/macos_child.hpp"
 #endif
 
 namespace omni::presentation {
@@ -32,7 +32,13 @@ public:
   void incoming(Message message){std::lock_guard lock(mutex_);if(closed_)return;
     if(message.kind==Kind::Video){if(video_)dropped_video_++;video_=std::move(message);}
     else if(message.kind==Kind::Audio){const auto rate=u32(message.body,0);const auto bytes=message.body.size()-16,limit=std::min<std::size_t>(128u*1024u,rate);if(bytes>limit){dropped_audio_++;return;}if(rate!=audio_rate_){dropped_audio_+=audio_.size();audio_.clear();audio_bytes_=0;audio_rate_=rate;}while(!audio_.empty()&&(audio_.size()>=32||audio_bytes_+bytes>limit)){audio_bytes_-=audio_.front().body.size()-16;audio_.pop_front();dropped_audio_++;}audio_bytes_+=bytes;audio_.push_back(std::move(message));}
-    else{check(controls_.size()<8);controls_.push_back(std::move(message));}
+    else{
+      // Commands and media are consumed in separate batches. Retire earlier
+      // queued media on every playback transition before publishing the State,
+      // so a pause/resume pair cannot replay pre-pause samples in the same batch.
+      if(message.kind==Kind::State){dropped_audio_+=audio_.size();audio_.clear();audio_bytes_=0;if(video_){dropped_video_++;video_.reset();}}
+      check(controls_.size()<8);controls_.push_back(std::move(message));
+    }
   }
   Batch take(bool video){std::lock_guard lock(mutex_);Batch result;result.controls.swap(controls_);result.audio.swap(audio_);audio_bytes_=0;if(video){result.video=std::move(video_);video_.reset();}return result;}
   void outgoing(Pending message){std::lock_guard lock(mutex_);if(closed_)return;if(message.kind==Kind::Input)input_=std::move(message);else{check(message.kind==Kind::Metrics);metrics_=std::move(message);}changed_.notify_one();}
@@ -67,7 +73,13 @@ class Host{
   }
   void audio(const Message& message){
     if(!admit(message)||!playing_||!focused_)return;const auto b=std::span<const std::uint8_t>(message.body);const auto rate=u32(b,0);if(rate!=audio_rate_){check(SDL_ClearAudioStream(audio_));SDL_AudioSpec spec{SDL_AUDIO_S16LE,2,static_cast<int>(rate)};check(SDL_SetAudioStreamFormat(audio_,&spec,nullptr));audio_rate_=rate;}
-    const auto queued=SDL_GetAudioStreamQueued(audio_);check(queued>=0);if(static_cast<std::uint32_t>(queued)>audio_rate_)check(SDL_ClearAudioStream(audio_));check(SDL_PutAudioStreamData(audio_,b.data()+16,static_cast<int>(b.size()-16)));
+    const auto queued=SDL_GetAudioStreamQueued(audio_);check(queued>=0);
+    const auto bytes=b.size()-16,limit=std::min<std::size_t>(128u*1024u,audio_rate_);
+    if(bytes>limit)return;
+    // Bound the queue after admission, including the packet being appended.
+    // SDL reports source-format bytes; stereo s16 uses four bytes per frame.
+    if(static_cast<std::size_t>(queued)>limit-bytes)check(SDL_ClearAudioStream(audio_));
+    check(SDL_PutAudioStreamData(audio_,b.data()+16,static_cast<int>(bytes)));
   }
   void send_input(){
     Bytes b(kInputBytes,0);if(focused_){b[144]=1;int count=0;const bool* keys=SDL_GetKeyboardState(&count);if(keys)for(int i=0;i<std::clamp(count,0,512);i++)if(keys[i])b[static_cast<unsigned>(i)/8]|=std::uint8_t(1u<<(static_cast<unsigned>(i)%8));
@@ -89,13 +101,25 @@ public:
       if(owner_.stop_requested())break;if(owner_.take_focus()&&!SDL_RaiseWindow(window_))reason_=4;
       SDL_Event event;while(SDL_PollEvent(&event)){
         if(event.type==SDL_EVENT_QUIT||(event.type==SDL_EVENT_WINDOW_CLOSE_REQUESTED&&event.window.windowID==SDL_GetWindowID(window_))){reason_=1;quit_=true;}
+        else if((event.type==SDL_EVENT_WINDOW_FOCUS_LOST||event.type==SDL_EVENT_WINDOW_MINIMIZED||event.type==SDL_EVENT_WINDOW_HIDDEN)&&event.window.windowID==SDL_GetWindowID(window_)){focused_=false;fence(2);}
+        else if((event.type==SDL_EVENT_RENDER_DEVICE_LOST||event.type==SDL_EVENT_RENDER_DEVICE_RESET||event.type==SDL_EVENT_RENDER_TARGETS_RESET)&&event.render.windowID==SDL_GetWindowID(window_)){fence(4);throw Failure();}
+        else if(event.type==SDL_EVENT_GAMEPAD_REMOVED){const bool owned=std::any_of(pads_.begin(),pads_.end(),[&](auto* pad){return pad&&SDL_GetGamepadID(pad)==event.gdevice.which;});update_pads();if(owned)fence(2);}
+        else if(event.type==SDL_EVENT_GAMEPAD_ADDED)update_pads();
         else if(event.type==SDL_EVENT_KEY_DOWN&&!event.key.repeat&&event.key.windowID==SDL_GetWindowID(window_)&&event.key.scancode==SDL_SCANCODE_F11){if(!SDL_SetWindowFullscreen(window_,!(SDL_GetWindowFlags(window_)&SDL_WINDOW_FULLSCREEN)))reason_=4;}
         else if(event.type==SDL_EVENT_MOUSE_WHEEL&&event.wheel.windowID==SDL_GetWindowID(window_)){wheel_x_=std::clamp(wheel_x_+event.wheel.x,-32767.0f,32767.0f);wheel_y_=std::clamp(wheel_y_+event.wheel.y,-32767.0f,32767.0f);}
         else if((event.type==SDL_EVENT_FINGER_DOWN||event.type==SDL_EVENT_FINGER_MOTION||event.type==SDL_EVENT_FINGER_UP||event.type==SDL_EVENT_FINGER_CANCELED)&&event.tfinger.windowID==SDL_GetWindowID(window_)){if(event.type==SDL_EVENT_FINGER_DOWN&&!finger_down_){finger_=event.tfinger.fingerID;finger_down_=true;}if(finger_down_&&finger_==event.tfinger.fingerID){finger_x_=event.tfinger.x;finger_y_=event.tfinger.y;if(event.type==SDL_EVENT_FINGER_UP||event.type==SDL_EVENT_FINGER_CANCELED)finger_down_=false;}}
       }
-      if(quit_||bus_.closed())break;const bool focused=SDL_GetKeyboardFocus()==window_;if(focused!=focused_){focused_=focused;fence(2);}const auto now=Clock::now();if(playing_&&now-last_activity_>std::chrono::milliseconds(250))fence(3);
+      if(quit_||bus_.closed())break;
+      const auto flags=SDL_GetWindowFlags(window_);
+      const bool focused=SDL_GetKeyboardFocus()==window_&&(flags&(SDL_WINDOW_HIDDEN|SDL_WINDOW_MINIMIZED))==0;
+      if(focused!=focused_){focused_=focused;fence(2);}const auto now=Clock::now();if(playing_&&now-last_activity_>std::chrono::milliseconds(250))fence(3);
       const bool present=now-last_video_>=std::chrono::microseconds(8333);auto batch=bus_.take(present);for(const auto& message:batch.controls){control(message);if(quit_||bus_.closed())break;}if(quit_||bus_.closed())break;for(const auto& message:batch.audio){if(bus_.closed())break;audio(message);}if(bus_.closed())break;if(batch.video){video(*batch.video);last_video_=Clock::now();}
-      if(now-last_pads_>=std::chrono::seconds(1)){update_pads();last_pads_=now;}if(now-last_input_>=std::chrono::microseconds(8333))send_input();if(now-last_metrics_>=std::chrono::seconds(1))send_metrics();SDL_Delay(1);
+      if(now-last_pads_>=std::chrono::seconds(1)){
+        update_pads();last_pads_=now;SDL_AudioSpec spec{};
+        const auto device=SDL_GetAudioStreamDevice(audio_);
+        if(!device||!SDL_GetAudioDeviceFormat(device,&spec,nullptr)){fence(4);throw Failure();}
+      }
+      if(now-last_input_>=std::chrono::microseconds(8333))send_input();if(now-last_metrics_>=std::chrono::seconds(1))send_metrics();SDL_Delay(1);
     }
   }
   void shutdown(){playing_=false;focused_=false;stop_haptics();for(auto*& pad:pads_)if(pad){SDL_CloseGamepad(pad);pad=nullptr;}if(audio_){SDL_DestroyAudioStream(audio_);audio_=nullptr;}if(texture_){SDL_DestroyTexture(texture_);texture_=nullptr;}if(renderer_){SDL_DestroyRenderer(renderer_);renderer_=nullptr;}if(window_){SDL_DestroyWindow(window_);window_=nullptr;}SDL_Quit();}
@@ -105,7 +129,7 @@ static unsigned argument(const char* raw,unsigned maximum,bool zero=false){check
 int main(int argc,char** argv){
   using namespace omni::presentation;
 #ifdef __APPLE__
-  const rlimit core{0,0},files{64,64},memory{3ULL*1024*1024*1024,3ULL*1024*1024*1024};if(setrlimit(RLIMIT_CORE,&core)!=0||setrlimit(RLIMIT_NOFILE,&files)!=0||setrlimit(RLIMIT_AS,&memory)!=0)std::_Exit(2);
+  if(!omni::macos::establish_child())std::_Exit(2);
 #endif
   try{
     const bool gated=argc==8&&std::strcmp(argv[1],"--stdio-presentation-v2-gated")==0;check(gated||(argc==7&&std::strcmp(argv[1],"--stdio-presentation-v2")==0));const auto session=session_from_text(std::span<const char>(argv[2],std::strlen(argv[2])));const auto width=argument(argv[3],kMaxDimension),height=argument(argv[4],kMaxDimension),volume=argument(argv[5],100,true);const bool haptics=std::strcmp(argv[6],"haptics")==0;check(haptics||std::strcmp(argv[6],"no-haptics")==0);Owner owner;

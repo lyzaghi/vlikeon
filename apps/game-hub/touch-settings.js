@@ -1,11 +1,12 @@
 import{currentLocale}from'./i18n.js';
 import{defaultTouchProfile,validateTouchProfile}from'./touch-profile.js';
+import{mountTouchLayoutEditor}from'./touch-layout-editor.js';
 const text=(vi,en)=>currentLocale()==='vi'?vi:en;
 const node=(tag,className,value)=>{const item=document.createElement(tag);if(className)item.className=className;if(value!==undefined)item.textContent=value;return item;};
 export async function mountTouchSettings(container,bridge,game,notify){
   container.replaceChildren(node('p','muted small',text('Đang lấy điều khiển cảm ứng…','Loading touch controls…')));let profile;
   try{profile=validateTouchProfile(await bridge.request('game_touch_get',{game_id:game.id}));}catch(error){container.replaceChildren(node('p','muted small',error.message));return;}
-  if(!container.isConnected)return;let busy=false;const form=node('div','touch-settings-form'),fields=[];
+  if(!container.isConnected)return;let busy=false,editor=null;const form=node('div','touch-settings-form'),fields=[];
   const title=node('h3','',text('Bố trí cảm ứng cho game này','Touch layout for this game')),description=node('p','muted small',text('Lưu để áp dụng cho lần chơi bằng Game Hub Web tiếp theo. Các nút chạm giữ đúng ý nghĩa nút trong game.','Save to apply on the next Game Hub Web session. Touch controls keep their game-button meanings.'));
   const status=node('p','muted small');status.setAttribute('role','status');
   function select(key,label,options){const row=node('label','field-label'),control=node('select');for(const[value,title]of options){const option=node('option','',title);option.value=value;control.append(option);}control.addEventListener('change',()=>{profile[key]=control.value;paint();});row.append(node('span','',label),control);form.append(row);fields.push({key,control});}
@@ -14,9 +15,10 @@ export async function mountTouchSettings(container,bridge,game,notify){
   for(const[key,label,min,max]of[['size_percent',text('Kích thước','Size'),80,140],['opacity_percent',text('Độ đậm','Opacity'),40,100]]){const row=node('label','input-deadzone-label'),control=node('input'),output=node('output');control.type='range';control.min=String(min);control.max=String(max);control.step='1';control.setAttribute('aria-label',label);control.addEventListener('input',()=>{profile[key]=Number(control.value);paint();});row.append(node('span','',label),control,output);form.append(row);fields.push({key,control,output});}
   const handed=node('label','input-haptics-label'),handedCheck=node('input');handedCheck.type='checkbox';handedCheck.addEventListener('change',()=>{profile.left_handed=handedCheck.checked;paint();});handed.append(handedCheck,node('span','',text('Đổi bên cụm hướng và nút cho tay trái','Swap directional and button groups for left-handed play')));form.append(handed);
   const preview=node('div','touch-layout-preview');preview.setAttribute('aria-hidden','true');const directions=node('span','touch-preview-directions','↑ ← ↓ →'),faces=node('span','touch-preview-faces','Y X B A');preview.append(directions,faces);
-  function paint(){for(const{key,control,output}of fields){control.value=String(profile[key]);control.disabled=busy;if(output)output.textContent=profile[key]+'%';}handedCheck.checked=profile.left_handed;handedCheck.disabled=busy;preview.classList.toggle('left-handed',profile.left_handed);preview.style.setProperty('--touch-scale',String(profile.size_percent/100));preview.style.opacity=String(profile.opacity_percent/100);preview.hidden=profile.visibility==='hidden';}
+  function paint(){for(const{key,control,output}of fields){control.value=String(profile[key]);control.disabled=busy;if(output)output.textContent=profile[key]+'%';}handedCheck.checked=profile.left_handed;handedCheck.disabled=busy;preview.classList.toggle('left-handed',profile.left_handed);preview.style.setProperty('--touch-scale',String(profile.size_percent/100));preview.style.opacity=String(profile.opacity_percent/100);preview.hidden=profile.visibility==='hidden'||Boolean(profile.custom_layout);editor?.paint();}
   const actions=node('div','detail-actions'),save=node('button','button button-primary',text('Lưu bố trí cảm ứng','Save touch layout')),reset=node('button','button button-secondary',text('Nạp bố trí mặc định','Load default layout'));save.type=reset.type='button';
   reset.addEventListener('click',()=>{profile=defaultTouchProfile();paint();status.textContent=text('Đã nạp mặc định vào bản nháp. Nhấn Lưu để giữ lại.','Defaults loaded into the draft. Save to keep them.');});
   save.addEventListener('click',()=>void(async()=>{if(busy)return;busy=true;save.disabled=reset.disabled=true;paint();try{profile=validateTouchProfile(await bridge.request('game_touch_set',{game_id:game.id,touch:validateTouchProfile(profile)}));status.textContent=text('Đã lưu bố trí cho lần chơi tới.','Touch layout saved for the next session.');}catch(error){notify(error.message,true);}finally{busy=false;save.disabled=reset.disabled=false;paint();}})());
-  actions.append(save,reset);container.replaceChildren(title,description,form,preview,actions,status);paint();
+  const custom=node('section','touch-custom-settings');editor=mountTouchLayoutEditor(custom,()=>profile,()=>busy,paint);
+  actions.append(save,reset);container.replaceChildren(title,description,form,preview,custom,actions,status);paint();
 }

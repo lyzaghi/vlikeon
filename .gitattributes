@@ -1,1 +1,4 @@
+* text=auto eol=lf
+# Unified patch context lines consist of one required leading space.
+browser/patches/*.patch whitespace=-blank-at-eol
 engines/isolation-linux/uapi/** text eol=lf

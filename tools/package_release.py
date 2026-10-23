@@ -7,6 +7,7 @@ import argparse
 import hashlib
 import json
 import os
+import plistlib
 from pathlib import Path
 import re
 import struct
@@ -89,6 +90,74 @@ def main():
     for name in (identity["browser_entry"], identity["broker_entry"]):
         if name not in executables:
             raise ValueError("Both entry points must be approved executable files")
+    if identity["platform"] == "macos-aarch64":
+        broker_entry = "VlikeonBroker.app/Contents/MacOS/omniplay-broker"
+        inventory = {entry["path"]: entry for entry in entries}
+        if identity["broker_entry"] != broker_entry:
+            raise ValueError("macOS named XPC activation requires the explicit broker app entry")
+        required = {"VlikeonBroker.app/Contents/Info.plist",
+                    "VlikeonBroker.app/Contents/_CodeSignature/CodeResources",
+                    "native-runtimes/catalog.json"}
+        if not required <= inventory.keys() or inventory["native-runtimes/catalog.json"]["bytes"] > 1024**2:
+            raise ValueError("The macOS app seal or bounded native catalog is missing")
+        info_path = "VlikeonBroker.app/Contents/Info.plist"
+        if inventory[info_path]["bytes"] > 65536:
+            raise ValueError("The broker property list exceeds its bound")
+        info = plistlib.loads((base / info_path).read_bytes())
+        if info.get("CFBundleExecutable") != "omniplay-broker" or info.get("CFBundlePackageType") != "APPL":
+            raise ValueError("The macOS broker app has a conflicting entry point")
+        catalog = json.loads((base / "native-runtimes/catalog.json").read_text(encoding="utf-8"))
+        runtimes = catalog.get("runtimes")
+        if not isinstance(runtimes, list) or not 1 <= len(runtimes) <= 32:
+            raise ValueError("macOS packaging requires a finite native runtime catalog")
+        owners = set()
+        for runtime in runtimes:
+            mac = runtime.get("macos", {})
+            owner = mac.get("owner_signing_identifier", "")
+            if not re.fullmatch(r"[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+){2,}", owner) or len(owner) > 160:
+                raise ValueError("The macOS XPC owner identifier is invalid")
+            owners.add(owner)
+            contents = f"VlikeonBroker.app/Contents/XPCServices/{owner}.xpc/Contents"
+            required = {f"{contents}/Info.plist", f"{contents}/MacOS/omniplay-macos-owner",
+                        f"{contents}/Resources/runtime-catalog.json", f"{contents}/_CodeSignature/CodeResources"}
+            if not required <= inventory.keys() or f"{contents}/MacOS/omniplay-macos-owner" not in executables:
+                raise ValueError("The macOS package is missing the nested signed XPC owner layout")
+            runtime_id = runtime.get("manifest", {}).get("id", "")
+            if not re.fullmatch(r"[A-Za-z0-9_-]{1,64}", runtime_id):
+                raise ValueError("The macOS runtime identifier is invalid")
+            prefix = f"native-runtimes/{runtime_id}/"
+            if mac.get("guest_protocol") != 1 or mac.get("virtualization") is not True:
+                raise ValueError("macOS requires the explicit diskless guest protocol")
+            nested_catalog_path = f"{contents}/Resources/runtime-catalog.json"
+            if inventory[nested_catalog_path]["bytes"] > 1024**2:
+                raise ValueError("The sealed owner catalog exceeds its bound")
+            nested_catalog = json.loads((base / nested_catalog_path).read_text(encoding="utf-8"))
+            if nested_catalog.get("schema_version") != 2:
+                raise ValueError("The native host-core catalog is no longer supported")
+            selected = [entry for entry in nested_catalog.get("runtimes", []) if entry.get("id") == runtime_id]
+            if len(selected) != 1:
+                raise ValueError("A runtime needs one sealed guest identity")
+            guest = selected[0]
+            if (guest.get("guest_memory_mb") != runtime.get("memory_limit_mb")
+                    or guest.get("guest_cpu_count") != mac.get("guest_cpu_count")
+                    or guest.get("scratch_mb") != mac.get("scratch_memory_mb")):
+                raise ValueError("Guest resource identities differ between catalogs")
+            for field in ("kernel", "initrd"):
+                original = inventory.get(mac.get(f"guest_{field}"))
+                if (not original or Path(original["path"]).name != guest.get(field)
+                        or original["bytes"] != guest.get(f"{field}_bytes")
+                        or original["sha256"] != guest.get(f"{field}_sha256")):
+                    raise ValueError("Guest image identities differ between catalogs")
+            for original in runtime.get("files", []):
+                path = original.get("path", "")
+                if not path.startswith(prefix) or path not in inventory:
+                    raise ValueError("A macOS runtime file is outside its authenticated inventory")
+                mirror = f"{contents}/Resources/Runtimes/{runtime_id}/{path[len(prefix):]}"
+                copied = inventory.get(mirror)
+                if not copied or (copied["bytes"], copied["sha256"]) != (original["bytes"], original["sha256"]):
+                    raise ValueError("The XPC runtime copy differs from its declared package bytes")
+        if len(owners) != 1:
+            raise ValueError("The macOS package mixes XPC owner authorities")
     if identity["platform"] == "linux-x86_64":
         required = {"libexec/omniplay-native-host", "share/systemd/user/omniplay-native-host.service",
                     "share/systemd/user/omniplay-native-host.socket"}

@@ -1,6 +1,7 @@
 #import <Foundation/Foundation.h>
 #include "process.hpp"
 #include <cerrno>
+#include <algorithm>
 #include <array>
 #include <chrono>
 #include <csignal>
@@ -51,9 +52,13 @@ struct Active {
   std::string session;
   uint64_t owner = 0;
   std::mutex lifecycle;
-  Child actor;
+  std::shared_ptr<VirtualMachine> guest;
+  uint64_t reserved_mb = 0;
   Child presentation;
   Descriptor events;
+  Descriptor lifetime;
+  Descriptor activation;
+  uint64_t activation_sequence=0;
   std::optional<SessionLease> storage;
   bool stopping = false;
   bool monitor_started = false;
@@ -82,9 +87,11 @@ bool ordinary_private_directory(const std::filesystem::path& path) {
 }
 bool same(const RuntimeSpec& a, const RuntimeSpec& b) {
   return a.id == b.id && a.team_identifier == b.team_identifier &&
-      a.actor_path == b.actor_path && a.actor_identifier == b.actor_identifier &&
       a.presentation_path == b.presentation_path && a.presentation_identifier == b.presentation_identifier &&
-      a.core_path == b.core_path && a.core_identifier == b.core_identifier;
+      a.guest.kernel == b.guest.kernel && a.guest.initrd == b.guest.initrd &&
+      a.kernel_sha256 == b.kernel_sha256 && a.initrd_sha256 == b.initrd_sha256 &&
+      a.guest.memory_mb == b.guest.memory_mb && a.guest.cpu_count == b.guest.cpu_count &&
+      a.guest.scratch_mb == b.guest.scratch_mb && a.presentation_memory_mb == b.presentation_memory_mb;
 }
 std::optional<Pipe> make_pipe() {
   int raw[2] = {-1, -1};
@@ -125,11 +132,12 @@ bool observe(Child& child) {
 }
 void stop_locked(Active& active) {
   active.stopping = true;
-  signal_owned(active.actor, SIGKILL);
+  active.lifetime=Descriptor();active.activation=Descriptor();
+  if (active.guest) active.guest->stop();
   signal_owned(active.presentation, SIGKILL);
 }
 bool ended_locked(Active& active) {
-  const bool actor = observe(active.actor);
+  const bool actor = !active.guest || active.guest->ended();
   const bool presentation = observe(active.presentation);
   return actor && presentation && (!active.storage || active.storage->finish_launch());
 }
@@ -149,22 +157,23 @@ std::vector<char*> pointers(std::vector<std::string>& storage) {
   for (auto& value : storage) result.push_back(value.data());
   result.push_back(nullptr); return result;
 }
-std::vector<char*> environment(std::vector<std::string>& storage) {
+std::vector<char*> environment(std::vector<std::string>& storage,uint32_t memory_mb) {
   NSString* home = NSHomeDirectory(); NSString* temporary = NSTemporaryDirectory();
   if (![home isKindOfClass:NSString.class] || !home.length ||
       ![temporary isKindOfClass:NSString.class] || !temporary.length) return {};
   storage = {"HOME=" + std::string(home.fileSystemRepresentation),
       "TMPDIR=" + std::string(temporary.fileSystemRepresentation),
-      "PATH=/usr/bin:/bin", "LANG=en_US.UTF-8", "LC_ALL=en_US.UTF-8"};
+      "PATH=/usr/bin:/bin", "LANG=en_US.UTF-8", "LC_ALL=en_US.UTF-8",
+      "OMNIPLAY_CHILD_MEMORY_MB="+std::to_string(memory_mb)};
   return pointers(storage);
 }
 std::optional<pid_t> spawn_child(const std::string& executable,
     const std::filesystem::path& directory, std::vector<std::string> arguments,
-    const std::vector<std::pair<int, int>>& descriptors) {
+    const std::vector<std::pair<int, int>>& descriptors,uint32_t memory_mb) {
   // Allocate before initializing C spawn resources; no C++ throwing operation
   // may leak those owners or a newly created child.
   std::vector<std::string> environment_storage;
-  auto env = environment(environment_storage); auto argv = pointers(arguments);
+  auto env = environment(environment_storage,memory_mb); auto argv = pointers(arguments);
   if (env.empty()) return std::nullopt;
   Descriptor null(open("/dev/null", O_RDWR | O_CLOEXEC | O_NOFOLLOW));
   if (null.value < 0) return std::nullopt;
@@ -203,7 +212,7 @@ void monitor(const std::shared_ptr<Active>& active) {
       std::lock_guard lock(active->lifecycle);
       if (count > 0 || (count < 0 && event_error != EINTR)) stop_locked(*active);
       ended = ended_locked(*active);
-      if (active->actor.reaped || active->presentation.reaped) stop_locked(*active);
+      if ((active->guest && (active->guest->ended() || active->guest->failed())) || active->presentation.reaped) stop_locked(*active);
       if (active->stopping && !deadline) deadline = Clock::now() + std::chrono::seconds(5);
     }
     if (ended) { forget_confirmed(active); return; }
@@ -244,16 +253,27 @@ std::optional<LaunchEndpoints> launch_pair(const RuntimeSpec& runtime,
     // retirement pairs all consume the same four process-owner slots.
     std::lock_guard lock(g_processes);
     if (g_active.size() >= 4 || g_active.contains(active->session)) return std::nullopt;
+    uint64_t charged = 0;
+    for (const auto& [_, entry] : g_active) charged += entry->reserved_mb;
+    // Fixed guest RAM plus the declared helper address-space ceiling. Budget
+    // is reserved while holding the global lock, including uncertain retirees.
+    const uint64_t physical_mb = NSProcessInfo.processInfo.physicalMemory / (1024 * 1024);
+    const uint64_t limit = std::min<uint64_t>(12288, physical_mb / 2);
+    active->reserved_mb = static_cast<uint64_t>(runtime.guest.memory_mb) + runtime.presentation_memory_mb;
+    if (active->reserved_mb > limit || charged > limit - active->reserved_mb) return std::nullopt;
     g_active.emplace(active->session, active);
   }
   try {
     auto broker_to_actor = make_pipe(); auto actor_to_broker = make_pipe();
     auto presentation_to_actor = make_pipe(); auto actor_to_presentation = make_pipe();
-    if (!broker_to_actor || !actor_to_broker || !presentation_to_actor || !actor_to_presentation) {
+    auto lifetime=make_pipe();auto activation=make_pipe();
+    if (!broker_to_actor || !actor_to_broker || !presentation_to_actor || !actor_to_presentation || !lifetime || !activation) {
       failed_launch(active); return std::nullopt;
     }
     std::unique_lock lock(active->lifecycle);
     if (active->stopping) throw std::runtime_error("macos_owner_unavailable");
+    active->lifetime=std::move(lifetime->write);active->activation=std::move(activation->write);
+    if(fcntl(active->activation.value,F_SETFL,O_NONBLOCK)!=0)throw std::runtime_error("macos_owner_unavailable");
     if (!active->storage->begin_launch()) throw std::runtime_error("macos_owner_unavailable");
     active->events = Descriptor(kqueue());
     if (active->events.value < 0 || fcntl(active->events.value, F_SETFD, FD_CLOEXEC) != 0)
@@ -261,32 +281,27 @@ std::optional<LaunchEndpoints> launch_pair(const RuntimeSpec& runtime,
     auto fresh = admit_runtime(runtime.id.c_str());
     if (!fresh || !same(runtime, *fresh)) throw std::runtime_error("macos_owner_unavailable");
     auto presentation = spawn_child(runtime.presentation_path, directory,
-        {runtime.presentation_path, "--stdio-presentation-v2", parameters.session_id,
+        {runtime.presentation_path, "--stdio-presentation-v2-gated", parameters.session_id,
          std::to_string(parameters.maximum_width), std::to_string(parameters.maximum_height),
-         std::to_string(parameters.volume), parameters.haptics ? "haptics" : "no-haptics"},
-        {{actor_to_presentation->read.value, STDIN_FILENO}, {presentation_to_actor->write.value, STDOUT_FILENO}});
+         std::to_string(parameters.volume), parameters.haptics ? "haptics" : "no-haptics",std::to_string(getpid())},
+        {{actor_to_presentation->read.value, STDIN_FILENO}, {presentation_to_actor->write.value, STDOUT_FILENO},
+         {activation->read.value,5},{lifetime->read.value,6}},runtime.presentation_memory_mb);
     if (!presentation) throw std::runtime_error("macos_owner_unavailable");
     active->presentation.pid = *presentation;
     active->presentation.identity = identity(*presentation);
     if (!active->presentation.identity || !register_exit(active->events.value, *presentation) ||
-        !admit_owned_child(runtime, true, *presentation) || !same_identity(*active->presentation.identity))
+        !admit_owned_child(runtime, *presentation) || !same_identity(*active->presentation.identity))
       throw std::runtime_error("macos_owner_unavailable");
     fresh = admit_runtime(runtime.id.c_str());
     if (!fresh || !same(runtime, *fresh)) throw std::runtime_error("macos_owner_unavailable");
-    auto actor = spawn_child(runtime.actor_path, directory,
-        {runtime.actor_path, "--stdio-runtime-v1", "--presentation-client-v2", parameters.session_id, "3", "4"},
-        {{broker_to_actor->read.value, STDIN_FILENO}, {actor_to_broker->write.value, STDOUT_FILENO},
-         {presentation_to_actor->read.value, 3}, {actor_to_presentation->write.value, 4}});
-    if (!actor) throw std::runtime_error("macos_owner_unavailable");
-    active->actor.pid = *actor;
-    active->actor.identity = identity(*actor);
-    if (!active->actor.identity || !register_exit(active->events.value, *actor) ||
-        !admit_owned_child(runtime, false, *actor) || !same_identity(*active->actor.identity))
-      throw std::runtime_error("macos_owner_unavailable");
+    active->guest = VirtualMachine::launch(runtime.guest, directory, parameters.session_id,
+        broker_to_actor->read.value, actor_to_broker->write.value,
+        presentation_to_actor->read.value, actor_to_presentation->write.value);
+    if (!active->guest) throw std::runtime_error("macos_guest_unavailable");
     start_monitor_locked(active);
     if (!active->monitor_started || active->stopping)
       throw std::runtime_error("macos_owner_unavailable");
-    if (kill(active->presentation.pid, SIGCONT) != 0 || kill(active->actor.pid, SIGCONT) != 0)
+    if (kill(active->presentation.pid, SIGCONT) != 0)
       throw std::runtime_error("macos_owner_unavailable");
     return LaunchEndpoints{broker_to_actor->write.release(), actor_to_broker->read.release()};
   } catch (...) { failed_launch(active); return std::nullopt; }
@@ -309,6 +324,20 @@ bool stop_session(const std::string& session, uint64_t owner) {
     if (found != g_active.end() && found->second->owner == owner) active = found->second; }
   if (active) { std::lock_guard lock(active->lifecycle); stop_locked(*active); }
   return static_cast<bool>(active);
+}
+bool activate_session(const std::string& session,uint64_t owner){
+  if(!owner)return false;std::shared_ptr<Active> active;
+  {std::lock_guard lock(g_processes);auto found=g_active.find(session);if(found!=g_active.end()&&found->second->owner==owner)active=found->second;}
+  if(!active)return false;std::lock_guard lock(active->lifecycle);
+  if(active->stopping||active->activation.value<0||active->activation_sequence>=0x7fffffffffffffffULL)return false;
+  std::array<unsigned char,40> packet{'O','P','O','W','N','E','R','1'};
+  auto digit=[](char value)->unsigned char{return value<='9'?value-'0':value-'a'+10;};
+  size_t byte=8;for(size_t i=0;i<session.size();){if(session[i]=='-'){++i;continue;}packet[byte++]=static_cast<unsigned char>((digit(session[i])<<4)|digit(session[i+1]));i+=2;}
+  const uint64_t sequence=++active->activation_sequence;
+  for(size_t i=0;i<8;++i)packet[24+i]=static_cast<unsigned char>(sequence>>(8*i));
+  packet[32]=1;ssize_t count;
+  do{count=write(active->activation.value,packet.data(),packet.size());}while(count<0&&errno==EINTR);
+  return count==static_cast<ssize_t>(packet.size());
 }
 void stop_connection(uint64_t owner) {
   std::array<std::shared_ptr<Active>, 4> matches{}; size_t count = 0;

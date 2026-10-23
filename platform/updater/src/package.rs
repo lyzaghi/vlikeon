@@ -1,5 +1,5 @@
 use crate::rejected;
-use omniplay_contracts::{ContentHash,Result};
+use omniplay_contracts::{ContentHash,ErrorCode,PlatformError,Result};
 use omniplay_core::{updates::ReleaseManifest,util::{hash_file,storage_error,sync_directory}};
 use serde::{Deserialize,Serialize};
 use sha2::{Digest,Sha256};
@@ -70,25 +70,33 @@ pub fn read_manifest(file:&mut File)->Result<PackageManifest> {
 }
 
 pub fn unpack(mut source:File,directory:&Path,release:&ReleaseManifest)->Result<PackageManifest> {
-    let manifest=read_manifest(&mut source)?;manifest.validate(release)?;
+    unpack_cancellable(&mut source,directory,release,&std::sync::atomic::AtomicBool::new(false))
+}
+
+fn check_cancel(cancel:&std::sync::atomic::AtomicBool)->Result<()>{if cancel.load(std::sync::atomic::Ordering::Relaxed){Err(PlatformError::new(ErrorCode::Cancelled,"Update extraction was cancelled"))}else{Ok(())}}
+
+pub fn unpack_cancellable(source:&mut File,directory:&Path,release:&ReleaseManifest,cancel:&std::sync::atomic::AtomicBool)->Result<PackageManifest> {
+    check_cancel(cancel)?;
+    let manifest=read_manifest(source)?;manifest.validate(release)?;
     // Caller creates a fresh UUID directory under its private install root. Never merge
     // package files into an existing tree; no links or archive-supplied permissions exist.
     if std::fs::read_dir(directory).map_err(storage_error)?.next().is_some(){return Err(rejected("Update staging directory is not empty"));}
     let mut created=BTreeSet::new();
     for entry in &manifest.files {
+        check_cancel(cancel)?;
         let path=directory.join(&entry.path);let parent=path.parent().ok_or_else(||rejected("Package file has no parent"))?;
         std::fs::create_dir_all(parent).map_err(storage_error)?;
         let mut options=OpenOptions::new();options.create_new(true).write(true);
         #[cfg(unix)]{use std::os::unix::fs::OpenOptionsExt;options.mode(if entry.executable{0o700}else{0o600});}
         let mut target=options.open(&path).map_err(storage_error)?;let mut hash=Sha256::new();let mut left=entry.bytes;let mut buffer=[0u8;65536];
-        while left>0 {let request=left.min(buffer.len()as u64)as usize;let read=source.read(&mut buffer[..request]).map_err(storage_error)?;if read==0{return Err(rejected("Package payload is truncated"));}target.write_all(&buffer[..read]).map_err(storage_error)?;hash.update(&buffer[..read]);left-=read as u64;}
+        while left>0 {check_cancel(cancel)?;let request=left.min(buffer.len()as u64)as usize;let read=source.read(&mut buffer[..request]).map_err(storage_error)?;if read==0{return Err(rejected("Package payload is truncated"));}target.write_all(&buffer[..read]).map_err(storage_error)?;hash.update(&buffer[..read]);left-=read as u64;}
         if format!("{:x}",hash.finalize())!=entry.sha256.0{return Err(rejected("Package file checksum failed"));}
         #[cfg(unix)]{use std::os::unix::fs::PermissionsExt;target.set_permissions(std::fs::Permissions::from_mode(if entry.executable{0o500}else{0o400})).map_err(storage_error)?;}
         target.sync_all().map_err(storage_error)?;created.insert(parent.to_owned());
     }
     let mut tail=[0u8;1];if source.read(&mut tail).map_err(storage_error)?!=0{return Err(rejected("Package has unlisted trailing data"));}
     if manifest.platform=="linux-x86_64"{validate_linux_registration(directory)?;}
-    for parent in created.into_iter().rev(){sync_directory(&parent)?;}sync_directory(directory)?;
+    for parent in created.into_iter().rev(){check_cancel(cancel)?;sync_directory(&parent)?;}sync_directory(directory)?;check_cancel(cancel)?;
     Ok(manifest)
 }
 
@@ -104,12 +112,25 @@ fn validate_linux_registration(directory:&Path)->Result<()> {
 pub fn verify_entry(directory:&Path,manifest:&PackageManifest,entry:&str)->Result<PathBuf> {
     validate_relative(entry)?;
     let file=manifest.files.iter().find(|f|f.path==entry&&f.executable).ok_or_else(||rejected("Entry point is not in the installed inventory"))?;
-    let base=directory.canonicalize().map_err(storage_error)?;let path=base.join(entry);
-    let resolved=path.canonicalize().map_err(storage_error)?;
-    if !resolved.starts_with(&base)||!std::fs::symlink_metadata(&path).map_err(storage_error)?.is_file(){return Err(rejected("Installed entry point escapes its release directory"));}
+    let resolved=installed_file(directory,entry)?;
     let mut opened=File::open(&resolved).map_err(storage_error)?;let(hash,bytes)=hash_file(&mut opened,file.bytes)?;
     if hash!=file.sha256||bytes!=file.bytes{return Err(rejected("Installed entry point checksum failed"));}
     Ok(resolved)
+}
+
+// Inspect every component, not only the final file: an intermediate link must
+// not redirect an otherwise correctly signed executable outside its inventory.
+pub fn installed_file(directory:&Path,entry:&str)->Result<PathBuf>{
+    validate_relative(entry)?;
+    let check=|path:&Path,is_directory:bool|->Result<()>{let metadata=std::fs::symlink_metadata(path).map_err(storage_error)?;
+        #[cfg(windows)]{use std::os::windows::fs::MetadataExt;if metadata.file_attributes()&0x400!=0{return Err(rejected("Installed paths cannot contain reparse points"));}}
+        let wrong_type=if is_directory{!metadata.is_dir()}else{!metadata.is_file()};
+        if metadata.file_type().is_symlink()||wrong_type{return Err(rejected("Installed paths must contain ordinary directories and files"));}Ok(())};
+    if !directory.is_absolute(){return Err(rejected("Installed version directory must be absolute"));}
+    for ancestor in directory.ancestors(){check(ancestor,true)?;}
+    let base=directory.canonicalize().map_err(storage_error)?;let mut path=base.clone();let parts=entry.split('/').collect::<Vec<_>>();
+    for(index,part)in parts.iter().enumerate(){path.push(part);check(&path,index+1<parts.len())?;}
+    let resolved=path.canonicalize().map_err(storage_error)?;if !resolved.starts_with(&base){return Err(rejected("Installed file escapes its version directory"));}Ok(resolved)
 }
 
 pub fn inventory_hashes(manifest:&PackageManifest)->BTreeMap<&str,&ContentHash>{manifest.files.iter().map(|f|(f.path.as_str(),&f.sha256)).collect()}

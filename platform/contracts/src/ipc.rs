@@ -53,10 +53,20 @@ pub enum Command {
     LibraryImportStatus { job_id:Uuid },
     LibraryImportCancel { job_id:Uuid },
     LibraryRemove { game_id: Uuid },
+    StorageUnusedPreview {after_hash:Option<String>},
+    StorageUnusedRemove {after_hash:Option<String>,revision:crate::ContentHash},
+    SaveBackupExport {save_ids:Vec<Uuid>,destination_grant_id:Uuid},
+    SaveBackupRestore {grant_id:Uuid},
+    LibraryRecoveryList {after:Option<String>},
+    LibraryRecoveryImport {candidate_id:String,revision:crate::ContentHash,title:String,system:GameSystem},
+    SaveOrphanPreview {save_id:Uuid,after:Option<String>},
+    SaveOrphanRecover {save_id:Uuid,candidate_id:String,revision:crate::ContentHash},
     InstalledGameSelect { title: String },
     InstalledGameLaunch { game_id: Uuid },
     InstalledGameProcesses,
-    StreamInputArm {game_id:Uuid,pair_id:Uuid,session_id:Uuid,host_public_key:String,grant:crate::StreamGrantDocument},
+    StreamCapturePrepare {game_id:Uuid,pair_id:Uuid,session_id:Uuid,host_public_key:String,grant:crate::StreamGrantDocument},
+    StreamCaptureRelease {capture_id:Uuid,session_id:Uuid},
+    StreamInputArm {game_id:Uuid,pair_id:Uuid,session_id:Uuid,host_public_key:String,grant:crate::StreamGrantDocument,capture_id:Uuid,capture_window:String},
     StreamInputFrame {grant_id:Uuid,session_id:Uuid,sequence:u64,frame:crate::RemoteInputFrame},
     StreamInputRelease {grant_id:Uuid,session_id:Uuid},
     StreamInputStatus {grant_id:Uuid,session_id:Uuid},
@@ -172,7 +182,7 @@ pub enum Command {
 
 impl Command {
     pub fn contains_secrets(&self)->bool {
-        matches!(self,Self::SyncActionStart{..}|Self::SyncActionCollect{..}|Self::SyncCreate{..}|Self::SyncRegister{..}|Self::SyncRecover{..}|Self::SyncRenew{..}|Self::SyncRevokeDevice{..}|Self::SyncDeleteAccount{..}|Self::StreamInputArm{..}|Self::StreamInputFrame{..}|Self::StreamInputRelease{..}|Self::StreamInputStatus{..}|Self::StreamInputRevoke{..})
+        matches!(self,Self::SyncActionStart{..}|Self::SyncActionCollect{..}|Self::SyncCreate{..}|Self::SyncRegister{..}|Self::SyncRecover{..}|Self::SyncRenew{..}|Self::SyncRevokeDevice{..}|Self::SyncDeleteAccount{..}|Self::StreamCapturePrepare{..}|Self::StreamCaptureRelease{..}|Self::StreamInputArm{..}|Self::StreamInputFrame{..}|Self::StreamInputRelease{..}|Self::StreamInputStatus{..}|Self::StreamInputRevoke{..})
     }
 }
 

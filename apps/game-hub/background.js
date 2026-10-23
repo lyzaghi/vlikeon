@@ -11,6 +11,9 @@ const pageInputGrants = new Map();
 const pageExports = new Map();
 const pageMediaJobs=new Map(),pageMediaSets=new Map();
 const pageRequests=new Map();
+// Native process/window identities stay in this worker, never in Game Hub replies.
+const ownedCaptures=new Map();
+function retireCapture(id){const value=ownedCaptures.get(id);if(!value)return;ownedCaptures.delete(id);if(value.picker!==null)try{chrome.desktopCapture.cancelChooseDesktopMedia(value.picker);}catch{}void retireNative('stream_capture_release',{capture_id:id,session_id:value.session_id});}
 const ownership=new DocumentOwnership();
 let nativePort = null;
 let authenticating=0;
@@ -43,6 +46,14 @@ function connectNative() {
     if (!item) return;
     pending.delete(message.id);
     clearTimeout(item.timer);
+    if(item.method==='stream_capture_prepare'&&message.status==='ok'){
+      const value=message.result;
+      if(!value||!UUID.test(value.capture_id)||!UUID.test(value.game_id)||!UUID.test(value.session_id)||!Number.isSafeInteger(value.process_id)||value.process_id<=0||typeof value.creation_time!=='string'||!/^\d{1,20}$/.test(value.creation_time)||!Number.isSafeInteger(value.expires_at_ms)){connected.disconnect();return;}
+      if(!pages.has(item.page)||item.expired){void retireNative('stream_capture_release',{capture_id:value.capture_id,session_id:value.session_id});return;}
+      ownedCaptures.set(value.capture_id,{...value,page:item.page,picker:null,choosing:false,window:null});
+      const{process_id,creation_time,...publicValue}=value;message={...message,result:publicValue};
+    }
+    if(item.method==='stream_capture_release'&&message.status==='ok')ownedCaptures.delete(message.result?.capture_id);
     if(message.status==='ok'){
       try{for(const action of ownership.accept(item.page,item.method,item.params,message.result,pages.has(item.page)&&!item.expired))void retireNative(action.method,action.params);}
       catch(error){
@@ -111,6 +122,7 @@ function connectNative() {
     for(const exports of pageExports.values())exports.clear();
     for(const jobs of pageMediaJobs.values())jobs.clear();for(const sets of pageMediaSets.values())sets.clear();
     ownership.reset();
+    for(const id of [...ownedCaptures.keys()])retireCapture(id);
     for (const page of pages) { try { page.postMessage({ event: 'host_disconnected', reason: error ? 'host_unavailable' : 'host_closed' }); } catch {} }
   });
   return connected;
@@ -173,13 +185,23 @@ chrome.runtime.onConnect.addListener(page => {
     // chunk payloads, while waiting for a native reply or late cleanup.
     const identities={};for(const key of ['grant_id','destination_grant_id','transfer_id','job_id','session_id'])if(typeof params?.[key]==='string')identities[key]=params[key];
     pending.set(message.id, { page, timer, method:message.command.method,params:identities,sessionId:params?.session_id,transferId:params?.transfer_id,jobId:params?.job_id,setId:params?.set_id });
-    try {live();connectNative().postMessage({protocol_major:1,protocol_minor:0,id:message.id,deadline_ms:message.deadline_ms,command:message.command,profile_id}); }
+    try {
+      live();let command=message.command;
+      if(method==='stream_input_arm'){
+        const capture=ownedCaptures.get(params?.capture_id);
+        if(!capture||capture.page!==page||capture.game_id!==params.game_id||capture.session_id!==params.session_id||capture.pair_id!==params.pair_id||capture.expires_at_ms<=Date.now()||!capture.window)throw new Error('capture_unavailable');
+        command={method,params:{...params,capture_window:capture.window}};
+      }
+      if(method==='stream_capture_release'&&ownedCaptures.get(params?.capture_id)?.page!==page)throw new Error('capture_unavailable');
+      connectNative().postMessage({protocol_major:1,protocol_minor:0,id:message.id,deadline_ms:message.deadline_ms,command,profile_id});
+    }
     catch { clearTimeout(timer); pending.delete(message.id); page.postMessage({ id: message.id, status: 'error', error: { code: 'runtime_unavailable', message: 'The local library service is unavailable.', recoverable: true } }); }
     }finally{authenticating--;pageAuthentication.set(page,Math.max(0,(pageAuthentication.get(page)||1)-1));}
   });
   page.onDisconnect.addListener(() => {
     forgetBrowserPage(page);
     pages.delete(page);
+    for(const[id,capture]of ownedCaptures)if(capture.page===page)retireCapture(id);
     for(const action of ownership.close(page))void retireNative(action.method,action.params);
     for(const session_id of pageSessions.get(page)||[])void endObservedSession(session_id);
     for(const session_id of pageNativeSessions.get(page)||[])void endNativeSession(session_id);
@@ -200,3 +222,31 @@ chrome.runtime.onConnect.addListener(page => {
 });
 
 chrome.action.onClicked.addListener(() => chrome.tabs.create({ url: chrome.runtime.getURL('index.html') }));
+
+chrome.runtime.onMessage.addListener((message,sender,respond)=>{
+  if(message?.type!=='omniplay_owned_capture_v1')return;
+  const page=[...pages].find(page=>page.sender?.documentId===sender.documentId);
+  const capture=ownedCaptures.get(message.capture_id);
+  if(!page||!isGameHubSender({name:'omniplay-ui',sender})||!capture||capture.page!==page){respond({error:'permission_denied'});return;}
+  if(message.action==='cancel'){retireCapture(message.capture_id);respond({released:true});return;}
+  if(message.action!=='choose'||typeof message.audio!=='boolean'||capture.choosing||capture.window||capture.expires_at_ms<=Date.now()){respond({error:'invalid_state'});return;}
+  capture.choosing=true;
+  void(async()=>{
+    let timer=0,settled=false;
+    const finish=value=>{if(settled)return;settled=true;clearTimeout(timer);capture.choosing=false;capture.picker=null;respond(value);};
+    try{
+      const check=()=>{if(ownedCaptures.get(message.capture_id)!==capture||!pages.has(page)||capture.expires_at_ms<=Date.now())throw new Error('cancelled');};
+      const context=await gameHubContext(page,check);check();
+      timer=setTimeout(()=>{retireCapture(message.capture_id);finish({error:'deadline_exceeded'});},45000);
+      const picker=chrome.desktopCapture.chooseDesktopMedia(message.audio?['window','audio']:['window'],{id:context.tabId,url:sender.url},{systemAudio:'exclude',windowAudio:message.audio?'window':'exclude',selfBrowserSurface:'exclude',omniplayStrictWindowAudio:message.audio,omniplayProcessId:capture.process_id,omniplayCreationTime:capture.creation_time},(streamId,options)=>{
+        const error=chrome.runtime.lastError;
+        try{
+          check();if(error||!streamId||options?.omniplayOwnedCaptureProtocol!==1||typeof options.omniplayWindowId!=='string'||!/^\d{1,20}$/.test(options.omniplayWindowId)||options.omniplayWindowId==='0'||typeof options.canRequestAudioTrack!=='boolean'||message.audio&&options.canRequestAudioTrack&&options.audioScope!=='application')throw new Error('unsupported_capability');
+          capture.window=options.omniplayWindowId;
+          finish({stream_id:streamId,audio_present:message.audio&&options.canRequestAudioTrack,owned_capture:{protocol:1,capture_id:capture.capture_id,game_id:capture.game_id,session_id:capture.session_id,expires_at_ms:capture.expires_at_ms}});
+        }catch{retireCapture(message.capture_id);finish({error:'capture_refused'});}
+      });
+      if(!settled)capture.picker=picker;
+    }catch{retireCapture(message.capture_id);finish({error:'capture_refused'});}
+  })();return true;
+});

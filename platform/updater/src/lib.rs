@@ -14,7 +14,8 @@ pub fn install_root()->Result<PathBuf> {
     let base=if cfg!(windows){std::env::var_os("LOCALAPPDATA").map(PathBuf::from)}
         else if cfg!(target_os="macos"){std::env::var_os("HOME").map(|p|PathBuf::from(p).join("Library/Application Support"))}
         else{std::env::var_os("XDG_DATA_HOME").map(PathBuf::from).or_else(||std::env::var_os("HOME").map(|p|PathBuf::from(p).join(".local/share")))};
-    base.map(|p|p.join("OmniPlay").join("install")).ok_or_else(||rejected("The user installation directory is unavailable"))
+    let base=base.filter(|path|path.is_absolute()).ok_or_else(||rejected("The user installation directory must be absolute"))?;
+    Ok(base.join("OmniPlay").join("install"))
 }
 
 pub fn acknowledge_broker_health()->Result<()> {

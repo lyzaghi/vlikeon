@@ -6,15 +6,15 @@ const sessionMethods=new Set(['session_start','session_pause','session_resume','
   'session_cancel_close','session_detach','session_disc_status','session_select_disc',
   'session_save_compatibility','save_create','save_load','save_live_export',
   'performance_native_start','performance_native_status','performance_native_cancel']);
-const importGrantMethods=new Set(['library_import','library_import_start','save_import','save_repair']);
+const importGrantMethods=new Set(['library_import','library_import_start','save_import','save_repair','save_backup_restore']);
 const exportGrantMethods=new Set(['save_export','save_live_export','save_export_upload_start',
-  'save_export_upload_commit','diagnostics_export','performance_run_export']);
+  'save_export_upload_commit','diagnostics_export','performance_run_export','save_backup_export']);
 const transferMethods=new Map([
   ['transfer_read','download'],['save_upload_chunk','upload'],['save_upload_commit','upload'],
   ['save_export_upload_chunk','export'],['save_export_upload_commit','export']]);
 const grantCreation=new Map([['file_select_import','import'],['file_select_export','export'],['disc_select_folder','directory']]);
 
-export const creationMethods=new Set(['web_session_begin','session_prepare','session_prepare_start',
+export const creationMethods=new Set(['stream_capture_prepare','web_session_begin','session_prepare','session_prepare_start',
   'session_prepare_status','stream_input_arm','save_export_upload_start','asset_ranges_start',
   'asset_ranges_collect','file_select_import','file_select_export','disc_select_folder',
   'asset_read_start','firmware_read_start','save_read_start','save_upload_start',

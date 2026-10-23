@@ -6,8 +6,8 @@ use uuid::Uuid;
 
 pub fn session_preferences(database:&Database,game_id:Uuid)->Result<SessionConfig> {
     Library::new(database).get(game_id)?;
-    let value:Option<String>=database.connection.query_row("SELECT value FROM preferences WHERE key=?1",[format!("session.{game_id}")],|r|r.get(0)).optional().map_err(storage_error)?;
-    let config:SessionConfig=match value{Some(raw)=>serde_json::from_str(&raw).map_err(|_|PlatformError::new(ErrorCode::CorruptData,"Game settings require recovery"))?,None=>SessionConfig::default()};
+    let value:Option<String>=database.connection.query_row("SELECT substr(value,1,4097) FROM preferences WHERE key=?1",[format!("session.{game_id}")],|r|r.get(0)).optional().map_err(storage_error)?;
+    let config:SessionConfig=match value{Some(raw)if raw.len()<=4096=>serde_json::from_str(&raw).map_err(|_|PlatformError::new(ErrorCode::CorruptData,"Game settings require recovery"))?,Some(_)=>return Err(PlatformError::new(ErrorCode::CorruptData,"Game settings exceed their storage bound")),None=>SessionConfig::default()};
     config.validate()?;Ok(config)
 }
 
@@ -39,12 +39,16 @@ impl Assistant {
         Ok(LocalAdvice{source:"local_rules_v1".into(),locale:settings.locale,message:message.into(),proposal,external_model_used:false})
     }
     pub fn accept(&mut self,database:&Database,id:Uuid)->Result<SessionConfig> {
+        // Consent, compare-and-set and audit share one snapshot/commit. A second
+        // broker cannot change preferences between the comparison and write.
+        let tx=database.connection.unchecked_transaction().map_err(storage_error)?;
         if !database.settings()?.ai_enabled{return Err(PlatformError::new(ErrorCode::PermissionDenied,"Local recommendations are disabled"));}
-        let proposal=self.pending.remove(&id).ok_or_else(||PlatformError::new(ErrorCode::NotFound,"Recommendation was not found"))?;
+        let proposal=self.pending.get(&id).cloned().ok_or_else(||PlatformError::new(ErrorCode::NotFound,"Recommendation was not found"))?;
         if proposal.expires_at_ms<=now_ms(){return Err(PlatformError::new(ErrorCode::PermissionExpired,"Recommendation expired; request a fresh one"));}
         if config_hash(&session_preferences(database,proposal.game_id)?)?!=proposal.before_hash{return Err(PlatformError::new(ErrorCode::Conflict,"Game settings changed after this recommendation"));}
+        if proposal.expires_at_ms<=now_ms(){return Err(PlatformError::new(ErrorCode::PermissionExpired,"Recommendation expired; request a fresh one"));}
         set_session_preferences(database,proposal.game_id,&proposal.after)?;
-        database.record_audit("assistant.settings_accepted",Some(proposal.game_id))?;Ok(proposal.after)
+        database.record_audit("assistant.settings_accepted",Some(proposal.game_id))?;tx.commit().map_err(storage_error)?;self.pending.remove(&id);Ok(proposal.after)
     }
     pub fn dismiss(&mut self,id:Uuid){self.pending.remove(&id);}
 }

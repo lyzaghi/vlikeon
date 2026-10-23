@@ -1,5 +1,12 @@
 # Dedicated Worker WebGL2 source
 
+Current item-6 source also preserves declared display aspect independently of
+the raw guest framebuffer. The Worker sets a bounded destination; the C frontend
+blits into that destination without replacing it with raw dimensions. The new
+`_om_web_hw_display_protocol() == 1` export is mandatory. Existing hardware core
+artifacts must be rebuilt; missing/mismatched exports refuse admission. No such
+rebuild or device test was executed. See `GRAPHICS_AUDIO_INPUT_ITEM6.md`.
+
 The shared Web player now has an explicit hardware-video path. A core manifest
 must declare `hardware_video_protocol: 1`, an unthreaded WASM module, result
 protocol 2 and a finite `hardware_video` target. Bundle admission and renderer

@@ -1,15 +1,17 @@
 #pragma once
 #include <cstdint>
 #include <string>
-#ifdef OMNIPLAY_DEVICE_FREE_ACTOR
+#if defined(OMNIPLAY_DEVICE_FREE_ACTOR) && defined(_WIN32)
 #include <windows.h>
-#else
+#elif !defined(OMNIPLAY_DEVICE_FREE_ACTOR)
 #include <SDL3/SDL.h>
 #endif
 
 namespace omni {
-#ifdef OMNIPLAY_DEVICE_FREE_ACTOR
+#if defined(OMNIPLAY_DEVICE_FREE_ACTOR) && defined(_WIN32)
 using CoreModule=HMODULE;
+#elif defined(OMNIPLAY_DEVICE_FREE_ACTOR)
+using CoreModule=void*;
 #else
 using CoreModule=SDL_SharedObject*;
 #endif

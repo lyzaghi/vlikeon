@@ -5,10 +5,10 @@ export function validateMetrics(value){
   requireValue(value&&Object.keys(value).every(key=>fields.includes(key))&&fields.every(key=>value[key]===null||typeof value[key]==='number'&&Number.isFinite(value[key])&&value[key]>=0&&value[key]<=({packet_loss_percent:100,frames_decoded_per_second:300,frames_dropped:100000}[key]??60000)),'invalid_request','Streaming quality sample is invalid.');return value;
 }
 export class StreamQuality extends EventTarget{
-  #sender;#ceiling;#current;#bad=0;#good=0;#last=0;#pending=null;#busy=false;
+  #sender;#ceiling;#current;#bad=0;#good=0;#last=0;#pending=null;#busy=false;#closed=false;
   constructor(sender,ceiling){super();this.#sender=sender;this.#ceiling=ceiling;this.#current=ceiling;}
   async sample(value){
-    validateMetrics(value);if(this.#busy)return;this.#busy=true;
+    if(this.#closed)return;validateMetrics(value);if(this.#busy)return;this.#busy=true;
     try{
       const now=performance.now(),bad=(value.packet_loss_percent??0)>5||(value.rtt_ms??0)>180||(value.jitter_buffer_ms??0)>100||(value.frames_dropped??0)>10;
       this.#bad=bad?this.#bad+1:0;this.#good=bad?0:this.#good+1;
@@ -18,10 +18,11 @@ export class StreamQuality extends EventTarget{
       }
       if(now-this.#last<8000||this.#pending)return;
       const next=this.#bad>=3?Math.max(2000000,Math.floor(this.#current*.8)):this.#good>=10?Math.min(this.#ceiling,Math.floor(this.#current*1.1)):this.#current;
-      if(next===this.#current)return;const before=this.#current;await this.#set(next,next<before?'congestion_reduction':'healthy_recovery');this.#pending={bitrate:before,baseline:value};this.#last=now;this.#bad=this.#good=0;
+      if(next===this.#current)return;const before=this.#current;await this.#set(next,next<before?'congestion_reduction':'healthy_recovery');if(this.#closed)return;this.#pending={bitrate:before,baseline:value};this.#last=now;this.#bad=this.#good=0;
     }finally{this.#busy=false;}
   }
-  async #set(bitrate,reason){const parameters=this.#sender.getParameters();requireValue(Array.isArray(parameters.encodings)&&parameters.encodings.length===1,'unsupported_capability','The negotiated video sender cannot apply this quality policy.');parameters.encodings[0].maxBitrate=bitrate;await this.#sender.setParameters(parameters);this.#current=bitrate;this.dispatchEvent(new CustomEvent('change',{detail:{bitrate,reason}}));}
+  close(){this.#closed=true;this.#sender=null;this.#pending=null;}
+  async #set(bitrate,reason){if(this.#closed)return;const sender=this.#sender,parameters=sender.getParameters();requireValue(Array.isArray(parameters.encodings)&&parameters.encodings.length===1,'unsupported_capability','The negotiated video sender cannot apply this quality policy.');parameters.encodings[0].maxBitrate=bitrate;await sender.setParameters(parameters);if(this.#closed||sender!==this.#sender)return;this.#current=bitrate;this.dispatchEvent(new CustomEvent('change',{detail:{bitrate,reason}}));}
 }
 export class StreamStats{
   #previous=new Map();

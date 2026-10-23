@@ -1,0 +1,50 @@
+{
+  "schema_version": 1,
+  "comparisons": [
+    {
+      "from": "001a",
+      "to": "001c",
+      "changed_paths": [
+        "apps/web/assembly-receipt.json",
+        "docs/OUTSTANDING_WORK.md",
+        "engines/native/CMakeLists.txt",
+        "qa/integration/rebuild_resources.py",
+        "qa/integration/source_languages.py",
+        "tools/assemble_android.py",
+        "tools/assemble_ios.py",
+        "tools/build_native_runtime.py",
+        "tools/generate_browser_patch.py"
+      ]
+    },
+    {
+      "from": "001b",
+      "to": "001c",
+      "changed_paths": [
+        "tools/assemble_android.py",
+        "tools/assemble_ios.py",
+        "tools/generate_browser_patch.py"
+      ]
+    }
+  ],
+  "retained_passes": {
+    "001a": [
+      "exact-source-patch",
+      "release-inventory",
+      "browser-unit",
+      "rust-workspace",
+      "audio-configure",
+      "audio-build",
+      "audio-contract"
+    ],
+    "001b": [
+      "native-configure",
+      "native-build",
+      "actor-imports"
+    ],
+    "001c": [
+      "source-languages",
+      "source-generation"
+    ]
+  },
+  "qualification": "The listed carried checks have unchanged relevant inputs. Whole failed batches are not promoted to passes. Generator changes are requalified in 001c; native build changes are requalified in 001b."
+}

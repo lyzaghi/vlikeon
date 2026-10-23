@@ -67,7 +67,7 @@ export class GamePlayer extends EventTarget{
         const guard=this.#browserGuard;await this.#bridge.request('browser_game_guard_acquire',{id:guard},10000);
         if(preparation.signal.aborted)await this.#bridge.request('browser_game_guard_release',{id:guard},10000).catch(()=>{});check();
       }
-      const[inputProfile,touchProfile]=await Promise.all([this.#bridge.request('game_input_get',{game_id:game.id}),this.#bridge.request('game_touch_get',{game_id:game.id})]);check();this.#inputProfile=validateInputProfile(inputProfile);this.#touch.configure(touchProfile);this.#haptics.enable(this.#inputProfile.haptics_enabled);
+      const[inputProfile,touchProfile]=await Promise.all([this.#bridge.request('game_input_get',{game_id:game.id}),this.#bridge.request('game_touch_get',{game_id:game.id})]);check();this.#inputProfile=validateInputProfile(inputProfile);this.#ports.configure(this.#inputProfile.raw_gamepads);this.#touch.configure(touchProfile);this.#haptics.enable(this.#inputProfile.haptics_enabled);
       const settings=await this.#bridge.request('game_settings_get',{game_id:game.id});
       this.#playSettings=settings;
       check();const response=await fetch(new URL('./cores/catalog.json',import.meta.url),{signal:preparation.signal});if(!response.ok)throw new Error(text('notInstalled'));
@@ -275,6 +275,11 @@ export class GamePlayer extends EventTarget{
   #pollInput(){
     if(!this.#runtime)return;
     if(this.#runtime.state==='running'){
+      if(document.hidden||!document.hasFocus()||this.#pauseTask){
+        this.#haptics.stop();this.#keys.clear();this.#analogKeys.clear();this.#touch?.clear();this.#pointer?.clear();
+        this.#runtime.input(Array.from({length:4},()=>Array(16).fill(0)),Array.from({length:4},()=>Array(4).fill(0)));
+        this.#pauseFromEvent();this.#frame=requestAnimationFrame(()=>this.#pollInput());return;
+      }
       const pads=this.#ports.update();
       const touch=this.#touch.snapshot(),{ports,analogPorts}=gameInput(pads,this.#inputProfile,this.#keys,touch.buttons,this.#analogKeys,['n64','psp'].includes(this.#game.system),touch.sticks);
       const pause=Boolean(pads[0]?.mapping==='standard'&&pads[0]?.buttons[16]?.pressed);if(pause&&!this.#lastPauseButton)this.#pauseFromEvent();this.#lastPauseButton=pause;

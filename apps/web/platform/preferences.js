@@ -4,6 +4,8 @@ import{UUID,integer,requireValue,utf8}from'./errors.js';
 import{Sha256}from'./sha256.js';
 import{coreOptionRuntime,defaultCoreOptions,validateCoreOptions}from'../runtime/core-options.js';
 import{readSyncConsent,revokeSyncConsent}from'./sync-consent.js';
+import{hardwareVideoPolicy}from'../runtime/hardware-video.js';
+import{coreThreadPolicy,threadsAvailable}from'../runtime/thread-policy.js';
 
 const DEFAULTS={schema_version:1,locale:'vi',reduce_motion:false,high_contrast:false,text_scale:1,telemetry_opt_in:false,cloud_sync_opt_in:false,ai_enabled:false,suspend_background_tabs:false,appearance:{accent:'lime',library_layout:'cards',library_density:'comfortable'}};
 export const defaultSettings=()=>({...DEFAULTS,appearance:{...DEFAULTS.appearance}});
@@ -82,24 +84,26 @@ export class WebPreferences {
     return{source:'local_rules_v1',locale:settings.locale,message,proposal,external_model_used:false};
   }
   async accept(id,{signal}={}){
-    const entry=this.#pending.get(id);this.#pending.delete(id);requireValue(entry&&entry.expires>performance.now(),'permission_expired','Request a fresh recommendation.');const proposal=entry.proposal;
-    return this.#store.transaction(['config','games'],'readwrite',async tx=>{
+    const entry=this.#pending.get(id);requireValue(entry&&entry.expires>performance.now(),'permission_expired','Request a fresh recommendation.');const proposal=entry.proposal;
+    const result=await this.#store.transaction(['config','games'],'readwrite',async tx=>{
+      requireValue(entry.expires>performance.now(),'permission_expired','Request a fresh recommendation.');
       const settings=validateSettings((await tx.get('config','settings'))?.value??{...DEFAULTS});requireValue(settings.ai_enabled,'permission_denied','Local recommendations are disabled.');requireValue(await tx.get('games',proposal.game_id),'not_found','The game was not found.');
       const current=validateConfig((await tx.get('config',configKey(proposal.game_id)))?.value??defaultConfig());requireValue(configHash(current)===proposal.before_hash,'conflict','Game settings changed after this recommendation.');await tx.put('config',{key:configKey(proposal.game_id),value:proposal.after});return proposal.after;
-    },signal);
+    },signal);this.#pending.delete(id);return result;
   }
   dismiss(id){this.#pending.delete(id);return{dismissed:true};}
   close(){this.#pending.clear();}
 }
 
 export function rankWebRuntime(game,device,candidates,catalog){
-  requireValue(device&&typeof device.wasm==='boolean'&&typeof device.webgpu==='boolean'&&(device.memory_mb===null||integer(device.memory_mb,1,4*1024*1024))&&(device.battery_percent===null||Number.isFinite(device.battery_percent)&&device.battery_percent>=0&&device.battery_percent<=100)&&Array.isArray(candidates)&&candidates.length<=32,'invalid_request','Runtime routing input is invalid.');
+  requireValue(device&&typeof device.wasm==='boolean'&&typeof device.webgpu==='boolean'&&typeof device.webgl2==='boolean'&&typeof device.touch==='boolean'&&(device.thermal_throttled===null||typeof device.thermal_throttled==='boolean')&&(device.memory_mb===null||integer(device.memory_mb,1,4*1024*1024))&&(device.battery_percent===null||Number.isFinite(device.battery_percent)&&device.battery_percent>=0&&device.battery_percent<=100)&&Array.isArray(candidates)&&candidates.length<=32,'invalid_request','Runtime routing input is invalid.');
   const ids=new Set(),ranked=[];
   for(const candidate of candidates){
     requireValue(candidate&&typeof candidate.id==='string'&&/^[A-Za-z0-9_-]{1,128}$/.test(candidate.id)&&!ids.has(candidate.id),'invalid_request','Runtime routing identity is invalid.');ids.add(candidate.id);
     const core=catalog.find(core=>core.id===candidate.id),reasons=[];let eligible=true;
     if(candidate.kind!=='web_wasm'||candidate.available!==true||!core){eligible=false;reasons.push('not_installed');}
     if(core?.distribution_approved!==true){eligible=false;reasons.push('unapproved');}if(core?.security_revoked===true){eligible=false;reasons.push('revoked');}
+    if(core){try{if(hardwareVideoPolicy(core)&&!device.webgl2){eligible=false;reasons.push('requires_web_gl2');}if(coreThreadPolicy(core)&&!threadsAvailable()){eligible=false;reasons.push('not_installed');}}catch{eligible=false;reasons.push('unapproved');}}
     if(!core?.systems?.includes(game.system)){eligible=false;reasons.push('wrong_system');}if(!device.wasm||typeof WebAssembly!=='object'){eligible=false;reasons.push('requires_web_assembly');}
     if(core?.needs_webgpu&&!device.webgpu){eligible=false;reasons.push('requires_web_gpu');}if(core?.minimum_memory_mb&&device.memory_mb!==null&&device.memory_mb<core.minimum_memory_mb){eligible=false;reasons.push('not_enough_memory');}
     if(eligible)reasons.push('available_local_runtime');reasons.push('unmeasured_on_device');if(device.battery_percent!==null&&device.battery_percent<20)reasons.push('battery_conservation');if(device.thermal_throttled===true)reasons.push('thermal_pressure');

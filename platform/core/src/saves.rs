@@ -20,7 +20,10 @@ impl<'a> SaveStore<'a> {
     pub fn commit(&mut self, metadata: SaveMetadata, payload: &[u8], expected_parent: Option<Uuid>) -> Result<SaveMetadata> {
         self.commit_origin(metadata,payload,expected_parent,crate::save_origins::NewOrigin::Captured)
     }
-    fn commit_origin(&mut self, mut metadata:SaveMetadata,payload:&[u8],expected_parent:Option<Uuid>,origin:crate::save_origins::NewOrigin)->Result<SaveMetadata>{
+    fn commit_origin(&mut self,metadata:SaveMetadata,payload:&[u8],expected_parent:Option<Uuid>,origin:crate::save_origins::NewOrigin)->Result<SaveMetadata>{
+        self.commit_origin_reference(metadata,payload,expected_parent,origin,None)
+    }
+    fn commit_origin_reference(&mut self,mut metadata:SaveMetadata,payload:&[u8],expected_parent:Option<Uuid>,origin:crate::save_origins::NewOrigin,reference:Option<&str>)->Result<SaveMetadata>{
         metadata.validate()?;
         if payload.len() as u64 != metadata.payload_bytes || digest(payload) != metadata.payload_hash {
             return Err(PlatformError::new(ErrorCode::ContentMismatch, "Save payload does not match its metadata"));
@@ -30,6 +33,10 @@ impl<'a> SaveStore<'a> {
         let kind = kind_name(metadata.kind);
         let staged=crate::save_payloads::stage(self.database,&metadata,payload)?;
         let transaction = self.database.connection.transaction_with_behavior(TransactionBehavior::Immediate).map_err(storage_error)?;
+        if reference.is_some(){
+            let active:bool=transaction.query_row("SELECT EXISTS(SELECT 1 FROM sessions WHERE game_id=?1 AND state NOT IN ('stopped','failed'))",[metadata.game_id.to_string()],|row|row.get(0)).map_err(storage_error)?;
+            if active{return Err(PlatformError::new(ErrorCode::Busy,"Stop the game before restoring its backup"));}
+        }
         let game_hash: Option<String> = transaction.query_row("SELECT content_hash FROM games WHERE id=?1", [metadata.game_id.to_string()], |row| row.get(0)).optional().map_err(storage_error)?;
         if game_hash.as_deref() != Some(metadata.game_content_hash.0.as_str()) { return Err(PlatformError::new(ErrorCode::ContentMismatch, "Save game content is not in this library")); }
         let removed:bool=transaction.query_row("SELECT EXISTS(SELECT 1 FROM locally_removed_saves WHERE save_id=?1)",[metadata.id.to_string()],|row|row.get(0)).map_err(storage_error)?;
@@ -50,12 +57,21 @@ impl<'a> SaveStore<'a> {
         transaction.execute("INSERT INTO saves(id,game_id,kind,slot,generation,parent_id,metadata_json,payload_hash,payload_bytes,created_at_ms) VALUES(?1,?2,?3,?4,?5,?6,?7,?8,?9,?10)", params![metadata.id.to_string(), metadata.game_id.to_string(), kind, metadata.slot, metadata.generation, metadata.parent_id.map(|id|id.to_string()), json, metadata.payload_hash.0, metadata.payload_bytes, metadata.created_at_ms]).map_err(storage_error)?;
         crate::save_origins::insert(&transaction,&origin)?;
         staged.publish(&transaction,&metadata)?;
+        if let Some(reference)=reference{transaction.execute("INSERT INTO preferences(key,value) VALUES(?1,?2)",params![format!("backup_reference.{}",metadata.id),reference]).map_err(storage_error)?;}
         if !metadata.conflict {
             transaction.execute("INSERT INTO save_heads(game_id,kind,slot,save_id) VALUES(?1,?2,?3,?4) ON CONFLICT(game_id,kind,slot) DO UPDATE SET save_id=excluded.save_id", params![metadata.game_id.to_string(),kind,metadata.slot,metadata.id.to_string()]).map_err(storage_error)?;
         }
         transaction.execute("INSERT INTO audit(event,entity_id,created_at_ms) VALUES('save.commit',?1,?2)", params![metadata.id.to_string(), crate::now_ms()]).map_err(storage_error)?;
         transaction.commit().map_err(storage_error)?;
         Ok(metadata)
+    }
+
+    /// A user-selected archive is a new local branch, never authenticated remote
+    /// authority. Keep its complete archived origin separately as a reference.
+    pub(crate) fn restore_backup(&mut self,mut metadata:SaveMetadata,payload:&[u8],game_id:Uuid,id:Uuid,reference:&str)->Result<SaveMetadata>{
+        if reference.len()>256*1024{return Err(PlatformError::new(ErrorCode::ResourceLimit,"Backup origin reference exceeds its bound"));}
+        let original=metadata.clone();metadata.id=id;metadata.game_id=game_id;metadata.parent_id=None;metadata.generation=1;metadata.conflict=true;
+        self.commit_origin_reference(metadata,payload,None,crate::save_origins::NewOrigin::Imported(original),Some(reference))
     }
 
     pub fn metadata(&self, id: Uuid) -> Result<SaveMetadata> {
@@ -102,6 +118,13 @@ impl<'a> SaveStore<'a> {
         let (mut metadata,_)=self.read(id,None)?;
         let kind=kind_name(metadata.kind);
         let transaction=self.database.connection.transaction_with_behavior(TransactionBehavior::Immediate).map_err(storage_error)?;
+        let active:bool=transaction.query_row("SELECT EXISTS(SELECT 1 FROM sessions WHERE game_id=?1 AND state NOT IN ('stopped','failed'))",[metadata.game_id.to_string()],|row|row.get(0)).map_err(storage_error)?;
+        if active{return Err(PlatformError::new(ErrorCode::Busy,"Stop the game before selecting current saved progress"));}
+        let current:Option<String>=transaction.query_row("SELECT metadata_json FROM saves WHERE id=?1",[id.to_string()],|row|row.get(0)).optional().map_err(storage_error)?;
+        let current=current.ok_or_else(||PlatformError::new(ErrorCode::Conflict,"Saved progress changed while choosing a save"))?;
+        if serde_json::to_value(parse_metadata(current.as_bytes())?).map_err(storage_error)?!=serde_json::to_value(&metadata).map_err(storage_error)?{
+            return Err(PlatformError::new(ErrorCode::Conflict,"Saved progress changed while choosing a save").recover("Refresh save history and choose again"));
+        }
         let existing:Option<String>=transaction.query_row("SELECT save_id FROM save_heads WHERE game_id=?1 AND kind=?2 AND slot=?3",params![metadata.game_id.to_string(),kind,metadata.slot],|row|row.get(0)).optional().map_err(storage_error)?;
         if existing!=expected_head.map(|value|value.to_string()) {return Err(PlatformError::new(ErrorCode::Conflict,"Current progress changed while choosing a save").recover("Refresh the save history and choose again"));}
         metadata.conflict=false;

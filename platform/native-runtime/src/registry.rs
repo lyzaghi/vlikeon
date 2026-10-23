@@ -65,19 +65,19 @@ impl RuntimePackage{
 #[serde(deny_unknown_fields)]
 struct Catalog {schema_version:u32,runtimes:Vec<RuntimePackage>}
 
-pub struct NativeRegistry {root:Option<PathBuf>,packages:Vec<RuntimePackage>,profile_root:PathBuf,profile_id:Uuid,release_inventory:Option<PackageManifest>,#[cfg(all(target_os="linux",target_arch="x86_64",target_env="gnu"))]linux_context:Option<(omniplay_sandbox::linux_delegation::Delegation,crate::linux_image_cache::ProfileImageCache)>}
+pub struct NativeRegistry {#[cfg(all(target_os="macos",target_arch="aarch64"))]macos_context:Option<omniplay_sandbox::macos::MacConnection>,root:Option<PathBuf>,packages:Vec<RuntimePackage>,profile_root:PathBuf,profile_id:Uuid,release_inventory:Option<PackageManifest>,#[cfg(all(target_os="linux",target_arch="x86_64",target_env="gnu"))]linux_context:Option<(omniplay_sandbox::linux_delegation::Delegation,crate::linux_image_cache::ProfileImageCache)>}
 impl NativeRegistry {
     pub fn installed(profile_root:&Path,profile_id:Uuid)->Self {
         // Windows cleanup belongs to the broker's bounded asynchronous owner.
         // Do not run profile/process/filesystem recovery before native hello.
-        #[cfg(not(windows))]collect_abandoned_work(profile_root,profile_id);
-        let mut registry=Self{root:None,packages:Vec::new(),profile_root:profile_root.to_owned(),profile_id,release_inventory:None,#[cfg(all(target_os="linux",target_arch="x86_64",target_env="gnu"))]linux_context:None};
+        #[cfg(all(not(windows),not(target_os="macos")))]collect_abandoned_work(profile_root,profile_id);
+        let mut registry=Self{#[cfg(all(target_os="macos",target_arch="aarch64"))]macos_context:None,root:None,packages:Vec::new(),profile_root:profile_root.to_owned(),profile_id,release_inventory:None,#[cfg(all(target_os="linux",target_arch="x86_64",target_env="gnu"))]linux_context:None};
         // Catalog failure disables only native execution. The library, exports and
         // isolated web runtimes remain available instead of losing the whole profile.
         if let Ok((root,inventory))=installed_root(){
             if let Ok(packages)=load_catalog(&root,Some(&inventory)){registry.root=Some(root);registry.release_inventory=Some(inventory);registry.packages=packages;}
         }
-        #[cfg(debug_assertions)]
+        #[cfg(all(debug_assertions,not(target_os="macos")))]
         if registry.root.is_none(){
             if let Some(path)=std::env::var_os("OMNIPLAY_DEV_NATIVE_ROOT"){
                 let root=PathBuf::from(path);
@@ -87,15 +87,34 @@ impl NativeRegistry {
         registry
     }
     fn available(&self)->bool{
+        #[cfg(all(target_os="macos",target_arch="aarch64"))]{return self.macos_context.is_some()&&self.release_inventory.is_some()&&self.root.is_some();}
         #[cfg(all(target_os="linux",target_arch="x86_64",target_env="gnu"))]{return self.linux_context.is_some()&&self.release_inventory.is_some()&&self.root.is_some();}
-        #[cfg(not(all(target_os="linux",target_arch="x86_64",target_env="gnu")))]{omniplay_sandbox::supported()}
+        #[cfg(not(any(all(target_os="linux",target_arch="x86_64",target_env="gnu"),all(target_os="macos",target_arch="aarch64"))))]{omniplay_sandbox::supported()}
+    }
+    #[cfg(all(target_os="macos",target_arch="aarch64"))]
+    pub fn installed_macos(profile_root:&Path,profile_id:Uuid)->Result<Self>{
+        if profile_id.is_nil(){return Err(unavailable("The macOS owner needs an exact profile identity"));}
+        let(root,inventory)=installed_root()?;let packages=load_catalog(&root,Some(&inventory))?;
+        let identity=packages.first().and_then(|p|p.macos.clone()).ok_or_else(||unavailable("The signed macOS catalog has no owner identity"))?;
+        for package in &packages{
+            let mac=package.macos.as_ref().ok_or_else(||unavailable("Every macOS package requires its explicit owner policy"))?;
+            if mac.owner_signing_identifier!=identity.owner_signing_identifier||mac.team_identifier!=identity.team_identifier||mac.owner_entitlements_sha256!=identity.owner_entitlements_sha256{return Err(unavailable("The macOS catalog mixes XPC owner authorities"));}
+            crate::mac_package::admit(&root,package,&inventory)?;
+        }
+        let profile_root=profile_root.canonicalize().map_err(storage_error)?;
+        let executable=root.join(format!("VlikeonBroker.app/Contents/XPCServices/{}.xpc/Contents/MacOS/omniplay-macos-owner",identity.owner_signing_identifier));
+        let connection=omniplay_sandbox::macos::MacConnection::connect_control(&identity.owner_signing_identifier,&identity.team_identifier,&profile_id.to_string(),&executable,&profile_root)?;
+        let recovery=crate::mac_work::recover(&connection,&profile_root)?;
+        if recovery.remaining!=0{return Err(unavailable("Retained macOS work needs confirmed recovery; current-boot launched work requires a system restart"));}
+        if !connection.execution_available(){return Err(unavailable("The macOS owner has not established the complete execution boundary"));}
+        Ok(Self{root:Some(root),packages,profile_root,profile_id,release_inventory:Some(inventory),macos_context:Some(connection)})
     }
     /// Explicit trusted-host composition only. No environment variable, renderer
     /// parameter or default installed() call can create/grant this delegation.
     #[cfg(all(target_os="linux",target_arch="x86_64",target_env="gnu"))]
     pub fn installed_linux(profile_root:&Path,profile_id:Uuid,delegation:omniplay_sandbox::linux_delegation::Delegation,cache_bytes:u64)->Result<Self>{
         if profile_id.is_nil()||delegation.identity().profile!=profile_id.to_string(){return Err(unavailable("The Linux delegation belongs to a different profile"));}let(root,inventory)=installed_root()?;let packages=load_catalog(&root,Some(&inventory))?;if packages.iter().any(|package|package.linux.is_none()){return Err(unavailable("Every selected Linux native package requires its explicit actor image policy"));}
-        let profile_root=profile_root.canonicalize().map_err(storage_error)?;let cache=crate::linux_image_cache::ProfileImageCache::open(&profile_root,profile_id,cache_bytes)?;Ok(Self{root:Some(root),packages,profile_root,profile_id,release_inventory:Some(inventory),linux_context:Some((delegation,cache))})
+        let profile_root=profile_root.canonicalize().map_err(storage_error)?;let cache=crate::linux_image_cache::ProfileImageCache::open(&profile_root,profile_id,cache_bytes)?;Ok(Self{#[cfg(all(target_os="macos",target_arch="aarch64"))]macos_context:None,root:Some(root),packages,profile_root,profile_id,release_inventory:Some(inventory),linux_context:Some((delegation,cache))})
     }
     /// Trusted service-owner entry point. Package admission precedes provisioning;
     /// retained work is audited before converting the profile to launch authority.
@@ -107,7 +126,7 @@ impl NativeRegistry {
         let profile_root=profile_root.canonicalize().map_err(storage_error)?;let _profile=omniplay_sandbox::linux_launch::private_directory(&profile_root)?;
         let cache=crate::linux_image_cache::ProfileImageCache::open(&profile_root,profile_id,cache_bytes)?;
         let recovery=host.profile(&profile_id.to_string(),profile_lease)?;let summary=crate::linux_work::recover_linux_work(&profile_root,profile_id,&recovery)?;let delegation=recovery.finish()?;
-        Ok((Self{root:Some(root),packages,profile_root,profile_id,release_inventory:Some(inventory),linux_context:Some((delegation,cache))},summary))
+        Ok((Self{#[cfg(all(target_os="macos",target_arch="aarch64"))]macos_context:None,root:Some(root),packages,profile_root,profile_id,release_inventory:Some(inventory),linux_context:Some((delegation,cache))},summary))
     }
     #[cfg(all(target_os="linux",target_arch="x86_64",target_env="gnu"))]
     pub fn installed_linux_service(profile_root:&Path,profile_id:Uuid,socket:&Path,cache_bytes:u64)->Result<(Self,crate::LinuxRecoverySummary)>{
@@ -116,7 +135,7 @@ impl NativeRegistry {
         let lease_path=profile_root.join("linux-cgroup.lease");let lease=OpenOptions::new().read(true).write(true).create(true).mode(0o600).custom_flags(libc::O_CLOEXEC|libc::O_NOFOLLOW).open(&lease_path).map_err(storage_error)?;let value=lease.metadata().map_err(storage_error)?;if !value.is_file()||value.uid()!=profile_owner||value.mode()&0o7777!=0o600||value.nlink()!=1{return Err(unavailable("The Linux profile resource lease is not private"));}
         let directory=omniplay_sandbox::linux_host_channel::request(socket,&profile_id.to_string())?;let recovery=omniplay_sandbox::linux_delegation::RecoveryDelegation::admit(directory,&profile_id.to_string(),lease,omniplay_sandbox::linux_delegation::DelegationPolicy{maximum_sessions:4,maximum_reserved_bytes:14*1024*1024*1024})?;
         let summary=crate::linux_work::recover_linux_work(&profile_root,profile_id,&recovery)?;let delegation=recovery.finish()?;let cache=crate::linux_image_cache::ProfileImageCache::open(&profile_root,profile_id,cache_bytes)?;
-        Ok((Self{root:Some(root),packages,profile_root,profile_id,release_inventory:Some(inventory),linux_context:Some((delegation,cache))},summary))
+        Ok((Self{#[cfg(all(target_os="macos",target_arch="aarch64"))]macos_context:None,root:Some(root),packages,profile_root,profile_id,release_inventory:Some(inventory),linux_context:Some((delegation,cache))},summary))
     }
 }
 
@@ -134,11 +153,16 @@ impl RuntimeFactory for NativeRegistry {
         let package=self.packages.iter().find(|p|p.manifest.id==id).cloned().ok_or_else(||unavailable("The requested native runtime is not installed"))?;
         package.manifest.validate()?;
         let root=self.root.clone().ok_or_else(||unavailable("The installed native runtime catalog is unavailable"))?;
+        #[cfg(all(target_os="macos",target_arch="aarch64"))]{
+            let connection=self.macos_context.clone().ok_or_else(||unavailable("The authenticated macOS owner is unavailable"))?;
+            let inventory=self.release_inventory.clone().ok_or_else(||unavailable("The macOS release inventory is unavailable"))?;
+            return Ok(Box::new(crate::mac_adapter::MacAdapter::new(root,package,inventory,self.profile_root.clone(),connection)));
+        }
         #[cfg(all(target_os="linux",target_arch="x86_64",target_env="gnu"))]{
             let(delegation,cache)=self.linux_context.as_ref().ok_or_else(||unavailable("The explicit Linux profile resource context is absent"))?;let inventory=self.release_inventory.clone().ok_or_else(||unavailable("The authenticated Linux release inventory is absent"))?;
             return Ok(Box::new(crate::linux_adapter::LinuxAdapter::new(root,package,inventory,self.profile_root.clone(),self.profile_id,delegation.clone(),cache.clone())));
         }
-        #[cfg(not(all(target_os="linux",target_arch="x86_64",target_env="gnu")))]
+        #[cfg(not(any(all(target_os="linux",target_arch="x86_64",target_env="gnu"),all(target_os="macos",target_arch="aarch64"))))]
         Ok(Box::new(NativeAdapter::new(root,package,self.profile_root.clone(),self.profile_id,self.release_inventory.clone())))
     }
 }
@@ -204,7 +228,7 @@ pub(crate) fn parse_catalog(raw:&[u8])->Result<Vec<RuntimePackage>>{
         if Path::new(&package.worker).parent()!=Path::new(&package.core_library).parent(){return Err(unavailable("The native core library must reside beside its fixed worker executable"));}
         if let Some(presentation)=&package.presentation{
             validate_relative(&presentation.executable)?;
-            if !(omniplay_sandbox::presentation_supported()||package.linux.is_some()&&package.manifest.platform=="linux-x86_64")||presentation.protocol!=2||package.video_backend!=VideoBackend::Software||!(1..=4096).contains(&presentation.maximum_width)||!(1..=4096).contains(&presentation.maximum_height)||!(256..=2048).contains(&presentation.memory_limit_mb)||u64::from(presentation.maximum_width)*u64::from(presentation.maximum_height)*16+128*1024*1024>u64::from(presentation.memory_limit_mb)*1024*1024||!paths.contains(&presentation.executable)||presentation.executable==package.worker||presentation.executable==package.core_library||Path::new(&presentation.executable).parent()!=Path::new(&package.worker).parent(){return Err(unavailable("The private presentation package differs from its protocol, software, inventory or memory policy"));}
+            if !(omniplay_sandbox::presentation_supported()||package.linux.is_some()&&package.manifest.platform=="linux-x86_64"||package.macos.is_some()&&package.manifest.platform=="macos-aarch64")||presentation.protocol!=2||package.video_backend!=VideoBackend::Software||!(1..=4096).contains(&presentation.maximum_width)||!(1..=4096).contains(&presentation.maximum_height)||!(256..=2048).contains(&presentation.memory_limit_mb)||u64::from(presentation.maximum_width)*u64::from(presentation.maximum_height)*16+128*1024*1024>u64::from(presentation.memory_limit_mb)*1024*1024||!paths.contains(&presentation.executable)||presentation.executable==package.worker||presentation.executable==package.core_library||Path::new(&presentation.executable).parent()!=Path::new(&package.worker).parent(){return Err(unavailable("The private presentation package differs from its protocol, software, inventory or memory policy"));}
         }
     }
     Ok(catalog.runtimes)

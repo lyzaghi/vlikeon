@@ -15,7 +15,7 @@ const emptySummary=()=>({uploaded:0,downloaded:0,equivalent:0,suppressed:0,waiti
 function failure(error,current){const code=current.timedOut?'deadline_exceeded':current.controller.signal.aborted?'cancelled':codes.has(error?.code)?error.code:'storage_failure';return{code,message:code==='cancelled'?'Synchronization stopped. Retained encrypted transfers can resume.':code==='deadline_exceeded'?'This synchronization opportunity reached its deadline. Choose Sync now to continue.':code==='conflict'?'Saved progress identities differ. Both copies remain retained for recovery.':'Synchronization could not finish. Local progress and retained encrypted copies remain available.',recoverable:true};}
 
 export class WebSyncRun{
-  #store;#saves;#credentials;#account;#profile;#recovery;#available=false;#current=null;#starting=false;#closed=false;#listeners=new AbortController();#exportController=null;#exportTask=null;
+  #store;#saves;#credentials;#account;#profile;#recovery;#available=false;#current=null;#starting=false;#startController=null;#startTask=null;#closePromise=null;#closed=false;#listeners=new AbortController();#exportController=null;#exportTask=null;
   constructor(store,saves,credentials,account,profile,{recovery}={}){
     requireValue(typeof profile==='string'&&UUID.test(profile)&&typeof recovery?.process==='function','invalid_request','The browser synchronization profile is invalid.');this.#store=store;this.#saves=saves;this.#credentials=credentials;this.#account=account;this.#profile=profile;this.#recovery=recovery;
     const options={signal:this.#listeners.signal};window.addEventListener('blur',()=>this.stop(),options);window.addEventListener('pagehide',()=>this.stop(),options);document.addEventListener('visibilitychange',()=>{if(document.hidden)this.stop();},options);
@@ -37,13 +37,21 @@ export class WebSyncRun{
     if(input.enabled){requireValue(!document.hidden&&document.hasFocus(),'cancelled','Enable synchronization from the foreground Game Hub.');const{status,policy}=await this.#policy(signal);requireValue(status.connected&&status.account.registered&&policy.service_audiences.includes(status.account.audience),'permission_denied','Connect a registered account on an enabled service first.');}
     const result=await configureSyncConsent(this.#store,this.#profile,input,value=>validateSettings(value??defaultSettings()),{signal,available:this.#available});if(!result.enabled)this.stop();return result;
   }
-  async start({signal}={}){
-    checkAbort(signal);this.assertIdle();this.#account.assertIdle();requireValue(!document.hidden&&document.hasFocus(),'cancelled','Keep Game Hub in the foreground while synchronizing.');this.#starting=true;
+  start({signal}={}){
+    try{checkAbort(signal);this.assertIdle();this.#account.assertIdle();requireValue(!document.hidden&&document.hasFocus(),'cancelled','Keep Game Hub in the foreground while synchronizing.');}catch(error){return Promise.reject(error);}
+    this.#starting=true;const controller=new AbortController(),abort=()=>controller.abort();this.#startController=controller;
+    let resolve,reject;const task=new Promise((done,failed)=>{resolve=done;reject=failed;});this.#startTask=task;
+    signal?.addEventListener('abort',abort,{once:true});if(signal?.aborted)abort();
+    const finish=()=>{signal?.removeEventListener('abort',abort);this.#starting=false;if(this.#startController===controller)this.#startController=null;if(this.#startTask===task)this.#startTask=null;};
+    this.#startOwned(controller).then(value=>{finish();resolve(value);},error=>{finish();reject(error);});return task;
+  }
+  async #startOwned(controller){
+    const signal=controller.signal;
     try{
       const context=await loadSyncContext(this.#store,this.#profile,{signal}),{status,policy}=await this.#policy(signal);requireValue(status.connected&&status.generation===context.generation&&status.account.registered&&policy.service_audiences.includes(status.account.audience),'permission_denied','Enable synchronization for a registered account on this service first.');await this.#store.transaction(['config'],'readonly',tx=>assertSyncContext(tx,context),signal);this.#account.assertIdle();checkAbort(signal);requireValue(!this.#closed&&!document.hidden&&document.hasFocus(),'cancelled','The synchronization opportunity left the foreground.');
-      const current={snapshot:{id:crypto.randomUUID(),state:'running',started_at_ms:Date.now(),finished_at_ms:null,stop_requested:false,summary:emptySummary(),error:null},controller:new AbortController(),alive:true,http:null,journal:null,timedOut:false,timer:0,task:null};this.#current=current;
+      const current={snapshot:{id:crypto.randomUUID(),state:'running',started_at_ms:Date.now(),finished_at_ms:null,stop_requested:false,summary:emptySummary(),error:null},controller,alive:true,http:null,journal:null,timedOut:false,timer:0,task:null};this.#current=current;
       current.timer=setTimeout(()=>{current.timedOut=true;this.#stop(current);},RUN_TIME);current.task=this.#perform(current,policy,context);return structuredClone(current.snapshot);
-    }finally{this.#starting=false;}
+    }catch(error){controller.abort();throw error;}
   }
   async #perform(current,policy,context){
     let error=null,result=null;
@@ -65,7 +73,7 @@ export class WebSyncRun{
   #job(id){requireValue(typeof id==='string'&&UUID.test(id)&&this.#current?.snapshot.id===id,'not_found','The synchronization run was not found.');return this.#current;}
   jobStatus(id){return structuredClone(this.#job(id).snapshot);}
   #stop(current){if(!current?.alive)return;current.snapshot.stop_requested=true;current.controller.abort();current.http?.close();current.journal?.close();this.#credentials.lock();}
-  stop(){this.#stop(this.#current);this.#exportController?.abort();}
+  stop(){this.#startController?.abort();this.#stop(this.#current);this.#exportController?.abort();}
   cancel(id){const current=this.#job(id);this.#stop(current);return structuredClone(current.snapshot);}
-  async close(){if(this.#closed)return;this.#closed=true;this.#listeners.abort();this.stop();await Promise.allSettled([this.#current?.task,this.#exportTask]);}
+  close(){if(this.#closePromise)return this.#closePromise;let resolve;this.#closePromise=new Promise(done=>{resolve=done;});this.#closed=true;this.#listeners.abort();this.stop();Promise.allSettled([this.#startTask]).then(()=>Promise.allSettled([this.#current?.task,this.#exportTask])).then(()=>resolve());return this.#closePromise;}
 }

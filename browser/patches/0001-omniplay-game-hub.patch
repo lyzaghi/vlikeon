@@ -244,7 +244,7 @@
  #if BUILDFLAG(IS_CHROMEOS)
 --- a/chrome/browser/resources/component_extension_resources.grd
 +++ b/chrome/browser/resources/component_extension_resources.grd
-@@ -12,6 +12,93 @@
+@@ -12,6 +12,98 @@
    </outputs>
    <release seq="1">
      <includes>
@@ -261,6 +261,8 @@
 +        <include name="IDR_OMNIPLAY_COMPATIBILITY_JS" file="omniplay_game_hub/compatibility.js" resource_path="omniplay_game_hub/compatibility.js" type="BINDATA" />
 +        <include name="IDR_OMNIPLAY_COMPONENT_CONTEXT_JS" file="omniplay_game_hub/component-context.js" resource_path="omniplay_game_hub/component-context.js" type="BINDATA" />
 +        <include name="IDR_OMNIPLAY_COMPONENT_OWNERSHIP_JS" file="omniplay_game_hub/component-ownership.js" resource_path="omniplay_game_hub/component-ownership.js" type="BINDATA" />
++        <include name="IDR_OMNIPLAY_CONTROLLER_PROFILE_JS" file="omniplay_game_hub/controller-profile.js" resource_path="omniplay_game_hub/controller-profile.js" type="BINDATA" />
++        <include name="IDR_OMNIPLAY_CONTROLLER_SETTINGS_JS" file="omniplay_game_hub/controller-settings.js" resource_path="omniplay_game_hub/controller-settings.js" type="BINDATA" />
 +        <include name="IDR_OMNIPLAY_CONTROLLERS_JS" file="omniplay_game_hub/controllers.js" resource_path="omniplay_game_hub/controllers.js" type="BINDATA" />
 +        <include name="IDR_OMNIPLAY_CORE_OPTION_SETTINGS_JS" file="omniplay_game_hub/core-option-settings.js" resource_path="omniplay_game_hub/core-option-settings.js" type="BINDATA" />
 +        <include name="IDR_OMNIPLAY_CORES_CATALOG_JSON" file="omniplay_game_hub/cores/catalog.json" resource_path="omniplay_game_hub/cores/catalog.json" type="BINDATA" />
@@ -276,6 +278,7 @@
 +        <include name="IDR_OMNIPLAY_INPUT_PROFILE_JS" file="omniplay_game_hub/input-profile.js" resource_path="omniplay_game_hub/input-profile.js" type="BINDATA" />
 +        <include name="IDR_OMNIPLAY_INPUT_SETTINGS_JS" file="omniplay_game_hub/input-settings.js" resource_path="omniplay_game_hub/input-settings.js" type="BINDATA" />
 +        <include name="IDR_OMNIPLAY_LIBRARY_IMPORT_JS" file="omniplay_game_hub/library-import.js" resource_path="omniplay_game_hub/library-import.js" type="BINDATA" />
++        <include name="IDR_OMNIPLAY_LIBRARY_RECOVERY_JS" file="omniplay_game_hub/library-recovery.js" resource_path="omniplay_game_hub/library-recovery.js" type="BINDATA" />
 +        <include name="IDR_OMNIPLAY_MANIFEST" file="omniplay_game_hub/manifest.json" resource_path="omniplay_game_hub/manifest.json" type="BINDATA" />
 +        <include name="IDR_OMNIPLAY_MEDIA_CLIENT_JS" file="omniplay_game_hub/media-client.js" resource_path="omniplay_game_hub/media-client.js" type="BINDATA" />
 +        <include name="IDR_OMNIPLAY_NATIVE_MEDIA_CLIENT_JS" file="omniplay_game_hub/native-media-client.js" resource_path="omniplay_game_hub/native-media-client.js" type="BINDATA" />
@@ -331,8 +334,10 @@
 +        <include name="IDR_OMNIPLAY_STYLES_CSS" file="omniplay_game_hub/styles.css" resource_path="omniplay_game_hub/styles.css" type="BINDATA" />
 +        <include name="IDR_OMNIPLAY_SYNC_SETTINGS_JS" file="omniplay_game_hub/sync-settings.js" resource_path="omniplay_game_hub/sync-settings.js" type="BINDATA" />
 +        <include name="IDR_OMNIPLAY_TOUCH_CONTROLS_JS" file="omniplay_game_hub/touch-controls.js" resource_path="omniplay_game_hub/touch-controls.js" type="BINDATA" />
++        <include name="IDR_OMNIPLAY_TOUCH_LAYOUT_EDITOR_JS" file="omniplay_game_hub/touch-layout-editor.js" resource_path="omniplay_game_hub/touch-layout-editor.js" type="BINDATA" />
 +        <include name="IDR_OMNIPLAY_TOUCH_PROFILE_JS" file="omniplay_game_hub/touch-profile.js" resource_path="omniplay_game_hub/touch-profile.js" type="BINDATA" />
 +        <include name="IDR_OMNIPLAY_TOUCH_SETTINGS_JS" file="omniplay_game_hub/touch-settings.js" resource_path="omniplay_game_hub/touch-settings.js" type="BINDATA" />
++        <include name="IDR_OMNIPLAY_UNUSED_CONTENT_JS" file="omniplay_game_hub/unused-content.js" resource_path="omniplay_game_hub/unused-content.js" type="BINDATA" />
 +        <include name="IDR_OMNIPLAY_UPDATE_SETTINGS_JS" file="omniplay_game_hub/update-settings.js" resource_path="omniplay_game_hub/update-settings.js" type="BINDATA" />
 +      </if>
        <include name="IDR_NETWORK_SPEECH_SYNTHESIS_JS" file="network_speech_synthesis/tts_extension.js" type="BINDATA" />

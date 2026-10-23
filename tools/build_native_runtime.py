@@ -163,8 +163,7 @@ def main():
     if args.toolset:
         command += ["-T", args.toolset]
     subprocess.run([str(value) for value in command], check=True)
-    targets=['omniplay-native-worker']+(['omniplay-presentation-host']if brokered else [])
-    subprocess.run([str(args.cmake), "--build", str(build), "--config", "Release", "--target",*targets,"--parallel", str(args.parallel)], check=True)
+    subprocess.run([str(args.cmake), "--build", str(build), "--config", "Release", "--target","omniplay-native-runtime-build","--parallel", str(args.parallel)], check=True)
     if first_party_sources()!=compiled_sources:raise ValueError('Native frontend/helper source changed during its build')
     workers = list(build.rglob("omniplay-native-worker.exe"))
     if len(workers) != 1:

@@ -29,7 +29,7 @@ struct Failure:std::runtime_error {const char* code;explicit Failure(const char*
 class Engine {
   static Engine* active_;
   std::unique_ptr<presentation::Client> presentation_;
-  std::uint64_t presentation_epoch_=0,presentation_count_=0;bool presentation_escape_=false,presentation_input_seen_=false;
+  std::uint64_t presentation_epoch_=0,presentation_count_=0,presentation_dropped_=0;bool presentation_escape_=false,presentation_input_seen_=false;
   std::atomic<unsigned> presentation_rate_{48000};
   CoreModule object_=nullptr;
   SDL_Window* window_=nullptr;SDL_Renderer* renderer_=nullptr;SDL_Texture* texture_=nullptr;SDL_AudioStream* audio_=nullptr;
@@ -55,6 +55,7 @@ class Engine {
   MemoryFiles memory_files_;OmniWritableFilesV1 memory_files_interface_{};bool memory_files_installed_=false;
   bool md_portable_=false,md_layout_failed_=false;std::optional<MdSaveContract> md_contract_;
   std::chrono::steady_clock::time_point deadline_,previous_frame_,metrics_start_,presentation_due_;
+  std::chrono::steady_clock::time_point audio_health_due_{};
   std::vector<double> intervals_;std::uint32_t presented_=0,dropped_=0;Json latest_metrics_;
   struct Api {
     decltype(&retro_api_version) api_version;

@@ -146,7 +146,7 @@ int om_web_n64_state_header(const void* input, size_t length) {
             'override CFLAGS += -fexceptions -fno-fast-math -fno-unsafe-math-optimizations -ffp-contract=off\n'
             'override CXXFLAGS += -fexceptions -fno-fast-math -fno-unsafe-math-optimizations -ffp-contract=off\n')
     exports = json.loads((ROOT / 'engines/web/exports.json').read_text(encoding='utf-8')) + ['_om_web_libretro_call', '_om_web_log_interface'] + [
-        '_om_web_hw_' + name for name in ('prepare', 'register', 'call', 'alive', 'callback_bytes')]
+        '_om_web_hw_' + name for name in ('prepare', 'register', 'call', 'alive', 'callback_bytes', 'display_protocol')]
     (work / 'exports.json').write_text(json.dumps(exports, indent=2) + '\n', encoding='utf-8')
     shutil.copy2(ROOT / 'engines/web/runtime-methods.json', work / 'runtime-methods.json')
     policy = ROOT / 'engines/policies/mupen64plus-web-options.json'

@@ -1,12 +1,34 @@
 # macOS native containment source
 
+The current unbuilt implementation replaces the inherited host-core design below
+with a diskless ARM64 Linux guest and a separate signed native presentation helper.
+Owner entitlements now include the public virtualization entitlement. Current
+interfaces, schema-2 catalogs and bounds are in `MACOS_DISKLESS_GUEST.md`.
+Following the earlier automatic rejection, the user explicitly authorized
+activation before qualification; the source execution gate is now true. Actual
+signature/image/profile/resource checks remain. No build, VM execution or test occurred.
+
+## Historical source record
+
+The previous architecture/status below is preserved as history. The current
+guest document and the current-revision section of `MACOS_ITEM4_CLOSURE.md`
+supersede its host-core design and statements about remaining implementation.
+
 Current source work is tracked in `MACOS_ITEM4_CLOSURE.md`. The owner now directs
 source authoring first and practical verification later. New low-level source
-adds suspended pair admission, retained process ownership, schema-2 staged
-receipts, an exclusive storage lease and a durable pre-spawn launch fence.
-The existing XPC launch capability remains false until the remaining broker,
-save-return, descendant/resource and recovery source contracts are complete.
-The historical foundation description below does not constitute target evidence.
+adds suspended pair admission, retained process ownership, profile-bound schema-3
+receipts, exclusive storage leases and durable pre-spawn launch fences. The current
+worktree also authors the authenticated XPC client, RuntimeAdapter, save channel,
+profile association, focus/lifetime pipes and app assembly. Launch remains false
+because the inherited shared writable container, aggregate resource boundary and
+independent crash retirement are still unresolved source obligations. See the
+closure document for current behavior; no transition to item 5 is authorized.
+
+## Historical foundation before the current adapter work
+
+The description below records the earlier foundation, not the current complete
+operation inventory or target evidence. The closure document above supersedes
+its statements about which protocol operations have source implementations.
 
 OmniPlay keeps native execution unavailable on macOS until the complete signed
 App Sandbox launch and storage boundary is present. It does not call the

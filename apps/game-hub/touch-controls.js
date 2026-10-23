@@ -5,6 +5,7 @@ const node=(tag,className,value)=>{const item=document.createElement(tag);if(cla
 const clamp=value=>Math.max(-1,Math.min(1,value));
 export class TouchControls{
   #root;#active;#system;#profile=defaultTouchProfile();#abort=new AbortController();#pointers=new Map();#keys=new Map();#pulses=new Map();#buttons=[];#sticks=[];#stickKeys=[new Set(),new Set()];#enabled=null;#showSticks=false;
+  #homes=[];#groups=[];#resize=null;
   constructor(system,active){
     this.#system=system;this.#active=active;this.#root=node('div','touch-controller');this.#root.setAttribute('role','group');this.#root.setAttribute('aria-label',text('Điều khiển cảm ứng trong game','Game touch controls'));
     const main=node('div','touch-controller-main'),dpad=node('div','touch-direction-pad'),faces=node('div','touch-face-buttons'),aux=node('div','touch-aux-buttons'),sticks=node('div','touch-stick-pair');
@@ -22,19 +23,40 @@ export class TouchControls{
     }
     for(const type of['pointerup','pointercancel','lostpointercapture'])this.#listen(this.#root,type,event=>this.#release(event.pointerId));
     this.#listen(this.#root,'pointermove',event=>{if(this.#pointers.get(event.pointerId)?.kind==='button')this.#move(event);});
-    main.append(dpad,faces);this.#root.append(main,aux,sticks);
-    this.#listen(window,'blur',()=>this.clear());this.#listen(window,'pagehide',()=>this.clear());this.#listen(document,'visibilitychange',()=>{if(document.hidden)this.clear();});this.#listen(window,'resize',()=>{this.clear();this.#visibility();});
+    main.append(dpad,faces);this.#root.append(main,aux,sticks);this.#groups=[main,aux,sticks];
+    this.#homes=[...this.#buttons.map(v=>({element:v.button,id:v.id,parent:v.button.parentElement})),...this.#sticks.map((element,i)=>({element,id:16+i,parent:sticks}))];
+    if(typeof ResizeObserver==='function'){this.#resize=new ResizeObserver(()=>{this.clear();this.#customGeometry();});this.#resize.observe(this.#root);}
+    this.#listen(window,'blur',()=>this.clear());this.#listen(window,'pagehide',()=>this.clear());this.#listen(document,'visibilitychange',()=>{if(document.hidden)this.clear();});this.#listen(window,'resize',()=>{this.clear();this.#visibility();this.#customGeometry();});
     const media=window.matchMedia('(any-pointer: coarse)');this.#listen(media,'change',()=>{this.clear();this.#visibility();});this.configure(this.#profile);
   }
   get element(){return this.#root;}
   #listen(target,type,handler){target.addEventListener(type,handler,{signal:this.#abort.signal});}
-  configure(value){this.clear();this.#profile=validateTouchProfile(value);this.#root.classList.toggle('left-handed',this.#profile.left_handed);this.#root.style.setProperty('--touch-scale',String(this.#profile.size_percent/100));this.#root.style.setProperty('--touch-opacity',String(this.#profile.opacity_percent/100));this.#showSticks=this.#profile.layout==='sticks'||this.#profile.layout==='auto'&&['n64','psp'].includes(this.#system);this.#root.querySelector('.touch-stick-pair').hidden=!this.#showSticks;this.#visibility();}
+  configure(value){
+    this.clear();this.#profile=validateTouchProfile(value);const custom=this.#profile.custom_layout;
+    this.#root.classList.toggle('left-handed',this.#profile.left_handed);this.#root.classList.toggle('custom-touch-layout',Boolean(custom));
+    this.#root.style.setProperty('--touch-scale',String(this.#profile.size_percent/100));this.#root.style.setProperty('--touch-opacity',String(this.#profile.opacity_percent/100));
+    for(const item of this.#homes){item.element.hidden=false;item.element.removeAttribute('style');(custom?this.#root:item.parent).append(item.element);}
+    for(const group of this.#groups)group.hidden=Boolean(custom);
+    this.#root.style.height='';this.#showSticks=Boolean(custom)||this.#profile.layout==='sticks'||this.#profile.layout==='auto'&&['n64','psp'].includes(this.#system);
+    if(!custom)this.#root.querySelector('.touch-stick-pair').hidden=!this.#showSticks;
+    this.#customGeometry();this.#visibility();
+  }
+  #customGeometry(){
+    const layout=this.#profile.custom_layout;if(!layout)return;
+    const width=this.#root.clientWidth;if(width<=0)return;const height=Math.round(width*layout.height/1000);
+    this.#root.style.height=height+'px';
+    for(const item of this.#homes){const placement=layout.controls.find(v=>v.id===item.id);const base=item.id>=16?110:44;
+      const size=Math.min(width,height,Math.max(44,base*placement.size_percent/100*this.#profile.size_percent/100));
+      const x=this.#profile.left_handed?1000-placement.x:placement.x;
+      item.element.hidden=!placement.visible;Object.assign(item.element.style,{position:'absolute',width:size+'px',height:size+'px',minWidth:'0',minHeight:'0',left:Math.max(0,Math.min(width-size,width*x/1000-size/2))+'px',top:Math.max(0,Math.min(height-size,height*placement.y/1000-size/2))+'px'});
+    }
+  }
   #visibility(){this.#root.hidden=this.#profile.visibility==='hidden'||this.#profile.visibility==='auto'&&!navigator.maxTouchPoints&&!window.matchMedia('(any-pointer: coarse)').matches;this.#sync();}
   #sync(){const enabled=Boolean(this.#active()&&!this.#root.hidden&&this.#root.isConnected&&!document.hidden&&document.hasFocus());if(this.#enabled!==enabled){this.#enabled=enabled;if(!enabled)this.clear();for(const{button}of this.#buttons)button.disabled=!enabled;for(const pad of this.#sticks)pad.tabIndex=enabled?0:-1;this.#root.setAttribute('aria-disabled',String(!enabled));}return enabled;}
   #acceptKeys(event){return this.#sync()&&!event.ctrlKey&&!event.altKey&&!event.metaKey;}
   #button(label,id){
     const button=node('button','touch-game-button',label);button.type='button';button.disabled=true;button.setAttribute('aria-label',text('Nút game ','Game button ')+label);button.setAttribute('aria-pressed','false');this.#buttons.push({button,id});let lastKeyboard=-1000;
-    if(![4,5,6,7].includes(id))this.#listen(button,'pointerdown',event=>this.#begin(event,{kind:'button',target:button,buttons:[id]}));
+    this.#listen(button,'pointerdown',event=>{if([4,5,6,7].includes(id)&&!this.#profile.custom_layout)return;this.#begin(event,{kind:'button',target:button,buttons:[id]});});
     this.#listen(button,'keydown',event=>{if(!event.isTrusted||!this.#acceptKeys(event)||!['Space','Enter','NumpadEnter'].includes(event.code))return;event.preventDefault();event.stopPropagation();lastKeyboard=performance.now();if(!event.repeat&&this.#keys.size<32)this.#keys.set(id+':'+event.code,[id]);this.#paint();});
     this.#listen(button,'keyup',event=>{if(this.#keys.delete(id+':'+event.code)){event.preventDefault();event.stopPropagation();lastKeyboard=performance.now();this.#paint();}});
     this.#listen(button,'blur',()=>{for(const key of this.#keys.keys())if(key.startsWith(id+':'))this.#keys.delete(key);this.#paint();});
@@ -57,5 +79,5 @@ export class TouchControls{
   snapshot(){if(!this.#sync())return{buttons:new Set(),sticks:[{active:false,x:0,y:0},{active:false,x:0,y:0}]};return{buttons:this.#held(),sticks:[this.#axes(0),this.#axes(1)]};}
   suspend(){this.clear();this.#enabled=false;for(const{button}of this.#buttons)button.disabled=true;for(const pad of this.#sticks)pad.tabIndex=-1;this.#root.setAttribute('aria-disabled','true');}
   clear(){const previous=Array.from(this.#pointers.entries());this.#pointers.clear();this.#keys.clear();this.#stickKeys.forEach(keys=>keys.clear());for(const record of this.#pulses.values())clearTimeout(record.timer);this.#pulses.clear();for(const[id,record]of previous)try{if(record.target.hasPointerCapture(id))record.target.releasePointerCapture(id);}catch{}this.#paint();}
-  dispose(){this.#abort.abort();this.clear();this.#root.remove();}
+  dispose(){this.#abort.abort();this.#resize?.disconnect();this.clear();this.#root.remove();}
 }

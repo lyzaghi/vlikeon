@@ -8,7 +8,7 @@ use uuid::Uuid;
 
 const SCHEMA:&str=r#"
 BEGIN IMMEDIATE;
-CREATE TABLE IF NOT EXISTS security(id INTEGER PRIMARY KEY CHECK(id=1),highest_metadata INTEGER NOT NULL DEFAULT 0,minimum_epoch INTEGER NOT NULL DEFAULT 0,latest_clock_ms INTEGER NOT NULL DEFAULT 0,data_schema_floor INTEGER NOT NULL DEFAULT 13);
+CREATE TABLE IF NOT EXISTS security(id INTEGER PRIMARY KEY CHECK(id=1),highest_metadata INTEGER NOT NULL DEFAULT 0,minimum_epoch INTEGER NOT NULL DEFAULT 0,latest_clock_ms INTEGER NOT NULL DEFAULT 0,data_schema_floor INTEGER NOT NULL DEFAULT __PROFILE_SCHEMA__);
 INSERT OR IGNORE INTO security(id) VALUES(1);
 CREATE TABLE IF NOT EXISTS observed(version INTEGER PRIMARY KEY,digest TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS roots(version INTEGER PRIMARY KEY,old_signed TEXT NOT NULL,new_signed TEXT NOT NULL);
@@ -39,7 +39,7 @@ impl Store {
         connection.execute_batch("PRAGMA journal_mode=WAL;PRAGMA synchronous=FULL;PRAGMA trusted_schema=OFF;").map_err(storage_error)?;
         let version:u32=connection.query_row("PRAGMA user_version",[],|r|r.get(0)).map_err(storage_error)?;
         if version>2{return Err(rejected("Installation database requires a newer updater"));}
-        if version==0{connection.execute_batch(SCHEMA).map_err(storage_error)?;}
+        if version==0{connection.execute_batch(&SCHEMA.replace("__PROFILE_SCHEMA__",&omniplay_core::database::CURRENT_SCHEMA_VERSION.to_string())).map_err(storage_error)?;}
         if version==1{connection.execute_batch("BEGIN IMMEDIATE;ALTER TABLE security ADD COLUMN data_schema_floor INTEGER NOT NULL DEFAULT 3;PRAGMA user_version=2;COMMIT;").map_err(storage_error)?;}
         Ok(Self{root,connection,channel})
     }
@@ -124,7 +124,7 @@ impl Store {
         if let Some(existing)=self.releases()?.into_iter().find(|r|r.metadata_version==release.metadata_version){return Ok(existing);}
         let root=self.trusted_root()?;let pending=crate::transport::download_cancellable(&self.root.join("downloads"),&root,&release,cancel)?;
         if cancel.load(std::sync::atomic::Ordering::Relaxed){return Err(PlatformError::new(ErrorCode::Cancelled,"Update download was cancelled"));}
-        self.stage_verified(&release,envelope,File::open(&pending.path).map_err(storage_error)?)
+        self.stage_verified(&release,envelope,File::open(&pending.path).map_err(storage_error)?,cancel)
     }
 
     pub fn stage_file(&mut self,envelope:&SignedEnvelope,source:&Path)->Result<InstalledRelease> {
@@ -135,15 +135,16 @@ impl Store {
         let mut file=File::open(source).map_err(storage_error)?;
         let mut pending=omniplay_core::util::PendingFile::create(&self.root.join("downloads"))?;
         crate::transport::copy_verified(&mut file,&mut pending.file,&release)?;
-        self.stage_verified(&release,envelope,File::open(&pending.path).map_err(storage_error)?)
+        self.stage_verified(&release,envelope,File::open(&pending.path).map_err(storage_error)?,&std::sync::atomic::AtomicBool::new(false))
     }
 
-    fn stage_verified(&mut self,release:&ReleaseManifest,envelope:&SignedEnvelope,source:File)->Result<InstalledRelease> {
+    fn stage_verified(&mut self,release:&ReleaseManifest,envelope:&SignedEnvelope,mut source:File,cancel:&std::sync::atomic::AtomicBool)->Result<InstalledRelease> {
         let id=Uuid::new_v4();let staging=self.root.join("staging").join(id.to_string());
         std::fs::create_dir_all(staging.parent().expect("generated parent")).map_err(storage_error)?;
         std::fs::create_dir(&staging).map_err(storage_error)?;
         let result=(||{
-            let manifest=package::unpack(source,&staging,release)?;
+            let manifest=package::unpack_cancellable(&mut source,&staging,release,cancel)?;
+            if cancel.load(std::sync::atomic::Ordering::Relaxed){return Err(PlatformError::new(ErrorCode::Cancelled,"Update staging was cancelled"));}
             let versions=self.root.join("versions");std::fs::create_dir_all(&versions).map_err(storage_error)?;
             std::fs::rename(&staging,versions.join(id.to_string())).map_err(storage_error)?;sync_directory(&versions)?;
             let value=InstalledRelease{id,version:release.version.clone(),metadata_version:release.metadata_version,security_epoch:release.security_epoch,status:"staged".into(),attempts:0,healthy:false,manifest};
@@ -176,8 +177,14 @@ impl Store {
         let directory=self.version_directory(release.id);
         package::verify_entry(&directory,&release.manifest,&release.manifest.browser_entry)?;
         package::verify_entry(&directory,&release.manifest,&release.manifest.broker_entry)?;
-        if all {for entry in &release.manifest.files {package::validate_relative(&entry.path)?;let path=directory.join(&entry.path);let resolved=path.canonicalize().map_err(storage_error)?;if !resolved.starts_with(&directory)||!std::fs::symlink_metadata(&path).map_err(storage_error)?.is_file(){return Err(rejected("Installed file is outside its version directory"));}let(hash,bytes)=omniplay_core::util::hash_file(&mut File::open(resolved).map_err(storage_error)?,entry.bytes)?;if hash!=entry.sha256||bytes!=entry.bytes{return Err(rejected("Installed file checksum failed"));}}}
+        if all {for entry in &release.manifest.files {let resolved=package::installed_file(&directory,&entry.path)?;let(hash,bytes)=omniplay_core::util::hash_file(&mut File::open(resolved).map_err(storage_error)?,entry.bytes)?;if hash!=entry.sha256||bytes!=entry.bytes{return Err(rejected("Installed file checksum failed"));}}}
         Ok(())
+    }
+
+    pub fn verify_release_files(&self,id:Uuid)->Result<InstalledRelease>{
+        let _lock=self.lock()?;
+        let release=self.releases()?.into_iter().find(|value|value.id==id).ok_or_else(||rejected("Installed release was not found"))?;
+        self.verify_installed(&release,true)?;Ok(release)
     }
 
     pub fn note_launch(&self,id:Uuid)->Result<()> {self.connection.execute("UPDATE releases SET attempts=attempts+1 WHERE id=?1 AND status='active' AND healthy=0",[id.to_string()]).map_err(storage_error)?;Ok(())}

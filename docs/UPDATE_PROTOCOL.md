@@ -1,5 +1,12 @@
 # Desktop update implementation
 
+Current item-14 changes and remaining implementation are tracked in
+`ITEM14_INSTALL_REPAIR_UPDATES.md`. Extraction now observes cancellation during
+bounded copies and before publication. The CLI adds `verify <release UUID>`;
+entry/full-inventory checks reject intermediate links/reparse points. Fresh
+installation floors use the current core schema constant rather than the older
+schema numbers in the historical description below. No update operation ran.
+
 The authored updater uses a private OmniPlay protocol, not a claim of TUF conformance. Its threat model includes hostile mirrors, interrupted downloads, stale signed metadata, conflicting release metadata, path traversal, archive amplification and accidental entry-point corruption. A fully compromised current OS user can replace that user's launcher and installation database; a per-user installer cannot protect itself against that adversary.
 
 `platform/core/src/updates.rs` authenticates exact payload bytes with distinct Ed25519 threshold keys, verifies channel/platform, monotonic metadata versions, expiry, security epoch, schema compatibility and artifact hash/length. Consecutive root rotations require both old and new thresholds on identical payloads. Expired intermediate roots may authenticate a successor, but the final root and release must be fresh for any new installation. A remembered wall-clock high-water mark rejects large backward clock changes. Online compromise of one HTTPS mirror does not confer a signing key.

@@ -81,6 +81,7 @@ def main():
                  'tools/prepare_chromium_upgrade.py',
                  'tools/generate_browser_patch.py', 'tools/stage_browser_integration.py',
                  'tools/game_hub_assets.py', 'tools/desktop_capture_audio_patch.py',
+                 'tools/source_patch.py',
                  'docs/DESKTOP_BROWSER_BUILD.md', 'docs/COMPLETION_SEQUENCE.md',
                  'qa/browser/component-context.test.mjs', 'qa/browser/component-ownership.test.mjs',
                  'qa/browser/DESKTOP_ACCEPTANCE.md']:

@@ -6,13 +6,17 @@ endif()
 set(OMNIPLAY_BROKER_REQUIREMENT "" CACHE STRING "Exact designated requirement for the signed OmniPlay broker")
 set(OMNIPLAY_OWNER_BUNDLE_ID "" CACHE STRING "Approved XPC owner bundle identifier")
 set(OMNIPLAY_RUNTIME_CATALOG "" CACHE FILEPATH "Closed signed-bundle runtime catalog")
+set(OMNIPLAY_RUNTIMES_DIRECTORY "" CACHE PATH "Explicit guest kernel/initramfs and signed presentation runtime tree")
+if(NOT IS_DIRECTORY "${OMNIPLAY_RUNTIMES_DIRECTORY}")
+  message(FATAL_ERROR "An explicit runtime resource tree is required before owner signing")
+endif()
 if(OMNIPLAY_BROKER_REQUIREMENT STREQUAL "" OR OMNIPLAY_BROKER_REQUIREMENT MATCHES "[<>&]" OR NOT OMNIPLAY_OWNER_BUNDLE_ID MATCHES "^[A-Za-z0-9-]+(\\.[A-Za-z0-9-]+){2,}$" OR NOT EXISTS "${OMNIPLAY_RUNTIME_CATALOG}")
   message(FATAL_ERROR "Explicit broker code requirement and owner bundle identity are required")
 endif()
 configure_file(Info.plist.in ${CMAKE_CURRENT_BINARY_DIR}/Info.plist @ONLY)
 configure_file("${OMNIPLAY_RUNTIME_CATALOG}" "${CMAKE_CURRENT_BINARY_DIR}/runtime-catalog.json" COPYONLY)
 set_source_files_properties("${CMAKE_CURRENT_BINARY_DIR}/runtime-catalog.json" PROPERTIES MACOSX_PACKAGE_LOCATION Resources)
-add_executable(omniplay-macos-owner MACOSX_BUNDLE src/main.mm src/session.mm src/catalog.mm src/process.mm "${CMAKE_CURRENT_BINARY_DIR}/runtime-catalog.json")
+add_executable(omniplay-macos-owner MACOSX_BUNDLE src/main.mm src/session.mm src/catalog.mm src/process.mm src/boot.mm src/virtual_machine.mm "${CMAKE_CURRENT_BINARY_DIR}/runtime-catalog.json")
 set_target_properties(omniplay-macos-owner PROPERTIES
   BUNDLE_EXTENSION xpc MACOSX_BUNDLE_INFO_PLIST ${CMAKE_CURRENT_BINARY_DIR}/Info.plist
   BUILD_RPATH "" INSTALL_RPATH "" XCODE_ATTRIBUTE_ENABLE_HARDENED_RUNTIME YES
@@ -21,4 +25,11 @@ set_target_properties(omniplay-macos-owner PROPERTIES
 target_compile_features(omniplay-macos-owner PRIVATE cxx_std_20)
 target_compile_options(omniplay-macos-owner PRIVATE -fobjc-arc -fblocks -Wall -Wextra -Wpedantic -fstack-protector-strong)
 target_link_options(omniplay-macos-owner PRIVATE -Wl,-pie -Wl,-dead_strip -Wl,-fatal_warnings)
-target_link_libraries(omniplay-macos-owner PRIVATE "-framework Foundation" "-framework Security")
+target_link_libraries(omniplay-macos-owner PRIVATE "-framework Foundation" "-framework Security" "-framework Virtualization")
+set_target_properties(omniplay-macos-owner PROPERTIES OSX_ARCHITECTURES arm64 OSX_DEPLOYMENT_TARGET 13.0)
+# Populate before the separate final signing/notarization operation. The owner
+# subsequently admits the sealed guest image bytes and helper; copying is not admission.
+add_custom_command(TARGET omniplay-macos-owner POST_BUILD
+  COMMAND "${CMAKE_COMMAND}" -E copy_directory "${OMNIPLAY_RUNTIMES_DIRECTORY}"
+    "$<TARGET_BUNDLE_CONTENT_DIR:omniplay-macos-owner>/Resources/Runtimes"
+  VERBATIM)

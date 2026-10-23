@@ -4,11 +4,11 @@ const text=(vi,en)=>currentLocale()==='vi'?vi:en;
 const node=(tag,className,value)=>{const item=document.createElement(tag);if(className)item.className=className;if(value!==undefined)item.textContent=value;return item;};
 export async function mountSaveHistory(container,bridge,game,notify){
   const title=node('h3','',t('saves')),status=node('p','muted small'),rows=node('div','save-history-rows'),controls=node('div','detail-actions');status.setAttribute('role','status');
-  const previous=node('button','button button-secondary',text('Trang trước','Previous page')),next=node('button','button button-secondary',text('Trang sau','Next page')),refresh=node('button','button button-quiet',text('Làm mới lịch sử','Refresh history'));
-  for(const button of[previous,next,refresh])button.type='button';controls.append(previous,next,refresh);container.replaceChildren(title,status,rows,controls);
-  const cursors=[null];let pageIndex=0,following=null,busy=false,revision=0;
-  const support=bridge.request('hello').then(value=>({origins:value.save_origin_protocol===1,repair:value.save_repair_protocol===1,cloud:value.save_cloud_recovery_protocol===1&&value.encrypted_sync===true})).catch(()=>({origins:false,repair:false,cloud:false}));
-  function lock(value){busy=value;for(const button of container.querySelectorAll('button'))button.disabled=value;previous.disabled=value||pageIndex===0;next.disabled=value||!following;}
+  const previous=node('button','button button-secondary',text('Trang trước','Previous page')),next=node('button','button button-secondary',text('Trang sau','Next page')),refresh=node('button','button button-quiet',text('Làm mới lịch sử','Refresh history')),backup=node('button','button button-secondary',text('Sao lưu trang này','Back up this page')),restore=node('button','button button-secondary',text('Khôi phục gói sao lưu','Restore backup archive'));
+  backup.hidden=restore.hidden=true;for(const button of[previous,next,refresh,backup,restore])button.type='button';controls.append(previous,next,refresh,backup,restore);container.replaceChildren(title,status,rows,controls);
+  const cursors=[null];let pageIndex=0,following=null,busy=false,revision=0,pageIds=[];
+  const support=bridge.request('hello').then(value=>({orphan:value.save_orphan_protocol===1,backup:value.save_backup_protocol===1,origins:value.save_origin_protocol===1,repair:value.save_repair_protocol===1,cloud:value.save_cloud_recovery_protocol===1&&value.encrypted_sync===true})).catch(()=>({orphan:false,backup:false,origins:false,repair:false,cloud:false}));
+  function lock(value){busy=value;for(const button of container.querySelectorAll('button'))button.disabled=value;previous.disabled=value||pageIndex===0;next.disabled=value||!following;backup.disabled=value||!pageIds.length;}
   async function task(action){if(busy)return;lock(true);try{return await action();}catch(error){if(error?.code!=='cancelled')notify(error.message||t('error'),true);}finally{if(container.isConnected)lock(false);}}
   async function load(reset=false){
     const oldCursors=[...cursors],oldIndex=pageIndex,oldStatus=status.textContent;if(reset){cursors.splice(0,cursors.length,null);pageIndex=0;}const ticket=++revision;status.textContent=text('Đang lấy lịch sử…','Loading history…');
@@ -20,7 +20,7 @@ export async function mountSaveHistory(container,bridge,game,notify){
       cloudRecords=recoveryRecords(records);
     }catch{cloudError=true;}}
     if(!container.isConnected||ticket!==revision)return;
-    following=page.next_cursor;rows.replaceChildren();status.textContent=text(`Trang ${pageIndex+1} · ${page.entries.length} bản lưu · Tổng ${page.total}`,`Page ${pageIndex+1} · ${page.entries.length} saves · ${page.total} total`);
+    following=page.next_cursor;pageIds=page.entries.map(entry=>entry.metadata.id);backup.hidden=restore.hidden=!capabilities.backup;rows.replaceChildren();status.textContent=text(`Trang ${pageIndex+1} · ${page.entries.length} bản lưu · Tổng ${page.total}`,`Page ${pageIndex+1} · ${page.entries.length} saves · ${page.total} total`);
     if(cloudError)status.append(node('small','muted',text('Chưa lấy được trạng thái khôi phục từ đồng bộ. Làm mới để thử lại.','Cloud recovery status is unavailable. Refresh to try again.')));
     if(!page.entries.length)rows.append(node('p','muted small',page.total?t('noResults'):t('noSaves')));
     for(const entry of page.entries){
@@ -31,6 +31,18 @@ export async function mountSaveHistory(container,bridge,game,notify){
       if(cloud)description.append(node('small','',recoveryLabel(cloud)));
       const actions=node('div','detail-actions'),exportButton=node('button','button button-secondary',t('export'));exportButton.type='button';exportButton.addEventListener('click',()=>void task(async()=>{const grant=await bridge.request('file_select_export',{suggested_name:`omniplay-save-${save.id}.opsave`},120000);const result=await bridge.request('save_export',{save_id:save.id,destination_grant_id:grant.grant_id},120000);notify(exportMessage(result));}));actions.append(exportButton);
       if(capabilities.origins){const origin=node('button','button button-secondary',text('Nguồn gốc','Origin'));origin.type='button';origin.addEventListener('click',()=>void task(async()=>{const owner=revision,value=checkedSaveOrigin(await bridge.request('save_origin_get',{save_id:save.id}),save);if(owner!==revision||!container.isConnected||!row.isConnected)return;showOrigin(value,save);}));actions.append(origin);}
+      if(capabilities.orphan){
+        let after=null;const find=node('button','button button-secondary',text('Tìm dữ liệu mồ côi khớp bản này','Find matching orphan payload'));find.type='button';
+        find.addEventListener('click',()=>void task(async()=>{
+          const owner=revision,result=await bridge.request('save_orphan_preview',{save_id:save.id,after},120000);if(owner!==revision||!container.isConnected||!row.isConnected)return;
+          if(!Array.isArray(result?.matches)||result.matches.length>64||!Number.isSafeInteger(result.scanned)||result.scanned<0||result.scanned>64||result.next_after!==null&&typeof result.next_after!=='string')throw new Error('orphan_preview');
+          after=result.next_after;find.textContent=after?text('Tìm nhóm mồ côi tiếp theo','Search next orphan group'):text('Tìm lại từ đầu','Search from beginning');
+          if(!result.matches.length){notify(text(after?'Chưa thấy dữ liệu khớp trong nhóm này; có thể tìm nhóm tiếp.':'Không thấy dữ liệu mồ côi khớp trong lượt quét này. Tất cả tệp vẫn giữ nguyên.',after?'No match in this group; search the next group.':'No matching orphan payload was found in this scan. All files remain retained.'));return;}
+          const candidate=result.matches[0];if(typeof candidate.candidate_id!=='string'||!/^[a-f0-9]{64}$/.test(candidate.revision))throw new Error('orphan_candidate');
+          if(!confirm(text('Đã tìm thấy payload có đúng độ dài và checksum của bản lưu này. Đóng game và tạo bản sao phục hồi? Tệp mồ côi gốc và lịch sử vẫn giữ nguyên.','A payload matches this save’s exact length and checksum. Close the game and create a recovery copy? The orphan original and history remain unchanged.')))return;
+          const recovered=await bridge.request('save_orphan_recover',{save_id:save.id,candidate_id:candidate.candidate_id,revision:candidate.revision},120000);if(owner!==revision||!container.isConnected||!row.isConnected)return;if(recovered?.metadata?.id!==save.id||typeof recovered.repaired!=='boolean')throw new Error('orphan_result');notify(recovered.repaired?text('Đã phục hồi payload, giữ nguyên tệp mồ côi gốc.','Payload recovered; the orphan original is retained.'):text('Payload hiện tại đã toàn vẹn.','The current payload is already intact.'));await load();
+        }));actions.append(find);
+      }
       if(capabilities.repair){
         const repair=node('button','button button-secondary',text('Khôi phục từ tệp sao lưu','Recover from backup'));repair.type='button';
         repair.addEventListener('click',()=>void task(async()=>{
@@ -66,6 +78,16 @@ export async function mountSaveHistory(container,bridge,game,notify){
   }
   previous.addEventListener('click',()=>void task(async()=>{pageIndex--;try{await load();}catch(error){pageIndex++;throw error;}container.scrollIntoView({block:'nearest'});}));
   next.addEventListener('click',()=>void task(async()=>{const target=following;if(!target)return;cursors.splice(pageIndex+1,cursors.length,target);pageIndex++;try{await load();}catch(error){pageIndex--;throw error;}container.scrollIntoView({block:'nearest'});}));
+  backup.addEventListener('click',()=>void task(async()=>{
+    const ids=[...pageIds],owner=revision;if(!ids.length)return;
+    const grant=await bridge.request('file_select_export',{suggested_name:`vlikeon-saves-${game.id}-page-${pageIndex+1}.opbackup`},120000);
+    try{if(owner!==revision||!container.isConnected)return;const result=await bridge.request('save_backup_export',{save_ids:ids,destination_grant_id:grant.grant_id},120000);if(owner!==revision||!container.isConnected)return;if(result?.exported!==true||result.entries!==ids.length)throw new Error(text('Phản hồi sao lưu không hợp lệ.','The backup response is invalid.'));notify(exportMessage(result)+' '+text(`Gói gồm ${ids.length} bản lưu của trang này; các trang khác cần sao lưu riêng.`,`The archive includes ${ids.length} saves from this page; back up other pages separately.`));}finally{await bridge.request('permission_revoke',{grant_id:grant.grant_id}).catch(()=>{});}
+  }));
+  restore.addEventListener('click',()=>void task(async()=>{
+    if(!confirm(text('Đóng game rồi chọn gói tối đa 64 bản lưu / 128 MiB. Tất cả bản hợp lệ được khôi phục thành nhánh riêng cho game có nội dung tương ứng trong thư viện; không thay bản đang dùng. Kết quả có thể hoàn thành một phần.','Close games, then select an archive of at most 64 saves / 128 MiB. Valid saves become separate branches for matching library content; current progress stays selected. Restoration can partially complete.')))return;
+    const owner=revision,grant=await bridge.request('file_select_import',undefined,120000);
+    try{if(owner!==revision||!container.isConnected)return;const result=await bridge.request('save_backup_restore',{grant_id:grant.grant_id},120000);if(owner!==revision||!container.isConnected)return;if(!Array.isArray(result?.entries)||!result.entries.length||result.entries.length>64)throw new Error(text('Phản hồi khôi phục không hợp lệ.','The restore response is invalid.'));const success=result.entries.filter(entry=>entry.restored_id&&entry.error===null).length,retained=result.entries.filter(entry=>entry.already_present===true).length;notify(text(`${success}/${result.entries.length} bản đã sẵn sàng, gồm ${retained} bản đã khôi phục trước đó. Các bản thất bại chưa được thêm; tệp sao lưu vẫn giữ nguyên.`,`${success}/${result.entries.length} saves are available, including ${retained} previously restored saves. Failed entries were not added; the backup file remains unchanged.`),success!==result.entries.length);await load(true);}finally{await bridge.request('permission_revoke',{grant_id:grant.grant_id}).catch(()=>{});}
+  }));
   refresh.addEventListener('click',()=>void task(()=>load(true)));await task(()=>load());
 }
 

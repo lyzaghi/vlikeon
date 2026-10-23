@@ -37,6 +37,8 @@ fn data_directory(profile_id: uuid::Uuid) -> omniplay_contracts::Result<PathBuf>
 }
 
 fn native_registry(profile_root:&std::path::Path,profile_id:uuid::Uuid)->omniplay_native_runtime::NativeRegistry{
+    #[cfg(all(target_os="macos",target_arch="aarch64"))]
+    if let Ok(registry)=omniplay_native_runtime::NativeRegistry::installed_macos(profile_root,profile_id){return registry;}
     #[cfg(all(target_os="linux",target_arch="x86_64",target_env="gnu"))]
     {
         if let Some(runtime)=std::env::var_os("XDG_RUNTIME_DIR").map(PathBuf::from).filter(|path|path.is_absolute()){

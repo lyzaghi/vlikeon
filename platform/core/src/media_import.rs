@@ -99,6 +99,7 @@ impl<'a> Planner<'a>{
 }
 
 pub fn import_bundle(database:&Database,scope:DiscScope,entry:&str,title:String,system:GameSystem,encoding:CueEncoding,cancel:&AtomicBool,mut progress:impl FnMut(ImportProgress))->Result<GameManifest>{
+    let _asset_lease=crate::asset_storage::AssetLease::acquire(database)?;
     if title.trim().is_empty()||title.len()>512||!scope.entries.contains(entry){return Err(invalid("Disc title or entry point is invalid"));}
     let extension=Path::new(entry).extension().and_then(|v|v.to_str()).unwrap_or("");let format=ContentFormat::from_extension(extension).ok_or_else(||invalid("Disc format is unsupported"))?;format.extension(system)?;
     let mut planner=Planner{scope:&scope,encoding,assets:Vec::new(),shared:BTreeMap::new(),cancel};let selected=Path::new(entry);let entry_name=format!("game.{}",format.extension(system)?);let mut discs=Vec::new();

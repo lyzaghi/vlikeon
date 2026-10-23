@@ -10,12 +10,13 @@ fn run()->Result<serde_json::Value> {
     let channel=Channel::embedded()?;let mut store=Store::open(&omniplay_updater::install_root()?,channel)?;
     match args.as_slice() {
         [command]if command=="status"=>encode(store.status()?),
+        [command,id]if command=="verify"=>{let release=store.verify_release_files(uuid::Uuid::parse_str(id).map_err(|_|rejected("Release ID is invalid"))?)?;Ok(serde_json::json!({"release_id":release.id,"inventory_matches":true,"files":release.manifest.files.len()}))},
         [command]if command=="download"=>{store.refresh_roots(&std::sync::atomic::AtomicBool::new(false))?;let root=store.trusted_root()?;let envelope=omniplay_updater::transport::metadata(&store.channel.metadata_url,&root)?;encode(store.stage_download(&envelope)?)},
         [command,metadata,package]if command=="stage"=>{let envelope=Store::envelope_from_file(Path::new(metadata))?;encode(store.stage_file(&envelope,Path::new(package))?)},
         [command,id]if command=="activate"=>encode(store.activate(uuid::Uuid::parse_str(id).map_err(|_|rejected("Release ID is invalid"))?)?),
         [command]if command=="rollback"=>encode(store.rollback()?),
         [command,old,new]if command=="rotate-root"=>{let version=store.rotate_root(&Store::envelope_from_file(Path::new(old))?,&Store::envelope_from_file(Path::new(new))?)?;Ok(serde_json::json!({"root_version":version}))},
-        _=>Err(rejected("Use status, download, stage <signed metadata> <package>, activate <release ID>, rollback, or rotate-root <old-signed> <new-signed>")),
+        _=>Err(rejected("Use status, verify <release ID>, download, stage <signed metadata> <package>, activate <release ID>, rollback, or rotate-root <old-signed> <new-signed>")),
     }
 }
 fn main(){match run(){Ok(value)=>println!("{value}"),Err(error)=>{eprintln!("{error}");std::process::exit(1);}}}

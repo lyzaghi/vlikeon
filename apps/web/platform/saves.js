@@ -79,11 +79,13 @@ export class WebSaves {
     const captured=await this.#store.transaction(SYNC_SAVE_STORES,'readonly',tx=>syncSaveIdentity(tx,id),signal);checkAbort(signal);requireValue(await hashInWorker(captured.payload,{signal})===captured.metadata.payload_hash,'corrupt_data','Local saved progress changed before encrypted synchronization.');
     await this.#store.transaction(SYNC_SAVE_STORES,'readonly',async tx=>{const current=await syncSaveIdentity(tx,id);requireValue(current.payload_revision===captured.payload_revision&&current.metadata_hash===captured.metadata_hash&&current.canonical===captured.canonical,'conflict','Saved progress changed while checking its synchronization snapshot.');},signal);checkAbort(signal);return captured;
   }
-  async commit(input,payload,parent,{signal,importedFrom=null,remoteMetadata=null,guardTx=null}={}){
+  async commit(input,payload,parent,{signal,importedFrom=null,remoteMetadata=null,guardTx=null,backupReference=null}={}){
     const metadata=validateSave(input);requireValue(payload instanceof Blob&&payload.size===metadata.payload_bytes&&metadata.parent_id===parent,'content_mismatch','Save bytes or causal parent do not match their metadata.');
-    requireValue(guardTx===null||typeof guardTx==='function','invalid_request','The save publication guard is invalid.');checkAbort(signal);requireValue(await(remoteMetadata?hashInWorker:hashBlob)(payload,{signal})===metadata.payload_hash,'corrupt_data','Save integrity check failed.');checkAbort(signal);
-    return this.#store.transaction(['config','games','saves','heads','removed_saves','save_origins','save_payload_revisions'],'readwrite',async tx=>{
+    requireValue(guardTx===null||typeof guardTx==='function','invalid_request','The save publication guard is invalid.');checkAbort(signal);requireValue(await(remoteMetadata||backupReference!==null?hashInWorker:hashBlob)(payload,{signal})===metadata.payload_hash,'corrupt_data','Save integrity check failed.');checkAbort(signal);
+    requireValue(backupReference===null||typeof backupReference==='string'&&utf8(backupReference).length<=256*1024&&importedFrom!==null&&metadata.conflict===true,'invalid_request','The backup reference is invalid.');
+    return this.#store.transaction(['config','games','saves','heads','removed_saves','save_origins','save_payload_revisions','leases'],'readwrite',async tx=>{
       if(guardTx)await guardTx(tx);
+      if(backupReference!==null){const leases=await tx.request(tx.store('leases').index('game').getAll(metadata.game_id));requireValue(!leases.some(lease=>!['stopped','failed'].includes(lease.info.state)&&lease.expires_at_ms>Date.now()),'busy','Stop the game before restoring its backup.');}
       requireValue(!(await tx.get('removed_saves',metadata.id)),'conflict','This save identity was intentionally removed locally.');
       const game=await tx.get('games',metadata.game_id);requireValue(game?.content_hash===metadata.game_content_hash,'content_mismatch','Save content is not in this library.');
       requireValue(!(await tx.get('saves',metadata.id)),'conflict','Save identity is already present.');
@@ -100,6 +102,7 @@ export class WebSaves {
       await tx.add('saves',{...saved,payload});
       await tx.add('save_payload_revisions',{save_id:saved.id,revision:crypto.randomUUID()});
       await tx.add('save_origins',origin);
+      if(backupReference!==null)await tx.add('config',{key:`backup_reference.${saved.id}`,value:backupReference});
       if(!saved.conflict)await tx.put('heads',{game_id:saved.game_id,kind:saved.kind,slot:saved.slot,save_id:saved.id});
       await tx.put('config',{key:'usage',value:{...usage,saves_bytes:usage.saves_bytes+payload.size,save_count:usage.save_count+1}});return saved;
     },signal);
@@ -139,14 +142,16 @@ export class WebSaves {
     },signal);
   }
   async read(id,target=null,{signal}={}){
-    requireValue(UUID.test(id),'invalid_request','Save identity is invalid.');const record=await this.#store.transaction(['saves'],'readonly',tx=>tx.get('saves',id),signal),metadata=saveMetadata(record);
+    requireValue(UUID.test(id),'invalid_request','Save identity is invalid.');const observed=await this.#store.transaction(['saves','save_payload_revisions'],'readonly',async tx=>({record:await tx.get('saves',id),revision:await tx.get('save_payload_revisions',id)}),signal),record=observed.record,metadata=saveMetadata(record);
     if(target){validateCompatibility(target);requireValue(metadata.game_content_hash===target.game_content_hash,'content_mismatch','This save belongs to different content.');requireValue(metadataCompatible(metadata,target),'incompatible_save','Choose a save compatible with the selected runtime.');}
-    requireValue(record.payload instanceof Blob&&record.payload.size===metadata.payload_bytes&&await hashBlob(record.payload,{signal})===metadata.payload_hash,'corrupt_data','Stored save integrity check failed.');return{metadata,payload:record.payload};
+    requireValue(record.payload instanceof Blob&&record.payload.size===metadata.payload_bytes&&await hashBlob(record.payload,{signal})===metadata.payload_hash,'corrupt_data','Stored save integrity check failed.');return{metadata,payload:record.payload,payload_revision:observed.revision?.revision??null};
   }
   async promote(id,expected,{signal}={}){
-    requireValue(expected===null||typeof expected==='string'&&UUID.test(expected),'invalid_request','Expected progress identity is invalid.');const{metadata}=await this.read(id,null,{signal});
-    return this.#store.transaction(['saves','heads'],'readwrite',async tx=>{
-      const record=await tx.get('saves',id);requireValue(record&&record.payload_hash===metadata.payload_hash,'conflict','Saved progress changed.');
+    requireValue(expected===null||typeof expected==='string'&&UUID.test(expected),'invalid_request','Expected progress identity is invalid.');const{metadata,payload_revision}=await this.read(id,null,{signal});
+    requireValue(typeof payload_revision==='string'&&UUID.test(payload_revision),'corrupt_data','Save payload revision needs recovery.');
+    return this.#store.transaction(['saves','heads','leases','save_payload_revisions'],'readwrite',async tx=>{
+      const leases=await tx.request(tx.store('leases').index('game').getAll(metadata.game_id));requireValue(!leases.some(lease=>!['stopped','failed'].includes(lease.info.state)&&lease.expires_at_ms>Date.now()),'busy','Stop the game before selecting current saved progress.');
+      const record=await tx.get('saves',id),revision=await tx.get('save_payload_revisions',id);requireValue(record&&revision?.revision===payload_revision&&originMetadataHash(saveMetadata(record))===originMetadataHash(metadata),'conflict','Saved progress changed. Refresh history and retry.');
       const key=[metadata.game_id,metadata.kind,metadata.slot],head=await tx.get('heads',key);requireValue((head?.save_id??null)===expected,'conflict','Current progress changed. Refresh history before choosing again.');
       const current={...record,conflict:false};await tx.put('saves',current);await tx.put('heads',{game_id:metadata.game_id,kind:metadata.kind,slot:metadata.slot,save_id:id});return saveMetadata(current);
     },signal);

@@ -12,9 +12,28 @@ pub enum RecoveryPhase {Reserved,Staged,Retiring}
 #[derive(Clone,Copy,Debug)]
 pub struct RecoveryReservation {pub phase:RecoveryPhase,pub windows_creation_protocol:u32}
 
+#[derive(serde::Serialize,serde::Deserialize)]#[serde(deny_unknown_fields)]
+pub struct MacWorkJournal{pub schema_version:u32,pub profile:Uuid,pub session:Uuid,pub runtime:String,pub boot:Uuid,pub reserved_bytes:u64,pub files:u32}
+impl MacWorkJournal{
+    fn validate(&self)->Result<()>{
+        if self.schema_version!=1||self.profile.is_nil()||self.session.is_nil()||self.boot.is_nil()||self.runtime.is_empty()||self.runtime.len()>64||!self.runtime.bytes().all(|b|b.is_ascii_alphanumeric()||matches!(b,b'_'|b'-'))||self.reserved_bytes==0||self.reserved_bytes>8*1024*1024*1024||!(1..=144).contains(&self.files){return Err(invalid());}Ok(())
+    }
+}
+fn macos_journal_key(work:Uuid)->String{format!("macos_native_work_v1_{work}")}
+pub fn macos_journal(database:&Database,profile:Uuid,work:Uuid)->Result<Option<MacWorkJournal>>{
+    if profile.is_nil()||work.is_nil(){return Err(invalid());}
+    let raw:Option<(i64,String)>=database.connection.query_row("SELECT length(CAST(value AS BLOB)),substr(value,1,4097) FROM preferences WHERE key=?1",[macos_journal_key(work)],|row|Ok((row.get(0)?,row.get(1)?))).optional().map_err(storage_error)?;
+    let Some((bytes,raw))=raw else{return Ok(None)};if bytes<1||bytes>4096||raw.len()!=bytes as usize{return Err(invalid());}
+    let journal:MacWorkJournal=serde_json::from_str(&raw).map_err(|_|invalid())?;journal.validate()?;
+    if journal.profile!=profile||journal.session!=work||serde_json::to_string(&journal).map_err(storage_error)?!=raw{return Err(invalid());}Ok(Some(journal))
+}
+
 /// Include ledger-only debts in the recovery inventory. Directory enumeration
 /// alone misses a creator that died after reservation but before mkdir.
 pub fn windows_recovery_candidates(database:&Database,profile:Uuid)->Result<Vec<Uuid>>{
+    recovery_candidates(database,profile)
+}
+pub fn recovery_candidates(database:&Database,profile:Uuid)->Result<Vec<Uuid>>{
     if profile.is_nil(){return Err(invalid());}
     let mut query=database.connection.prepare("SELECT work_id,profile_id FROM native_work_storage ORDER BY work_id LIMIT 65").map_err(storage_error)?;
     let rows=query.query_map([],|row|Ok((row.get::<_,String>(0)?,row.get::<_,String>(1)?))).map_err(storage_error)?;
@@ -24,6 +43,9 @@ pub fn windows_recovery_candidates(database:&Database,profile:Uuid)->Result<Vec<
 }
 
 pub fn windows_recovery_reservation(database:&Database,profile:Uuid,work:Uuid)->Result<Option<RecoveryReservation>>{
+    recovery_reservation(database,profile,work)
+}
+pub fn recovery_reservation(database:&Database,profile:Uuid,work:Uuid)->Result<Option<RecoveryReservation>>{
     if profile.is_nil()||work.is_nil(){return Err(invalid());}
     let row:Option<(String,String,u32)>=database.connection.query_row(
         "SELECT profile_id,phase,windows_creation_protocol FROM native_work_storage WHERE work_id=?1",
@@ -45,6 +67,14 @@ pub fn linux_recovery_cursor(database:&Database)->Result<Option<String>>{let val
 pub fn set_linux_recovery_cursor(database:&Database,value:&str)->Result<()>{if value.len()>2048{return Err(invalid());}database.connection.execute("INSERT INTO preferences(key,value) VALUES('linux_native_recovery_cursor_v1',?1) ON CONFLICT(key) DO UPDATE SET value=excluded.value",[value]).map_err(storage_error)?;Ok(())}
 pub fn windows_recovery_cursor(database:&Database)->Result<Option<String>>{let value:Option<String>=database.connection.query_row("SELECT value FROM preferences WHERE key='windows_native_recovery_cursor_v1'",[],|row|row.get(0)).optional().map_err(storage_error)?;if let Some(value)=&value{id(value)?;}Ok(value)}
 pub fn set_windows_recovery_cursor(database:&Database,value:Uuid)->Result<()>{if value.is_nil(){return Err(invalid());}database.connection.execute("INSERT INTO preferences(key,value) VALUES('windows_native_recovery_cursor_v1',?1) ON CONFLICT(key) DO UPDATE SET value=excluded.value",[value.to_string()]).map_err(storage_error)?;Ok(())}
+pub fn macos_recovery_cursor(database:&Database)->Result<Option<Uuid>>{
+    let value:Option<(i64,String)>=database.connection.query_row("SELECT length(CAST(value AS BLOB)),substr(value,1,38) FROM preferences WHERE key='macos_native_recovery_cursor_v1'",[],|row|Ok((row.get(0)?,row.get(1)?))).optional().map_err(storage_error)?;
+    match value{None=>Ok(None),Some((36,raw))=>id(&raw).map(Some),_=>Err(invalid())}
+}
+pub fn set_macos_recovery_cursor(database:&Database,value:Uuid)->Result<()>{
+    if value.is_nil(){return Err(invalid());}
+    database.connection.execute("INSERT INTO preferences(key,value) VALUES('macos_native_recovery_cursor_v1',?1) ON CONFLICT(key) DO UPDATE SET value=excluded.value",[value.to_string()]).map_err(storage_error)?;Ok(())
+}
 fn invalid()->PlatformError{PlatformError::new(ErrorCode::StorageFailure,"Native work storage needs confirmed recovery before it can be reused")}
 fn full()->PlatformError{PlatformError::new(ErrorCode::ResourceLimit,"Native session staging has reached its private storage quota").recover("Close earlier native sessions or finish recovering retained session work before retrying")}
 fn linked(value:&fs::Metadata)->bool{let result=value.file_type().is_symlink();#[cfg(windows)]{use std::os::windows::fs::MetadataExt;return result||value.file_attributes()&0x400!=0;}#[cfg(not(windows))]{result}}
@@ -54,18 +84,25 @@ fn known_tree(profile_root:&Path,known:&BTreeSet<String>,new:Uuid)->Result<()>{
     let root=profile_root.join("native-work");let shape=match fs::symlink_metadata(&root){Err(error)if error.kind()==std::io::ErrorKind::NotFound=>return Ok(()),Err(error)=>return Err(storage_error(error)),Ok(value)=>value};if !shape.is_dir()||linked(&shape){return Err(invalid());}
     let mut count=0;for entry in fs::read_dir(root).map_err(storage_error)?{count+=1;if count>256{return Err(full());}let entry=entry.map_err(storage_error)?;let name=entry.file_name().into_string().map_err(|_|invalid())?;let work=id(&name)?;let shape=fs::symlink_metadata(entry.path()).map_err(storage_error)?;if !shape.is_dir()||linked(&shape)||work!=new&&!known.contains(&name){return Err(invalid());}}Ok(())
 }
-pub fn reserve(database:&mut Database,profile:Uuid,work:Uuid,bytes:u64,files:u32)->Result<()>{reserve_with_protocol(database,profile,work,bytes,files,0)}
+pub fn reserve(database:&mut Database,profile:Uuid,work:Uuid,bytes:u64,files:u32)->Result<()>{reserve_with_protocol(database,profile,work,bytes,files,0,None)}
+/// Boot provenance and copy debt commit together, outside the actor container.
+/// No created directory/child receipt may replace this protected journal.
+pub fn reserve_macos(database:&mut Database,journal:&MacWorkJournal)->Result<()>{
+    journal.validate()?;let raw=serde_json::to_string(journal).map_err(storage_error)?;
+    if raw.len()>4096{return Err(invalid());}
+    reserve_with_protocol(database,journal.profile,journal.session,journal.reserved_bytes,journal.files,0,Some(&raw))
+}
 /// The Windows owner must hold its profile creation lease until owner.lease is
 /// acquired. The protocol bit commits in the same transaction as the debt; it
 /// is never inferred from an old directory name or added to a legacy row.
 #[cfg(windows)]
-pub fn reserve_windows(database:&mut Database,profile:Uuid,work:Uuid,bytes:u64,files:u32)->Result<()>{reserve_with_protocol(database,profile,work,bytes,files,1)}
-fn reserve_with_protocol(database:&mut Database,profile:Uuid,work:Uuid,bytes:u64,files:u32,protocol:u32)->Result<()>{
+pub fn reserve_windows(database:&mut Database,profile:Uuid,work:Uuid,bytes:u64,files:u32)->Result<()>{reserve_with_protocol(database,profile,work,bytes,files,1,None)}
+fn reserve_with_protocol(database:&mut Database,profile:Uuid,work:Uuid,bytes:u64,files:u32,protocol:u32,macos_journal:Option<&str>)->Result<()>{
     if profile.is_nil()||work.is_nil()||bytes==0||bytes>8*1024*1024*1024||!(1..=144).contains(&files){return Err(full());}
     let profile_root=database.root.clone();let tx=database.connection.transaction_with_behavior(TransactionBehavior::Immediate).map_err(storage_error)?;
     let mut query=tx.prepare("SELECT work_id FROM native_work_storage LIMIT 65").map_err(storage_error)?;let known=query.query_map([],|row|row.get::<_,String>(0)).map_err(storage_error)?.collect::<std::result::Result<BTreeSet<_>,_>>().map_err(storage_error)?;drop(query);if known.len()>64{return Err(invalid());}for value in &known{id(value)?;}known_tree(&profile_root,&known,work)?;
     let(count,total,file_count):(u64,u64,u64)=tx.query_row("SELECT count(*),COALESCE(sum(reserved_bytes),0),COALESCE(sum(file_count),0) FROM native_work_storage",[],|row|Ok((row.get(0)?,row.get(1)?,row.get(2)?))).map_err(storage_error)?;
-    if count>=64||total.checked_add(bytes).is_none_or(|value|value>32*1024*1024*1024)||file_count+u64::from(files)>4096{return Err(full());}tx.execute("INSERT INTO native_work_storage(work_id,profile_id,reserved_bytes,file_count,phase,manifest_sha256,created_at_ms,windows_creation_protocol) VALUES(?1,?2,?3,?4,'reserved',NULL,?5,?6)",params![work.to_string(),profile.to_string(),bytes,files,now_ms(),protocol]).map_err(storage_error)?;tx.commit().map_err(storage_error)
+    if count>=64||total.checked_add(bytes).is_none_or(|value|value>32*1024*1024*1024)||file_count+u64::from(files)>4096{return Err(full());}tx.execute("INSERT INTO native_work_storage(work_id,profile_id,reserved_bytes,file_count,phase,manifest_sha256,created_at_ms,windows_creation_protocol) VALUES(?1,?2,?3,?4,'reserved',NULL,?5,?6)",params![work.to_string(),profile.to_string(),bytes,files,now_ms(),protocol]).map_err(storage_error)?;if let Some(journal)=macos_journal{tx.execute("INSERT INTO preferences(key,value) VALUES(?1,?2)",params![macos_journal_key(work),journal]).map_err(storage_error)?;}tx.commit().map_err(storage_error)
 }
 pub fn staged(database:&Database,profile:Uuid,work:Uuid,manifest:&ContentHash)->Result<()>{ContentHash::parse(manifest.0.clone())?;if database.connection.execute("UPDATE native_work_storage SET phase='staged',manifest_sha256=?3 WHERE work_id=?1 AND profile_id=?2 AND phase='reserved'",params![work.to_string(),profile.to_string(),manifest.0]).map_err(storage_error)?!=1{return Err(invalid());}Ok(())}
 pub fn require_reserved(database:&Database,profile:Uuid,work:Uuid,minimum_bytes:u64,files:u32)->Result<()>{let admitted:bool=database.connection.query_row("SELECT EXISTS(SELECT 1 FROM native_work_storage WHERE work_id=?1 AND profile_id=?2 AND phase='reserved' AND reserved_bytes>=?3 AND file_count>=?4)",params![work.to_string(),profile.to_string(),minimum_bytes,files],|row|row.get(0)).map_err(storage_error)?;if !admitted{return Err(invalid());}Ok(())}
@@ -81,7 +118,21 @@ pub fn retiring(database:&Database,profile:Uuid,work:Uuid)->Result<()>{
 pub fn require_retiring(database:&Database,profile:Uuid,work:Uuid)->Result<()>{
     let admitted:bool=database.connection.query_row("SELECT EXISTS(SELECT 1 FROM native_work_storage WHERE work_id=?1 AND profile_id=?2 AND phase='retiring')",params![work.to_string(),profile.to_string()],|row|row.get(0)).map_err(storage_error)?;if !admitted{return Err(invalid());}Ok(())
 }
+/// Caller first obtains authenticated owner-container removal and removes the
+/// exact broker work directory. Journal and quota debt then disappear atomically.
+pub fn release_macos_removed(database:&Database,profile:Uuid,work:Uuid)->Result<()>{
+    if macos_journal(database,profile,work)?.is_none()||!absent(&database.root.join("native-work").join(work.to_string()))?{return Err(invalid());}
+    let tx=database.connection.unchecked_transaction().map_err(storage_error)?;
+    let existing:Option<(String,String)>=tx.query_row("SELECT profile_id,phase FROM native_work_storage WHERE work_id=?1",[work.to_string()],|row|Ok((row.get(0)?,row.get(1)?))).optional().map_err(storage_error)?;
+    if !existing.is_some_and(|(owner,phase)|owner==profile.to_string()&&phase=="retiring"){return Err(invalid());}
+    tx.execute("DELETE FROM native_work_storage WHERE work_id=?1 AND profile_id=?2 AND phase='retiring'",params![work.to_string(),profile.to_string()]).map_err(storage_error)?;
+    tx.execute("DELETE FROM preferences WHERE key=?1",[macos_journal_key(work)]).map_err(storage_error)?;
+    tx.commit().map_err(storage_error)
+}
 pub fn release_removed(database:&Database,profile:Uuid,work:Uuid)->Result<()>{
+    // macOS boot provenance must retire atomically with its debt. Generic
+    // Windows/Linux collectors may not orphan or bypass that separate journal.
+    if macos_journal(database,profile,work)?.is_some(){return Err(invalid());}
     if !absent(&database.root.join("native-work").join(work.to_string()))?{return Err(invalid());}let existing:Option<(String,String)>=database.connection.query_row("SELECT profile_id,phase FROM native_work_storage WHERE work_id=?1",[work.to_string()],|row|Ok((row.get(0)?,row.get(1)?))).optional().map_err(storage_error)?;
     if existing.is_some_and(|(owner,phase)|owner!=profile.to_string()||phase!="retiring"){return Err(invalid());}database.connection.execute("DELETE FROM native_work_storage WHERE work_id=?1 AND profile_id=?2 AND phase='retiring'",params![work.to_string(),profile.to_string()]).map_err(storage_error)?;Ok(())
 }
@@ -91,7 +142,7 @@ pub fn release_uncreated(database:&Database,profile:Uuid,work:Uuid)->Result<()>{
     if !absent(&database.root.join("native-work").join(work.to_string()))?{return Err(invalid());}let changed=database.connection.execute("UPDATE native_work_storage SET phase='retiring' WHERE work_id=?1 AND profile_id=?2 AND phase='reserved'",params![work.to_string(),profile.to_string()]).map_err(storage_error)?;if changed!=1{return Err(invalid());}release_removed(database,profile,work)
 }
 pub fn collect_removed(database:&Database,limit:usize)->Result<usize>{
-    let mut query=database.connection.prepare("SELECT profile_id,work_id FROM native_work_storage WHERE phase='retiring' ORDER BY created_at_ms,work_id LIMIT ?1").map_err(storage_error)?;let rows=query.query_map([limit.min(64)],|row|Ok((row.get::<_,String>(0)?,row.get::<_,String>(1)?))).map_err(storage_error)?.collect::<std::result::Result<Vec<_>,_>>().map_err(storage_error)?;drop(query);let mut released=0;for(profile,work)in rows{let(profile,work)=(id(&profile)?,id(&work)?);if absent(&database.root.join("native-work").join(work.to_string()))?{release_removed(database,profile,work)?;released+=1;}}Ok(released)
+    let mut query=database.connection.prepare("SELECT profile_id,work_id FROM native_work_storage WHERE phase='retiring' ORDER BY created_at_ms,work_id LIMIT ?1").map_err(storage_error)?;let rows=query.query_map([limit.min(64)],|row|Ok((row.get::<_,String>(0)?,row.get::<_,String>(1)?))).map_err(storage_error)?.collect::<std::result::Result<Vec<_>,_>>().map_err(storage_error)?;drop(query);let mut released=0;for(profile,work)in rows{let(profile,work)=(id(&profile)?,id(&work)?);if macos_journal(database,profile,work)?.is_some(){continue;}if absent(&database.root.join("native-work").join(work.to_string()))?{release_removed(database,profile,work)?;released+=1;}}Ok(released)
 }
 
 #[cfg(test)]

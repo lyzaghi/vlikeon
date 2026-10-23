@@ -29,12 +29,13 @@ struct LaunchEndpoints {
   int take_output() noexcept;
 };
 
-// This process owner stays disconnected from the XPC protocol until checked
-// save return and recovery are present alongside launch.
+// Endpoints carry the bounded actor control/save protocol. Process authority
+// stays with the exact authenticated XPC connection which created this pair.
 std::optional<LaunchEndpoints> launch_pair(const RuntimeSpec& runtime,
     SessionLease session, const LaunchParameters& parameters,
     uint64_t connection_owner);
 bool session_active(const std::string& session_id);
 bool stop_session(const std::string& session_id, uint64_t connection_owner);
+bool activate_session(const std::string& session_id, uint64_t connection_owner);
 void stop_connection(uint64_t connection_owner);
 }

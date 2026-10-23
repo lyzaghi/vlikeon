@@ -1,5 +1,10 @@
 # Per-game touch controls source
 
+Current extension: `ADVANCED_INPUT_CUSTOMIZATION.md` adds optional `custom_layout`
+to schema 1, with an editor and runtime placement of all sixteen buttons and two
+sticks. Older six-field profiles default to null and retain the baseline below.
+The extension remains unbuilt and unverified on actual layouts/devices.
+
 This document describes local emulator touch profiles. Remote playback has a
 separate per-pair keyboard/mouse touch profile and explicit host authorization;
 see `REMOTE_TOUCH_AND_INPUT_FENCES.md`. Neither profile implements an OS virtual
@@ -60,7 +65,7 @@ neutralizes retained touch input when the UI stops providing fresh frames.
 
 This is the Game Hub Web frontend used by desktop, Web/PWA and mobile resource
 assemblies. It does not add an SDL-native button overlay, native mobile emulator,
-advanced WASM core artifact or arbitrary drag-and-drop layout editor. Those and
+advanced WASM core artifact. A drag-and-drop editor is now authored; native
 raw/remote controller paths remain part of the full scope. No touch/key/assistive
 event, layout render, browser/mobile UI, storage transaction, worker, compiler or
 test has been executed.

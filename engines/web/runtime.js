@@ -11,6 +11,8 @@ export class WebGameRuntime extends EventTarget {
   #stopTask=null;
   #nativeMedia=null;
   #threads=null;
+  #playTask=null;#pauseTask=null;
+  #canvasLoss=null;
   get state(){return this.#state;}
   get videoGeometry(){return{...this.#videoGeometry};}
   async unlockAudio(){if(!this.#audio)this.#audio=new AudioContext({latencyHint:'interactive'});await this.#audio.resume();}
@@ -33,18 +35,34 @@ export class WebGameRuntime extends EventTarget {
     this.#latencyFrames=preset==='smooth'?Math.max(3,latencyFrames):latencyFrames;
     this.#worker=new Worker(new URL('./libretro-worker.js',import.meta.url),{type:'module',name:'OmniPlay emulator'});
     const owner=this.#worker;
-    owner.onmessage=event=>{if(this.#worker===owner)this.#message(event.data);};
+    owner.onmessage=event=>{if(this.#worker===owner){try{this.#message(event.data);}catch(error){this.#failed(error?.message||'The emulator message could not be handled.');}}};
     owner.onerror=()=>{if(this.#worker===owner)this.#failed('The isolated emulator worker stopped.');};
     owner.onmessageerror=()=>{if(this.#worker===owner)this.#failed('The emulator returned an invalid message.');};
     const cancelled=()=>{if(signal?.aborted||!this.#worker||['stopping','stopped','failed'].includes(this.#state))throw Object.assign(new Error('Game preparation was cancelled.'),{code:'cancelled'});};
     try{
       if(threadPolicy)this.#threads=new UiThreadRelay(threadPolicy,moduleUrl,owner,message=>this.#failed(message));
       this.#state='preparing';cancelled();
+      this.#canvasLoss=event=>{event.preventDefault();if(this.#worker===owner)this.#failed('The video surface was lost. Reopen the game before continuing.');};
+      this.#canvas?.addEventListener('contextlost',this.#canvasLoss);
       if(!this.#audio)this.#audio=new AudioContext({latencyHint:'interactive'});
+      this.#audio.onstatechange=()=>{
+        if(this.#worker!==owner||this.#state!=='running')return;
+        if(this.#audio?.state==='closed')this.#failed('The audio device closed. Reopen the game before continuing.');
+        else if(this.#audio?.state!=='running')void this.pause().catch(()=>{});
+      };
       await this.#audio.audioWorklet.addModule(new URL('./audio-worklet.js',import.meta.url));
       this.#audioNode=new AudioWorkletNode(this.#audio,'omniplay-audio',{outputChannelCount:[2]});
       this.#audioNode.connect(this.#audio.destination);this.#audioNode.port.postMessage({method:'volume',volume});
-      this.#audioNode.port.onmessage=event=>this.dispatchEvent(new CustomEvent('audio_metrics',{detail:event.data}));
+      this.#audioNode.onprocessorerror=()=>{if(this.#worker===owner)this.#failed('The audio processor stopped. Reopen the game before continuing.');};
+      this.#audioNode.port.onmessage=event=>{
+        if(this.#worker!==owner)return;
+        if(event.data?.event==='audio_ack'){
+          if(Number.isSafeInteger(event.data.sequence)&&event.data.sequence>0)owner.postMessage({method:'audio_ack',params:{sequence:event.data.sequence}});
+        }else if(event.data?.event==='audio_metrics'){
+          this.#audioNode?.port.postMessage({method:'metrics_ack',sequence:event.data.sequence});
+          this.dispatchEvent(new CustomEvent('audio_metrics',{detail:event.data}));
+        }
+      };
       let stageId=null;
       if(nativeMedia){
         if(media||rom!==undefined||typeof nativeMedia.read!=='function'||typeof nativeMedia.close!=='function'||globalThis.crossOriginIsolated!==true||typeof SharedArrayBuffer!=='function')throw new Error('Native game reads require isolated shared memory and one media source.');
@@ -71,9 +89,37 @@ export class WebGameRuntime extends EventTarget {
       cancelled();const info=await this.#request('prepare',params,transfer,30000);cancelled();if(info.systemAssetsProtocol!==(systemAssets?1:0)||info.threadProtocol!==(threadPolicy?1:0)||info.hardwareVideoProtocol!==(hardwareVideo?1:0)||fileBackedContentRequired&&info.fileBackedContent!==true||info.systemMemoryProtocol!==1||!Number.isSafeInteger(info.systemRamBytes)||info.systemRamBytes<minimumSystemRamBytes||info.inputProtocol!==3||info.coreOptionsProtocol!==1||info.libretroResultProtocol!==resultProtocol||info.portableInGameFormat!==(portableFiles?.format??null)||stageId&&info.mediaProtocol!==1||nativeMedia&&info.nativeReadProtocol!==1||firmware&&info.firmwareProtocol!==1||discControlEnabled&&info.discProtocol!==1||savedFiles&&(info.savedFilesProtocol!==1||info.saveFilesSupported!==true)||!savedFiles&&info.saveFilesSupported===true)throw new Error('The installed emulator does not support the required session data.');this.#nominalHz=info.nominalRefreshHz;this.#configureAudio();this.#state='ready';return info;
     }catch(error){await this.stop();throw error;}
   }
-  async start(){if(this.#state!=='ready'&&this.#state!=='paused')throw new Error('Game is not ready.');await this.#audio.resume();await this.#request('start');this.#state='running';}
-  async pause(){if(this.#state!=='running')return;await this.#request('pause');this.#audioNode?.port.postMessage({method:'clear'});await this.#audio?.suspend();this.#state='paused';}
-  async resume(){if(this.#state!=='paused')return;await this.#audio?.resume();await this.#request('resume');this.#state='running';}
+  async #play(method){
+    if(this.#playTask)return this.#playTask;
+    if(this.#pauseTask)await this.#pauseTask;
+    if(method==='start'?!['ready','paused'].includes(this.#state):this.#state!=='paused')throw new Error('Game is not ready.');
+    const owner=this.#worker,initial=this.#state;
+    const operation=(async()=>{
+      await this.#audio.resume();
+      if(this.#worker!==owner||this.#state!==initial)throw new Error('Playback was cancelled.');
+      this.#audioNode?.port.postMessage({method:'clear'});
+      try{await this.#request(method);}catch(error){if(this.#worker===owner)this.#failed(error.message);throw error;}
+      if(this.#worker!==owner||this.#state!==initial)throw new Error('Playback was cancelled.');
+      this.#state='running';
+    })();this.#playTask=operation;
+    try{return await operation;}finally{if(this.#playTask===operation)this.#playTask=null;}
+  }
+  async start(){return this.#play('start');}
+  async pause(){
+    if(this.#pauseTask)return this.#pauseTask;
+    if(this.#playTask){try{await this.#playTask;}catch{}}
+    if(this.#state!=='running')return;
+    const owner=this.#worker;this.#state='pausing';
+    const operation=(async()=>{
+      this.#audioNode?.port.postMessage({method:'clear'});
+      try{await this.#request('pause');await this.#audio?.suspend();}
+      catch(error){if(this.#worker===owner)this.#failed(error.message);throw error;}
+      finally{this.#audioNode?.port.postMessage({method:'clear'});}
+      if(this.#worker===owner&&this.#state==='pausing')this.#state='paused';
+    })();this.#pauseTask=operation;
+    try{return await operation;}finally{if(this.#pauseTask===operation)this.#pauseTask=null;}
+  }
+  async resume(){return this.#play('resume');}
   input(ports,analogPorts,hapticsAvailable=[false,false,false,false],pointer={x:0,y:0,pressed:false,inside:false}){if(this.#state==='running'&&!this.#inputInFlight){this.#inputInFlight=true;void this.#request('input',{ports,analogPorts,hapticsAvailable,pointer,pointerGeometry:this.videoGeometry,observed_at_ms:performance.timeOrigin+performance.now()}).then(result=>{const value=result?.videoGeometry;if(!value||!Number.isInteger(value.width)||!Number.isInteger(value.height)||value.width<0||value.height<0||value.width>4096||value.height>4096||Boolean(value.width)!==Boolean(value.height))throw new Error('The emulator returned invalid video geometry.');this.#videoGeometry={width:value.width,height:value.height};}).catch(error=>this.#failed(error.message)).finally(()=>{this.#inputInFlight=false;});}}
   async save(kind){try{const result=await this.#request('save',{kind},[],30000);return result.payload;}catch(error){if(error.code==='runtime_timeout')this.#failed('Save capture timed out. Reopen the game before continuing.');throw error;}}
   async load(kind,payload){
@@ -88,11 +134,14 @@ export class WebGameRuntime extends EventTarget {
   async stop(){
     if(this.#stopTask)return this.#stopTask;
     const operation=(async()=>{
-      this.#state='stopping';const native=this.#closeNative(),worker=this.#worker;
+      this.#state='stopping';this.#audioNode?.port.postMessage({method:'clear'});const native=this.#closeNative(),worker=this.#worker;
       if(worker){try{await this.#request('stop',{},[],2000);}catch{}this.#threads?.close();this.#threads=null;worker.terminate();this.#worker=null;}
       this.#threads?.close();this.#threads=null;
+      if(this.#canvasLoss)this.#canvas?.removeEventListener('contextlost',this.#canvasLoss);this.#canvasLoss=null;
       for(const item of this.#pending.values()){clearTimeout(item.timer);item.reject(new Error('Runtime stopped.'));}this.#pending.clear();
-      this.#audioNode?.disconnect();try{await this.#audio?.close();await native;}finally{this.#audio=null;this.#audioNode=null;this.#state='stopped';this.#inputInFlight=false;this.#videoGeometry={width:0,height:0};}
+      if(this.#audioNode){this.#audioNode.onprocessorerror=null;this.#audioNode.port.onmessage=null;this.#audioNode.port.close();this.#audioNode.disconnect();}
+      if(this.#audio)this.#audio.onstatechange=null;
+      try{await this.#audio?.close();await native;}finally{this.#audio=null;this.#audioNode=null;this.#state='stopped';this.#inputInFlight=false;this.#videoGeometry={width:0,height:0};}
     })();this.#stopTask=operation;
     try{return await operation;}finally{if(this.#stopTask===operation)this.#stopTask=null;}
   }
@@ -102,6 +151,7 @@ export class WebGameRuntime extends EventTarget {
     const id=crypto.randomUUID();return new Promise((resolve,reject)=>{const timer=setTimeout(()=>{this.#pending.delete(id);if(this.#threads)this.#failed('The threaded emulator exceeded its operation deadline.');reject(Object.assign(new Error('Runtime operation timed out.'),{code:'runtime_timeout'}));},timeout);this.#pending.set(id,{resolve,reject,timer});try{this.#worker.postMessage({id,method,params},transfer);}catch(error){clearTimeout(timer);this.#pending.delete(id);reject(error);}});
   }
   #message(message){
+    if(!message||typeof message!=='object')throw new Error('The emulator returned an invalid message.');
     if(message.event){
       if(message.event==='pthread'){if(this.#threads)this.#threads.handle(message.data);else this.#failed('The emulator requested undeclared threads.');return;}
       if(message.event==='native_media_read'){void this.#readNative(message.data);return;}
@@ -112,10 +162,37 @@ export class WebGameRuntime extends EventTarget {
         const values=this.#state==='running'&&Number.isFinite(age)&&age>=-50&&age<=250?packet.values:Array.from({length:4},()=>({strong:0,weak:0}));
         this.dispatchEvent(new CustomEvent('haptics',{detail:{values,age_ms:Number.isFinite(age)?Math.max(0,age):251}}));
       }
-      else if(message.event==='audio'&&this.#audioNode)this.#audioNode.port.postMessage(message.data,[message.data.samples]);
-      else if(message.event==='video'&&this.#canvas){const{rgba,width,height}=message.data;if(width*height>4096*4096||rgba.byteLength!==width*height*4)return;this.#canvas.width=width;this.#canvas.height=height;this.#canvas.getContext('2d',{alpha:false}).putImageData(new ImageData(new Uint8ClampedArray(rgba),width,height),0,0);}
+      else if(message.event==='audio'){
+        const packet=message.data;
+        if(!packet||!Number.isSafeInteger(packet.sequence)||packet.sequence<1||!(packet.samples instanceof ArrayBuffer)||
+          packet.samples.byteLength===0||packet.samples.byteLength>16384*2*4||packet.samples.byteLength%8||
+          !Number.isFinite(packet.sampleRate)||packet.sampleRate<8000||packet.sampleRate>192000){this.#failed('The emulator returned invalid audio.');return;}
+        // Paused/preparing/failed sessions must not feed audio produced by
+        // load/init callbacks into a suspended worklet for replay on resume.
+        if(this.#state!=='running'||!this.#audioNode){this.#worker?.postMessage({method:'audio_ack',params:{sequence:packet.sequence}});return;}
+        this.#audioNode.port.postMessage({method:'samples',...packet},[packet.samples]);
+      }
+      else if(message.event==='video'){
+        const packet=message.data;let presented=false;
+        try{
+          if(!packet||!Number.isSafeInteger(packet.sequence)||packet.sequence<1||!Number.isInteger(packet.width)||!Number.isInteger(packet.height)||packet.width<1||packet.height<1||packet.width>4096||packet.height>4096||!(packet.rgba instanceof ArrayBuffer)||packet.rgba.byteLength!==packet.width*packet.height*4)throw new Error('The emulator returned invalid video.');
+          if(this.#canvas&&this.#state==='running'){
+            const{rgba,width,height}=packet;if(this.#canvas.width!==width)this.#canvas.width=width;if(this.#canvas.height!==height)this.#canvas.height=height;
+            const context=this.#canvas.getContext('2d',{alpha:false});if(!context)throw new Error('The video surface is unavailable.');
+            context.putImageData(new ImageData(new Uint8ClampedArray(rgba),width,height),0,0);
+            presented=true;
+          }
+        }catch(error){this.#failed(error.message);}
+        finally{if(Number.isSafeInteger(packet?.sequence))this.#worker?.postMessage({method:'video_ack',params:{sequence:packet.sequence,presented}});}
+      }
       else if(message.event==='runtime_error')this.#failed(message.data.message);
-      else if(message.event==='av_info'){this.#nominalHz=message.data.fps;this.#configureAudio();this.dispatchEvent(new CustomEvent(message.event,{detail:message.data}));}
+      else if(message.event==='av_info'){
+        const value=message.data;
+        if(!value||!Number.isFinite(value.fps)||value.fps<20||value.fps>240||!Number.isFinite(value.sampleRate)||value.sampleRate<8000||value.sampleRate>192000||!Number.isSafeInteger(value.sequence)||value.sequence<1){this.#failed('The emulator returned invalid AV timing.');return;}
+        this.#worker?.postMessage({method:'av_ack',params:{sequence:value.sequence}});
+        this.#nominalHz=value.fps;this.#configureAudio();this.dispatchEvent(new CustomEvent(message.event,{detail:value}));
+      }
+      else if(message.event==='metrics'){if(Number.isSafeInteger(message.data?.sequence))this.#worker?.postMessage({method:'metrics_ack',params:{sequence:message.data.sequence}});this.dispatchEvent(new CustomEvent(message.event,{detail:message.data}));}
       else this.dispatchEvent(new CustomEvent(message.event,{detail:message.data}));
       return;
     }

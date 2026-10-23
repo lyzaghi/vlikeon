@@ -15,6 +15,7 @@ pub mod linux_plan;
 #[cfg(all(target_os="linux",target_arch="x86_64",target_env="gnu"))]pub mod linux_presentation;
 
 #[cfg(windows)]mod windows;
+#[cfg(all(target_os="macos",target_arch="aarch64"))]pub mod macos;
 #[cfg(windows)]pub use windows::{ContainedProcess,ContainerIdentity,PresentationHost};
 
 pub struct Launched {pub process:ContainedProcess,pub input:File,pub output:File}

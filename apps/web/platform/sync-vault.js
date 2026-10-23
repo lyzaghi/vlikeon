@@ -29,7 +29,8 @@ export class WebSyncVault{
   async #snapshot(signal){return this.#store.transaction(['config'],'readonly',async tx=>({record:record((await tx.get('config',RECORD))?.value??null,this.#profile),key:(await tx.get('config',KEY))?.value??null}),signal);}
   async status({signal}={}){const value=(await this.#snapshot(signal)).record;return{generation:value?.generation??null,connected:value?.connected===true,account:value?.connected?publicAccount(value.account):null,credential_store:'origin_bound_webcrypto',root_key_retained:false};}
   async assertGeneration(generation,{signal}={}){const value=(await this.#snapshot(signal)).record;requireValue(value?.connected&&value.generation===generation,'permission_expired','Synchronization credentials changed. Unlock the current device again.');return publicAccount(value.account);}
-  async store(account,credentials,expectedGeneration,{signal}={}){
+  async store(account,credentials,expectedGeneration,{signal,guard=()=>{}}={}){
+    requireValue(typeof guard==='function','invalid_request','Credential publication guard is invalid.');guard();
     checkAbort(signal);requireValue(isSecureContext&&crypto.subtle&&credentials instanceof ArrayBuffer&&credentials.byteLength===CREDENTIAL_BYTES&&(expectedGeneration===null||typeof expectedGeneration==='string'&&UUID.test(expectedGeneration)),'invalid_request','The browser credential commit is invalid.');const bytes=new Uint8Array(credentials);
     try{
       requireValue(bytes[0]===79&&bytes[1]===80&&bytes[2]===75&&bytes[3]===49,'invalid_request','Browser credentials use an unsupported format.');const identity=publicAccount(account);requireValue(Array.from(bytes.subarray(4,20),value=>value.toString(16).padStart(2,'0')).join('')===identity.device_id.replaceAll('-',''),'invalid_request','Browser delegated credentials belong to another device.');const snapshot=await this.#snapshot(signal);requireValue((snapshot.record?.generation??null)===expectedGeneration,'conflict','Browser synchronization credentials changed before saving.');
@@ -39,7 +40,9 @@ export class WebSyncVault{
       await this.#store.transaction(['config'],'readwrite',async tx=>{
         const current=record((await tx.get('config',RECORD))?.value??null,this.#profile),currentKey=(await tx.get('config',KEY))?.value??null;
         requireValue((current?.generation??null)===expectedGeneration&&(currentKey?.id??null)===(priorKey?.id??null),'conflict','Browser synchronization credentials changed before commit.');if(currentKey)wrappingKey(currentKey,this.#profile);
+        guard();
         await tx.put('config',{key:KEY,value:key});await tx.put('config',{key:RECORD,value});
+        guard();
       },signal);return{generation,account:identity};
     }finally{bytes.fill(0);}
   }
@@ -48,10 +51,10 @@ export class WebSyncVault{
     try{credentials=await crypto.subtle.decrypt({name:'AES-GCM',iv:value.nonce,additionalData:aad(this.#profile,value.generation,key.id,value.account),tagLength:128},key.key,value.sealed);checkAbort(signal);requireValue(credentials.byteLength===CREDENTIAL_BYTES,'corrupt_data','Browser delegated credentials have an invalid size.');await this.assertGeneration(value.generation,{signal});return{generation:value.generation,account:publicAccount(value.account),credentials};}
     catch(error){if(credentials)new Uint8Array(credentials).fill(0);if(error instanceof WebPlatformError)throw error;throw new WebPlatformError('permission_denied','Browser synchronization credentials could not be unwrapped. Local progress remains available.');}
   }
-  async updateAccount(account,expectedGeneration,{signal}={}){
+  async updateAccount(account,expectedGeneration,{signal,guard=()=>{}}={}){
     // Certificate/registration updates also rewrap against a fresh generation.
     // A concurrent disconnect cannot be undone by a late account action.
-    const unlocked=await this.unlock(expectedGeneration,{signal});try{const value=publicAccount(account);requireValue(['account_id','device_id','root_public_key','audience'].every(key=>value[key]===unlocked.account[key]),'conflict','A certificate update cannot replace its connected account.');return await this.store(value,unlocked.credentials,expectedGeneration,{signal});}finally{new Uint8Array(unlocked.credentials).fill(0);}
+    const unlocked=await this.unlock(expectedGeneration,{signal});try{guard();const value=publicAccount(account);requireValue(['account_id','device_id','root_public_key','audience'].every(key=>value[key]===unlocked.account[key]),'conflict','A certificate update cannot replace its connected account.');return await this.store(value,unlocked.credentials,expectedGeneration,{signal,guard});}finally{new Uint8Array(unlocked.credentials).fill(0);}
   }
   async disconnect(expectedGeneration,{signal}={}){
     requireValue(expectedGeneration===null||typeof expectedGeneration==='string'&&UUID.test(expectedGeneration),'invalid_request','The browser synchronization generation is invalid.');const generation=crypto.randomUUID();

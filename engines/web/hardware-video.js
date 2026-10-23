@@ -24,7 +24,8 @@ export class HardwareVideo{
   #core;#policy;#slot=0;#registered=false;#active=false;#poisoned=false;#busy=false;#canvas;#loss;
   constructor(core,policy,canvas,onLoss,power){
     this.#core=core;this.#policy=validateHardwareVideo(policy);this.#canvas=canvas;
-    for(const name of ['prepare','register','call','alive','callback_bytes'])if(typeof core['_om_web_hw_'+name]!=='function')throw new Error('The declared hardware video frontend is missing.');
+    for(const name of ['prepare','register','call','alive','callback_bytes','display_protocol'])if(typeof core['_om_web_hw_'+name]!=='function')throw new Error('The declared hardware video frontend is missing.');
+    if(core._om_web_hw_display_protocol()!==1)throw new Error('Rebuild the hardware frontend with the bounded display protocol.');
     this.#slot=core._malloc(8);if(!this.#slot||this.#slot%4||this.#slot+8>core.HEAPU8.length)throw new Error('Hardware video completion storage is unavailable.');
     this.#loss=event=>{event.preventDefault();if(this.#poisoned)return;this.#poisoned=true;onLoss();};
     canvas.addEventListener('webglcontextlost',this.#loss);
