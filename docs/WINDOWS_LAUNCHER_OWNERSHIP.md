@@ -47,6 +47,15 @@ Membership is necessary, not sufficient, for capture/input. The native chooser
 must still bind local consent, exact HWND, exact retained process instance,
 game/session/capture owner, expiry and ongoing liveness/revocation.
 
+The broker input authorization path now admits the exact process handle retained
+by its capture record through `stream_selected_process`, instead of asking for
+the initial launcher again. It repeats exact-job admission and identity checks
+after local input consent and installed-helper admission. The final page,
+capture and certificate deadline check happens after those potentially slow
+operations, before computing the worker's remaining lifetime. This prepares
+input for a future correctly bound descendant capture; it does not supply the
+missing native chooser or change current root-only capture preparation.
+
 ## Remaining scope
 
 - Connect the native chooser's selected process handle to the prepared capture,

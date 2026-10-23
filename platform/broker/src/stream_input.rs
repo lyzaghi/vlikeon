@@ -86,15 +86,25 @@ impl StreamInputs{
         #[cfg(not(windows))]{let _=(installed,session_id,grant,game);Err(unavailable())}
         #[cfg(windows)]{
             use std::os::windows::io::AsHandle;
-            let process=installed.stream_process(database,game_id)?;let mut target=omniplay_stream_input::target_identity(process.as_handle())?;
+            // Follow the exact process retained by capture, not the original
+            // launcher. A native-selected descendant must remain in this
+            // installed session's retained job; never reacquire by PID.
+            let process=installed.stream_selected_process(database,game_id,capture._process.as_handle())?;
+            let mut target=omniplay_stream_input::target_identity(process.as_handle())?;
             if target.process_id!=captured_target.process_id||target.creation_time!=captured_target.creation_time{return Err(unavailable());}target.window=Some(window);
             let title:String=game.title.chars().filter(|c|!c.is_control()).take(100).collect();let client=key_id(&grant.client_public_key)?;let vi=database.settings()?.locale=="vi";
             let description=if vi{format!("Cho thiết bị đã ghép nối điều khiển bàn phím và chuột của game:\n{title}\n\nBản nhận diện thiết bị nhận:\n{client}\n\nChỉ áp dụng cho tiến trình game do OmniPlay đã mở. Đưa game ra phía trước trong 30 giây. Đổi cửa sổ, dùng chuột/bàn phím tại host hoặc nhấn F12/Ctrl/Alt/Windows sẽ thu hồi quyền. Hiệu lực tối đa 30 phút. Tay cầm ảo chưa khả dụng.")}else{format!("Allow the paired device to control keyboard and mouse for:\n{title}\n\nViewer fingerprint:\n{client}\n\nApplies only to the game process launched by OmniPlay. Bring it to the foreground within 30 seconds. Switching windows, using the host keyboard/mouse or pressing F12/Ctrl/Alt/Windows revokes this grant. Maximum lifetime: 30 minutes. Virtual gamepads are unavailable.")};
             let answer=rfd::MessageDialog::new().set_title("OmniPlay — Remote input").set_description(&description).set_buttons(rfd::MessageButtons::YesNo).set_level(rfd::MessageLevel::Warning).show();
             if answer!=rfd::MessageDialogResult::Yes{return Err(PlatformError::new(ErrorCode::Cancelled,"Native remote input was not authorized"));}
-            // A native consent dialog can outlast the certificate or game process.
-            let now=omniplay_core::now_ms();if now>=deadline_ms||now>=capture_expires{return Err(PlatformError::new(ErrorCode::DeadlineExceeded,"Native input consent exceeded the capture or page lifetime"));}grant.validate(&grant.audience,now)?;let actual=omniplay_stream_input::target_identity(process.as_handle())?;if actual.process_id!=target.process_id||actual.creation_time!=target.creation_time{return Err(unavailable());}
-            let remaining=(grant.expires_at_ms-now).min(capture_expires-now).min(30*60*1000)as u32;let(path,artifact)=approved_helper()?;let grant_id=Uuid::new_v4();
+            // Consent AND installed-helper admission can outlast the capture,
+            // certificate, page or game. Recheck the exact retained process's
+            // job membership after both; slow hashing must not extend a grant.
+            let(path,artifact)=approved_helper()?;
+            let process=installed.stream_selected_process(database,game_id,process.as_handle())?;
+            let actual=omniplay_stream_input::target_identity(process.as_handle())?;
+            if actual.process_id!=target.process_id||actual.creation_time!=target.creation_time{return Err(unavailable());}
+            let now=omniplay_core::now_ms();if now>=deadline_ms||now>=capture_expires{return Err(PlatformError::new(ErrorCode::DeadlineExceeded,"Native input setup exceeded the capture or page lifetime"));}grant.validate(&grant.audience,now)?;
+            let remaining=(grant.expires_at_ms-now).min(capture_expires-now).min(30*60*1000)as u32;let grant_id=Uuid::new_v4();
             let worker=InputWorker::spawn(&path,target,grant_id,session_id,now+u64::from(remaining))?;
             if omniplay_core::now_ms()>=deadline_ms{return Err(PlatformError::new(ErrorCode::DeadlineExceeded,"Native input setup exceeded the requesting page's deadline"));}
             let status=StreamInputStatus{grant_id,game_id,pair_id,session_id,state:StreamInputState::WaitingForTarget,reason:None,keyboard_mouse:true,gamepad:false,expires_at_ms:now+u64::from(remaining)};

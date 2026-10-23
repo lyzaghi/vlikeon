@@ -71,6 +71,10 @@ Item 57 now authors Windows creation-time launcher job ownership and private
 selected-process-handle admission; see `WINDOWS_LAUNCHER_OWNERSHIP.md`. This
 improves installed-session lifetime source but does not yet replace this
 capture path's root-only preparation or complete descendant window consent.
+Input authorization now follows the capture's retained process handle and
+rechecks its exact installed-job membership after local consent and helper
+admission; it no longer substitutes the initial launcher at that stage. The
+deadline is rechecked after those operations before worker lifetime is set.
 
 API reasoning follows Microsoft's documented
 [window process lookup](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-getwindowthreadprocessid)

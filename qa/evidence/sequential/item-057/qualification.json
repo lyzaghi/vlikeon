@@ -7,6 +7,8 @@
     "Installed session stays active until the original owned process group drains",
     "Launcher exit status is not treated as descendant game success",
     "Host-only selected process-handle admission checks original instance liveness and exact retained-job membership",
+    "Broker input authorization follows the exact retained capture process and repeats job/identity admission after local consent and helper admission",
+    "Final input lifetime checks include time spent in helper admission; no already expired capture/page/certificate is granted a fresh worker lifetime",
     "Existing direct-root capture preparation remains root-only; no renderer or remote process-selection command added"
   ],
   "build_executed": false,

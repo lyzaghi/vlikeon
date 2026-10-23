@@ -9,6 +9,13 @@ and host-only selected process-handle admission. No descendant capture chooser
 is integrated, native API executed or launcher compatibility claimed. See
 `WINDOWS_LAUNCHER_OWNERSHIP.md`; item 57 and original 51–109 scope remain open.
 
+The next item-57 checkpoint connects input authorization to the actual retained
+capture process instead of reacquiring the root launcher. Exact-job/identity
+admission is repeated after consent and helper admission, then original page,
+capture and certificate deadlines are checked before computing worker lifetime.
+The descendant chooser/capture binding still needs implementation; no build,
+test, dialog, helper or native API was executed for this checkpoint.
+
 On the owner's continued source-work/next steering, item 56 now has initial
 private native codec-intersection and bounded raw-frame mailbox source in
 `native_video.rs`. `NATIVE_VIDEO_SERVICE.md` records the independent executable,
