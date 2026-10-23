@@ -3,6 +3,7 @@ mod protocol;
 pub mod native_video;
 pub mod native_video_colour;
 pub mod native_h264_rtp;
+pub mod native_h264_receive;
 pub use protocol::*;
 
 use omniplay_contracts::{ErrorCode,PlatformError,Result};

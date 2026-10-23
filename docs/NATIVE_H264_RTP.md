@@ -38,6 +38,10 @@ bytes directly to an unauthenticated peer or claim end-to-end streaming. The
 browser WebRTC path remains separately implemented; a native injection adapter
 and actual profile/level/VUI/parameter-set exchange are still required.
 
+The subsequent source checkpoint adds a separate bounded internal receive stage
+in `native_h264_receive.rs`, documented in `NATIVE_H264_RECEIVER.md`. It has no
+network/decoder/product caller and does not supply the missing SRTP/jitter layers.
+
 The eight source fixtures cover headers/clock, FU-A reassembly and sequence wrap,
 multi-NAL markers, explicit prefix widths, malformed framing, forbidden/nonpicture
 input, transactional mode-0 failure and replay/input bounds. They use inert NAL

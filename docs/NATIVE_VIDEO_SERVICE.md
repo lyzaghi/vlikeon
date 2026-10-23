@@ -206,3 +206,11 @@ access-unit marker handling. `NATIVE_H264_RTP.md` records limits and missing
 codec/VUI/parameter-set/receiver/SRTP/network work. Eight inert source fixtures
 are authored, not executed. No current broker/transport caller invokes it and
 no parser, network, decoder, build or test ran. Full original scope remains open.
+
+The next source checkpoint adds bounded RTP receive-header admission and H.264
+single-NAL/FU-A/STAP-A reconstruction after the required authenticated/reordered
+transport stage. It rejects incomplete/expired/replayed units and initially
+requires IDR layout, without claiming full bitstream/decoder compatibility.
+Seven inert source cases remain unexecuted. `NATIVE_H264_RECEIVER.md` records
+limits and missing SRTP/jitter/codec/decoder/product integration. No receiver,
+network, decoder, build or test executed; original requirements remain open.

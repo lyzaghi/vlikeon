@@ -94,6 +94,13 @@ fixtures are authored, unexecuted. No broker/native injection/receiver/SRTP/netw
 integration or execution is implied; actual codec/VUI admission and all original
 platform/service/transport/final qualification requirements remain open.
 
+The next item-56 source checkpoint adds an internal bounded H.264 RTP receive
+stage (single NAL/FU-A/STAP-A) with source/header/sequence/timestamp/assembly-age
+fences. Seven inert source cases, including sender/receiver round trip, are
+authored and unexecuted. It has no product/network/decoder caller and requires
+authenticated SRTP/reorder/codec authority before entry. All original missing
+receiver/service/platform/transport and final execution evidence remain due.
+
 This fork's current assignment: items 51 and 52 are accepted with evidence in
 `SAVE_ARCHIVE_INTERCHANGE.md` and `STORAGE_FAULT_QUALIFICATION.md`. On 2026-10-23,
 the owner deferred Linux build/runtime work for item 53, then deferred build/test
