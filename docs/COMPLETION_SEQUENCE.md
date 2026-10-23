@@ -52,6 +52,13 @@ to the encoder worker/Rust frame bridge and unbuilt/unexecuted. Native capture
 transport, host admission/lifecycle/UI, application audio, other platforms and
 every original item-56 product/qualification requirement remain open.
 
+The subsequent item-56 checkpoint connects WGC capture, C++ SDR conversion and
+MF encoding inside a distinct owned-v2 worker mode. It requires an inherited
+original process handle/local confirmation and preserves capture age/sequence,
+keyframe fences and both native Stop results. Rust typed v2 launch/client and
+product admission/UI/receiver/transport remain unconnected; no build, native
+prompt/media operation or test ran. Full remaining scope stays open.
+
 This fork's current assignment: items 51 and 52 are accepted with evidence in
 `SAVE_ARCHIVE_INTERCHANGE.md` and `STORAGE_FAULT_QUALIFICATION.md`. On 2026-10-23,
 the owner deferred Linux build/runtime work for item 53, then deferred build/test

@@ -12,7 +12,9 @@ keepalive/Stop behavior and required external supervision are in [PROTOCOL.md](P
 The static recipe also includes a separate WGC/D3D11 owned-window capture
 candidate (`vlikeon_capture.hpp`, `src/capture.cpp`) with native confirmation,
 original-process checks, bounded raw frames and GPU aspect-fit BGRA scaling.
-It is not called by the encoder worker or Rust bridge. Exact behavior/limits:
+The separate owned-v2 worker mode now connects it to native colour conversion
+and encoding; current Rust launch/bridge still do not call that mode. See
+[OWNED_PROTOCOL.md](OWNED_PROTOCOL.md). Capture behavior/limits:
 [WINDOWS_OWNED_VIDEO_CAPTURE.md](../../docs/WINDOWS_OWNED_VIDEO_CAPTURE.md).
 
 This standalone static-library recipe supplies an H.264 Main Level 4.2 NV12

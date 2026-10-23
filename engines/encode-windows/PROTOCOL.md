@@ -1,11 +1,13 @@
 # Private Windows video worker protocol v1 — authored, unexecuted
 
-The CMake recipe defines `omniplay-video-worker.exe`. It runs only with the exact
-argument `--stdio-video-v1` and pipe handles for stdin/stdout. It accepts owned
+The CMake recipe defines `omniplay-video-worker.exe`. Its raw v1 mode runs with
+the exact argument `--stdio-video-v1` and pipe handles for stdin/stdout. It accepts owned
 raw video bytes, not a display/window token or capture authority. No file/network
 destination, renderer RPC, arbitrary path/CLSID or permission prompt is accepted.
 Installed-helper admission, launch job/resource limits, original process witness,
 independent supervision and broker integration remain required before product use.
+The separate inherited-handle owned-window v2 mode is described in
+[OWNED_PROTOCOL.md](OWNED_PROTOCOL.md); it does not widen this v1 wire format.
 
 All integers are little-endian. Each frame has a 20-byte header:
 

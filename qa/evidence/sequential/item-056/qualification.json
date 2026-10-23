@@ -12,7 +12,8 @@
     "Explicit SDR colour contract, owned sRGB BGRA-to-limited BT.709 NV12 reference conversion/padding normalization and matching MF colour fields",
     "Broker-private mailbox/conversion/worker bridge retaining raw receipt age and pending keyframe intent; output remains unnegotiated, no current product command or capture producer",
     "Eight authored Rust colour/buffer/identity regression cases, none executed",
-    "Unintegrated Windows WGC/D3D11 owned-window capture source, retained original process/item, local consent, bounded callback frames and SDR aspect-fit opaque BGRA readback; not built or run"
+    "Unintegrated Windows WGC/D3D11 owned-window capture source, retained original process/item, local consent, bounded callback frames and SDR aspect-fit opaque BGRA readback; not built or run",
+    "Owned-v2 C++ worker source connects WGC, explicit SDR conversion and MF with inherited game handle, host-alive fences, capture sequence/age, reliable keyframe fence and combined Stop receipts; current Rust parent does not invoke v2"
   ],
   "static_review": "Source review and git diff whitespace check only",
   "build_executed": false,

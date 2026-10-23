@@ -28,7 +28,7 @@ does not preempt an OS callback or prove native encoder/capture shutdown.
 
 Remaining implementation and qualification:
 
-1. Add the independent native service executable, trusted owner/capture admission,
+1. Finish independent service packaging/integration and trusted owner/capture admission,
    private bounded transport and supervision. Bind authority to original process
    handles and the document/pair/capture lifetime; retain failed teardown.
 2. Connect Windows capture surfaces/application audio and real Media Foundation
@@ -158,3 +158,12 @@ limitations. It is not connected to the encoder worker/Rust bridge/product UI;
 no capture, dialog, build or test ran. Private native capture transport/admission,
 application audio, actual colour/receiver/transport integration and all original
 platform/service qualification requirements remain unfinished.
+
+The C++ worker now has a separate owned-window v2 mode connecting retained
+native process/window capture, opaque BGRA scaling, explicit SDR conversion and
+MF encoding in one actor. Original receipt age and accepted native sequence
+follow encoded output, reliable keyframe intent has a sequence fence, and Stop
+requires both capture/encoder close results. `OWNED_PROTOCOL.md` records the exact
+wire/caller contract. Current Rust typed launch/client still cannot invoke v2;
+native admission/UI, actual receiver/transport integration and all original
+platform/qualification scope remain due. No build, launch, prompt or test ran.

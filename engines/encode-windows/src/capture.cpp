@@ -39,12 +39,13 @@ struct OwnedFrame{
 struct Source{
   HANDLE process=nullptr;DWORD pid=0;HWND window=nullptr;HMONITOR monitor=nullptr;
   ULONGLONG deadline=0;graphics::SizeInt32 size{};
+  std::function<bool()> host_alive;
   std::atomic<bool> closed{false};
   std::shared_ptr<std::atomic<bool>> close_fault=std::make_shared<std::atomic<bool>>(false);
   std::mutex mutex;std::deque<OwnedFrame> frames;
   bool live()const{
     DWORD actual=0;DWORD cloaked=0;
-    return !closed.load()&&!close_fault->load()&&GetTickCount64()<deadline&&
+    return !closed.load()&&!close_fault->load()&&host_alive&&host_alive()&&GetTickCount64()<deadline&&
         WaitForSingleObject(process,0)==WAIT_TIMEOUT&&IsWindow(window)&&IsWindowVisible(window)&&!IsIconic(window)&&
         GetAncestor(window,GA_ROOT)==window&&GetWindowThreadProcessId(window,&actual)&&actual==pid&&
         MonitorFromWindow(window,MONITOR_DEFAULTTONULL)==monitor&&
@@ -167,9 +168,9 @@ struct WindowCapture::Impl{
 };
 WindowCapture::WindowCapture():impl_(std::make_unique<Impl>()){}
 WindowCapture::~WindowCapture()=default;
-HRESULT WindowCapture::confirm_and_create(HANDLE process,HWND window,CaptureConfiguration config,std::unique_ptr<WindowCapture>& result){
+HRESULT WindowCapture::confirm_and_create(HANDLE process,HWND window,CaptureConfiguration config,std::unique_ptr<WindowCapture>& result,std::function<bool()> host_alive){
   ULONGLONG started=GetTickCount64();
-  if(result||!process||process==INVALID_HANDLE_VALUE||!window||
+  if(result||!host_alive||!process||process==INVALID_HANDLE_VALUE||!window||
       !((config.width==1280&&config.height==720)||(config.width==1920&&config.height==1080))||
       !(config.fps==30||config.fps==60)||!config.remaining_ms||config.remaining_ms>1800000)return E_INVALIDARG;
   try{
@@ -177,7 +178,7 @@ HRESULT WindowCapture::confirm_and_create(HANDLE process,HWND window,CaptureConf
     if(type!=APTTYPE_MTA)return RPC_E_WRONG_THREAD;
     auto instance=std::unique_ptr<WindowCapture>(new WindowCapture());auto& self=*instance->impl_;
     winrt::check_hresult(RoInitialize(RO_INIT_MULTITHREADED));self.ro=true;self.config=config;
-    self.source=std::make_shared<Source>();auto source=self.source;
+    self.source=std::make_shared<Source>();auto source=self.source;source->host_alive=std::move(host_alive);
     source->window=window;source->monitor=MonitorFromWindow(window,MONITOR_DEFAULTTONULL);source->deadline=started+config.remaining_ms;
     if(!DuplicateHandle(GetCurrentProcess(),process,GetCurrentProcess(),&source->process,
         PROCESS_QUERY_LIMITED_INFORMATION|SYNCHRONIZE,FALSE,0))winrt::throw_last_error();

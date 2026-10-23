@@ -2,7 +2,8 @@
 
 Source only. No CMake configure/build, native dialog, capture session, D3D/driver,
 window/frame/device operation or test was executed. No product capability is
-enabled and no current worker/broker command calls this capture class.
+enabled and no current product broker command invokes this capture class. The
+owned-v2 C++ worker path now connects it to conversion/encoding as source only.
 
 `engines/encode-windows/src/capture.cpp` adds `WindowCapture`, included by the
 static-library recipe. The factory accepts the trusted host's original game
@@ -80,11 +81,13 @@ Destructor cleanup is best effort only. Actual original helper-process retiremen
 is separate from these API receipts. Startup failures also close/fence resources;
 their OS cleanup still needs failure-injection qualification.
 
-This candidate is not called by `omniplay-video-worker` or the Rust broker frame
-bridge yet. The current video pipe accepts raw NV12, not window tokens or process
-handles. An admitted private native capture adapter/transport must connect WGC
-owned BGRA to the existing explicit colour converter/mailbox without exposing
-process/window identity to a renderer. Installed admission, pair/document lease,
+The raw v1 video pipe still accepts only owned NV12. The new C++ owned-v2 entry
+requires a genuinely inherited original game handle, native confirmation and
+private HWND configuration, and connects WGC BGRA to conversion and encode.
+Its host-alive callback checks pipe EOF/Stop/failure/expiry before/after consent
+and capture work. Current Rust launch/client/broker do not invoke v2 yet. The
+typed private handle/admission path must never expose native process/window
+identity as renderer authority. Installed admission, pair/document lease,
 accessible Stop UI, application audio, receiver negotiation/transport, other
 platforms and full original item-56 scope remain open.
 
