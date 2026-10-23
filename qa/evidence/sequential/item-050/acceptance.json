@@ -1,0 +1,170 @@
+{
+  "schema_version": 1,
+  "item": 50,
+  "status": "accepted",
+  "reviewer": "Codex",
+  "executor": "Antigravity",
+  "batch": "050d",
+  "source_manifest_sha256": "b2bc62f4819c6aac813f40bed85a9fb0c5c0c4fa4d90000246f319404411588e",
+  "accepted_at": "2026-10-23T08:31:50.751Z",
+  "runtime_inputs": {
+    "apps/android/assembly-receipt.json": "ea4bab13bc431dffa1451e7adb25eeddb03a5d23a00075ed5236891f0bb8cb94",
+    "apps/game-hub/app.js": "df4a07f283d0ae3d96331ed0b61f330fcd0a9676f17c3815d4abc37e4df74a55",
+    "apps/game-hub/component-ownership.js": "5069ddf0c11b3418160e1eacac9883f6715c54f9f63178ad56d0ef54dbbbd5a9",
+    "apps/game-hub/manual-recovery-format.js": "2a04a9fe9c7d666dc8b9f1ff1b0ab91772d0958098c5d52dcfbba6b24a439442",
+    "apps/game-hub/manual-recovery.js": "1962890303693fa4320ae3f3f3b631f15db0d469adcf09866f4ecb9079a55e37",
+    "apps/game-hub/styles.css": "bbcbff174222aaf3815914acc8cf79cf81a49c5be253aed1ed616359f8e48780",
+    "apps/ios/assembly-receipt.json": "ce54eee7ac2728bcfb1f3b1a7d08005c3b3a9becaabe970a32089ca05659ff47",
+    "apps/web/assembly-receipt.json": "63bb702075e4b184d6eb1958a3ea1791493205f4832c88b516961ed618e465bd",
+    "apps/web/platform/manual-recovery.js": "3e9280f2cc68ec311ded632bff6d2cea1c294e9736965b69d3cda321e7d0828c",
+    "apps/web/platform/platform.js": "65c0281897f427319d02bdf7d5d8424efb1d9bb1b640f0c67562a39d4fe332e2",
+    "browser/patches/0001-omniplay-game-hub.patch": "b2636abf09c55bc2a60505d06f1ce02ce76b74353bd17fb3d02351e001e81501",
+    "browser/patches/series.json": "bf2beddd754eb3347dffdf4edfb0d2975a8cdd54ce9eb56d2f2d4e311bfa6882",
+    "platform/broker/src/service.rs": "ff798323631cc5cd0cb960106df88483d7f783b02b973cb2bbf1fe897caddc7f",
+    "platform/contracts/src/ipc.rs": "f247e91485dd347537962832a2ae4c87639cf93fa9608c858e93fc25c5b213a8",
+    "platform/core/src/lib.rs": "1a5790ca975dc83f4739d73f1126836d558f7cc351b1490b4ecd99890eb4235a",
+    "platform/core/src/manual_recovery.rs": "f572c16f76375764c9e919f059d1fdc3fad84eab16c524e1f098b9c1dd5868ea",
+    "platform/core/tests/manual_recovery.rs": "6f945ae2fca198ffcd4bb3b1fb1c4a87147c3be63aa74b358728b52211aa02d8",
+    "platform/local-service/src/host.rs": "269a3a5588b32bc4ff5e9d8ca77a0b302acaf43b94c2bebde7bdb33ece8db321",
+    "qa/browser/component-ownership.test.mjs": "75ce81d4e67c64d643c2630dd6c67fc9043b6b0207e146d5d4b168850ceaddc3",
+    "qa/browser/manual-recovery-ui.cjs": "f436555bdfe378eb0276f8b23ea0f66f6cdfcf43710941f40506d2685d784cf0",
+    "qa/browser/manual-recovery.test.mjs": "ac60586c40c595b236f1dd1320d064ceeb2387c5c71ae2a0d1e30c1eb34e7998",
+    "tools/assemble_web.py": "a3b1fa4ecee02acf2693ecfa032c0ba324d37514b6df63c249f1eb96a474307f"
+  },
+  "requirements": [
+    {
+      "requirement": "Manual inventory without trusted game/save metadata",
+      "implementation": [
+        "platform/core/src/manual_recovery.rs",
+        "apps/web/platform/manual-recovery.js"
+      ],
+      "evidence": [
+        "native-recovery.stdout.log",
+        "javascript.stdout.log",
+        "browser-integration.json"
+      ]
+    },
+    {
+      "requirement": "Explicit review of length, SHA-256 and byte prefix before export",
+      "implementation": [
+        "apps/game-hub/manual-recovery.js"
+      ],
+      "evidence": [
+        "browser-integration.json",
+        "manual-recovery-review.png",
+        "manual-recovery-mobile.png"
+      ]
+    },
+    {
+      "requirement": "Verified package export and extraction preserving originals and unverified trust",
+      "implementation": [
+        "platform/core/src/manual_recovery.rs",
+        "apps/game-hub/manual-recovery-format.js"
+      ],
+      "evidence": [
+        "native-recovery.stdout.log",
+        "javascript.stdout.log",
+        "browser-integration.json"
+      ]
+    },
+    {
+      "requirement": "Reject changed, corrupt, truncated or provenance-spoofed input",
+      "evidence": [
+        "native-recovery.stdout.log",
+        "javascript.stdout.log"
+      ]
+    },
+    {
+      "requirement": "Bounded inventories and no following junctions or concurrent save writer",
+      "evidence": [
+        "native-recovery.stdout.log",
+        "javascript.stdout.log"
+      ]
+    },
+    {
+      "requirement": "Selected import/export grants remain document-bound",
+      "implementation": [
+        "platform/contracts/src/ipc.rs",
+        "platform/broker/src/service.rs",
+        "platform/local-service/src/host.rs",
+        "apps/game-hub/component-ownership.js"
+      ],
+      "evidence": [
+        "native-consumers.stderr.log",
+        "javascript.stdout.log"
+      ]
+    },
+    {
+      "requirement": "Component reaches native/mobile host source and Web/PWA bundle",
+      "evidence": [
+        "native-consumers.stderr.log",
+        "source-generation.stdout.log"
+      ]
+    },
+    {
+      "requirement": "No automatic save/game/head/origin publication",
+      "evidence": [
+        "native-recovery.stdout.log",
+        "javascript.stdout.log",
+        "browser-integration.json"
+      ]
+    }
+  ],
+  "native_tests": 9,
+  "javascript_tests": 13,
+  "browser": {
+    "status": "passed",
+    "browser": "155.0.8059.85",
+    "real_indexed_db": true,
+    "picker": "controlled bridge fixture",
+    "cases": [
+      "missing_metadata",
+      "review",
+      "package_export",
+      "package_extraction",
+      "changed_source",
+      "cancelled_export",
+      "grant_revoke",
+      "no_publication",
+      "360px_layout"
+    ],
+    "errors": []
+  },
+  "source_generation": {
+    "repeatable": true,
+    "generated_files": 444,
+    "relative_imports": {
+      "resolved_or_platform_gated": 837,
+      "web_only_native_exclusions": [
+        "out/browser-integration/chrome/browser/resources/omniplay_game_hub/bridge.js",
+        "out/browser-android-integration/chrome/android/omniplay/assets/omniplay/bridge.js",
+        "apps/ios/GameHub/bridge.js"
+      ]
+    },
+    "stale_generated_sources": []
+  },
+  "limits": [
+    "Chrome fixture uses a controlled file-picker bridge; it does not prove OS file-provider dialogs or a full product browser window.",
+    "Windows native fixtures/checks and Chrome IndexedDB qualification only; other platform/device gates remain open.",
+    "No disk-full, power-loss, real device 4 GiB performance or hostile profile-ancestor replacement qualification.",
+    "Raw recovery packages are unencrypted and do not reconstruct absent save compatibility, lineage or authenticated provenance.",
+    "Item 51 save-archive interchange and item 52 fault/schema qualification remain open."
+  ],
+  "earlier_batches": [
+    {
+      "batch": "050a",
+      "status": "failed",
+      "reason": "Two QA path errors retained in evidence"
+    },
+    {
+      "batch": "050b",
+      "status": "passed",
+      "superseded_by": "050d"
+    },
+    {
+      "batch": "050c",
+      "status": "passed",
+      "superseded_by": "050d"
+    }
+  ]
+}

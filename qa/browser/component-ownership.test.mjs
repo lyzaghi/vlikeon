@@ -33,6 +33,22 @@ test('selected grants are document- and direction-bound and consumed on success'
   assert.equal(boundary.permits(first,'save_import',{grant_id:id},owner()),false);
 });
 
+test('manual extraction requires both selected grants from the same document',()=>{
+  const boundary=new DocumentOwnership(),first={},second={};boundary.open(first);boundary.open(second);
+  boundary.accept(first,'file_select_import',{}, {grant_id:id},true);
+  boundary.accept(second,'file_select_export',{}, {grant_id:other},true);
+  const params={grant_id:id,destination_grant_id:other};
+  assert.equal(boundary.permits(first,'manual_recovery_extract',params,owner()),false);
+  assert.equal(boundary.permits(second,'manual_recovery_extract',params,owner()),false);
+  boundary.accept(first,'file_select_export',{}, {grant_id:session},true);
+  const selected={grant_id:id,destination_grant_id:session};
+  assert.equal(boundary.permits(first,'manual_recovery_extract',selected,owner()),true);
+  assert.equal(boundary.permits(second,'manual_recovery_export',selected,owner()),false);
+  boundary.accept(first,'manual_recovery_extract',selected,{},true);
+  assert.equal(boundary.permits(first,'manual_recovery_extract',selected,owner()),false);
+  assert.equal(boundary.permits(first,'permission_revoke',{grant_id:session},owner()),false);
+});
+
 test('transfer IDs cannot be reused for the wrong direction or by another document',()=>{
   const boundary=new DocumentOwnership(),first={},second={};boundary.open(first);boundary.open(second);
   boundary.accept(first,'asset_read_start',{}, {transfer_id:id},true);

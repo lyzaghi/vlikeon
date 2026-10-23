@@ -15,6 +15,7 @@ import {AppearanceControls} from './appearance.js';
 import {SaveMaintenancePanel,removeLocalGameSaves} from './save-maintenance.js';
 import {UnusedContentPanel} from './unused-content.js';
 import {LibraryRecoveryPanel} from './library-recovery.js';
+import {ManualRecoveryPanel} from './manual-recovery.js';
 import {NativeWorkMaintenancePanel} from './native-work-maintenance.js';
 import {mountSaveHistory} from './save-history.js';
 import {DeviceInformationPanel} from './device-information.js';
@@ -43,6 +44,7 @@ const firmwareContainer=document.createElement('div');$('#view-settings').append
 const saveMaintenanceContainer=document.createElement('div');$('#view-settings').append(saveMaintenanceContainer);const saveMaintenance=new SaveMaintenancePanel(bridge,saveMaintenanceContainer,toast);
 const unusedContentContainer=document.createElement('div');$('#view-settings').append(unusedContentContainer);new UnusedContentPanel(bridge,unusedContentContainer,toast);
 const libraryRecoveryContainer=document.createElement('div');$('#view-settings').append(libraryRecoveryContainer);new LibraryRecoveryPanel(bridge,libraryRecoveryContainer,toast);
+const manualRecoveryContainer=document.createElement('div');$('#view-settings').append(manualRecoveryContainer);new ManualRecoveryPanel(bridge,manualRecoveryContainer,toast);
 document.addEventListener('omniplay_library_changed',()=>void loadGames(true).catch(showError));
 const nativeWorkContainer=document.createElement('div');$('#view-settings').append(nativeWorkContainer);const nativeWorkMaintenance=new NativeWorkMaintenancePanel(bridge,nativeWorkContainer,toast);
 const deviceInformationContainer=document.createElement('div');$('#view-devices').append(deviceInformationContainer);const deviceInformation=new DeviceInformationPanel(deviceInformationContainer,bridge);

@@ -18,6 +18,8 @@ import{inspectStorage}from'./storage-inventory.js';
 import{WebUnusedAssets}from'./unused-assets.js';
 import{WebSaveBackup}from'./save-backup.js';
 import{WebLibraryRecovery}from'./library-recovery.js';
+import{WebManualRecovery}from'./manual-recovery.js';
+import{unpackRecovery}from'../manual-recovery-format.js';
 import{firmwareRoleSizes}from'../runtime/firmware.js';
 import{webCoreOptionPolicy,coreOptionRuntime}from'../runtime/core-options.js';
 import{coreResourcePaths}from'../runtime/core-resources.js';
@@ -40,12 +42,13 @@ export async function openWebPlatform(onDisconnected=()=>{}){
 }
 
 class WebPlatform {
-  #store;#catalog;#library;#libraryRecovery;#saves;#backup;#files;#exports;#transfers;#preferences;#performance;#sessions;#firmware;#syncCredentials;#syncAccount;#syncRun;#syncRecovery;#unusedAssets;#pending=new Set();#closed=false;#identity;#storageInspectActive=false;
+  #store;#catalog;#library;#libraryRecovery;#manualRecovery;#saves;#backup;#files;#exports;#transfers;#preferences;#performance;#sessions;#firmware;#syncCredentials;#syncAccount;#syncRun;#syncRecovery;#unusedAssets;#pending=new Set();#closed=false;#identity;#storageInspectActive=false;
   constructor(store,catalog){this.#store=store;this.#catalog=catalog;this.#saves=new WebSaves(store);this.#library=new WebLibrary(store);this.#files=new WebFiles();this.#exports=new WebExportStreams(this.#files);this.#transfers=new WebTransfers(this.#saves);this.#preferences=new WebPreferences(store);this.#performance=new WebPerformance(store,catalog);this.#sessions=new WebSessions(store,catalog);this.#firmware=new WebFirmware(store);}
   async initialize(){
     this.#unusedAssets=new WebUnusedAssets(this.#store);
     this.#backup=new WebSaveBackup(this.#store,this.#saves);
     this.#libraryRecovery=new WebLibraryRecovery(this.#store,this.#library);
+    this.#manualRecovery=new WebManualRecovery(this.#store);
     this.#identity={profile_id:await this.#store.config('profile_id'),device_id:await this.#store.config('device_id')};
     this.#syncCredentials=new WebSyncCredentials(this.#store,this.#identity.profile_id);
     this.#syncAccount=new WebSyncAccount(this.#store,this.#syncCredentials,this.#identity.profile_id,{assertSyncIdle:()=>this.#syncRun?.assertIdle()});
@@ -62,7 +65,7 @@ class WebPlatform {
   }
   async #dispatch(method,p,signal){
     switch(method){
-      case'hello':return{application:'OmniPlay',version:'0.1.0-source',protocol_major:1,protocol_minor:0,save_origin_protocol:1,save_backup_protocol:1,library_recovery_protocol:1,save_repair_protocol:1,save_cloud_recovery_protocol:1,sync_settings_protocol:1,...this.#identity,platform:'web_pwa',capabilities:['local_library','file_dialog','save_history','save_export','asset_transfer','save_transfer','local_settings','local_assistance','performance_measurements','browser_storage','firmware_vault',...(this.#files.supportsDisc()?['disc_import']:[])],native_emulator:false,installed_games:false,encrypted_sync:this.#syncRun.available,desktop_updater:false};
+      case'hello':return{application:'OmniPlay',version:'0.1.0-source',protocol_major:1,protocol_minor:0,save_origin_protocol:1,save_backup_protocol:1,library_recovery_protocol:1,manual_recovery_protocol:1,save_repair_protocol:1,save_cloud_recovery_protocol:1,sync_settings_protocol:1,...this.#identity,platform:'web_pwa',capabilities:['local_library','file_dialog','save_history','save_export','asset_transfer','save_transfer','local_settings','local_assistance','performance_measurements','browser_storage','firmware_vault',...(this.#files.supportsDisc()?['disc_import']:[])],native_emulator:false,installed_games:false,encrypted_sync:this.#syncRun.available,desktop_updater:false};
       case'firmware_list':return this.#firmware.list({signal});
       case'sync_crypto_status':return this.#syncCredentials.status({signal});
       case'sync_transfer_status':return WebSyncJournal.status(this.#store,this.#identity.profile_id,{signal});
@@ -106,6 +109,10 @@ class WebPlatform {
       case'library_remove':requireValue(!this.#sessions.activeFor(p.game_id),'busy','Stop the active game before removing it.');return this.#library.remove(p.game_id,{signal});
       case'library_recovery_list':return this.#libraryRecovery.list(p.after??null,{signal});
       case'library_recovery_import':return this.#libraryRecovery.recover(p.candidate_id,p.revision,p.title,p.system,{signal});
+      case'manual_recovery_list':return this.#manualRecovery.list(p.after??null,{signal});
+      case'manual_recovery_inspect':return this.#manualRecovery.inspect(p.candidate_id,{signal});
+      case'manual_recovery_export':{const grant=this.#files.take(p.destination_grant_id,'export'),result=await this.#manualRecovery.export(p.candidate_id,p.revision,{signal});return{...await this.#files.deliver(grant,result.blob,signal),record:result.record};}
+      case'manual_recovery_extract':{const source=this.#files.take(p.grant_id,'import'),destination=this.#files.take(p.destination_grant_id,'export'),result=await unpackRecovery(source.file,{signal});return{...await this.#files.deliver(destination,result.payload,signal),record:result.record};}
       case'asset_read_start':{const asset=await this.#library.asset(p.game_id,p.asset_name??null);checkAbort(signal);return this.#transfers.open(asset.blob,asset.hash);}
       case'transfer_read':return this.#transfers.read(p.transfer_id,p.offset,p.limit);
       case'transfer_abort':await this.#exports.abort(p.transfer_id);return this.#transfers.abort(p.transfer_id);

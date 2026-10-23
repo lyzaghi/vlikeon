@@ -1,0 +1,18 @@
+{
+  "status": "passed",
+  "browser": "155.0.8059.85",
+  "real_indexed_db": true,
+  "picker": "controlled bridge fixture",
+  "cases": [
+    "missing_metadata",
+    "review",
+    "package_export",
+    "package_extraction",
+    "changed_source",
+    "cancelled_export",
+    "grant_revoke",
+    "no_publication",
+    "360px_layout"
+  ],
+  "errors": []
+}

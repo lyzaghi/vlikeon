@@ -6,9 +6,9 @@ const sessionMethods=new Set(['session_start','session_pause','session_resume','
   'session_cancel_close','session_detach','session_disc_status','session_select_disc',
   'session_save_compatibility','save_create','save_load','save_live_export',
   'performance_native_start','performance_native_status','performance_native_cancel']);
-const importGrantMethods=new Set(['library_import','library_import_start','save_import','save_repair','save_backup_restore']);
+const importGrantMethods=new Set(['library_import','library_import_start','save_import','save_repair','save_backup_restore','manual_recovery_extract']);
 const exportGrantMethods=new Set(['save_export','save_live_export','save_export_upload_start',
-  'save_export_upload_commit','diagnostics_export','performance_run_export','save_backup_export']);
+  'save_export_upload_commit','diagnostics_export','performance_run_export','save_backup_export','manual_recovery_export','manual_recovery_extract']);
 const transferMethods=new Map([
   ['transfer_read','download'],['save_upload_chunk','upload'],['save_upload_commit','upload'],
   ['save_export_upload_chunk','export'],['save_export_upload_commit','export']]);

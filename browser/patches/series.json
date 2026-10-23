@@ -60,6 +60,8 @@
     "library-import.js",
     "library-recovery.js",
     "manifest.json",
+    "manual-recovery-format.js",
+    "manual-recovery.js",
     "media-client.js",
     "native-media-client.js",
     "native-player.js",

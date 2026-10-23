@@ -1,0 +1,85 @@
+{
+  "item": 50,
+  "batch": "050d",
+  "executor": "antigravity",
+  "source_manifest_sha256": "b2bc62f4819c6aac813f40bed85a9fb0c5c0c4fa4d90000246f319404411588e",
+  "started_at": "2026-10-23T08:28:33.474Z",
+  "runner_pid": 13112,
+  "cases": [
+    {
+      "id": "native-recovery",
+      "args": [
+        "test",
+        "-p",
+        "omniplay-core",
+        "--test",
+        "manual_recovery",
+        "--locked",
+        "--offline",
+        "--",
+        "--test-threads=1"
+      ],
+      "exit_code": 0,
+      "elapsed_ms": 23159,
+      "status": "passed"
+    },
+    {
+      "id": "native-consumers",
+      "args": [
+        "check",
+        "-p",
+        "omniplay-broker",
+        "-p",
+        "omniplay-local-service",
+        "-p",
+        "omniplay-mobile",
+        "--all-targets",
+        "--locked",
+        "--offline"
+      ],
+      "exit_code": 0,
+      "elapsed_ms": 17374,
+      "status": "passed"
+    },
+    {
+      "id": "javascript",
+      "args": [
+        "--experimental-vm-modules",
+        "--test",
+        "qa/browser/manual-recovery.test.mjs",
+        "qa/browser/component-ownership.test.mjs"
+      ],
+      "exit_code": 0,
+      "elapsed_ms": 432,
+      "status": "passed"
+    },
+    {
+      "id": "source-generation",
+      "args": [
+        "-B",
+        "qa/integration/rebuild_resources.py",
+        "--source",
+        "E:\\V10\\work\\vlikeon-items-50-109-01a16780/source-050d",
+        "--work",
+        "E:\\V10\\work\\vlikeon-items-50-109-01a16780/generated-050d",
+        "--python",
+        "C:/Users/lyzag/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/python.exe"
+      ],
+      "exit_code": 0,
+      "elapsed_ms": 8133,
+      "status": "passed"
+    },
+    {
+      "id": "browser-integration",
+      "args": [
+        "qa/browser/manual-recovery-ui.cjs"
+      ],
+      "exit_code": 0,
+      "elapsed_ms": 2230,
+      "status": "passed"
+    }
+  ],
+  "source_unchanged": true,
+  "status": "passed",
+  "finished_at": "2026-10-23T08:29:24.981Z"
+}

@@ -244,7 +244,7 @@
  #if BUILDFLAG(IS_CHROMEOS)
 --- a/chrome/browser/resources/component_extension_resources.grd
 +++ b/chrome/browser/resources/component_extension_resources.grd
-@@ -12,6 +12,98 @@
+@@ -12,6 +12,100 @@
    </outputs>
    <release seq="1">
      <includes>
@@ -280,6 +280,8 @@
 +        <include name="IDR_OMNIPLAY_LIBRARY_IMPORT_JS" file="omniplay_game_hub/library-import.js" resource_path="omniplay_game_hub/library-import.js" type="BINDATA" />
 +        <include name="IDR_OMNIPLAY_LIBRARY_RECOVERY_JS" file="omniplay_game_hub/library-recovery.js" resource_path="omniplay_game_hub/library-recovery.js" type="BINDATA" />
 +        <include name="IDR_OMNIPLAY_MANIFEST" file="omniplay_game_hub/manifest.json" resource_path="omniplay_game_hub/manifest.json" type="BINDATA" />
++        <include name="IDR_OMNIPLAY_MANUAL_RECOVERY_FORMAT_JS" file="omniplay_game_hub/manual-recovery-format.js" resource_path="omniplay_game_hub/manual-recovery-format.js" type="BINDATA" />
++        <include name="IDR_OMNIPLAY_MANUAL_RECOVERY_JS" file="omniplay_game_hub/manual-recovery.js" resource_path="omniplay_game_hub/manual-recovery.js" type="BINDATA" />
 +        <include name="IDR_OMNIPLAY_MEDIA_CLIENT_JS" file="omniplay_game_hub/media-client.js" resource_path="omniplay_game_hub/media-client.js" type="BINDATA" />
 +        <include name="IDR_OMNIPLAY_NATIVE_MEDIA_CLIENT_JS" file="omniplay_game_hub/native-media-client.js" resource_path="omniplay_game_hub/native-media-client.js" type="BINDATA" />
 +        <include name="IDR_OMNIPLAY_NATIVE_PLAYER_JS" file="omniplay_game_hub/native-player.js" resource_path="omniplay_game_hub/native-player.js" type="BINDATA" />

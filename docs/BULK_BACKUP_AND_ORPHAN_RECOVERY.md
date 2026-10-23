@@ -92,6 +92,12 @@ runtime compatibility or lineage. It remains retained for manual analysis;
 there is no automatic guessing, provenance promotion or deletion. Web/PWA has
 no native loose-file namespace and does not advertise this native scanner.
 
+Sequential item 50 now supplies a separate manual inventory, inspection,
+unverified recovery package and extraction tool for these retained bytes,
+including unknown filenames and Web Blobs with invalid/missing metadata.
+See `MANUAL_DATA_RECOVERY.md` for its executed acceptance and limits. This does
+not upgrade unknown bytes into a compatible or authenticated save.
+
 ## Acceptance still required
 
 Four additional Rust fixtures cover archive roundtrip/retry/head preservation,

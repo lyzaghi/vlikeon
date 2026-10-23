@@ -8,8 +8,10 @@ items 11 and 12. Deferral is not completion. Preserve all existing authored sour
 - Full-profile/database backup, corruption diagnosis and recovery.
 - Reconstruction of multi-file disc layouts and missing import metadata.
 - Broader physical storage quotas and retained-reference/accounting limits.
-- Manual recovery of data without trustworthy metadata; never guess save
-  compatibility, lineage or authenticated provenance from raw bytes.
+- Manual preservation/analysis tooling for data without trustworthy metadata
+  is now completed as sequential item 50; see `MANUAL_DATA_RECOVERY.md` and its
+  executed evidence. Save compatibility, lineage and authenticated provenance
+  are never inferred from raw bytes. Other item 7 gaps below remain open.
 - Native/PWA archive interchange, failure/retry/purge behavior, filesystem
   durability, mobile providers and real device qualification.
 - Group backup currently covers at most 64 saves / 128 MiB, and the UI exports

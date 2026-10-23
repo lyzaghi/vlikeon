@@ -1,0 +1,85 @@
+{
+  "item": 50,
+  "batch": "050a",
+  "executor": "antigravity",
+  "source_manifest_sha256": "03e4f75530c0a0483ed1d3376aa1c2b269e834e28c99a049334d6984d2f28f72",
+  "started_at": "2026-10-23T07:00:26.947Z",
+  "runner_pid": 35480,
+  "cases": [
+    {
+      "id": "native-recovery",
+      "args": [
+        "test",
+        "-p",
+        "omniplay-core",
+        "--test",
+        "manual_recovery",
+        "--locked",
+        "--offline",
+        "--",
+        "--test-threads=1"
+      ],
+      "exit_code": 0,
+      "elapsed_ms": 88398,
+      "status": "passed"
+    },
+    {
+      "id": "native-consumers",
+      "args": [
+        "check",
+        "-p",
+        "omniplay-broker",
+        "-p",
+        "omniplay-local-service",
+        "-p",
+        "omniplay-mobile",
+        "--all-targets",
+        "--locked",
+        "--offline"
+      ],
+      "exit_code": 0,
+      "elapsed_ms": 103609,
+      "status": "passed"
+    },
+    {
+      "id": "javascript",
+      "args": [
+        "--experimental-vm-modules",
+        "--test",
+        "qa/browser/manual-recovery.test.mjs",
+        "qa/browser/component-ownership.test.mjs"
+      ],
+      "exit_code": 1,
+      "elapsed_ms": 1147,
+      "status": "failed"
+    },
+    {
+      "id": "source-generation",
+      "args": [
+        "-B",
+        "qa/integration/rebuild_resources.py",
+        "--source",
+        "E:\\V10\\work\\vlikeon-items-50-109-01a16780/source-050a",
+        "--work",
+        "E:\\V10\\work\\vlikeon-items-50-109-01a16780/generated-050a",
+        "--python",
+        "C:/Users/lyzag/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/python.exe"
+      ],
+      "exit_code": 0,
+      "elapsed_ms": 15050,
+      "status": "passed"
+    },
+    {
+      "id": "browser-integration",
+      "args": [
+        "qa/browser/manual-recovery-ui.cjs"
+      ],
+      "exit_code": 1,
+      "elapsed_ms": 29391,
+      "status": "failed"
+    }
+  ],
+  "source_unchanged": true,
+  "status": "failed",
+  "finished_at": "2026-10-23T07:04:24.997Z"
+}

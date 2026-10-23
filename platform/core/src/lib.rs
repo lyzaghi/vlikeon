@@ -26,6 +26,7 @@ pub mod asset_storage;
 pub mod save_backup;
 pub mod library_recovery;
 pub mod save_orphan_recovery;
+pub mod manual_recovery;
 
 #[cfg(test)]
 mod backup_recovery_tests;
