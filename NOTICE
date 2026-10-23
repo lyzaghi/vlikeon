@@ -10,6 +10,8 @@ reference source, copyright The Chromium Authors, under its BSD-style license.
 See licenses/Chromium-LICENSE and LICENSING.md for scope and exceptions.
 
 Third-party projects retain their own licenses and attribution requirements.
+The pinned Linux Landlock UAPI header retains GPL-2.0 WITH Linux-syscall-note;
+see engines/isolation-linux/uapi/ for exact source, license and exception files.
 security/dependencies.json records selected source provenance and outstanding
 distribution reviews. This notice does not approve binary distribution, assert
 a completed license audit or imply endorsement by any third party.

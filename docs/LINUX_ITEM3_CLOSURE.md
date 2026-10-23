@@ -18,6 +18,9 @@ work. This document tracks Linux implementation separately from execution.
   still requires O_PATH, exact owner/mode and cgroup-v2 validation.
 - Bound request/reply reading by a single five-second deadline and preserve the
   listener deadline across signal interruption.
+- Use a nonblocking connect and a finite completion deadline before restoring
+  blocking I/O; refuse a full Unix listener backlog instead of blocking before
+  the read/write deadlines exist.
 - Add actual Linux userland socket tests for fragmentation, CLOEXEC, descriptor
   closure, refused/corrupt replies, ordinary-file refusal and a bad client
   followed by a valid client on the same listener. These require target execution;
@@ -44,6 +47,14 @@ work. This document tracks Linux implementation separately from execution.
 The current Windows machine reports WSL is not installed. No Linux environment
 has been installed or claimed available. Source changes and authored tests
 remain unverified on Linux until exact target evidence is recorded.
+
+The manual GitHub Ubuntu workflow now provides actual target compiler evidence.
+Batch036 was rejected before execution due to workflow expression context.
+Batch037 reached the real Rust/C compilers and failed: a temporary cgroup-text
+borrow in Rust and old system Landlock UAPI headers. Socket tests were skipped,
+not passed. The next source retains the text owner and pins the unmodified
+Linux-v6.12 UAPI/license bytes with mandatory CMake hashes and ABI layout checks;
+runtime ABI >= 6 remains required. A new exact batch must qualify these changes.
 
 Antigravity executes only Codex-released batches on frozen inputs. Codex owns
 review, diagnosis, source/test edits and acceptance decisions. No source-copy,

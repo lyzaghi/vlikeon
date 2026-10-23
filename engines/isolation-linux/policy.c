@@ -8,7 +8,7 @@
 #include <linux/audit.h>
 #include <linux/capability.h>
 #include <linux/filter.h>
-#include <linux/landlock.h>
+#include "uapi/linux/landlock.h"
 #include <linux/sched.h>
 #include <linux/seccomp.h>
 #include <linux/securebits.h>
@@ -28,6 +28,8 @@
 #if !defined(LANDLOCK_SCOPE_SIGNAL) || !defined(LANDLOCK_ACCESS_FS_IOCTL_DEV)
 #error A qualified Landlock ABI-6-or-newer UAPI SDK is required
 #endif
+_Static_assert(sizeof(struct landlock_ruleset_attr)==24,"Pinned Landlock ABI-6 ruleset size");
+_Static_assert(offsetof(struct landlock_ruleset_attr,scoped)==16,"Pinned Landlock scope offset");
 
 static int control(int operation,unsigned long a,unsigned long b,unsigned long c,unsigned long d){return prctl(operation,a,b,c,d);}
 #define prctl(operation,a,b,c,d) control(operation,a,b,c,d)

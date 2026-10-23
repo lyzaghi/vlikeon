@@ -39,8 +39,9 @@ fn service_directory()->Result<File>{
     let mut current=OpenOptions::new().read(true).custom_flags(libc::O_PATH|libc::O_DIRECTORY|libc::O_NOFOLLOW|libc::O_CLOEXEC).open("/sys/fs/cgroup").map_err(|_|unavailable())?;let root=current.metadata().map_err(|_|unavailable())?;let mut shape=std::mem::MaybeUninit::<libc::statfs>::uninit();if !root.is_dir()||unsafe{libc::fstatfs(current.as_raw_fd(),shape.as_mut_ptr())}!=0||unsafe{shape.assume_init()}.f_type!=libc::CGROUP2_SUPER_MAGIC{return Err(unavailable());}
     for part in &parts{let name=CString::new(*part).map_err(|_|unavailable())?;current=traversed_child(&current,&name)?;}
     let process=std::process::id().to_string();if delegated{
-        let service=current;metadata(&service,false)?;let(mut manager,fresh)=created(&service,c"manager")?;if !fresh{empty_new(&manager)?;}entry(&manager,c"cgroup.procs",true)?.write_all(process.as_bytes()).map_err(|_|unavailable())?;
-        let mut members=text(&manager,c"cgroup.procs")?.lines();if members.next()!=Some(process.as_str())||members.next().is_some()||!text(&service,c"cgroup.procs")?.is_empty(){return Err(unavailable());}drop(manager);return Ok(service);
+        let service=current;metadata(&service,false)?;let(manager,fresh)=created(&service,c"manager")?;if !fresh{empty_new(&manager)?;}entry(&manager,c"cgroup.procs",true)?.write_all(process.as_bytes()).map_err(|_|unavailable())?;
+        let processes=text(&manager,c"cgroup.procs")?;
+        let mut members=processes.lines();if members.next()!=Some(process.as_str())||members.next().is_some()||!text(&service,c"cgroup.procs")?.is_empty(){return Err(unavailable());}drop(manager);return Ok(service);
     }
     let manager=current;metadata(&manager,false)?;let processes=text(&manager,c"cgroup.procs")?;let mut members=processes.lines();if members.next()!=Some(process.as_str())||members.next().is_some(){return Err(unavailable());}
     let parent_path=CString::new(format!("/proc/self/fd/{}/..",manager.as_raw_fd())).map_err(|_|unavailable())?;let raw=unsafe{libc::open(parent_path.as_ptr(),libc::O_PATH|libc::O_DIRECTORY|libc::O_NOFOLLOW|libc::O_CLOEXEC)};if raw<0{return Err(unavailable());}let service=unsafe{File::from_raw_fd(raw)};metadata(&service,false)?;if basename(&manager)?!="manager"||basename(&service)?!="omniplay-native-host.service"{return Err(unavailable());}Ok(service)

@@ -97,9 +97,38 @@ pub fn wait(listener:&UnixListener,timeout:std::time::Duration)->Result<bool>{
         if Instant::now()>=deadline{return Ok(false);}
     }
 }
+fn connect(path:&Path,timeout:Duration)->Result<UnixStream>{
+    let name=path.as_os_str().as_bytes();let mut address:libc::sockaddr_un=unsafe{zeroed()};
+    if !path.is_absolute()||name.is_empty()||name.len()>=address.sun_path.len()||name.contains(&0)||timeout.is_zero(){return Err(unavailable());}
+    address.sun_family=libc::AF_UNIX as libc::sa_family_t;
+    for(target,byte)in address.sun_path.iter_mut().zip(name){*target=*byte as libc::c_char;}
+    let raw=unsafe{libc::socket(libc::AF_UNIX,libc::SOCK_STREAM|libc::SOCK_CLOEXEC|libc::SOCK_NONBLOCK,0)};
+    if raw<0{return Err(unavailable());}let stream=unsafe{UnixStream::from_raw_fd(raw)};
+    let length=(size_of::<libc::sa_family_t>()+name.len()+1)as libc::socklen_t;
+    let result=unsafe{libc::connect(raw,(&address as*const libc::sockaddr_un).cast(),length)};
+    if result<0{
+        // AF_UNIX EAGAIN means a full listener backlog, not an in-flight TCP
+        // connect. Refuse that busy host immediately instead of waiting forever
+        // or treating a writable unconnected socket as successfully admitted.
+        if std::io::Error::last_os_error().raw_os_error()!=Some(libc::EINPROGRESS){return Err(unavailable());}
+        let deadline=Instant::now().checked_add(timeout).ok_or_else(unavailable)?;
+        let mut event=libc::pollfd{fd:raw,events:libc::POLLOUT,revents:0};
+        loop{
+            let remaining=deadline.checked_duration_since(Instant::now()).filter(|left|!left.is_zero()).ok_or_else(unavailable)?;
+            let milliseconds=remaining.as_millis().max(1).min(i32::MAX as u128)as i32;
+            let count=unsafe{libc::poll(&mut event,1,milliseconds)};
+            if count<0&&std::io::Error::last_os_error().kind()==std::io::ErrorKind::Interrupted{continue;}
+            if count!=1||event.revents&libc::POLLOUT==0||event.revents&(libc::POLLERR|libc::POLLHUP|libc::POLLNVAL)!=0{return Err(unavailable());}
+            let mut error=0;let mut size=size_of::<libc::c_int>()as libc::socklen_t;
+            if unsafe{libc::getsockopt(raw,libc::SOL_SOCKET,libc::SO_ERROR,(&mut error as*mut libc::c_int).cast(),&mut size)}!=0||size as usize!=size_of::<libc::c_int>()||error!=0{return Err(unavailable());}
+            break;
+        }
+    }
+    stream.set_nonblocking(false).map_err(|_|unavailable())?;Ok(stream)
+}
 pub fn request(path:&Path,profile:&str)->Result<File>{
     crate::linux_plan::session(profile)?;private_parent(path)?;let value=std::fs::symlink_metadata(path).map_err(|_|unavailable())?;if !value.file_type().is_socket()||value.uid()!=unsafe{libc::geteuid()}||value.mode()&0o7777!=0o600{return Err(unavailable());}
-    let mut stream=UnixStream::connect(path).map_err(|_|unavailable())?;peer(stream.as_raw_fd())?;stream.set_read_timeout(Some(std::time::Duration::from_secs(5))).map_err(|_|unavailable())?;stream.set_write_timeout(Some(std::time::Duration::from_secs(5))).map_err(|_|unavailable())?;let mut raw=[0u8;REQUEST_BYTES];raw[..8].copy_from_slice(REQUEST_MAGIC);raw[8..44].copy_from_slice(profile.as_bytes());stream.write_all(&raw).map_err(|_|unavailable())?;receive(&stream)
+    let mut stream=connect(path,Duration::from_secs(5))?;peer(stream.as_raw_fd())?;stream.set_read_timeout(Some(std::time::Duration::from_secs(5))).map_err(|_|unavailable())?;stream.set_write_timeout(Some(std::time::Duration::from_secs(5))).map_err(|_|unavailable())?;let mut raw=[0u8;REQUEST_BYTES];raw[..8].copy_from_slice(REQUEST_MAGIC);raw[8..44].copy_from_slice(profile.as_bytes());stream.write_all(&raw).map_err(|_|unavailable())?;receive(&stream)
 }
 
 #[cfg(test)]

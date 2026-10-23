@@ -84,6 +84,8 @@ def main():
         ordinary(path,isolation,True)
         if path.name!='CMakeLists.txt'and path.suffix not in {'.c','.h'}:raise ValueError('Unexpected Linux isolation source input')
         inputs.append((path,PurePosixPath('isolation-linux')/path.name,{}))
+    for name in ['linux/landlock.h','licenses/GPL-2.0.txt','licenses/Linux-syscall-note.txt','source.json','README.md']:
+        inputs.append((ordinary(isolation/'uapi'/name,isolation,True),PurePosixPath('isolation-linux/uapi')/name,{}))
     for name in ['LINUX_ISOLATION_POLICY.md','LINUX_ISOLATION_BOOTSTRAP.md','LINUX_RUNTIME_LAUNCH.md','LINUX_PRESENTATION_PAIR.md','LINUX_PROFILE_DELEGATION.md','LINUX_HOST_PROVISIONING.md','LINUX_WORK_JOURNAL.md','LINUX_IMAGE_PACKAGE.md','NATIVE_WORK_STORAGE.md','LINUX_INPUT_STAGING.md','LINUX_SESSION_COMPOSITION.md','LINUX_RUNTIME_ADAPTER.md','LINUX_ABANDONED_RECOVERY.md','LINUX_RESUMABLE_RETIREMENT.md','LINUX_CREATOR_RECOVERY.md','MACOS_NATIVE_CONTAINMENT.md','NATIVE_PRESENTATION_HOST.md','NATIVE_PRESENTATION_CLIENT.md','NATIVE_PRESENTATION_FRONTEND.md','NATIVE_PRESENTATION_LAUNCH.md']:
         inputs.append((ordinary(ROOT/'docs'/name,ROOT,True),PurePosixPath('docs')/name,{}))
     for name in ['Cargo.toml','Cargo.lock','platform/core/src/sessions.rs','platform/contracts/src/session.rs','platform/broker/Cargo.toml','platform/broker/src/main.rs','platform/broker/src/linux_host_main.rs','packaging/linux/systemd/user/omniplay-native-host.service','packaging/linux/systemd/user/omniplay-native-host.socket','tools/install_user_release_posix.py','tools/unregister_user_release_posix.py','tools/replace_user_bootstrap_posix.py','apps/game-hub/native-player.js']:

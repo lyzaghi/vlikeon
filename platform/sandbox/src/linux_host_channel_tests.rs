@@ -72,6 +72,18 @@ fn ordinary_fd_does_not_gain_cgroup_authority(){
 }
 
 #[test]
+fn connect_preserves_cloexec_and_restores_blocking_io(){
+    let name=format!("op-connect-{}-{}.sock",std::process::id(),std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos());
+    let path=std::env::temp_dir().join(name);let listener=UnixListener::bind(&path).unwrap();
+    let client=connect(&path,Duration::from_millis(100)).unwrap();let(server,_)=listener.accept().unwrap();
+    assert_ne!(unsafe{libc::fcntl(client.as_raw_fd(),libc::F_GETFD)}&libc::FD_CLOEXEC,0);
+    assert_eq!(unsafe{libc::fcntl(client.as_raw_fd(),libc::F_GETFL)}&libc::O_NONBLOCK,0);
+    drop(client);drop(server);drop(listener);std::fs::remove_file(&path).unwrap();
+    assert!(connect(&path,Duration::from_millis(100)).is_err());
+    assert!(connect(Path::new("relative.sock"),Duration::from_millis(100)).is_err());
+}
+
+#[test]
 fn bad_client_does_not_end_listener_or_invoke_provisioning(){
     assert_ne!(unsafe{libc::geteuid()},0,"request peer tests require the supported non-root host identity");
     let name=format!("op-host-{}-{}.sock",std::process::id(),std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos());
