@@ -23,7 +23,8 @@
     "Product-source native revocation acknowledgment, retained document capability and rearm blocking on pending/unknown cleanup",
     "Existing v1 keyboard helper/broker Stop acknowledgment retained as cleanup_required on failure; no durable legacy held-key recovery claim",
     "Seven authored asynchronous native-input forwarder cases, separate from fifteen Rust journal cases; none executed",
-    "Legacy keyboard/mouse helper creation-time job containment, bounded shutdown and retained singleton permit until IPC retirement; no execution evidence"
+    "Legacy keyboard/mouse helper creation-time job containment, bounded shutdown and retained singleton permit until IPC retirement; no execution evidence",
+    "Provider lifecycle rechecks original grant and previous input-gap clock after each OS write before advancing slots or accepting a frame; timing verification deferred"
   ],
   "static_review": "Source/API review and git diff whitespace check only; no compiler or runtime validation",
   "passed_test_cases": [],

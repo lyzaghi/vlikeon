@@ -128,6 +128,9 @@ impl<P:Provider> Gamepads<P>{
                 Ok(device)=>self.slots.push(Slot{number:*number,device}),
                 Err(_)=>{let _=self.retire();return Err(unavailable());}
             }
+            // Eager providers can create a real device here. A slow first
+            // creation must not authorize creation of the remaining slots.
+            if self.deadline.is_none_or(|deadline|Instant::now()>=deadline){let _=self.retire();return Err(denied());}
         }
         if self.deadline.is_none_or(|deadline|Instant::now()>=deadline){let _=self.retire();return Err(denied());}
         self.state=State::Preparing;Ok(())
@@ -136,8 +139,12 @@ impl<P:Provider> Gamepads<P>{
     pub fn activate(&mut self,owner:&Owner,host:&HostObservation)->Result<()>{
         self.matches(owner)?;self.tick(host)?;
         if self.state!=State::Preparing{return Err(denied());}
-        for slot in &mut self.slots{
-            if self.provider.write(&mut slot.device,&Report::default()).is_err(){let _=self.retire();return Err(unavailable());}
+        for index in 0..self.slots.len(){
+            if self.provider.write(&mut self.slots[index].device,&Report::default()).is_err(){let _=self.retire();return Err(unavailable());}
+            // Provider readiness may block. Do not initialize another slot or
+            // publish Active after the original grant has expired.
+            self.tick(host)?;
+            if self.state!=State::Preparing{return Err(denied());}
         }
         if self.deadline.is_none_or(|deadline|Instant::now()>=deadline){let _=self.retire();return Err(denied());}
         // Initialization/readiness can take longer than one input period.
@@ -175,9 +182,16 @@ impl<P:Provider> Gamepads<P>{
         // All validation precedes the first OS write. Partial multi-device
         // publication is still possible; provider failure retires every slot.
         self.sequence=sequence;
-        for slot in &mut self.slots{
+        for index in 0..self.slots.len(){
+            let slot=&mut self.slots[index];
             let report=reports.iter().find(|(number,_)|*number==slot.number).map(|(_,report)|*report).unwrap_or_default();
             if self.provider.write(&mut slot.device,&report).is_err(){let _=self.retire();return Err(unavailable());}
+            // Check against the PREVIOUS accepted frame. Resetting the clock
+            // first would revive input after a slow OS write crossed its gap
+            // or the overall grant deadline. Retirement may empty the slots;
+            // return before indexing another slot in that case.
+            self.tick(host)?;
+            if self.state!=State::Active{return Err(denied());}
         }
         self.last_frame=Some(Instant::now());Ok(())
     }

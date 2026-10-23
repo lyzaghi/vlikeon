@@ -18,6 +18,13 @@ launch permit; unknown process retirement retains its original job/handle and
 blocks relaunch. Cancellation/termination is not input-release proof. Build,
 runtime and failure-injection qualification remain deferred; item 55 stays open.
 
+The next static review adds gamepad authority/input-gap checks after each
+provider write, before another slot is written or a successful frame refreshes
+the input clock. Slow creation/output cannot earn fresh authority after the old
+deadline. This does not interrupt a blocked OS call or replace the independent
+helper watchdog, and fresh native observations still belong to that watchdog.
+No build, timing test or device qualification was executed.
+
 Item 55 source checkpoints: private owner/slot lifecycle, Linux uinput and stable
 standard-browser sampling are authored. A default-off Windows WinUHid candidate
 now adds a hash-pinned static client recipe, generic HID reports and retained
