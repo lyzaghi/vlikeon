@@ -310,7 +310,7 @@ positive process retirement witness; access refusal or PID lookup failure
 alone must not satisfy the observer trait. Signed helper/driver admission and
 native consent remain mandatory before wiring any runtime path.
 
-Eight journal regression cases are authored behind `cfg(test)` for the later
+Twelve journal/coordination regression cases are authored behind `cfg(test)` for the later
 Antigravity batch: stale reservation/replacement, reopen after lost activation
 reply, never-observed absence and later presence/absence, cleanup receipt before
 child exit, synthetic SQL write failure, outer-transaction refusal and unknown/
@@ -466,6 +466,53 @@ native permission observation, machine/user-wide slot arbitration, driver/helper
 admission and supported recovery UX remain unfinished. The ordinary product
 still advertises `gamepad:false`; all new build/test execution remains deferred.
 
+## Shared per-user arbitration source
+
+`stream_gamepad_arbitration.rs` adds a separate fixed-name SQLite store under the
+existing native application data root, shared by cooperating profile brokers.
+The broker derives that root only from its validated `profiles/<profile UUID>`
+directory; a caller cannot pass a different store to `GamepadSupervisor::prepared`.
+Directory ACL/ancestor admission remains the install service's responsibility.
+The API creates no directory, refuses linked/reparse directory/database entries,
+checks an application ID and schema version before changing a foreign database,
+and stores at most one canonical 8-KiB owner record. A single group reserves up
+to four slots, matching current host authorization. It does not implement
+multiple simultaneous groups, other-user arbitration or kernel driver access
+restrictions against unrelated software.
+
+An IMMEDIATE transaction serializes the singleton reservation across processes;
+FULL WAL state survives closing a connection or process. The complete profile
+prepared snapshot commits first, then the shared reservation. Profile activation
+intent commits next and must be mirrored to shared state before Activate is
+sent. Active presence and retained cleanup transitions are also mirrored.
+Reservation UUID, profile/device/client, full owner, exact helper/artifact and
+container list must match; revisions cannot go backwards. Expiry, Drop and
+an absent in-memory broker do not delete the shared row.
+
+These two SQLite connections do not form a distributed atomic transaction.
+Any uncertain commit stops activation and retains ownership. `reconcile_retained`
+now commits a complete profile retirement proof without immediately deleting it.
+Only that current cleanup proof, with all devices acknowledged removed and exact
+helper retirement, can release the matching shared row; profile deletion comes
+afterwards. This ordering also handles a crash between the two cleanup commits.
+A stale old group cannot delete a replacement group's row. A missing/corrupt
+profile cannot force-clear shared debt; startup reports retained ownership rather
+than treating that as successful cleanup.
+
+The optional startup recovery lane now uses that shared store as well. Recovery
+of a row belonging to another profile still needs the installed profile resolver/
+recovery UX; this lane does not follow arbitrary paths or clear foreign owners.
+Admission after deletion/restoration/loss of the coordination store must inventory
+existing profile debts before allowing any new activation. That install/recovery
+gate, ACL/ancestor hardening and real concurrent/crash/disk-fault qualification
+remain required before product activation; source authoring does not prove them.
+
+Four additional regression cases are authored for later execution: two profile
+connections competing for one persistent row, stale mirror refusal, correct
+two-store release and replacement protection, and refusal after profile proof
+was deleted too early. Combined with the earlier eight cases, twelve are
+authored; none has run. Current product capability remains false.
+
 ## Receiving browser sampling
 
 `engines/streaming/input.js::sampleStandardGamepads` now preserves browser
@@ -500,9 +547,11 @@ the explicit slot tuples accepted by the private group.
    implement the macOS provider/entitlement path. Explicit installation consent
    is required where needed. No existing Windows input helper gains gamepads
    from this module. Final provider license/provenance review remains open.
-3. Add independent helper watchdog observations, single-owner cross-process
-   slot arbitration, local/remote controller coexistence and supported global
-   device visibility semantics. Complete cleanup receipts before reassignment.
+3. Qualify/wire the shared per-user arbitration store, installed common-root/ACL
+   admission and recovery after coordination-store loss; complete foreign-profile
+   recovery and local/remote controller coexistence. Preserve independent watchdog
+   observations and supported system-visible device semantics. Actual cleanup
+   receipts remain required before reassignment.
 4. Add device readiness/admission, actual game-controller ordering and analog
    compatibility; remaining haptics/feedback and supported accessories are open.
 5. When the owner resumes build/test, Antigravity executes frozen batches only:

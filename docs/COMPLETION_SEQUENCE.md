@@ -43,6 +43,12 @@ a dedicated, process-bounded recovery lane and an existing-database-only SQLite
 connection. Default builds do not start it; close cooperatively cancels without
 blocking on unfinished OS calls. Eight journal/connection regression cases are
 authored, not executed. Global arbitration and input activation remain open.
+The latest source checkpoint adds a singleton shared per-user SQLite owner store,
+requires it in parent prepare/activation, mirrors committed profile transitions
+and retains profile retirement proof until shared ownership is released. Optional
+startup recovery respects shared debt. Twelve regression cases are authored,
+not run. Shared-root/ACL admission, lost-store/foreign-profile recovery, actual
+concurrency/OS qualification and product input activation remain unfinished.
 
 The owner now requests the individually numbered tasks in
 [`OUTSTANDING_WORK.md`](OUTSTANDING_WORK.md), completed in order. Task 1 source

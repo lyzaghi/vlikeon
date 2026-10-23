@@ -52,14 +52,16 @@ pub struct Record{
 impl Record{
     pub fn owner(&self)->Owner{self.owner}
     pub fn reservation(&self)->Uuid{self.reservation}
+    pub fn revision(&self)->u64{self.revision}
     pub fn profile(&self)->Uuid{self.profile}
+    pub fn device(&self)->Uuid{self.device}
     pub fn client(&self)->Uuid{self.client}
     pub fn helper(&self)->ProcessIdentity{self.helper}
     pub fn helper_sha256(&self)->&ContentHash{&self.helper_sha256}
     pub fn phase(&self)->Phase{self.phase}
     pub fn activation_attempted(&self)->bool{self.activation_attempted}
     pub fn devices(&self)->&[DeviceRecord]{&self.devices}
-    fn validate(&self)->Result<()>{
+    pub(crate) fn validate(&self)->Result<()>{
         let hash=&self.helper_sha256.0;
         if self.schema_version!=1||self.revision==0||self.revision>MAX_REVISION||
            [self.reservation,self.profile,self.device,self.client].iter().any(Uuid::is_nil)||!self.owner.valid()||
@@ -81,7 +83,10 @@ impl Record{
 /// Raw bytes are kept privately for compare-and-swap. A stale caller cannot
 /// delete/update a newer authorization even if it reuses a public grant UUID.
 pub struct Snapshot{record:Record,raw:String}
-impl Snapshot{pub fn record(&self)->&Record{&self.record}}
+impl Snapshot{
+    pub fn record(&self)->&Record{&self.record}
+    pub(crate) fn raw(&self)->&str{&self.raw}
+}
 pub struct Reservation{
     pub profile:Uuid,pub client:Uuid,pub owner:Owner,pub helper:ProcessIdentity,
     pub helper_sha256:ContentHash,pub identities:Vec<DeviceIdentity>,
@@ -164,7 +169,7 @@ fn remove(database:&mut Database,previous:&Snapshot)->Result<()>{
     if tx.execute("DELETE FROM preferences WHERE key=?1 AND value=?2",params![KEY,&previous.raw]).map_err(storage_error)?!=1{return Err(conflict());}
     tx.commit().map_err(storage_error)?;Ok(())
 }
-fn require_current(database:&Database,previous:&Snapshot)->Result<()>{
+pub(crate) fn require_current(database:&Database,previous:&Snapshot)->Result<()>{
     if previous.record.device!=database.device_id||encode(&previous.record)?!=previous.raw{return Err(invalid());}
     let current:bool=database.connection.query_row(
         "SELECT EXISTS(SELECT 1 FROM preferences WHERE key=?1 AND value=?2)",
@@ -225,13 +230,20 @@ pub enum Reconciliation{Retained(Snapshot),Removed}
 /// presence observation or an authenticated removal receipt before absence can
 /// clear it. An unattempted reservation is safe only after exact helper exit.
 pub fn reconcile(database:&mut Database,previous:&Snapshot,observer:&mut impl RecoveryObserver)->Result<Reconciliation>{
+    let(current,ready)=reconcile_retained(database,previous,observer)?;
+    if ready{remove(database,&current)?;Ok(Reconciliation::Removed)}else{Ok(Reconciliation::Retained(current))}
+}
+/// Preserve the complete profile retirement proof while a shared per-user
+/// reservation is released. The caller must release shared ownership BEFORE
+/// final profile deletion; missing profile metadata cannot prove shared cleanup.
+pub fn reconcile_retained(database:&mut Database,previous:&Snapshot,observer:&mut impl RecoveryObserver)->Result<(Snapshot,bool)>{
     require_current(database,previous)?;
     if !observer.helper_exited(previous.record.helper)?{
-        return Ok(Reconciliation::Retained(Snapshot{record:previous.record.clone(),raw:previous.raw.clone()}));
+        return Ok((Snapshot{record:previous.record.clone(),raw:previous.raw.clone()},false));
     }
-    if !previous.record.activation_attempted{remove(database,previous)?;return Ok(Reconciliation::Removed);}
     let mut record=previous.record.clone();record.phase=Phase::CleanupRequired;
     for device in &mut record.devices{
+        if !record.activation_attempted{device.removed=true;continue;}
         if device.removed{continue;}
         match observer.presence(device.identity.container){
             Presence::Present=>device.observed_present=true,
@@ -242,11 +254,9 @@ pub fn reconcile(database:&mut Database,previous:&Snapshot,observer:&mut impl Re
     // Recheck the exact process before publishing the final release. The native
     // observer must verify the saved creation identity, rather than read exit
     // status from an unrelated process that reused the old numeric PID.
-    if record.devices.iter().all(|device|device.removed)&&observer.helper_exited(record.helper)?{
-        remove(database,previous)?;return Ok(Reconciliation::Removed);
-    }
-    if record==previous.record{return Ok(Reconciliation::Retained(Snapshot{record,raw:previous.raw.clone()}));}
-    replace(database,previous,record).map(Reconciliation::Retained)
+    let ready=record.devices.iter().all(|device|device.removed)&&observer.helper_exited(record.helper)?;
+    let current=if record==previous.record{Snapshot{record,raw:previous.raw.clone()}}else{replace(database,previous,record)?};
+    Ok((current,ready))
 }
 
 // Authored regression cases only. Execution is deferred to the owner's frozen
@@ -357,5 +367,50 @@ mod tests{
         assert!(open_recovery(&fixture.path.0,fixture.database.device_id).is_err());
         let version:u32=fixture.database.connection.query_row("PRAGMA user_version",[],|row|row.get(0)).unwrap();
         assert_eq!(version,999999);
+    }
+    #[test]fn shared_owner_survives_connection_loss_and_blocks_another_profile(){
+        use crate::stream_gamepad_arbitration::Arbitration;
+        let mut first=Fixture::new();let mut second=Fixture::new();
+        let a=first.reserve();let b=second.reserve();
+        let mut shared=Arbitration::open(&first.path.0).unwrap();
+        let mut competing=Arbitration::open(&first.path.0).unwrap();
+        shared.reserve(&first.database,&a).unwrap();
+        assert!(competing.reserve(&second.database,&b).is_err());drop(shared);
+        let reopened=Arbitration::open(&first.path.0).unwrap();
+        assert_eq!(reopened.pending().unwrap().unwrap().reservation(),a.record.reservation());
+        assert!(competing.reserve(&second.database,&b).is_err());
+    }
+    #[test]fn shared_mirror_refuses_a_stale_profile_revision(){
+        use crate::stream_gamepad_arbitration::Arbitration;
+        let mut fixture=Fixture::new();let reserved=fixture.reserve();
+        let mut shared=Arbitration::open(&fixture.path.0).unwrap();shared.reserve(&fixture.database,&reserved).unwrap();
+        let attempted=begin_activation(&mut fixture.database,&reserved).unwrap();
+        shared.mirror(&fixture.database,&attempted).unwrap();
+        assert!(shared.mirror(&fixture.database,&reserved).is_err());
+        assert_eq!(shared.pending().unwrap().unwrap().phase(),Phase::ActivationAttempted);
+    }
+    #[test]fn shared_release_keeps_profile_proof_and_cannot_delete_replacement(){
+        use crate::stream_gamepad_arbitration::Arbitration;
+        let mut first=Fixture::new();let mut second=Fixture::new();let a=first.reserve();let b=second.reserve();
+        let mut shared=Arbitration::open(&first.path.0).unwrap();shared.reserve(&first.database,&a).unwrap();
+        let mut observer=Observer{exited:false,presence:Presence::Absent};
+        assert!(shared.release(&first.database,&a,&mut observer).is_err());
+        observer.exited=true;
+        let(proof,ready)=reconcile_retained(&mut first.database,&a,&mut observer).unwrap();assert!(ready);
+        shared.mirror(&first.database,&proof).unwrap();shared.release(&first.database,&proof,&mut observer).unwrap();
+        assert_eq!(first.load().raw,proof.raw);assert!(shared.pending().unwrap().is_none());
+        shared.reserve(&second.database,&b).unwrap();
+        shared.release(&first.database,&proof,&mut observer).unwrap();
+        assert_eq!(shared.pending().unwrap().unwrap().reservation(),b.record.reservation());
+    }
+    #[test]fn deleted_profile_proof_cannot_force_clear_shared_ownership(){
+        use crate::stream_gamepad_arbitration::Arbitration;
+        let mut fixture=Fixture::new();let reserved=fixture.reserve();
+        let mut shared=Arbitration::open(&fixture.path.0).unwrap();shared.reserve(&fixture.database,&reserved).unwrap();
+        let mut observer=Observer{exited:true,presence:Presence::Absent};
+        let(proof,ready)=reconcile_retained(&mut fixture.database,&reserved,&mut observer).unwrap();assert!(ready);
+        assert!(matches!(reconcile(&mut fixture.database,&proof,&mut observer).unwrap(),Reconciliation::Removed));
+        assert!(shared.release(&fixture.database,&proof,&mut observer).is_err());
+        assert!(shared.pending().unwrap().is_some());
     }
 }

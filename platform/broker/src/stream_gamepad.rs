@@ -5,6 +5,7 @@
 use omniplay_contracts::{ContentHash,ErrorCode,PlatformError,RemotePad,Result};
 use omniplay_core::{Database,stream_gamepad_journal::{self as journal,DeviceIdentity,
     ProcessIdentity,Snapshot,CleanupState,RecoveryObserver,Reconciliation}};
+use omniplay_core::stream_gamepad_arbitration::Arbitration;
 use omniplay_stream_input::{gamepad::{Owner,Report},gamepad_protocol::{self as wire,Action,Binding,Identity,Pad,Reply}};
 use std::{collections::BTreeSet,time::{Duration,Instant}};
 use uuid::Uuid;
@@ -54,7 +55,7 @@ impl Authority{
 }
 
 pub struct GamepadSupervisor<T:ParentChannel>{
-    channel:T,owner:Owner,profile:Uuid,client:Uuid,helper:ProcessIdentity,
+    channel:T,arbitration:Arbitration,owner:Owner,profile:Uuid,client:Uuid,helper:ProcessIdentity,
     identities:Vec<Identity>,journal:Option<Snapshot>,reservation:Option<Uuid>,request_id:u64,input_sequence:u64,
     deadline:Instant,sealed:bool,active:bool,
 }
@@ -64,9 +65,12 @@ impl<T:ParentChannel> GamepadSupervisor<T>{
     /// artifact, child and driver. A successful return means the complete device
     /// identity set is durably reserved, not that any controller is active.
     pub fn prepared(database:&mut Database,profile:Uuid,client:Uuid,owner:Owner,
-        selected_slots:&[u8],remaining:Duration,channel:T,reply:Reply)->Result<Self>{
+        selected_slots:&[u8],remaining:Duration,mut channel:T,reply:Reply)->Result<Self>{
+        let arbitration=match coordination_directory(&database.root,profile).and_then(|directory|Arbitration::open(&directory)){
+            Ok(value)=>value,Err(error)=>{let _=channel.stop();return Err(error);}
+        };
         let now=Instant::now();let helper=channel.helper();
-        let mut supervisor=Self{channel,owner,profile,client,helper,identities:Vec::new(),
+        let mut supervisor=Self{channel,arbitration,owner,profile,client,helper,identities:Vec::new(),
             journal:None,reservation:None,request_id:reply.id,input_sequence:0,deadline:now+remaining.min(Duration::from_secs(30*60)),
             sealed:false,active:false};
         let result=(||{
@@ -81,6 +85,7 @@ impl<T:ParentChannel> GamepadSupervisor<T>{
                 owner:journal_owner(supervisor.owner),helper,helper_sha256:supervisor.channel.helper_sha256().clone(),
                 identities:ids(identities)})?);
             supervisor.reservation=supervisor.journal.as_ref().map(|value|value.record().reservation());
+            supervisor.arbitration.reserve(database,supervisor.journal.as_ref().ok_or_else(stopped)?)?;
             Ok(())
         })();
         if let Err(error)=result{supervisor.sealed=true;let _=supervisor.channel.stop();return Err(error);}
@@ -120,7 +125,8 @@ impl<T:ParentChannel> GamepadSupervisor<T>{
         let updated=journal::record_cleanup(database,snapshot,journal_owner(self.owner),self.helper,state,pending.as_deref());
         // An uncertain commit remains authoritative
         // on disk; subsequent recovery must reload instead of trusting memory.
-        self.journal=Some(updated?);Ok(())
+        self.journal=Some(updated?);
+        self.arbitration.mirror(database,self.journal.as_ref().ok_or_else(stopped)?)?;Ok(())
     }
     pub fn activate(&mut self,database:&mut Database,authority:&Authority)->Result<()>{
         if !self.permitted(authority)||self.active{let _=self.retain_cleanup(database,None);return Err(stopped());}
@@ -132,6 +138,7 @@ impl<T:ParentChannel> GamepadSupervisor<T>{
         // The commit above is the only path to emitting activation. A pipe
         // failure after this point leaves activation_attempted durable.
         let result=(||{
+            self.arbitration.mirror(database,self.journal.as_ref().ok_or_else(stopped)?)?;
             // Committing FULL WAL may wait behind another writer. Do not emit
             // Activate using an authority observation that aged during commit.
             if !self.permitted(authority){return Err(stopped());}
@@ -140,7 +147,9 @@ impl<T:ParentChannel> GamepadSupervisor<T>{
                reply.identities.as_deref()!=Some(self.identities.as_slice())||Instant::now()>=self.deadline{return Err(stopped());}
             let next=journal::record_active(database,self.journal.as_ref().ok_or_else(stopped)?,
                 journal_owner(self.owner),self.helper,&ids(&self.identities))?;
-            self.journal=Some(next);self.active=true;Ok(())
+            self.journal=Some(next);
+            self.arbitration.mirror(database,self.journal.as_ref().ok_or_else(stopped)?)?;
+            self.active=true;Ok(())
         })();
         if result.is_err(){let _=self.retain_cleanup(database,None);}result
     }
@@ -203,10 +212,21 @@ impl<T:ParentChannel> GamepadSupervisor<T>{
     /// failure. Recovery may retain debt indefinitely; no force-clear or TTL.
     pub fn reconcile(&mut self,database:&mut Database,observer:&mut impl RecoveryObserver)->Result<bool>{
         if !self.sealed{return Err(invalid());}
-        let Some(current)=journal::load(database,self.profile)?else{self.journal=None;return Ok(true)};
+        let Some(current)=journal::load(database,self.profile)?else{
+            if self.arbitration.pending()?.is_some_and(|record|Some(record.reservation())==self.reservation){return Err(stopped());}
+            self.journal=None;return Ok(true);
+        };
         if current.record().owner()!=journal_owner(self.owner)||current.record().client()!=self.client||
            current.record().helper()!=self.helper||Some(current.record().reservation())!=self.reservation{return Err(invalid());}
-        match journal::reconcile(database,&current,observer)?{
+        let(current,ready)=journal::reconcile_retained(database,&current,observer)?;
+        self.journal=Some(current);
+        let current=self.journal.as_ref().ok_or_else(stopped)?;
+        if self.arbitration.pending()?.is_some_and(|record|record.reservation()==current.record().reservation()){
+            self.arbitration.mirror(database,current)?;
+        }
+        if !ready{return Ok(false);}
+        self.arbitration.release(database,current,observer)?;
+        match journal::reconcile(database,current,observer)?{
             Reconciliation::Removed=>{self.journal=None;Ok(true)},
             Reconciliation::Retained(value)=>{self.journal=Some(value);Ok(false)},
         }
@@ -283,7 +303,9 @@ impl RecoveryObserver for WindowsRecoveryObserver{
 pub fn recover_windows_gamepad(database:&mut Database,profile:Uuid,cancel:&std::sync::atomic::AtomicBool)->Result<bool>{
     use std::sync::atomic::Ordering;
     if cancel.load(Ordering::Acquire){return Err(stopped());}
-    let Some(saved)=journal::load(database,profile)?else{return Ok(true)};
+    let directory=coordination_directory(&database.root,profile)?;
+    let mut arbitration=Arbitration::open(&directory)?;
+    let Some(saved)=journal::load(database,profile)?else{return Ok(arbitration.pending()?.is_none())};
     let identity=saved.record().helper();
     let process=omniplay_stream_input::gamepad_process::RecoveryProcessWitness::from_saved(
         omniplay_stream_input::gamepad_process::ProcessIdentity{process_id:identity.process_id,creation_time:identity.creation_time})?;
@@ -305,7 +327,23 @@ pub fn recover_windows_gamepad(database:&mut Database,profile:Uuid,cancel:&std::
         }
     }
     let mut observer=Observer{process,cancel};
+    let(saved,ready)=journal::reconcile_retained(database,&saved,&mut observer)?;
+    if arbitration.pending()?.is_some_and(|record|record.reservation()==saved.record().reservation()){
+        arbitration.mirror(database,&saved)?;
+    }
+    if !ready{return Ok(false);}
+    arbitration.release(database,&saved,&mut observer)?;
     match journal::reconcile(database,&saved,&mut observer)?{
         Reconciliation::Removed=>Ok(true),Reconciliation::Retained(_)=>Ok(false),
     }
+}
+
+/// Exact existing native profile layout; never follow a renderer-selected
+/// coordination path or derive a shared store from an arbitrary parent folder.
+pub fn coordination_directory(root:&std::path::Path,profile:Uuid)->Result<std::path::PathBuf>{
+    if !root.is_absolute()||profile.is_nil()||root.file_name().and_then(|name|name.to_str())!=Some(profile.to_string().as_str()){
+        return Err(invalid());
+    }
+    let profiles=root.parent().filter(|path|path.file_name().is_some_and(|name|name=="profiles")).ok_or_else(invalid)?;
+    profiles.parent().map(|path|path.to_owned()).ok_or_else(invalid)
 }

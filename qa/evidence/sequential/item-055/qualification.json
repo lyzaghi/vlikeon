@@ -13,11 +13,12 @@
     "Windows process/foreground/local activity observations and opt-in private v2 helper actor/reader",
     "Bounded SQLite parent ownership journal with committed activation intent and exact-snapshot cleanup reconciliation",
     "Parent-side reply/authority orchestration and original Windows child-process-handle retirement witness",
-    "Eight authored journal/connection regression cases; execution deferred, no OS behavior qualified",
+    "Twelve authored journal/connection/shared-arbitration regression cases; execution deferred, no OS behavior qualified",
     "Windows private transport, creation-time job containment, independent authority lease and separate pipe writer/reader/watchdog source",
     "Concrete WindowsParentChannel adapter for broker orchestration, not exposed by current service commands",
     "Read-only Windows startup process witness and candidate journal/HID reconciliation after loss of the launch handle",
-    "Default-off Windows feature startup recovery lane with cooperative cancellation and existing-database-only connection"
+    "Default-off Windows feature startup recovery lane with cooperative cancellation and existing-database-only connection",
+    "Shared per-user singleton SQLite arbitration with revision-bound mirroring and retained profile proof before shared release"
   ],
   "static_review": "Source/API review and git diff whitespace check only; no compiler or runtime validation",
   "passed_test_cases": [],
@@ -29,7 +30,8 @@
   "advertised_gamepad_capability": false,
   "pending": [
     "Broker/native permission UI and authenticated capture/pair/session integration",
-    "Native authority observer/service wiring, transport compilation/OS qualification and cross-process device arbitration",
+    "Native authority observer/service wiring and transport compilation/OS qualification",
+    "Shared-root/ACL admission, coordination-store-loss/foreign-profile recovery and actual cross-process arbitration qualification",
     "Recovery-lane compilation/OS/cancellation qualification and real process-snapshot/PID-reuse/restart verification",
     "Combined keyboard/gamepad helper observation and injection attribution",
     "Windows assigned HID identity, exact signed driver/package admission and unresolved-creation recovery",
