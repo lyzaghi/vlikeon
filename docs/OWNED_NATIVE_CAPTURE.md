@@ -9,11 +9,14 @@ operation was run. This is not completion of all platform/native streaming work.
 
 The host first selects a running installed game and prepares capture for the
 pending paired remote session. `stream_capture_prepare` verifies the signed pair,
-configured audience and host identity, obtains this broker's retained child
-handle and records PID plus exact process creation FILETIME. Capture lifetime
-is bounded by the certificate and thirty minutes. PID and creation identity stay
-in the component worker; the Game Hub receives an opaque capture UUID and its
-game/pair/session/expiry bindings.
+configured audience and host identity, then retains bounded visible-window
+choices from this installed session's Windows job. The Game Hub receives opaque
+choice IDs and local titles. `stream_capture_select` consumes one explicit choice
+after native job/window/process re-admission and retains its handle and creation
+FILETIME. This includes job-owned descendants after their launcher exits. Capture
+lifetime is bounded by the original certificate and thirty minutes. Native
+PID/creation/HWND stay in the component worker; public capture replies contain
+only opaque identity and game/pair/session/expiry bindings.
 
 On the user's subsequent capture action the worker rechecks the live originating
 document and invokes the native Chromium window chooser for that tab. New
@@ -62,15 +65,17 @@ input-to-photon behavior still need execution evidence. Selection checks and
 later OS capture/input are not one atomic transaction; no race-free OS proof is
 claimed. Existing SendInput focus/UIPI/local-hook limitations remain applicable.
 
-Direct broker-owned children are supported by the authored binding. Launcher
-descendants, Linux/macOS owned capture and input adapters, signed virtual gamepad
+Direct children and Windows job-owned descendants now have authored selection
+bindings; neither has runtime qualification for this new flow. Linux/macOS owned
+capture and input adapters, signed virtual gamepad
 integration, independent native encoding paths and durable/mobile credential
 lifecycle remain required work in item 8. No policy is enabled to hide those gaps.
 
-Item 57 now authors Windows creation-time launcher job ownership and private
-selected-process-handle admission; see `WINDOWS_LAUNCHER_OWNERSHIP.md`. This
-improves installed-session lifetime source but does not yet replace this
-capture path's root-only preparation or complete descendant window consent.
+Item 57 now connects Windows creation-time launcher job ownership, retained
+window choices and two-phase broker/Game Hub selection; see
+`WINDOWS_LAUNCHER_OWNERSHIP.md`. The component worker additionally requires the
+Chromium picker's returned HWND to match the broker-selected window before
+publishing the media token. Explicit native sharing consent is still required.
 Input authorization now follows the capture's retained process handle and
 rechecks its exact installed-job membership after local consent and helper
 admission; it no longer substitutes the initial launcher at that stage. The

@@ -68,7 +68,7 @@ Antigravity batches, while source work continues. Items 53 and 54 remain open.
 54. [ ] Hoàn thiện capture cửa sổ game và âm thanh ứng dụng trên macOS. Mã đang triển khai và phần chưa kiểm chứng: `MACOS_OWNED_CAPTURE.md`.
 55. [ ] Hoàn thiện tích hợp virtual gamepad và phân quyền thiết bị điều khiển từ xa. Đã viết mã quyền/slot, backend Linux uinput và ứng viên Windows HID chưa tích hợp; phần còn thiếu tại `VIRTUAL_GAMEPAD_OWNERSHIP.md`. Build/test hoãn theo yêu cầu.
 56. [ ] Hoàn thiện dịch vụ capture/encode native độc lập và lựa chọn codec. Đã viết lõi chọn codec và hàng đợi raw-frame hữu hạn; service/backend/transport chưa tích hợp, xem `NATIVE_VIDEO_SERVICE.md`. Build/test vẫn hoãn.
-57. [ ] Hoàn thiện nhận diện quyền sở hữu tiến trình game con được launcher khởi chạy. Đã viết nhánh Windows Job Object theo phiên, theo dõi nhóm tiến trình và xác minh handle được native host chọn; chọn cửa sổ/capture/input game con chưa nối hoàn chỉnh. Xem `WINDOWS_LAUNCHER_OWNERSHIP.md`; build/test hoãn.
+57. [ ] Hoàn thiện nhận diện quyền sở hữu tiến trình game con được launcher khởi chạy. Đã nối mã Windows Job Object, danh sách cửa sổ theo phiên và chọn cửa sổ bằng mã ngắn hạn qua broker/Game Hub vào target capture/input. Chưa build/test hay kiểm chứng runtime; Linux/macOS và tương thích launcher còn thiếu. Xem `WINDOWS_LAUNCHER_OWNERSHIP.md`.
 58. [ ] Hoàn thiện vòng đời credential ghép đôi trên native và mobile.
 59. [ ] Triển khai hạ tầng signaling, relay và TURN dùng thực tế.
 60. [ ] Kiểm chứng Remote Play với mạng thật, reconnect, thu hồi quyền và lỗi capture/input.

@@ -69,6 +69,7 @@ pub enum Command {
     InstalledGameLaunch { game_id: Uuid },
     InstalledGameProcesses,
     StreamCapturePrepare {game_id:Uuid,pair_id:Uuid,session_id:Uuid,host_public_key:String,grant:crate::StreamGrantDocument},
+    StreamCaptureSelect {capture_id:Uuid,session_id:Uuid,choice_id:Uuid},
     StreamCaptureRelease {capture_id:Uuid,session_id:Uuid},
     StreamInputArm {game_id:Uuid,pair_id:Uuid,session_id:Uuid,host_public_key:String,grant:crate::StreamGrantDocument,capture_id:Uuid,capture_window:String},
     StreamInputFrame {grant_id:Uuid,session_id:Uuid,sequence:u64,frame:crate::RemoteInputFrame},
@@ -186,7 +187,7 @@ pub enum Command {
 
 impl Command {
     pub fn contains_secrets(&self)->bool {
-        matches!(self,Self::SyncActionStart{..}|Self::SyncActionCollect{..}|Self::SyncCreate{..}|Self::SyncRegister{..}|Self::SyncRecover{..}|Self::SyncRenew{..}|Self::SyncRevokeDevice{..}|Self::SyncDeleteAccount{..}|Self::StreamCapturePrepare{..}|Self::StreamCaptureRelease{..}|Self::StreamInputArm{..}|Self::StreamInputFrame{..}|Self::StreamInputRelease{..}|Self::StreamInputStatus{..}|Self::StreamInputRevoke{..})
+        matches!(self,Self::SyncActionStart{..}|Self::SyncActionCollect{..}|Self::SyncCreate{..}|Self::SyncRegister{..}|Self::SyncRecover{..}|Self::SyncRenew{..}|Self::SyncRevokeDevice{..}|Self::SyncDeleteAccount{..}|Self::StreamCapturePrepare{..}|Self::StreamCaptureSelect{..}|Self::StreamCaptureRelease{..}|Self::StreamInputArm{..}|Self::StreamInputFrame{..}|Self::StreamInputRelease{..}|Self::StreamInputStatus{..}|Self::StreamInputRevoke{..})
     }
 }
 

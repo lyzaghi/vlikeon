@@ -46,12 +46,19 @@ function connectNative() {
     if (!item) return;
     pending.delete(message.id);
     clearTimeout(item.timer);
-    if(item.method==='stream_capture_prepare'&&message.status==='ok'){
+    if(['stream_capture_prepare','stream_capture_select'].includes(item.method)&&message.status==='ok'){
       const value=message.result;
-      if(!value||!UUID.test(value.capture_id)||!UUID.test(value.game_id)||!UUID.test(value.session_id)||!Number.isSafeInteger(value.process_id)||value.process_id<=0||typeof value.creation_time!=='string'||!/^\d{1,20}$/.test(value.creation_time)||!Number.isSafeInteger(value.expires_at_ms)){connected.disconnect();return;}
+      if(!value||!UUID.test(value.capture_id)||!UUID.test(value.game_id)||!UUID.test(value.pair_id)||!UUID.test(value.session_id)||!Number.isSafeInteger(value.expires_at_ms)){connected.disconnect();return;}
+      const preparing=item.method==='stream_capture_prepare',previous=ownedCaptures.get(value.capture_id);
+      if(!preparing&&(value.capture_id!==item.params.capture_id||value.session_id!==item.params.session_id)){connected.disconnect();return;}
       if(!pages.has(item.page)||item.expired){void retireNative('stream_capture_release',{capture_id:value.capture_id,session_id:value.session_id});return;}
-      ownedCaptures.set(value.capture_id,{...value,page:item.page,picker:null,choosing:false,window:null});
-      const{process_id,creation_time,...publicValue}=value;message={...message,result:publicValue};
+      if(!preparing&&!previous){void retireNative('stream_capture_release',{capture_id:value.capture_id,session_id:value.session_id});try{item.page.postMessage({id:message.id,status:'error',error:{code:'cancelled',message:'The game window selection was closed.',recoverable:true}});}catch{}return;}
+      if(preparing){
+        if(value.game_id!==item.params.game_id||value.pair_id!==item.params.pair_id||value.session_id!==item.params.session_id||value.selection_required!==true||!Number.isSafeInteger(value.choice_expires_at_ms)||value.choice_expires_at_ms>value.expires_at_ms||!Array.isArray(value.choices)||value.choices.length<1||value.choices.length>32||value.choices.some(choice=>!UUID.test(choice?.choice_id)||typeof choice.title!=='string'||choice.title.length>1024)||new Set(value.choices.map(choice=>choice.choice_id)).size!==value.choices.length){connected.disconnect();return;}
+      }else if(value.selection_required!==false||!previous||previous.page!==item.page||previous.capture_id!==item.params.capture_id||previous.session_id!==item.params.session_id||previous.game_id!==value.game_id||previous.pair_id!==value.pair_id||previous.session_id!==value.session_id||previous.expires_at_ms!==value.expires_at_ms||!previous.selection_required||!previous.choices.some(choice=>choice.choice_id===item.params.choice_id)||!Number.isSafeInteger(value.process_id)||value.process_id<=0||typeof value.creation_time!=='string'||!/^\d{1,20}$/.test(value.creation_time)||typeof value.window_id!=='string'||!/^\d{1,20}$/.test(value.window_id)||value.window_id==='0'){connected.disconnect();return;}
+      if(value.expires_at_ms<=Date.now()||preparing&&value.choice_expires_at_ms<=Date.now()){void retireNative('stream_capture_release',{capture_id:value.capture_id,session_id:value.session_id});item.page.postMessage({id:message.id,status:'error',error:{code:'deadline_exceeded',message:'Refresh the game window choices.',recoverable:true}});return;}
+      ownedCaptures.set(value.capture_id,{...value,page:item.page,picker:null,choosing:false,window:null,expectedWindow:value.window_id??null});
+      const{process_id,creation_time,window_id,...publicValue}=value;message={...message,result:publicValue};
     }
     if(item.method==='stream_capture_release'&&message.status==='ok')ownedCaptures.delete(message.result?.capture_id);
     if(message.status==='ok'){
@@ -190,10 +197,18 @@ chrome.runtime.onConnect.addListener(page => {
     }, Math.max(1,message.deadline_ms-Date.now()));
     // Retain only transient handle identities, never account secrets, paths or
     // chunk payloads, while waiting for a native reply or late cleanup.
-    const identities={};for(const key of ['grant_id','destination_grant_id','transfer_id','job_id','session_id'])if(typeof params?.[key]==='string')identities[key]=params[key];
+    const identities={};for(const key of ['grant_id','destination_grant_id','transfer_id','job_id','session_id','capture_id','choice_id','game_id','pair_id'])if(typeof params?.[key]==='string')identities[key]=params[key];
     pending.set(message.id, { page, timer, method:message.command.method,params:identities,sessionId:params?.session_id,transferId:params?.transfer_id,jobId:params?.job_id,setId:params?.set_id });
     try {
       live();let command=message.command;
+      if(method==='stream_capture_prepare'){
+        for(const[id,value]of ownedCaptures)if(value.expires_at_ms<=Date.now()||value.selection_required&&value.choice_expires_at_ms<=Date.now())retireCapture(id);
+        if(ownedCaptures.size>=64||[...ownedCaptures.values()].some(value=>value.page===page))throw new Error('capture_unavailable');
+      }
+      if(method==='stream_capture_select'){
+        const capture=ownedCaptures.get(params?.capture_id);
+        if(!capture||capture.page!==page||capture.session_id!==params.session_id||!capture.selection_required||capture.choice_expires_at_ms<=Date.now()||!capture.choices.some(choice=>choice.choice_id===params.choice_id))throw new Error('capture_unavailable');
+      }
       if(method==='stream_input_arm'){
         const capture=ownedCaptures.get(params?.capture_id);
         if(!capture||capture.page!==page||capture.game_id!==params.game_id||capture.session_id!==params.session_id||capture.pair_id!==params.pair_id||capture.expires_at_ms<=Date.now()||!capture.window)throw new Error('capture_unavailable');
@@ -236,7 +251,7 @@ chrome.runtime.onMessage.addListener((message,sender,respond)=>{
   const capture=ownedCaptures.get(message.capture_id);
   if(!page||!isGameHubSender({name:'omniplay-ui',sender})||!capture||capture.page!==page){respond({error:'permission_denied'});return;}
   if(message.action==='cancel'){retireCapture(message.capture_id);respond({released:true});return;}
-  if(message.action!=='choose'||typeof message.audio!=='boolean'||capture.choosing||capture.window||capture.expires_at_ms<=Date.now()){respond({error:'invalid_state'});return;}
+  if(message.action!=='choose'||typeof message.audio!=='boolean'||capture.selection_required!==false||!capture.expectedWindow||capture.choosing||capture.window||capture.expires_at_ms<=Date.now()){respond({error:'invalid_state'});return;}
   capture.choosing=true;
   void(async()=>{
     let timer=0,settled=false;
@@ -248,7 +263,7 @@ chrome.runtime.onMessage.addListener((message,sender,respond)=>{
       const picker=chrome.desktopCapture.chooseDesktopMedia(message.audio?['window','audio']:['window'],{id:context.tabId,url:sender.url},{systemAudio:'exclude',windowAudio:message.audio?'window':'exclude',selfBrowserSurface:'exclude',omniplayStrictWindowAudio:message.audio,omniplayProcessId:capture.process_id,omniplayCreationTime:capture.creation_time},(streamId,options)=>{
         const error=chrome.runtime.lastError;
         try{
-          check();if(error||!streamId||options?.omniplayOwnedCaptureProtocol!==1||typeof options.omniplayWindowId!=='string'||!/^\d{1,20}$/.test(options.omniplayWindowId)||options.omniplayWindowId==='0'||typeof options.canRequestAudioTrack!=='boolean'||message.audio&&options.canRequestAudioTrack&&options.audioScope!=='application')throw new Error('unsupported_capability');
+          check();if(error||!streamId||options?.omniplayOwnedCaptureProtocol!==1||options.omniplayWindowId!==capture.expectedWindow||typeof options.canRequestAudioTrack!=='boolean'||message.audio&&options.canRequestAudioTrack&&options.audioScope!=='application')throw new Error('unsupported_capability');
           capture.window=options.omniplayWindowId;
           finish({stream_id:streamId,audio_present:message.audio&&options.canRequestAudioTrack,owned_capture:{protocol:1,capture_id:capture.capture_id,game_id:capture.game_id,session_id:capture.session_id,expires_at_ms:capture.expires_at_ms}});
         }catch{retireCapture(message.capture_id);finish({error:'capture_refused'});}

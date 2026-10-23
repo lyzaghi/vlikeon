@@ -18,29 +18,67 @@ pub fn available()->bool{
     #[cfg(not(windows))]{false}
 }
 struct Active{status:StreamInputStatus,worker:Option<InputWorker>,_artifact:File,#[cfg(windows)]_process:std::os::windows::io::OwnedHandle}
-struct Capture{id:Uuid,game:Uuid,pair:Uuid,session:Uuid,expires:u64,#[cfg(windows)]video_started:bool,#[cfg(windows)]_process:std::os::windows::io::OwnedHandle,target:omniplay_stream_input::protocol::Target}
-#[derive(Default)]pub struct StreamInputs{active:Option<Active>,capture:Option<Capture>}
+struct Capture{id:Uuid,game:Uuid,pair:Uuid,session:Uuid,expires:u64,window:u64,#[cfg(windows)]video_started:bool,#[cfg(windows)]_process:std::os::windows::io::OwnedHandle,target:omniplay_stream_input::protocol::Target}
+#[cfg(windows)]
+struct CaptureChoices{id:Uuid,game:Uuid,pair:Uuid,session:Uuid,expires:u64,choice_expires:u64,choices:Vec<(Uuid,omniplay_stream_input::game_process::GameWindow)>}
+#[derive(Default)]pub struct StreamInputs{active:Option<Active>,capture:Option<Capture>,#[cfg(windows)]choices:Option<CaptureChoices>}
 pub fn capture_available()->bool{cfg!(windows)&&policy().is_some_and(|p|p.enabled&&p.allow_browser_host&&!p.relay_origins.is_empty())}
 fn unavailable()->PlatformError{PlatformError::new(ErrorCode::UnsupportedCapability,"Owned native capture or input is unavailable for this target or installed product policy")}
 impl StreamInputs{
-    pub fn prepare_capture(&mut self,database:&Database,installed:&mut InstalledGames,game_id:Uuid,pair_id:Uuid,session_id:Uuid,host_public_key:String,document:StreamGrantDocument)->Result<serde_json::Value>{
+    pub fn prepare_capture(&mut self,database:&Database,installed:&mut InstalledGames,game_id:Uuid,pair_id:Uuid,session_id:Uuid,host_public_key:String,document:StreamGrantDocument,deadline_ms:u64)->Result<serde_json::Value>{
         if !capture_available(){return Err(unavailable());}
         if self.active.as_ref().is_some_and(|a|a.status.state!=StreamInputState::Revoked){return Err(PlatformError::new(ErrorCode::Busy,"Revoke native input before preparing another capture"));}
         if self.capture.as_ref().is_some_and(|c|c.expires>omniplay_core::now_ms()){return Err(PlatformError::new(ErrorCode::Busy,"Close the current owned capture before selecting another game"));}
+        #[cfg(windows)]
+        if self.choices.as_ref().is_some_and(|c|c.choice_expires>omniplay_core::now_ms()){return Err(PlatformError::new(ErrorCode::Busy,"Close or finish the current game window selection first"));}
         let policy=policy().ok_or_else(unavailable)?;let document=SignedDocument{payload:document.payload,signature:document.signature};let body:PairGrant=inspect(&document,8192)?;
         if !policy.relay_origins.contains(&body.audience)||body.host_public_key!=host_public_key||body.id!=pair_id{return Err(PlatformError::new(ErrorCode::PermissionDenied,"This pairing does not authorize this host capture context"));}
         let grant=verify_grant(&document,&body.audience,omniplay_core::now_ms())?;
-        #[cfg(not(windows))]{let _=(database,installed,game_id,session_id,grant);Err(unavailable())}
+        #[cfg(not(windows))]{let _=(database,installed,game_id,session_id,grant,deadline_ms);Err(unavailable())}
+        #[cfg(windows)]{
+            let observed=omniplay_core::now_ms();
+            let windows=installed.stream_windows(database,game_id)?;
+            if windows.is_empty(){return Err(PlatformError::new(ErrorCode::NotFound,"No visible owned game window is available").recover("Restore the game window and refresh; external launcher handoffs are not supported"));}
+            let choices:Vec<_>=windows.into_iter().map(|window|(Uuid::new_v4(),window)).collect();
+            let id=Uuid::new_v4();let expires=grant.expires_at_ms.min(observed.saturating_add(30*60*1000));
+            let choice_expires=expires.min(observed.saturating_add(30_000));
+            database.record_audit("stream_capture.prepared",Some(game_id))?;
+            let now=omniplay_core::now_ms();grant.validate(&grant.audience,now)?;
+            if now>=deadline_ms||now>=choice_expires{return Err(PlatformError::new(ErrorCode::DeadlineExceeded,"Game window discovery expired before it could be delivered"));}
+            let entries:Vec<_>=choices.iter().map(|(id,window)|serde_json::json!({"choice_id":id,"title":window.title()})).collect();
+            let result=serde_json::json!({"capture_id":id,"game_id":game_id,"pair_id":pair_id,"session_id":session_id,"expires_at_ms":expires,"choice_expires_at_ms":choice_expires,"selection_required":true,"choices":entries});
+            self.capture=None;
+            self.choices=Some(CaptureChoices{id,game:game_id,pair:pair_id,session:session_id,expires,choice_expires,choices});Ok(result)
+        }
+    }
+    pub fn select_capture(&mut self,database:&Database,installed:&mut InstalledGames,id:Uuid,session:Uuid,choice_id:Uuid,deadline_ms:u64)->Result<serde_json::Value>{
+        if !capture_available(){return Err(unavailable());}
+        #[cfg(not(windows))]{let _=(database,installed,id,session,choice_id,deadline_ms);Err(unavailable())}
         #[cfg(windows)]{
             use std::os::windows::io::AsHandle;
-            let process=installed.stream_process(database,game_id)?;let target=omniplay_stream_input::target_identity(process.as_handle())?;
+            let pending=self.choices.as_ref().ok_or_else(unavailable)?;
+            let now=omniplay_core::now_ms();
+            if pending.id!=id||pending.session!=session||pending.choice_expires<=now||deadline_ms<=now||self.capture.is_some(){return Err(unavailable());}
+            let selected=&pending.choices.iter().find(|(candidate,_)|*candidate==choice_id).ok_or_else(unavailable)?.1;
+            let process=installed.stream_window_process(database,pending.game,selected)?;
+            let target=omniplay_stream_input::target_identity(process.as_handle())?;
             if target.process_id>i32::MAX as u32{return Err(unavailable());}
-            let id=Uuid::new_v4();let expires=grant.expires_at_ms.min(omniplay_core::now_ms()+30*60*1000);
-            let result=serde_json::json!({"capture_id":id,"game_id":game_id,"pair_id":pair_id,"session_id":session_id,"expires_at_ms":expires,"process_id":target.process_id,"creation_time":target.creation_time.to_string()});
-            database.record_audit("stream_capture.prepared",Some(game_id))?;self.capture=Some(Capture{id,game:game_id,pair:pair_id,session:session_id,expires,video_started:false,_process:process,target});Ok(result)
+            let window=selected.window();
+            database.record_audit("stream_capture.selected",Some(pending.game))?;
+            // Audit/admission can be slow. Re-admit the retained choice after
+            // both before consuming its one-shot pending capture capability.
+            let process=installed.stream_window_process(database,pending.game,selected)?;
+            let actual=omniplay_stream_input::target_identity(process.as_handle())?;
+            let now=omniplay_core::now_ms();
+            if now>=deadline_ms||now>=pending.choice_expires||actual.process_id!=target.process_id||actual.creation_time!=target.creation_time{return Err(unavailable());}
+            let pending=self.choices.take().ok_or_else(unavailable)?;
+            let result=serde_json::json!({"capture_id":id,"game_id":pending.game,"pair_id":pending.pair,"session_id":session,"expires_at_ms":pending.expires,"selection_required":false,"process_id":target.process_id,"creation_time":target.creation_time.to_string(),"window_id":window.to_string()});
+            self.capture=Some(Capture{id,game:pending.game,pair:pending.pair,session,expires:pending.expires,window,video_started:false,_process:process,target});Ok(result)
         }
     }
     pub fn release_capture(&mut self,id:Uuid,session:Uuid)->Result<serde_json::Value>{
+        #[cfg(windows)]
+        if let Some(pending)=&self.choices{if pending.id!=id||pending.session!=session{return Err(PlatformError::new(ErrorCode::PermissionDenied,"Window choices belong to another session"));}self.choices=None;}
         if let Some(capture)=&self.capture{if capture.id!=id||capture.session!=session{return Err(PlatformError::new(ErrorCode::PermissionDenied,"Capture belongs to another session"));}self.capture=None;if let Some(active)=self.active.as_mut(){stop_active(active);}}
         Ok(serde_json::json!({"released":true,"capture_id":id}))
     }
@@ -58,7 +96,7 @@ impl StreamInputs{
         let capture=self.capture.as_mut().ok_or_else(unavailable)?;
         let now=omniplay_core::now_ms();
         if capture.video_started||expected.generation!=1||capture.id!=expected.capture||capture.game!=expected.game||
-            capture.pair!=expected.pair||capture.session!=expected.session||capture.expires<=now||deadline_ms<=now{return Err(unavailable());}
+            capture.pair!=expected.pair||capture.session!=expected.session||capture.window!=window||capture.expires<=now||deadline_ms<=now{return Err(unavailable());}
         let target=omniplay_stream_input::target_identity(capture._process.as_handle())?;
         if target.process_id!=capture.target.process_id||target.creation_time!=capture.target.creation_time{return Err(unavailable());}
         // Consume this capture's single attempt before admission/launch. A
@@ -81,6 +119,7 @@ impl StreamInputs{
         let capture=self.capture.as_ref().ok_or_else(unavailable)?;
         if capture.id!=capture_id||capture.game!=game_id||capture.pair!=pair_id||capture.session!=session_id||capture.expires<=omniplay_core::now_ms(){return Err(unavailable());}
         let window=capture_window.parse::<u64>().ok().filter(|id|*id>0&&id.to_string()==capture_window).ok_or_else(unavailable)?;
+        if capture.window!=window{return Err(unavailable());}
         let captured_target=capture.target.clone();
         let capture_expires=capture.expires;
         #[cfg(not(windows))]{let _=(installed,session_id,grant,game);Err(unavailable())}
@@ -116,7 +155,7 @@ impl StreamInputs{
     pub fn release(&mut self,id:Uuid,session:Uuid)->Result<StreamInputStatus>{let active=self.active(id,session)?;if matches!(active.status.state,StreamInputState::Revoked|StreamInputState::CleanupRequired){return Ok(active.status.clone());}let result=active.worker.as_mut().ok_or_else(unavailable)?.release();observe(active,result)}
     pub fn status(&mut self,id:Uuid,session:Uuid)->Result<StreamInputStatus>{let active=self.active(id,session)?;if matches!(active.status.state,StreamInputState::Revoked|StreamInputState::CleanupRequired){return Ok(active.status.clone());}let result=active.worker.as_mut().ok_or_else(unavailable)?.status();observe(active,result)}
     pub fn revoke(&mut self,id:Uuid,session:Uuid)->Result<StreamInputStatus>{let active=self.active(id,session)?;stop_active(active);Ok(active.status.clone())}
-    pub fn close(&mut self){self.active.take();self.capture.take();}
+    pub fn close(&mut self){self.active.take();self.capture.take();#[cfg(windows)]{self.choices.take();}}
 }
 impl Drop for StreamInputs{fn drop(&mut self){self.close();}}
 fn stop_active(active:&mut Active){

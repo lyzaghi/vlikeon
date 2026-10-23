@@ -23,6 +23,15 @@ these typed choices, not a raw PID/handle command. Broker/UI selection and
 descendant capture registration remain unconnected; no native API, build or
 test execution was performed and the item is still incomplete.
 
+Item 57 now connects a two-phase broker/Game Hub selection path: prepare retains
+bounded native window choices, select consumes an opaque original-lifetime
+choice into a capture's exact process/window, and the component worker retains
+native identities privately. Chromium consent is still required; a mismatched
+returned HWND is refused before publishing a media token. Document ownership,
+late/cancel cleanup, explicit choice UI and matching video/input HWND checks are
+authored. This is source integration only: build/tests/runtime remain deferred,
+policy is disabled, and launcher/platform/final qualification is unfinished.
+
 On the owner's continued source-work/next steering, item 56 now has initial
 private native codec-intersection and bounded raw-frame mailbox source in
 `native_video.rs`. `NATIVE_VIDEO_SERVICE.md` records the independent executable,

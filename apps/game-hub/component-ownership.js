@@ -14,7 +14,7 @@ const transferMethods=new Map([
   ['save_export_upload_chunk','export'],['save_export_upload_commit','export']]);
 const grantCreation=new Map([['file_select_import','import'],['file_select_export','export'],['disc_select_folder','directory']]);
 
-export const creationMethods=new Set(['stream_capture_prepare','web_session_begin','session_prepare','session_prepare_start',
+export const creationMethods=new Set(['stream_capture_prepare','stream_capture_select','web_session_begin','session_prepare','session_prepare_start',
   'session_prepare_status','stream_input_arm','save_export_upload_start','asset_ranges_start',
   'asset_ranges_collect','file_select_import','file_select_export','disc_select_folder',
   'asset_read_start','firmware_read_start','save_read_start','save_upload_start',
