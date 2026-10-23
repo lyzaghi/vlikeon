@@ -228,3 +228,11 @@ output, original receive-age/timestamp fences and actual 2D buffer/crop checks.
 `WINDOWS_NATIVE_VIDEO_DECODER.md` records the native caller/bitstream/secure IPC/
 display gaps. No current worker or product caller invokes it; no compiler,
 decoder/media/device operation or test ran. Full original scope remains open.
+
+The next source checkpoint connects the Windows decoder to private worker-v3
+configuration/compressed-input/poll/Stop commands and raw NV12 replies, retaining
+original local receive-clock deadlines. `DECODE_PROTOCOL.md` records the bounded
+contract and required typed viewer-side admission/watchdog. Current Rust/game
+video client does not invoke v3 and cannot stand in for viewer authority. Native
+receiver/codec/clock admission, secure transport and presentation/UI remain due.
+No build, protocol/decoder/media execution or test ran.

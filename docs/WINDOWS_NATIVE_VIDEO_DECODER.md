@@ -1,8 +1,8 @@
 # Windows native H.264 decoder candidate — item 56
 
 Authored source only. No CMake/compiler, COM/MF activation, decoder, picture,
-driver/device, parser or test was executed. No current worker/protocol/product
-caller invokes Decoder; the static-library recipe only includes its source.
+driver/device, parser or test was executed. The C++ worker's new v3 mode now
+invokes Decoder as source, but no current Rust/service/product caller invokes v3.
 
 `engines/encode-windows/src/decoder.cpp` uses the fixed Microsoft H.264 decoder
 CLSID, not a peer-supplied component or arbitrary DLL path. The caller must own
@@ -69,7 +69,11 @@ Primary API contracts reviewed: [Microsoft H.264 decoder](https://learn.microsof
 and [bounded 2D read locks](https://learn.microsoft.com/en-us/windows/win32/api/mfobjects/nf-mfobjects-imf2dbuffer2-lock2dsize).
 Installed SDK declarations were inspected read-only, not compiled or executed.
 
-Remaining: actual native decoder worker IPC/admission/authority watchdog,
+The next source checkpoint connects Decoder to the worker's private v3 pipe
+actor. `engines/encode-windows/DECODE_PROTOCOL.md` records exact framing, original
+local receipt, raw NV12 replies and Stop semantics. No protocol was run.
+
+Remaining: actual native decoder parent IPC/admission/authority watchdog,
 negotiated parameter-set/VUI admission and secure receiver connection, display
 surface/UI/audio synchronization, other platform decoders and the complete
 build/runtime/fault/colour/latency/energy/device qualification. Item 56 stays open.

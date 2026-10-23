@@ -19,8 +19,9 @@ and encoding; current Rust launch/bridge still do not call that mode. See
 
 `vlikeon_decoder.hpp`/`src/decoder.cpp` also author a private fixed-system-MFT
 H.264-to-NV12 decoder candidate with bounded input/output, original receive age,
-timestamp and actual 2D row/crop checks. It has no current worker/protocol/product
-caller and has not been compiled/activated. See
+timestamp and actual 2D row/crop checks. The new private decoder-v3 worker mode
+connects it to bounded pipe commands; no current Rust/service/product caller
+invokes that mode and nothing has been compiled/activated. See [DECODE_PROTOCOL.md](DECODE_PROTOCOL.md) and
 [WINDOWS_NATIVE_VIDEO_DECODER.md](../../docs/WINDOWS_NATIVE_VIDEO_DECODER.md).
 
 This standalone static-library recipe supplies an H.264 Main Level 4.2 NV12

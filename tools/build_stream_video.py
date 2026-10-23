@@ -83,7 +83,7 @@ def main():
                'cmake_sha256': digest(args.cmake), 'generator': args.generator,
                'architecture': args.architecture, 'sdk': args.sdk_version,
                'commands': [configure, build], 'artifact': artifact,
-               'private_protocols': [1, 2], 'helper_executed': False, 'tests_executed': False,
+               'private_protocols': [1, 2, 3], 'helper_executed': False, 'tests_executed': False,
                'release_requires': 'installed_inventory_provenance_signature_and_full_platform_media_qualification'}
     (output / 'build-receipt.json').write_text(json.dumps(receipt, indent=2) + '\n', encoding='utf-8')
     (output / 'executables.json').write_text(json.dumps([ENTRY], indent=2) + '\n', encoding='utf-8')

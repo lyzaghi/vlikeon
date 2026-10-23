@@ -1,6 +1,7 @@
 #include "vlikeon_encoder.hpp"
 #include "vlikeon_capture.hpp"
 #include "vlikeon_colour.hpp"
+#include "vlikeon_decoder.hpp"
 #include <mferror.h>
 #include <array>
 #include <algorithm>
@@ -15,14 +16,18 @@
 // Raw v1 accepts owned NV12 only. Owned v2 additionally requires an inherited
 // query/synchronize game HANDLE, a pinned HWND and native local confirmation.
 // No file/network destination or arbitrary encoder CLSID is accepted.
+// Decoder v3 accepts admitted Annex B only over the parent's private pipe.
 namespace {
 using vlikeon::video::Configuration;
 using vlikeon::video::Encoder;
 using vlikeon::video::Packet;
 using vlikeon::video::WindowCapture;
 using vlikeon::video::BgraFrame;
+using vlikeon::video::Decoder;
+using vlikeon::video::DecodedFrame;
 constexpr uint32_t max_input=1920*1080*3/2+9;
 constexpr uint16_t configure=1,frame=2,poll=3,stop=4,keyframe=5,status_reply=0x8000,packet_reply=0x8001;
+constexpr uint16_t decoded_reply=0x8002;
 struct Command{uint16_t kind;uint64_t id,received;std::vector<uint8_t> bytes;};
 struct Reply{std::vector<uint8_t> bytes;bool terminal;uint64_t expires;};
 struct Shared{
@@ -35,7 +40,7 @@ struct Shared{
   std::deque<Reply> replies;
   std::atomic<bool> broken{false},reader_done{false},writer_done{false},finished{false};
   std::atomic<uint64_t> stop_id{0},deadline{UINT64_MAX};
-  Shared(HANDLE in,HANDLE out,HANDLE target):input(in),output(out),game(target),version(target?2:1){}
+  Shared(HANDLE in,HANDLE out,HANDLE target,bool decode):input(in),output(out),game(target),version(decode?3:target?2:1){}
   void fail(){broken.store(true);changed.notify_all();}
 };
 uint64_t integer(std::span<const uint8_t> bytes,size_t offset,unsigned count){
@@ -61,6 +66,7 @@ void reader(const std::shared_ptr<Shared>& shared){
     if(integer(header,0,4)!=0x564b4c56||integer(header,4,2)!=shared->version||
         kind<configure||kind>(shared->game?keyframe:stop)||id!=previous+1||id>10000000||length>max_input||
         (kind==configure&&length!=(shared->game?69u:61u))||(kind==frame&&(shared->game||length<9))||
+        (kind==frame&&shared->version==3&&(length<=16||length>2*1024*1024+16))||
         ((kind==poll||kind==stop||kind==keyframe)&&length!=0)){shared->fail();break;}
     Command command{kind,id,GetTickCount64(),std::vector<uint8_t>(length)};
     if(!read_exact(shared->input,command.bytes))break;
@@ -106,7 +112,8 @@ void writer(const std::shared_ptr<Shared>& shared){
 }
 bool send(const std::shared_ptr<Shared>& shared,uint16_t kind,uint64_t id,
     std::vector<uint8_t> payload,bool terminal=false,uint64_t media_deadline=UINT64_MAX){
-  if(payload.size()>2*1024*1024+65536+32)return false;
+  size_t maximum=kind==decoded_reply?1920*1080*3/2+32:2*1024*1024+65536+32;
+  if(payload.size()>maximum||(kind==decoded_reply&&shared->version!=3))return false;
   std::vector<uint8_t> bytes;bytes.reserve(20+payload.size());
   append(bytes,0x564b4c56,4);append(bytes,shared->version,2);append(bytes,kind,2);append(bytes,id,8);append(bytes,payload.size(),4);
   bytes.insert(bytes.end(),payload.begin(),payload.end());
@@ -116,7 +123,7 @@ bool send(const std::shared_ptr<Shared>& shared,uint16_t kind,uint64_t id,
     if(terminal)shared->replies.clear();
     if(shared->replies.size()>=2)return false;
     shared->replies.push_back(Reply{std::move(bytes),terminal,
-        kind==packet_reply?std::min<uint64_t>(GetTickCount64()+100,media_deadline):shared->deadline.load()});
+        (kind==packet_reply||kind==decoded_reply)?std::min<uint64_t>(GetTickCount64()+100,media_deadline):shared->deadline.load()});
   }
   shared->changed.notify_all();return true;
 }
@@ -128,6 +135,7 @@ bool nonzero(std::span<const uint8_t> bytes){for(uint8_t byte:bytes)if(byte)retu
 int actor(const std::shared_ptr<Shared>& shared){
   std::unique_ptr<Encoder> encoder;
   std::unique_ptr<WindowCapture> capture;
+  std::unique_ptr<Decoder> decoder;
   struct Captured{int64_t pts;uint64_t sequence,received;bool keyframe;};
   std::deque<Captured> captured;
   uint64_t capture_sequence=0;bool force_keyframe=true;
@@ -142,15 +150,18 @@ int actor(const std::shared_ptr<Shared>& shared){
       // Fence delivery before any potentially blocking MF stop operation.
       if(capture)capture->close_delivery();
       if(encoder)encoder->close_delivery();
+      if(decoder)decoder->close_delivery();
       HRESULT capture_status=capture?capture->stop():S_OK;
       HRESULT encode_status=encoder?encoder->stop():S_OK;
-      terminal_status=FAILED(capture_status)?capture_status:encode_status;
+      HRESULT decode_status=decoder?decoder->stop():S_OK;
+      terminal_status=FAILED(capture_status)?capture_status:FAILED(encode_status)?encode_status:decode_status;
       explicit_stop=status(shared,stop_request,terminal_status,true);break;
     }
     if(shared->reader_done.load())break;
     uint64_t now=GetTickCount64();
     if(now>=parent_deadline||now>=shared->deadline.load())break;
     if(encoder){terminal_status=encoder->poll();if(FAILED(terminal_status))break;}
+    if(decoder){terminal_status=decoder->poll();if(FAILED(terminal_status))break;}
     if(capture&&configured&&captured.size()<6){
       BgraFrame image;HRESULT media=capture->take(image);
       if(FAILED(media)){if(shared->stop_id.load())continue;terminal_status=media;break;}
@@ -198,6 +209,15 @@ int actor(const std::shared_ptr<Shared>& shared){
       now=GetTickCount64();
       if(now>=expires){status(shared,command.id,MF_E_SHUTDOWN);break;}
       config.remaining_ms=static_cast<uint32_t>(expires-now);shared->deadline.store(expires);
+      if(shared->version==3){
+        if(config.require_hardware){status(shared,command.id,E_INVALIDARG);break;}
+        result=Decoder::create({config.width,config.height,config.fps,config.remaining_ms},decoder);
+        if(FAILED(result)){status(shared,command.id,result);break;}
+        configured=true;just_configured=true;
+        std::vector<uint8_t> receipt;append(receipt,0,4);receipt.insert(receipt.end(),bytes.begin(),bytes.end());
+        receipt.push_back(0); // No hardware-decoding observation is claimed.
+        if(!send(shared,status_reply,command.id,std::move(receipt)))break;
+      }else{
       if(shared->game){
         uint64_t window=integer(bytes,61,8);
         if(!window){status(shared,command.id,E_INVALIDARG);break;}
@@ -220,12 +240,29 @@ int actor(const std::shared_ptr<Shared>& shared){
         receipt.insert(receipt.end(),bytes.begin(),bytes.end());receipt.push_back(encoder->hardware_mft()?1:0);
         if(!send(shared,status_reply,command.id,std::move(receipt)))break;
       }else{status(shared,command.id,result);break;}
+      }
+    }else if(command.kind==frame&&configured&&shared->version==3){
+      uint64_t pts=integer(command.bytes,0,8),received=integer(command.bytes,8,8);
+      if(pts>static_cast<uint64_t>(INT64_MAX)){status(shared,command.id,E_INVALIDARG);break;}
+      result=decoder->submit(std::span(command.bytes).subspan(16),static_cast<int64_t>(pts),received);
+      if(!status(shared,command.id,result)||FAILED(result))break;
     }else if(command.kind==frame&&configured&&!shared->game){
       if(command.bytes.size()!=static_cast<size_t>(raw_size)+9||command.bytes[8]>1){status(shared,command.id,E_INVALIDARG);break;}
       uint64_t pts=integer(command.bytes,0,8);
       if(pts>static_cast<uint64_t>(INT64_MAX)){status(shared,command.id,E_INVALIDARG);break;}
       result=encoder->submit(std::span(command.bytes).subspan(9),static_cast<int64_t>(pts),command.bytes[8]!=0);
       if(!status(shared,command.id,result)||FAILED(result))break;
+    }else if(command.kind==poll&&configured&&shared->version==3){
+      DecodedFrame image;result=decoder->take(image);
+      if(result==S_OK){
+        if(image.received_tick_ms>GetTickCount64()||GetTickCount64()-image.received_tick_ms>100){terminal_status=MF_E_SHUTDOWN;break;}
+        std::vector<uint8_t> payload;payload.reserve(32+image.nv12.size());
+        append(payload,static_cast<uint64_t>(image.timestamp_100ns),8);
+        append(payload,image.width,4);append(payload,image.height,4);append(payload,image.stride,4);
+        append(payload,image.received_tick_ms,8);append(payload,image.nv12.size(),4);
+        payload.insert(payload.end(),image.nv12.begin(),image.nv12.end());
+        if(!send(shared,decoded_reply,command.id,std::move(payload),false,image.received_tick_ms+100))break;
+      }else if(!status(shared,command.id,result)||FAILED(result))break;
     }else if(command.kind==poll&&configured){
       Packet packet;result=encoder->take(packet);
       if(result==S_OK){
@@ -253,6 +290,7 @@ int actor(const std::shared_ptr<Shared>& shared){
   }
   if(encoder)encoder->close_delivery();
   if(capture)capture->close_delivery();
+  if(decoder)decoder->close_delivery();
   if(!explicit_stop)shared->fail();
   shared->finished.store(true);shared->changed.notify_all();
   if(explicit_stop){
@@ -263,7 +301,7 @@ int actor(const std::shared_ptr<Shared>& shared){
   // a stuck driver. No exit code is a substitute for the actual Stop receipt.
   return explicit_stop&&SUCCEEDED(terminal_status)&&shared->writer_done.load()&&!shared->broken.load()?0:2;
 }
-int run(HANDLE game=nullptr){
+int run(HANDLE game=nullptr,bool decode=false){
   HANDLE input=GetStdHandle(STD_INPUT_HANDLE),output=GetStdHandle(STD_OUTPUT_HANDLE);
   if(!input||!output||input==INVALID_HANDLE_VALUE||output==INVALID_HANDLE_VALUE||
       GetFileType(input)!=FILE_TYPE_PIPE||GetFileType(output)!=FILE_TYPE_PIPE)return 2;
@@ -273,7 +311,7 @@ int run(HANDLE game=nullptr){
   int result=2;
   std::shared_ptr<Shared> shared;
   try{
-    shared=std::make_shared<Shared>(input,output,game);
+    shared=std::make_shared<Shared>(input,output,game,decode);
     std::thread([shared]{try{reader(shared);}catch(...){shared->fail();shared->reader_done.store(true);}}).detach();
     std::thread([shared]{try{writer(shared);}catch(...){shared->fail();shared->writer_done.store(true);}}).detach();
     result=actor(shared);
@@ -283,6 +321,7 @@ int run(HANDLE game=nullptr){
 }
 int wmain(int argc,wchar_t** argv){
   if(argc==2&&std::wcscmp(argv[1],L"--stdio-video-v1")==0)return run();
+  if(argc==2&&std::wcscmp(argv[1],L"--stdio-decode-v3")==0)return run(nullptr,true);
   if(argc!=3||std::wcscmp(argv[1],L"--stdio-owned-video-v2")!=0)return 2;
   size_t length=std::wcslen(argv[2]);
   if(!length||length>20||argv[2][0]==L'0')return 2;
