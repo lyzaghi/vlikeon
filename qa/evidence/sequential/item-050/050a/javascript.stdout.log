@@ -1,0 +1,40 @@
+✔ transient document handles do not cross Game Hub tabs (2.0305ms)
+✔ selected grants are document- and direction-bound and consumed on success (0.7952ms)
+✔ manual extraction requires both selected grants from the same document (0.5313ms)
+✔ transfer IDs cannot be reused for the wrong direction or by another document (0.2842ms)
+✔ late successful creation returns cleanup instead of granting a closed document authority (1.6826ms)
+✔ document close retires its grants, transfers and jobs once (0.4684ms)
+✔ native disconnect invalidates retained handles while keeping page admission (0.3257ms)
+✔ native maintenance jobs belong to their initiating document and late starts are cancelled (0.3903ms)
+(node:40400) ExperimentalWarning: VM Modules is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+node:internal/fs/promises:697
+  return new FileHandle(await PromisePrototypeThen(
+                        ^
+
+Error: ENOENT: no such file or directory, open 'E:\V10\work\vlikeon-items-50-109-01a16780\source-050a\apps\game-hub\runtime\sha256.js'
+    at async open (node:internal/fs/promises:697:25)
+    at async readFile (node:internal/fs/promises:1348:14)
+    at async load (file:///E:/V10/work/vlikeon-items-50-109-01a16780/source-050a/qa/browser/manual-recovery.test.mjs:12:40) {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'E:\\V10\\work\\vlikeon-items-50-109-01a16780\\source-050a\\apps\\game-hub\\runtime\\sha256.js'
+}
+
+Node.js v24.19.0
+✖ qa\browser\manual-recovery.test.mjs (570.0811ms)
+ℹ tests 9
+ℹ suites 0
+ℹ pass 8
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 736.5415
+
+✖ failing tests:
+
+test at qa\browser\manual-recovery.test.mjs:1:1
+✖ qa\browser\manual-recovery.test.mjs (570.0811ms)
+  'test failed'

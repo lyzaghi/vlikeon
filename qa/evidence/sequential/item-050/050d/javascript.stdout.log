@@ -1,0 +1,23 @@
+✔ transient document handles do not cross Game Hub tabs (2.7737ms)
+✔ selected grants are document- and direction-bound and consumed on success (0.7946ms)
+✔ manual extraction requires both selected grants from the same document (0.4907ms)
+✔ transfer IDs cannot be reused for the wrong direction or by another document (0.2901ms)
+✔ late successful creation returns cleanup instead of granting a closed document authority (1.759ms)
+✔ document close retires its grants, transfers and jobs once (0.727ms)
+✔ native disconnect invalidates retained handles while keeping page admission (0.7259ms)
+✔ native maintenance jobs belong to their initiating document and late starts are cancelled (0.558ms)
+(node:42896) ExperimentalWarning: VM Modules is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ recovery package preserves arbitrary bytes and explicit unverified identity (49.8169ms)
+✔ damaged, truncated, trailing and spoofed provenance packages refuse (4.6121ms)
+✔ missing and malformed save metadata do not hide retained payloads (6.8118ms)
+✔ same size replacement invalidates review and deleted sources refuse (1.635ms)
+✔ stable hash cursors page more than 64 records without losing candidates (7.0556ms)
+ℹ tests 13
+ℹ suites 0
+ℹ pass 13
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 279.8132

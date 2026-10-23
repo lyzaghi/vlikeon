@@ -1,0 +1,4 @@
+page.evaluate: TypeError: Failed to fetch dynamically imported module: http://127.0.0.1:53521/web/idb.js
+    at E:\V10\work\vlikeon-items-50-109-01a16780\source-050a\qa\browser\manual-recovery-ui.cjs:19:16 {
+  log: []
+}

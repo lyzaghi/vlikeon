@@ -1,0 +1,9 @@
+Authored Chromium integration patch and staged product component.
+Authored Chromium Android module, APK asset inventory and source patch. No build or test was started.
+iOS resources and Xcode project authored. No build, simulator or test was started.
+Authored an inventoried Web/PWA resource bundle. No server, browser, core or test was started.
+Authored Chromium integration patch and staged product component.
+Authored Chromium Android module, APK asset inventory and source patch. No build or test was started.
+iOS resources and Xcode project authored. No build, simulator or test was started.
+Authored an inventoried Web/PWA resource bundle. No server, browser, core or test was started.
+{"repeatable": true, "generated_files": 444, "relative_imports": {"resolved_or_platform_gated": 837, "web_only_native_exclusions": ["out/browser-integration/chrome/browser/resources/omniplay_game_hub/bridge.js", "out/browser-android-integration/chrome/android/omniplay/assets/omniplay/bridge.js", "apps/ios/GameHub/bridge.js"]}, "stale_generated_sources": []}

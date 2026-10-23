@@ -1,0 +1,14 @@
+
+running 9 tests
+test manual_recovery_changed_same_size_bytes_refuse_stale_review_before_writes ... ok
+test manual_recovery_corrupt_truncated_and_trailing_packages_write_nothing ... ok
+test manual_recovery_invalid_identity_and_nonempty_destination_refuse ... ok
+test manual_recovery_inventory_covers_legacy_and_repair_without_trusting_directory_names ... ok
+test manual_recovery_never_descends_into_windows_junctions ... ok
+test manual_recovery_pages_all_unknown_names_and_preserves_zero_length_files ... ok
+test manual_recovery_respects_the_save_writer_lease ... ok
+test manual_recovery_unknown_names_roundtrip_without_game_metadata_or_publication ... ok
+test manual_recovery_unverified_manifest_cannot_claim_provenance_even_with_valid_trailer ... ok
+
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.65s
+
