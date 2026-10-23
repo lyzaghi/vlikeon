@@ -17,6 +17,12 @@ and encoding; current Rust launch/bridge still do not call that mode. See
 [OWNED_PROTOCOL.md](OWNED_PROTOCOL.md). Capture behavior/limits:
 [WINDOWS_OWNED_VIDEO_CAPTURE.md](../../docs/WINDOWS_OWNED_VIDEO_CAPTURE.md).
 
+`vlikeon_decoder.hpp`/`src/decoder.cpp` also author a private fixed-system-MFT
+H.264-to-NV12 decoder candidate with bounded input/output, original receive age,
+timestamp and actual 2D row/crop checks. It has no current worker/protocol/product
+caller and has not been compiled/activated. See
+[WINDOWS_NATIVE_VIDEO_DECODER.md](../../docs/WINDOWS_NATIVE_VIDEO_DECODER.md).
+
 This standalone static-library recipe supplies an H.264 Main Level 4.2 NV12
 Media Foundation adapter for 720p/1080p at 30/60 FPS. It enumerates system MFTs
 with bounded activation attempts and admits a single input/output stream. A

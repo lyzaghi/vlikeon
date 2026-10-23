@@ -221,3 +221,10 @@ to the depacketizer, preserving earliest local receipt through its original
 `NATIVE_RTP_REORDER.md` records duplicate/gap/source behavior and missing actual
 SRTP/transport/loss-recovery/decoder/product wiring. No parser, receiver, network,
 build or test execution ran. Original completion scope remains unchanged.
+
+The next source checkpoint adds a fixed Microsoft H.264 decoder candidate to
+the Windows static recipe, with synchronous MFT lifecycle, bounded pending/NV12
+output, original receive-age/timestamp fences and actual 2D buffer/crop checks.
+`WINDOWS_NATIVE_VIDEO_DECODER.md` records the native caller/bitstream/secure IPC/
+display gaps. No current worker or product caller invokes it; no compiler,
+decoder/media/device operation or test ran. Full original scope remains open.

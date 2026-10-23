@@ -25,7 +25,8 @@
     "Bounded internal H.264 RTP receive-header/source/sequence/timestamp admission and single-NAL/FU-A/STAP-A reconstruction; no product/network/decoder caller",
     "Seven additional inert receive-stage fixture sources including packetizer round trip; none executed, no codec/network/device qualification",
     "Bounded post-authentication RTP reorder lane connected to H.264 assembly, preserving original receipt age across duplicate/gap/window handling; no product/network caller",
-    "Six additional inert reorder/assembly fixture sources, none executed; SRTP/recovery/decoder/platform qualification still missing"
+    "Six additional inert reorder/assembly fixture sources, none executed; SRTP/recovery/decoder/platform qualification still missing",
+    "Unintegrated fixed Microsoft H.264 decoder candidate with bounded compressed/NV12 ownership, preserved receive age, timestamp order and locked 2D/crop checks; no build, activation or current worker/product caller"
   ],
   "static_review": "Source review and git diff whitespace check only",
   "build_executed": false,

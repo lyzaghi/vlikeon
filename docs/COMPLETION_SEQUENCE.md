@@ -107,6 +107,13 @@ packet/unit budgets. Six inert source fixtures are authored, unexecuted. This
 does not implement SRTP/network, adaptive playout/loss recovery, decoder or a
 product caller. All original remaining scope and real evidence stay open.
 
+The next item-56 source checkpoint adds a private Windows H.264 decoder candidate
+using the fixed OS MFT, bounded compressed/NV12 ownership, preserved receiver age,
+timestamp order and padded-surface/crop/2D-row checks. It is not invoked by any
+current worker/product path and is unbuilt/unexecuted. Native decoder IPC/secure
+receiver/bitstream admission/presentation plus all original platform/product and
+final evidence requirements remain open.
+
 This fork's current assignment: items 51 and 52 are accepted with evidence in
 `SAVE_ARCHIVE_INTERCHANGE.md` and `STORAGE_FAULT_QUALIFICATION.md`. On 2026-10-23,
 the owner deferred Linux build/runtime work for item 53, then deferred build/test
