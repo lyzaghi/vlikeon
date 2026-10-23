@@ -1,0 +1,55 @@
+name: Demo Game Boy core build
+run-name: Demo core ${{ inputs.batch_id }} ${{ inputs.expected_sha }}
+on:
+  workflow_dispatch:
+    inputs:
+      expected_sha:
+        description: Exact assigned source revision
+        required: true
+        type: string
+      batch_id:
+        description: Unique qualification batch
+        required: true
+        type: string
+permissions:
+  contents: read
+jobs:
+  core:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    env:
+      EXPECTED_SHA: ${{ inputs.expected_sha }}
+    steps:
+      - name: Admit assigned revision
+        run: test "$GITHUB_SHA" = "$EXPECTED_SHA"
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - name: Prepare disposable build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends bison flex libpng-dev pkg-config
+          git clone --no-checkout https://github.com/LIJI32/SameBoy.git third_party/sources/sameboy
+          git -C third_party/sources/sameboy checkout --detach 26a56bd6a122a6318a456abd80558408742d5adf
+          git clone --no-checkout https://github.com/gbdev/rgbds.git "$RUNNER_TEMP/rgbds"
+          git -C "$RUNNER_TEMP/rgbds" checkout --detach 81ea4ee920c67060a230a99138a0db2ec6518dfb
+          make -C "$RUNNER_TEMP/rgbds" -j2
+          git clone --no-checkout https://github.com/emscripten-core/emsdk.git "$RUNNER_TEMP/emsdk"
+          git -C "$RUNNER_TEMP/emsdk" checkout --detach 35659964bc2762fffec0d257997fb61475f765b7
+          "$RUNNER_TEMP/emsdk/emsdk" install 6.0.13
+          "$RUNNER_TEMP/emsdk/emsdk" activate 6.0.13
+      - name: Build exact SameBoy core with original upstream boot programs
+        run: |
+          source "$RUNNER_TEMP/emsdk/emsdk_env.sh"
+          emcc --version
+          python3 tools/build_sameboy_web.py --emcc "$RUNNER_TEMP/emsdk/upstream/emscripten/emcc" --rgbasm "$RUNNER_TEMP/rgbds/rgbasm" --rgbgfx "$RUNNER_TEMP/rgbds/rgbgfx" --rgblink "$RUNNER_TEMP/rgbds/rgblink"
+          sha256sum apps/game-hub/cores/sameboy/*
+          cp "$RUNNER_TEMP/emsdk/upstream/emscripten/LICENSE" apps/game-hub/cores/sameboy/LICENSE.emscripten.txt
+          git diff --exit-code
+      - name: Retain demo qualification artifacts
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: sameboy-demo-core
+          path: apps/game-hub/cores/sameboy/
+          if-no-files-found: error
+          retention-days: 7
