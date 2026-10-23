@@ -10,6 +10,14 @@ gamepads and device permissions). Build/test execution is now deferred; do not
 dispatch new Antigravity batches until resumed by the owner. Items 53–55 remain
 unchecked. Other chats' assignments and remaining 1–109 obligations are retained.
 
+The 2026-10-24 item-55 source checkpoint also moves the legacy keyboard/mouse
+helper onto the creation-time Windows job/handle allowlist launcher, using a
+fixed typed helper argument. Stop has finite process waits and joins only an
+already-finished IPC thread. An unfinished thread retains the process-local
+launch permit; unknown process retirement retains its original job/handle and
+blocks relaunch. Cancellation/termination is not input-release proof. Build,
+runtime and failure-injection qualification remain deferred; item 55 stays open.
+
 Item 55 source checkpoints: private owner/slot lifecycle, Linux uinput and stable
 standard-browser sampling are authored. A default-off Windows WinUHid candidate
 now adds a hash-pinned static client recipe, generic HID reports and retained

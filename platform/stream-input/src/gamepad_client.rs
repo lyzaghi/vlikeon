@@ -106,7 +106,7 @@ impl GamepadClient{
         if !owner.valid()||remaining.is_zero()||remaining>Duration::from_secs(30*60)||
             ContentHash::parse(sha256.0.clone()).is_err(){return Err(failure());}
         let permit=Permit::acquire()?;let now=Instant::now();
-        let child=SuspendedChild::launch(executable)?;
+        let child=SuspendedChild::launch(executable,crate::gamepad_child::HelperKind::Gamepad)?;
         let(process,thread,input,output)=child.into_parts();
         let shared=Arc::new(Shared{_permit:permit,_artifact:Some(artifact),process,owner,deadline:now+remaining,
             lease:Mutex::new(Lease{sequence:0,deadline:Instant::now()+Duration::from_millis(300),closed:false}),

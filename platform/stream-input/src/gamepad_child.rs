@@ -1,6 +1,6 @@
 //! Normal-user trusted helper launch, not a sandbox for untrusted executables.
 //! Admission/hash verification and an immutable executable guard belong to the
-//! native broker. No current product path invokes this source candidate.
+//! native broker. Used by the keyboard helper and candidate gamepad transport.
 use crate::{failure,gamepad_process::ProcessWitness,system_directory};
 use omniplay_contracts::Result;
 use std::{ffi::OsStr,fs::{File,OpenOptions},mem::{size_of,size_of_val},
@@ -64,8 +64,9 @@ pub(crate) struct SuspendedChild{
     pub(crate) process:Arc<ChildProcess>,thread:OwnedHandle,
     pub(crate) input:File,pub(crate) output:File,
 }
+pub(crate) enum HelperKind{KeyboardMouse,Gamepad}
 impl SuspendedChild{
-    pub(crate) fn launch(executable:&Path)->Result<Self>{
+    pub(crate) fn launch(executable:&Path,kind:HelperKind)->Result<Self>{
         if !executable.is_absolute(){return Err(failure());}
         let text=executable.to_str().filter(|value|!value.contains('"')).ok_or_else(failure)?;
         let directory=executable.parent().ok_or_else(failure)?;
@@ -84,7 +85,8 @@ impl SuspendedChild{
         attributes.set(PROC_THREAD_ATTRIBUTE_HANDLE_LIST,&inherited)?;
         attributes.set(PROC_THREAD_ATTRIBUTE_JOB_LIST,&jobs)?;
         let application=wide(executable.as_os_str())?;let directory=wide(directory.as_os_str())?;
-        let mut command=wide(OsStr::new(&format!("\"{text}\" --stdio-gamepad-v2")))?;
+        let argument=match kind{HelperKind::KeyboardMouse=>"--stdio-input-v1",HelperKind::Gamepad=>"--stdio-gamepad-v2"};
+        let mut command=wide(OsStr::new(&format!("\"{text}\" {argument}")))?;
         let system=system_directory()?;let system=system.to_str().ok_or_else(failure)?;
         let mut environment=Vec::new();
         for entry in [format!("PATH={system}\\System32"),format!("SystemRoot={system}"),format!("WINDIR={system}")]{
