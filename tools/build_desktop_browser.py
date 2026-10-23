@@ -148,13 +148,21 @@ def build(project, source, receipt, args, git, python, depot):
     environment = os.environ.copy()
     environment['PATH'] = str(depot) + os.pathsep + str(git.parent) + os.pathsep + environment.get('PATH', '')
     environment['DEPOT_TOOLS_UPDATE'] = '0'
+    # Keep source bytes and long-path support local to this build's Git children;
+    # do not rewrite the user's global Git configuration.
+    git_config_count = int(environment.get('GIT_CONFIG_COUNT', '0'))
+    for key, value in [('core.autocrlf', 'false'), ('core.longpaths', 'true')]:
+        environment['GIT_CONFIG_KEY_' + str(git_config_count)] = key
+        environment['GIT_CONFIG_VALUE_' + str(git_config_count)] = value
+        git_config_count += 1
+    environment['GIT_CONFIG_COUNT'] = str(git_config_count)
     if platform.system() == 'Windows':
         environment['DEPOT_TOOLS_WIN_TOOLCHAIN'] = '0'
     persist(journal_path, journal)
     revision = receipt['upstream_revision']
     checkout = workspace / 'src'
     if journal['phase'] == 'new':
-        command([python, depot / 'gclient.py', 'sync', '--nohooks', '--revision', 'src@' + revision],
+        command([python, depot / 'gclient.py', 'sync', '--nohooks', '--no-history', '--revision', 'src@' + revision],
                 workspace, environment, journal, journal_path, 'dependency_sync')
         journal['phase'] = 'synced'
         persist(journal_path, journal)

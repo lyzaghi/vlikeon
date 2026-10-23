@@ -10,7 +10,9 @@ def main():
     parser=argparse.ArgumentParser(description=__doc__);parser.add_argument('--source',type=Path,required=True);parser.add_argument('--node',required=True);args=parser.parse_args()
     counts={'python':0,'javascript':0,'json':0,'plist':0}
     for file in sorted(args.source.rglob('*')):
-        if not file.is_file() or file.relative_to(args.source).parts[0] in {'branding','third_party'}:continue
+        # Parse authored source only. Generated out/ contains Chromium schemas
+        # with their own grammar and may also contain a complete upstream tree.
+        if not file.is_file() or file.relative_to(args.source).parts[0] in {'branding','third_party','out','.git'}:continue
         if file.suffix=='.py':ast.parse(file.read_text(encoding='utf-8-sig'),filename=str(file));counts['python']+=1
         elif file.suffix in {'.js','.mjs'}:
             result=subprocess.run([args.node,'--input-type=module','--check'],input=file.read_bytes(),capture_output=True,timeout=15)

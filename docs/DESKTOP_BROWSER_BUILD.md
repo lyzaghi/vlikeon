@@ -1,11 +1,12 @@
 # Desktop Chromium integration and build source
 
-Item 1 covers the desktop Chromium product: the revision-bound patch queue,
+Historical product area 1 covers the desktop Chromium product: the revision-bound patch queue,
 bundled Game Hub, normal/private profile separation, browser-issued document
 authority, product-specific native-host discovery, and a repeatable build
 procedure for Windows x64, Linux x64 and macOS arm64. The current implementation
-is source only. No Chromium configuration, dependency hooks, compilation,
-browser execution or tests have run.
+has not completed a full Chromium build. Selected source/unit checks have run;
+see `SOURCE_INTEGRATION.md`. The current Windows build is sequential task 3 in
+`OUTSTANDING_WORK.md`; preparing its inputs does not establish compilation.
 
 ## Integration and authority
 
@@ -87,6 +88,7 @@ those system components.
 
 The recipe creates a separate owned gclient workspace within the prepared
 project. It synchronizes the fixed Chromium repository at the exact revision,
+runs with `--no-history` to avoid downloading unrelated repository history,
 runs upstream dependency hooks, preflights all modified destinations and then
 copies only the frozen overlay. A persisted journal retains completed phases;
 an interrupted overlay accepts only the exact original or new file bytes.
@@ -94,6 +96,21 @@ Unrelated edits fail. The existing sparse authoring checkout is never reused or
 reset by this procedure. A per-project exclusive lock prevents concurrent runs;
 after a crash, an operator must establish that no prior build is still active
 before removing its stale lock.
+
+Git child processes use LF source and long-path support through process-local
+configuration, leaving user-global Git settings intact. On Windows, bootstrap
+the explicitly pinned depot_tools using its official `bootstrap/win_tools.bat`
+and use the resulting `.cipd_bin/vpython3.exe` as `--python`; this supplies the
+upstream Python environment for gclient/autoninja instead of assuming unrelated
+system Python packages. Its actual executable hash is recorded in the receipt.
+
+The pinned Chromium revision's own `docs/windows_build_instructions.md` requires
+Visual Studio 2026 >=18.0.0, C++ plus MFC/ATL, Windows SDK 10.0.28000.2270 and
+appropriate Debugging Tools. Earlier native-fixture success with VS2022/SDK19041
+does not qualify this Chromium toolchain. Provisioning those components was
+explicitly approved by the owner for task 3; no reboot is authorized implicitly.
+`WINDOWS_CHROMIUM_BUILD.md` records the active task's exact inputs, prerequisite
+installation and retained attempts; task 3 stays open until compilation succeeds.
 
 GN and dependency toolchains come from the pinned upstream hooks. The recipe
 uses the selected depot_tools `autoninja.py` and the ordinary `chrome` target.
@@ -132,8 +149,8 @@ new-tab behavior, profile/private-window isolation, native-host failure handling
 permissions/CSP, worker restart/timeout/cleanup cases and a rebuild comparison.
 These runtime checks are deferred to the user's final consolidated pass.
 The authored case matrix is `qa/browser/DESKTOP_ACCEPTANCE.md`, with narrow
-source-level document admission cases in `component-context.test.mjs`. Neither
-has been executed.
+source-level document admission cases in `component-context.test.mjs`. The narrow
+unit cases passed in recorded batches; the real desktop matrix remains open.
 
 Upstream build contracts consulted for the recipe:
 
