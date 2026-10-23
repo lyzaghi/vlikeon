@@ -15,8 +15,9 @@ typedef struct VLKWinPadReport {
     uint16_t reserved; // Must be zero.
 } VLKWinPadReport;
 
-// No device operation: reserves one of four process-local slots and returns a
-// private token. IDs must come from the admitted package's assigned HID identity,
+// No new device creation: reserves one of four process-local slots and returns
+// a private token. It may retry cleanup of an older closing record in that slot.
+// IDs must come from the admitted package's assigned HID identity,
 // not a peer or a borrowed controller manufacturer. The first write must be zero.
 // Zero return means success; other returns are Windows error codes.
 uint32_t vlk_winpad_reserve(uint8_t slot, uint16_t vendor, uint16_t product,
