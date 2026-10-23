@@ -56,6 +56,13 @@ not passed. The next source retains the text owner and pins the unmodified
 Linux-v6.12 UAPI/license bytes with mandatory CMake hashes and ABI layout checks;
 runtime ABI >= 6 remains required. A new exact batch must qualify these changes.
 
+Batch038 source d07305c passed the actual Linux sandbox compilation and all eight
+userland socket cases (zero failures/ignored). The subsequent broker check was
+blocked by missing dbus development headers in the disposable runner, not a
+reported Rust source error at that stage. Bootstrap compilation reached a missing
+`sys/wait.h` declaration for WEXITED. Both are addressed in the next source;
+bootstrap build and full runtime/broker compilation remain pending new evidence.
+
 Antigravity executes only Codex-released batches on frozen inputs. Codex owns
 review, diagnosis, source/test edits and acceptance decisions. No source-copy,
 compiler parser or bridge SUCCESS marker marks item 3 or the product complete.

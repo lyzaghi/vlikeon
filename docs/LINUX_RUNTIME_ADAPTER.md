@@ -1,10 +1,13 @@
 # Explicit Linux runtime factory and adapter source
 
-NativeRegistry now has an explicit GNU/Linux constructor and LinuxAdapter
-implements the shared RuntimeAdapter interface. This source has not been built
-or invoked. The normal broker still calls installed(), supplies no Linux
-delegation and advertises no Linux native runtime. No default platform enablement,
-catalog installation, runtime qualification or distribution approval occurred.
+NativeRegistry has explicit GNU/Linux constructors and LinuxAdapter implements
+the shared RuntimeAdapter interface. Normal Linux broker startup now attempts
+installed_linux_service(); it exposes native packages only after the actual
+service delegation, authenticated inventory and retained-work audit succeed.
+The lower-level installed() path still supplies no Linux authority. Platform,
+catalog and distribution acceptance remain pending. Current item-3 compiler,
+test and source status is recorded in `LINUX_ITEM3_CLOSURE.md`; historical
+source-authoring notes below do not supersede that evidence record.
 
 ## Trusted factory construction
 

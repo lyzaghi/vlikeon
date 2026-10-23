@@ -1,13 +1,12 @@
 # Owned Linux bootstrap launch source
 
-This authors lower-level broker-side admission and gated launch of the separate
-Linux actor bootstrap. It is not yet connected to NativeRegistry/NativeAdapter,
-or an approved runtime catalog. A separate lower-level trusted GUI pair is now
-authored in `LINUX_PRESENTATION_PAIR.md`; product integration remains due.
-Linux native availability stays
-false. No compiler/resolver/configuration/SDK, ELF, product hash/admission, dlsym,
-spawn/process/thread/pidfd/pipe/socket/lease/cgroup, core/helper/browser/device or
-test ran. Overall progress remains 88%; every original requirement stays active.
+This implements lower-level broker-side admission and gated launch of the Linux
+actor bootstrap and trusted GUI pair (`LINUX_PRESENTATION_PAIR.md`). The explicit
+LinuxAdapter/service factory composes these sources; approval still requires
+the actual authenticated catalog and target behavior. Current item-3 compiler
+and test evidence is in `LINUX_ITEM3_CLOSURE.md`; historical authoring notes below
+do not supersede it. A compiler or userland socket pass alone establishes no
+spawn/cgroup/core/device qualification or product completion percentage.
 
 ## Executable and resource ownership
 

@@ -35,6 +35,11 @@ jobs:
         run: cargo +1.89.0 check --locked -p omniplay-sandbox
       - name: Exercise real Unix descriptor and host channel boundaries
         run: cargo +1.89.0 test --locked -p omniplay-sandbox linux_host_channel::tests -- --test-threads=1
+      - name: Provision broker development headers in disposable runner
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends libdbus-1-dev pkg-config
+          dpkg-query -W libdbus-1-dev pkg-config
       - name: Compile Linux runtime and both broker executables
         run: cargo +1.89.0 check --locked -p omniplay-native-runtime -p omniplay-broker --all-targets
       - name: Confirm tracked source stayed unchanged

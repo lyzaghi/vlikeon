@@ -1,12 +1,12 @@
 # Linux actor policy source component
 
-This is an unbuilt Linux x86-64 actor policy component. A separate namespace/root
-and static bootstrap target is now authored in `LINUX_ISOLATION_BOOTSTRAP.md`.
-Neither is an enabled, qualified sandbox or broker integration. No Linux
-kernel syscall, CMake/SDK/compiler, executable, core/helper, process, device or
-test ran. `omniplay_sandbox::supported()` still returns false on Linux; no catalog
-or platform was enabled. Overall progress stays 88% and the full product scope
-remains active.
+This Linux x86-64 actor policy has a separate namespace/root and static bootstrap
+target described in `LINUX_ISOLATION_BOOTSTRAP.md`. Exact Ubuntu compiler batches
+are now assigned during item 3; `LINUX_ITEM3_CLOSURE.md` records their outcomes.
+They do not establish actual kernel, process-tree, core/helper or device
+acceptance. `omniplay_sandbox::supported()` still returns false on Linux; the
+explicit service-backed factory admits authority independently. No overall
+completion percentage or distribution approval is claimed.
 
 ## Caller boundary
 
