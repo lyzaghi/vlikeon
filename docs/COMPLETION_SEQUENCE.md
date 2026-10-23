@@ -22,6 +22,11 @@ pre-creation Windows container identities, a separate parent-heartbeat lease,
 real Windows target/activity observations and a default-off private v2 helper
 actor/reader. Parent supervision, durable cleanup records and product integration
 remain unfinished; this is not an additional accepted item.
+The next source checkpoint adds a bounded SQLite ownership/cleanup journal,
+pre-activation durable intent, parent-side reply/authority orchestration and an
+original-process-handle Windows retirement witness. No current service path
+constructs them; real supervised transport, global arbitration, startup recovery
+and signed/native admission remain due. Build/test is still deferred.
 
 The owner now requests the individually numbered tasks in
 [`OUTSTANDING_WORK.md`](OUTSTANDING_WORK.md), completed in order. Task 1 source

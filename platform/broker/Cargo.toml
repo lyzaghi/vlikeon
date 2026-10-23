@@ -5,6 +5,11 @@ edition.workspace = true
 rust-version.workspace = true
 publish.workspace = true
 
+[features]
+default = []
+# Source candidate only; requires explicit native static linkage and admission.
+windows-gamepad = ["omniplay-stream-input/winuhid"]
+
 [dependencies]
 omniplay-updater.workspace = true
 omniplay-native-runtime.workspace = true

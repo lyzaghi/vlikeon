@@ -10,7 +10,10 @@
     "Standard browser gamepad sampling with sparse stable indices",
     "Default-off Windows generic HID candidate, pinned WinUHid static client recipe and exact-container cleanup query",
     "Two-step prepare/activate, pre-creation Windows container identities and non-reviving parent heartbeat lease",
-    "Windows process/foreground/local activity observations and opt-in private v2 helper actor/reader"
+    "Windows process/foreground/local activity observations and opt-in private v2 helper actor/reader",
+    "Bounded SQLite parent ownership journal with committed activation intent and exact-snapshot cleanup reconciliation",
+    "Parent-side reply/authority orchestration and original Windows child-process-handle retirement witness",
+    "Six authored journal regression cases; execution deferred, no OS behavior qualified"
   ],
   "static_review": "Source/API review and git diff whitespace check only; no compiler or runtime validation",
   "passed_test_cases": [],
@@ -22,7 +25,8 @@
   "advertised_gamepad_capability": false,
   "pending": [
     "Broker/native permission UI and authenticated capture/pair/session integration",
-    "Parent-side v2 client, external process supervision, durable cleanup ledger and cross-process device arbitration",
+    "Real parent-side v2 transport/authority writer, external process supervision and cross-process device arbitration",
+    "Journal service integration and boot/process startup recovery after loss of the original child handle",
     "Combined keyboard/gamepad helper observation and injection attribution",
     "Windows assigned HID identity, exact signed driver/package admission and unresolved-creation recovery",
     "macOS provider and entitlement/package path",

@@ -226,8 +226,9 @@ treated as an empty/removed set. An active receipt follows actual initial
 neutral writes and present-container observation. Cleanup retains actual
 unresolved identities; helper exit code 3 means cleanup is still required.
 Neither exit code 0 nor any process exit can replace the parent validating the
-known identity set and actual cleanup receipts. With no completed external
-supervisor/journal, no product path may yet launch this candidate.
+known identity set and actual cleanup receipts. Without completed external
+process supervision and journal integration, no product path may yet launch
+this candidate.
 
 The helper source entry is `--stdio-gamepad-v2`; it returns unavailable (exit 2)
 unless built for Windows x86-64/ARM64 MSVC with the default-off `winuhid` feature
@@ -236,8 +237,86 @@ and explicitly linked library. No current broker uses it. The existing
 private wire's native-consent boolean and provider IDs must originate in an
 admitted native broker/package; they are not a renderer permission API.
 The reader/actor design does not preempt a blocked driver call. Independent
-process supervision, durable parent cleanup records, global slot arbitration,
-parent-side client integration and signed admission are still required.
+process supervision, global slot arbitration, parent-side transport integration
+and signed admission are still required. The source-only parent journal and
+orchestration below do not activate the current service path.
+
+## Durable parent ownership and recovery
+
+`platform/core/src/stream_gamepad_journal.rs` stores one bounded native ownership
+record in the profile's existing SQLite preferences table. It uses no schema
+migration or separate filesystem journal. The record binds profile/device/client,
+full game/capture/pair/session/epoch/process/window owner, exact helper PID plus
+creation time, helper SHA-256, provider, logical slots and container GUIDs. A
+fresh reservation UUID and increasing revision prevent a stale snapshot from
+mutating a replacement, even if other identity fields happen to repeat. The
+canonical JSON record is bounded to 8 KiB and four unique devices; oversized,
+noncanonical, malformed or foreign-profile/device records block reuse.
+
+Writes require an autocommit SQLite connection in WAL mode with `synchronous`
+FULL or EXTRA. Reservation, activation intent, active presence and cleanup debt
+commit independently with an IMMEDIATE transaction and exact previous-value
+compare-and-swap. A connection already inside another transaction is refused;
+an uncommitted outer transaction cannot yield an activation ticket. Uncertain
+commit results require reloading the authoritative record. No successful disk
+fault/crash test or power-loss durability claim is made for this new source.
+
+The complete prepared identity set commits before activation intent, and intent
+commits **before** any Activate request. Therefore a broker crash or lost pipe
+reply cannot turn an attempted device creation back into an unused reservation.
+Only a validated active response from the exact admitted child records prior
+positive presence. An authenticated cleanup response can acknowledge an exact
+subset's removal; `null` retains unknown ownership. A changed/foreign device,
+reintroduced removed device or inconsistent pending/terminal set is rejected.
+Even a complete removal receipt remains journaled until exact helper exit is
+confirmed; this prevents a still-running process from creating again after
+slot release.
+
+Reconciliation never deletes debt by age, grant expiry, empty generic inventory
+or child exit code. An unattempted reservation can be removed after exact helper
+retirement. An attempted device requires an authenticated removal receipt or
+prior positive container presence followed by confirmed absence. A device never
+observed present stays retained; an OS query failure stays unknown. A late
+positive observation is stored for a later absence check. Compare-and-swap
+protects mutations if another broker changes the record during OS queries.
+
+`platform/broker/src/stream_gamepad.rs` authors parent orchestration around this
+journal and a required supervised `ParentChannel`. It checks final prepared
+identity/slot order, commits intent before activation, validates reply owner,
+request ID, completion, bounded reason and identity set, and preserves cleanup
+on exchange failure. IDs must be minted in one serialized transport writer with
+heartbeat IDs; the old Prepare ID is not the current wire counter. Input and
+release share an increasing sequence, validate slots/axes before sending and
+refuse authority observations older than 100 ms or from a different owner. A
+slow activation-intent commit triggers another freshness check before sending.
+Shutdown cancels writes/attempts bounded child stop before a potentially blocking
+cleanup journal write; storage failure cannot grant another group.
+
+`platform/stream-input/src/gamepad_process.rs` duplicates the actual launch
+process handle with query/synchronize rights and binds PID plus creation time.
+It checks termination on that original kernel object, so PID recycling does not
+substitute another process's exit status. The optional broker feature
+`windows-gamepad` joins that witness with the Windows exact-container presence
+query for live-parent reconciliation. It does not enable any service command,
+change the current keyboard helper, install a driver or launch a process.
+
+The real `ParentChannel` transport/independent authority writer, creation-time
+process supervision, cross-profile/OS reservation and startup recovery after the
+original process handle is lost remain unfinished. No current service constructs
+this supervisor or invokes its journal; therefore current app capability stays
+false. One profile journal is not a machine-global lease, an OS attestation or
+permission to clear another profile's device. Startup recovery must obtain a
+positive boot/process retirement witness; access refusal or PID lookup failure
+alone must not satisfy the observer trait. Signed helper/driver admission and
+native consent remain mandatory before wiring any runtime path.
+
+Six journal regression cases are authored behind `cfg(test)` for the later
+Antigravity batch: stale reservation/replacement, reopen after lost activation
+reply, never-observed absence and later presence/absence, cleanup receipt before
+child exit, synthetic SQL write failure, outer-transaction refusal and unknown/
+foreign pending sets (some share one case). They have not been executed. Fake
+process/container observations test journal decisions only; they cannot qualify
+Windows PnP removal, driver cleanup, disk-full or real process crash behavior.
 
 ## Receiving browser sampling
 
@@ -263,9 +342,10 @@ the explicit slot tuples accepted by the private group.
 1. Integrate provider admission, exact signed artifacts and host permission UI
    with broker/helper IPC and the authenticated capture/pair/session. Current
    `InputWorker` v1, status shape, native forwarder and host policy do not expose
-   this provider yet. The private v2 actor/reader source exists but its parent
-   client, durable supervisor/cleanup ledger and combined keyboard/gamepad flow
-   are not wired. Version the product path coherently before advertising support.
+   this provider yet. The private v2 actor/reader, parent orchestration and durable
+   cleanup ledger are authored, but real supervised transport, native authority
+   writer, service integration and combined keyboard/gamepad flow are not wired.
+   Version the product path coherently before advertising support.
 2. Finish the Windows candidate's supervised helper, assigned device identity,
    signed-driver admission, installed package and unresolved-creation recovery;
    implement the macOS provider/entitlement path. Explicit installation consent
