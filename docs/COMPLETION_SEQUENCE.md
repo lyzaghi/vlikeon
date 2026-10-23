@@ -88,6 +88,12 @@ No configure/build/staging/package/parser/test or worker execution ran. Real
 installed packages, native service/observer/UI, receiver/transport and all
 original remaining platform/qualification requirements stay open.
 
+Item 56 also now contains explicit bounded H.264 NAL framing and native RTP mode
+0/1 packetization with FU-A/marker/clock/sequence handling. Eight inert source
+fixtures are authored, unexecuted. No broker/native injection/receiver/SRTP/network
+integration or execution is implied; actual codec/VUI admission and all original
+platform/service/transport/final qualification requirements remain open.
+
 This fork's current assignment: items 51 and 52 are accepted with evidence in
 `SAVE_ARCHIVE_INTERCHANGE.md` and `STORAGE_FAULT_QUALIFICATION.md`. On 2026-10-23,
 the owner deferred Linux build/runtime work for item 53, then deferred build/test

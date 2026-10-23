@@ -19,7 +19,9 @@
     "Four additional native-authority admission test sources (separate from eight colour cases), none executed",
     "Fixed installed-worker inventory/hash/current-broker admission, retained ancestor/file guards and private prepared-capture one-attempt launch handoff; no current service caller or executed admission",
     "Explicit Windows video snapshot/build/staging recipe and release-inventory structural PE architecture/mitigation checks; no recipe/parser/package execution",
-    "Seven authored inert PE fixture test sources, separate from four authority and eight colour cases; none executed"
+    "Seven authored inert PE fixture test sources, separate from four authority and eight colour cases; none executed",
+    "Bounded explicit H.264 access-unit framing and RTP mode 0/1 packetization with FU-A, marker, clock and sequence handling; no current product/network caller",
+    "Eight authored inert NAL/RTP fixture sources, separate from existing colour/authority/PE cases; none executed and not decodable codec evidence"
   ],
   "static_review": "Source review and git diff whitespace check only",
   "build_executed": false,

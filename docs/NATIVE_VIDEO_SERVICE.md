@@ -199,3 +199,10 @@ packager. Static runtime/asInvoker/mitigation settings are authored; seven inert
 PE fixture cases remain unexecuted. `WINDOWS_VIDEO_PACKAGING.md` records scope,
 toolchain/provenance/signature limitations and remaining requirements. No build,
 staging, parser/test, package, release or helper execution ran.
+
+The next source checkpoint adds bounded explicit H.264 NAL framing and RTP mode
+0/1 packetization, including FU-A, 90 kHz timestamps, sequence wrap and final
+access-unit marker handling. `NATIVE_H264_RTP.md` records limits and missing
+codec/VUI/parameter-set/receiver/SRTP/network work. Eight inert source fixtures
+are authored, not executed. No current broker/transport caller invokes it and
+no parser, network, decoder, build or test ran. Full original scope remains open.
