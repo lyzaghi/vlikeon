@@ -18,8 +18,6 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     env:
-      CARGO_HOME: ${{ runner.temp }}/vlikeon-cargo
-      CARGO_TARGET_DIR: ${{ runner.temp }}/vlikeon-target
       CARGO_TERM_COLOR: never
       EXPECTED_SHA: ${{ inputs.expected_sha }}
     steps:
@@ -29,7 +27,10 @@ jobs:
         with:
           persist-credentials: false
       - name: Provision fixed Rust toolchain in disposable runner
-        run: rustup toolchain install 1.89.0 --profile minimal
+        run: |
+          printf 'CARGO_HOME=%s\n' "$RUNNER_TEMP/vlikeon-cargo" >> "$GITHUB_ENV"
+          printf 'CARGO_TARGET_DIR=%s\n' "$RUNNER_TEMP/vlikeon-target" >> "$GITHUB_ENV"
+          rustup toolchain install 1.89.0 --profile minimal
       - name: Compile Linux sandbox
         run: cargo +1.89.0 check --locked -p omniplay-sandbox
       - name: Exercise real Unix descriptor and host channel boundaries
