@@ -9,7 +9,7 @@ use std::{collections::VecDeque,fs::File,io::{Read,Write},os::windows::io::{AsRa
 use uuid::Uuid;
 use windows_sys::Win32::{Foundation::*,System::{IO::CancelSynchronousIo,Threading::*}};
 
-const CONFIGURE:u16=1;const FRAME:u16=2;const POLL:u16=3;const STOP:u16=4;
+const CONFIGURE:u16=1;const FRAME:u16=2;const POLL:u16=3;const STOP:u16=4;const KEYFRAME:u16=5;
 static LIVE:AtomicBool=AtomicBool::new(false);
 static RETAINED:OnceLock<(Arc<ChildProcess>,File)>=OnceLock::new();
 struct Permit{release:bool}
@@ -21,12 +21,12 @@ impl VideoOwner{fn valid(self)->bool{[self.capture,self.game,self.pair,self.sess
 #[derive(Clone,Copy)]
 pub struct VideoProfile{pub width:u32,pub height:u32,pub fps:u32,pub bitrate:u32,pub require_hardware:bool}
 impl VideoProfile{fn valid(self)->bool{matches!((self.width,self.height),(1280,720)|(1920,1080))&&matches!(self.fps,30|60)&&(500_000..=30_000_000).contains(&self.bitrate)}}
-pub struct VideoPacket{pub timestamp_100ns:i64,pub keyframe:bool,pub bytes:Vec<u8>,pub sequence_header:Vec<u8>}
+pub struct VideoPacket{pub timestamp_100ns:i64,pub keyframe:bool,pub source_sequence:Option<u64>,pub bytes:Vec<u8>,pub sequence_header:Vec<u8>}
 struct Queued{packet:VideoPacket,deadline:Instant}
 struct Packets{queue:VecDeque<Queued>,bytes:usize}
 struct Lease{sequence:u64,deadline:Instant}
 struct Shared{
-    process:Arc<ChildProcess>,target:ProcessWitness,owner:VideoOwner,deadline:Instant,
+    process:Arc<ChildProcess>,target:ProcessWitness,owner:VideoOwner,deadline:Instant,window:Option<u64>,
     _permit:Permit,artifact:Option<File>,closed:AtomicBool,revoking:AtomicBool,
     lease:Mutex<Lease>,stop_deadline:Mutex<Option<Instant>>,pending:Mutex<Option<Instant>>,
     packets:Mutex<Packets>,io:OnceLock<OwnedHandle>,
@@ -77,11 +77,21 @@ fn thread_handle(thread:&JoinHandle<()>)->Result<OwnedHandle>{
 }
 impl VideoWorker{
     pub fn spawn(executable:&Path,artifact:File,sha256:ContentHash,owner:VideoOwner,target:ProcessWitness,remaining:Duration)->Result<(Self,VideoAuthorityLease)>{
+        Self::spawn_mode(executable,artifact,sha256,owner,target,remaining,None)
+    }
+    /// The HWND is private native capture context, not renderer authority.
+    /// Native WGC confirmation remains mandatory inside the v2 worker.
+    pub fn spawn_owned(executable:&Path,artifact:File,sha256:ContentHash,owner:VideoOwner,target:ProcessWitness,window:u64,remaining:Duration)->Result<(Self,VideoAuthorityLease)>{
+        let mut pid=0;
+        if window==0||unsafe{windows_sys::Win32::UI::WindowsAndMessaging::GetWindowThreadProcessId(window as usize as HWND,&mut pid)}==0||pid!=target.identity().process_id{return Err(failure());}
+        Self::spawn_mode(executable,artifact,sha256,owner,target,remaining,Some(window))
+    }
+    fn spawn_mode(executable:&Path,artifact:File,sha256:ContentHash,owner:VideoOwner,target:ProcessWitness,remaining:Duration,window:Option<u64>)->Result<(Self,VideoAuthorityLease)>{
         if !owner.valid()||remaining.is_zero()||remaining>Duration::from_secs(1800)||target.exited(target.identity())?||ContentHash::parse(sha256.0.clone()).is_err(){return Err(failure());}
         let permit=Permit::acquire()?;let now=Instant::now();
-        let child=SuspendedChild::launch(executable,HelperKind::Video)?;
+        let child=if window.is_some(){SuspendedChild::launch_owned_video(executable,target.native_handle())?}else{SuspendedChild::launch(executable,HelperKind::Video)?};
         let(process,primary,input,output)=child.into_parts();
-        let shared=Arc::new(Shared{process,target,owner,deadline:now+remaining,_permit:permit,artifact:Some(artifact),
+        let shared=Arc::new(Shared{process,target,owner,deadline:now+remaining,window,_permit:permit,artifact:Some(artifact),
             closed:AtomicBool::new(false),revoking:AtomicBool::new(false),lease:Mutex::new(Lease{sequence:0,deadline:now+Duration::from_millis(300)}),
             stop_deadline:Mutex::new(None),pending:Mutex::new(None),packets:Mutex::new(Packets{queue:VecDeque::new(),bytes:0}),io:OnceLock::new()});
         let(sender,receiver)=mpsc::sync_channel(1);
@@ -102,6 +112,7 @@ impl VideoWorker{
         Ok((client,VideoAuthorityLease{shared}))
     }
     pub fn owner(&self)->VideoOwner{self.shared.owner}
+    pub fn owned_capture(&self)->bool{self.shared.window.is_some()}
     pub fn remaining_authorized(&self)->Result<Duration>{
         if !self.shared.authority_live(){return Err(failure());}
         Ok(self.shared.deadline.saturating_duration_since(Instant::now()))
@@ -125,12 +136,15 @@ impl VideoWorker{
         payload.extend(self.shared.owner.generation.to_le_bytes());
         for value in [profile.width,profile.height,profile.fps,profile.bitrate,remaining as u32]{payload.extend(value.to_le_bytes());}
         payload.push(u8::from(profile.require_hardware));
-        let reply=self.call(CONFIGURE,payload.clone(),Duration::from_secs(5))?;
-        if reply.len()!=66||reply[..4]!=[0;4]||reply[4..65]!=payload[..]||reply[65]>1||profile.require_hardware&&reply[65]!=1{self.shared.close();return Err(failure());}
-        self.profile=Some(profile);Ok(reply[65]!=0)
+        if let Some(window)=self.shared.window{payload.extend(window.to_le_bytes());}
+        let reply=self.call(CONFIGURE,payload.clone(),Duration::from_secs(if self.owned_capture(){45}else{5}))?;
+        let end=4+payload.len();
+        if reply.len()!=end+1||reply[..4]!=[0;4]||reply[4..end]!=payload[..]||reply[end]>1||profile.require_hardware&&reply[end]!=1{self.shared.close();return Err(failure());}
+        self.profile=Some(profile);Ok(reply[end]!=0)
     }
     /// Tight NV12. False means the worker did not accept this raw frame.
     pub fn submit(&mut self,bytes:Vec<u8>,timestamp_100ns:i64,keyframe:bool)->Result<bool>{
+        if self.owned_capture(){return Err(failure());}
         let profile=self.profile.ok_or_else(failure)?;
         if timestamp_100ns<0||bytes.len()!=(profile.width*profile.height*3/2)as usize{return Err(failure());}
         let mut payload=Vec::with_capacity(9+bytes.len());payload.extend(timestamp_100ns.to_le_bytes());payload.push(u8::from(keyframe));payload.extend(bytes);
@@ -146,6 +160,15 @@ impl VideoWorker{
         drop(packets);
         if !self.shared.authority_live()||packet.as_ref().is_some_and(|value|Instant::now()>=value.deadline){self.shared.close();return Err(failure());}
         Ok(packet.map(|value|value.packet))
+    }
+    /// Returns an intent fence, not a decoder-refresh receipt. Only a matching
+    /// actual keyframe packet at/after the fence confirms the new keyframe.
+    pub fn request_keyframe(&mut self)->Result<u64>{
+        if !self.owned_capture()||self.profile.is_none(){return Err(failure());}
+        let reply=self.call(KEYFRAME,Vec::new(),Duration::from_millis(250))?;
+        if reply.len()!=12||reply[..4]!=[0;4]{self.shared.close();return Err(failure());}
+        let fence=u64::from_le_bytes(reply[4..].try_into().map_err(|_|failure())?);
+        if !(1..=10_000_000).contains(&fence){self.shared.close();return Err(failure());}Ok(fence)
     }
     pub fn stop_confirmed(&mut self)->Result<()>{
         if self.shared.revoking.load(Ordering::Acquire){return Err(failure());}
@@ -166,14 +189,16 @@ impl Drop for VideoWorker{fn drop(&mut self){let _=self.close();}}
 fn exchange(input:&mut File,output:&mut File,shared:&Shared,id:&mut u64,kind:u16,payload:&[u8],timeout:Duration)->Result<(u16,Vec<u8>)>{
     if !shared.transport_live()||*id>=10_000_000||payload.len()>3_110_409{return Err(failure());}
     *id+=1;*shared.pending.lock().map_err(|_|failure())?=Some(Instant::now()+timeout);
-    let mut header=Vec::with_capacity(20);header.extend(b"VLKV");header.extend(1u16.to_le_bytes());header.extend(kind.to_le_bytes());header.extend(id.to_le_bytes());header.extend((payload.len()as u32).to_le_bytes());
+    let version:u16=if shared.window.is_some(){2}else{1};
+    let mut header=Vec::with_capacity(20);header.extend(b"VLKV");header.extend(version.to_le_bytes());header.extend(kind.to_le_bytes());header.extend(id.to_le_bytes());header.extend((payload.len()as u32).to_le_bytes());
     input.write_all(&header).and_then(|_|input.write_all(payload)).map_err(|_|failure())?;
     let mut reply=[0u8;20];output.read_exact(&mut reply).map_err(|_|failure())?;
     let reply_kind=u16::from_le_bytes([reply[6],reply[7]]);
     let length=u32::from_le_bytes(reply[16..20].try_into().map_err(|_|failure())?)as usize;
-    if &reply[..4]!=b"VLKV"||reply[4..6]!=[1,0]||u64::from_le_bytes(reply[8..16].try_into().map_err(|_|failure())?)!=*id||
-        !matches!(reply_kind,0x8000|0x8001)||length>2*1024*1024+65536+17||
-        (reply_kind==0x8001&&kind!=POLL)||(reply_kind==0x8000&&!matches!(length,4|66)){return Err(failure());}
+    let status_length=if kind==CONFIGURE{if version==2{74}else{66}}else if kind==KEYFRAME&&version==2{12}else{4};
+    if &reply[..4]!=b"VLKV"||reply[4..6]!=version.to_le_bytes()||u64::from_le_bytes(reply[8..16].try_into().map_err(|_|failure())?)!=*id||
+        !matches!(reply_kind,0x8000|0x8001)||length>2*1024*1024+65536+29||
+        (reply_kind==0x8001&&kind!=POLL)||(reply_kind==0x8000&&length!=4&&length!=status_length){return Err(failure());}
     let mut bytes=vec![0u8;length];output.read_exact(&mut bytes).map_err(|_|failure())?;
     let pending=shared.pending.lock().map_err(|_|failure())?.take().ok_or_else(failure)?;
     // During explicit Stop, finish reading one already-issued Poll solely to
@@ -186,35 +211,64 @@ fn io_loop(mut input:File,mut output:File,shared:Arc<Shared>,receiver:mpsc::Rece
     let run=(||->Result<()>{
         let mut id=0;let mut configured=false;let mut last_poll=Instant::now();let mut first_input=true;
         let mut accepted:VecDeque<(i64,bool,Instant)>=VecDeque::new();
+        let mut native_sequence=0u64;let mut native_pts:Option<i64>=None;let mut keyframe_fences:VecDeque<u64>=VecDeque::new();
         while shared.transport_live(){
             if !shared.revoking.load(Ordering::Acquire)&&accepted.front().is_some_and(|(_,_,submitted)|submitted.elapsed()>=Duration::from_millis(250)){return Err(failure());}
             if configured&&!shared.revoking.load(Ordering::Acquire)&&last_poll.elapsed()>=Duration::from_millis(8){
+                let requested_at=Instant::now();
                 let(kind,bytes)=exchange(&mut input,&mut output,&shared,&mut id,POLL,&[],Duration::from_millis(250))?;
                 last_poll=Instant::now();
                 if shared.revoking.load(Ordering::Acquire){
                     // Drain an in-flight Poll without accepting any media.
                 }else if kind==0x8001{
-                    if bytes.len()<17||bytes[8]>1{return Err(failure());}
+                    let owned=shared.window.is_some();let prefix=if owned{29}else{17};
+                    if bytes.len()<prefix||bytes[8]>1{return Err(failure());}
                     let pts=i64::from_le_bytes(bytes[..8].try_into().map_err(|_|failure())?);
                     let size=u32::from_le_bytes(bytes[9..13].try_into().map_err(|_|failure())?)as usize;
                     let header=u32::from_le_bytes(bytes[13..17].try_into().map_err(|_|failure())?)as usize;
-                    let(expected,force,submitted)=accepted.pop_front().ok_or_else(failure)?;
-                    if pts!=expected||force&&bytes[8]!=1||size==0||size>2*1024*1024||header>65536||bytes.len()!=17+size+header||submitted.elapsed()>=Duration::from_millis(250){return Err(failure());}
-                    let packet=VideoPacket{timestamp_100ns:pts,keyframe:bytes[8]!=0,bytes:bytes[17..17+size].to_vec(),sequence_header:bytes[17+size..].to_vec()};
+                    if pts<0||size==0||size>2*1024*1024||header>65536||bytes.len()!=prefix+size+header{return Err(failure());}
+                    let received=Instant::now();
+                    let(source_sequence,deadline)=if owned{
+                        let sequence=u64::from_le_bytes(bytes[17..25].try_into().map_err(|_|failure())?);
+                        let age=u32::from_le_bytes(bytes[25..29].try_into().map_err(|_|failure())?);
+                        if sequence!=native_sequence+1||sequence>10_000_000||(native_sequence==0&&bytes[8]!=1)||native_pts.is_some_and(|previous|pts<=previous){return Err(failure());}
+                        while keyframe_fences.front().is_some_and(|fence|*fence<=sequence){
+                            if keyframe_fences.pop_front()!=Some(sequence)||bytes[8]!=1{return Err(failure());}
+                        }
+                        // Add the FULL local RTT to source-reported age rather
+                        // than starting a fresh budget on receipt.
+                        let age=Duration::from_millis(u64::from(age)).checked_add(received.duration_since(requested_at)).ok_or_else(failure)?;
+                        let remaining=Duration::from_millis(250).checked_sub(age).filter(|value|!value.is_zero()).ok_or_else(failure)?;
+                        native_sequence=sequence;native_pts=Some(pts);(Some(sequence),received+remaining)
+                    }else{
+                        let(expected,force,submitted)=accepted.pop_front().ok_or_else(failure)?;
+                        if pts!=expected||force&&bytes[8]!=1||submitted.elapsed()>=Duration::from_millis(250){return Err(failure());}
+                        (None,submitted+Duration::from_millis(250))
+                    };
+                    let deadline=deadline.min(received+Duration::from_millis(100));
+                    let packet=VideoPacket{timestamp_100ns:pts,keyframe:bytes[8]!=0,source_sequence,bytes:bytes[prefix..prefix+size].to_vec(),sequence_header:bytes[prefix+size..].to_vec()};
                     let mut packets=shared.packets.lock().map_err(|_|failure())?;
-                    if !shared.authority_live()||packets.queue.len()>=4||packets.bytes+size+header>4*1024*1024{return Err(failure());}
-                    packets.bytes+=size+header;packets.queue.push_back(Queued{packet,deadline:(submitted+Duration::from_millis(250)).min(Instant::now()+Duration::from_millis(100))});
+                    if !shared.authority_live()||Instant::now()>=deadline||packets.queue.len()>=4||packets.bytes+size+header>4*1024*1024{return Err(failure());}
+                    packets.bytes+=size+header;packets.queue.push_back(Queued{packet,deadline});
                 }else if bytes.as_slice()!=[1,0,0,0]{return Err(failure());}
             }
             let call=match receiver.recv_timeout(Duration::from_millis(8)){Ok(value)=>value,Err(mpsc::RecvTimeoutError::Timeout)=>continue,Err(_)=>break};
             if call.kind!=STOP&&shared.revoking.load(Ordering::Acquire){return Err(failure());}
             if (!configured&&call.kind!=CONFIGURE&&call.kind!=STOP)||(configured&&call.kind==CONFIGURE){return Err(failure());}
+            if shared.window.is_some()&&call.kind==FRAME||shared.window.is_none()&&call.kind==KEYFRAME{return Err(failure());}
             let submitted=Instant::now();
             let(kind,reply)=exchange(&mut input,&mut output,&shared,&mut id,call.kind,&call.payload,call.timeout)?;
             if kind!=0x8000{return Err(failure());}
             if call.kind==CONFIGURE{
-                if reply.len()!=66||reply[..4]!=[0;4]||reply[4..65]!=call.payload[..]||reply[65]>1||call.payload[60]!=0&&reply[65]!=1{return Err(failure());}
+                let size=if shared.window.is_some(){69}else{61};let end=4+size;
+                if call.payload.len()!=size||reply.len()!=end+1||reply[..4]!=[0;4]||reply[4..end]!=call.payload[..]||reply[end]>1||call.payload[60]!=0&&reply[end]!=1{return Err(failure());}
                 configured=true;
+            }
+            if call.kind==KEYFRAME{
+                if reply.len()!=12||reply[..4]!=[0;4]{return Err(failure());}
+                let fence=u64::from_le_bytes(reply[4..].try_into().map_err(|_|failure())?);
+                if fence<=native_sequence||fence>10_000_000||keyframe_fences.back().is_some_and(|previous|fence<*previous){return Err(failure());}
+                if keyframe_fences.back()!=Some(&fence){if keyframe_fences.len()>=8{return Err(failure());}keyframe_fences.push_back(fence);}
             }
             if call.kind==FRAME&&reply.as_slice()==[0,0,0,0]{
                 if accepted.len()>=6||call.payload.len()<9{return Err(failure());}

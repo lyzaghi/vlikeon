@@ -17,6 +17,7 @@ impl WindowsVideoFrames{
     /// The caller already owns an admitted job-contained worker and maintains
     /// its independent native lease while configure blocks. No lease is renewed.
     pub fn attach(mut worker:VideoWorker,profile:Profile,source_format:PixelFormat,require_hardware:bool)->Result<Self>{
+        if worker.owned_capture(){return Err(unavailable());}
         profile.validate()?;
         let owner=worker.owner();let binding=Binding{capture:owner.capture,session:owner.session,generation:owner.generation};
         let mailbox=Arc::new(FrameMailbox::new(binding,profile,source_format,worker.remaining_authorized()?)?);
@@ -60,3 +61,29 @@ impl WindowsVideoFrames{
     }
 }
 impl Drop for WindowsVideoFrames{fn drop(&mut self){let _=self.mailbox.close();let _=self.worker.close();}}
+
+/// Owned-v2 keeps capture/conversion/encoding inside the job-contained helper.
+/// No raw producer API. Independent authority observations remain mandatory.
+pub struct WindowsOwnedVideo{worker:VideoWorker,closed:bool}
+impl WindowsOwnedVideo{
+    pub fn attach(mut worker:VideoWorker,profile:Profile,require_hardware:bool)->Result<Self>{
+        profile.validate()?;if !worker.owned_capture(){return Err(unavailable());}
+        worker.configure(VideoProfile{width:profile.width,height:profile.height,fps:profile.fps,bitrate:profile.bitrate_bps,require_hardware})?;
+        worker.remaining_authorized()?;Ok(Self{worker,closed:false})
+    }
+    pub fn request_keyframe(&mut self)->Result<u64>{
+        if self.closed{return Err(unavailable());}
+        match self.worker.request_keyframe(){Ok(fence)=>Ok(fence),Err(error)=>{self.closed=true;let _=self.worker.close();Err(error)}}
+    }
+    pub fn take_unnegotiated(&mut self)->Result<Option<UnnegotiatedVideoPacket>>{
+        if self.closed{return Err(unavailable());}
+        match self.worker.take_packet(){
+            Ok(packet)=>Ok(packet.map(|packet|UnnegotiatedVideoPacket{owner:self.worker.owner(),packet})),
+            Err(error)=>{self.closed=true;let _=self.worker.close();Err(error)},
+        }
+    }
+    pub fn revoke(&mut self)->Result<()>{
+        if self.closed{return Err(unavailable());}self.closed=true;self.worker.stop_confirmed()
+    }
+}
+impl Drop for WindowsOwnedVideo{fn drop(&mut self){let _=self.worker.close();}}

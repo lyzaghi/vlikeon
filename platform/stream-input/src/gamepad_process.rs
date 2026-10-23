@@ -32,6 +32,7 @@ impl ProcessWitness{
         if identity.creation_time==0{return Err(failure());}Ok(Self{handle,identity})
     }
     pub fn identity(&self)->ProcessIdentity{self.identity}
+    pub(crate) fn native_handle(&self)->BorrowedHandle<'_>{self.handle.as_handle()}
     pub fn exited(&self,expected:ProcessIdentity)->Result<bool>{
         if expected!=self.identity{return Err(failure());}
         // The original kernel process object remains identified after exit,

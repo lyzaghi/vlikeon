@@ -167,3 +167,12 @@ requires both capture/encoder close results. `OWNED_PROTOCOL.md` records the exa
 wire/caller contract. Current Rust typed launch/client still cannot invoke v2;
 native admission/UI, actual receiver/transport integration and all original
 platform/qualification scope remain due. No build, launch, prompt or test ran.
+
+The next source checkpoint connects Rust's typed original-game-handle launcher
+to owned-v2, validates native capture sequence/timestamps/source-age plus local
+RTT, and retains reliable keyframe fences until actual keyframe output. An
+internal `WindowsOwnedVideo` wrapper exposes only unnegotiated output and revoke;
+raw-v1 mailbox injection stays separate. `WINDOWS_VIDEO_SUPERVISION.md` records
+these contracts. Actual installed admission, native authority observation lane,
+service/UI invocation and receiver/transport remain unconnected. Build/test is
+still deferred; no process or media operation was executed.

@@ -59,6 +59,14 @@ keyframe fences and both native Stop results. Rust typed v2 launch/client and
 product admission/UI/receiver/transport remain unconnected; no build, native
 prompt/media operation or test ran. Full remaining scope stays open.
 
+The next item-56 source checkpoint adds Rust owned-v2 launch/client and a private
+owned-video broker wrapper. Only a query/synchronize duplicate of the original
+game handle is inherited beside stdio; native sequence/age/RTT, first keyframe
+and requested keyframe fences are checked before queuing unnegotiated output.
+No actual installed/native observation/service/UI/receiver path invokes it yet.
+No build/test, native dialog, helper launch or capture/media operation ran;
+all original remaining requirements remain open.
+
 This fork's current assignment: items 51 and 52 are accepted with evidence in
 `SAVE_ARCHIVE_INTERCHANGE.md` and `STORAGE_FAULT_QUALIFICATION.md`. On 2026-10-23,
 the owner deferred Linux build/runtime work for item 53, then deferred build/test

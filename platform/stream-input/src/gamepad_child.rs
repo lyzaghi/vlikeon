@@ -4,7 +4,7 @@
 use crate::{failure,gamepad_process::ProcessWitness,system_directory};
 use omniplay_contracts::Result;
 use std::{ffi::OsStr,fs::{File,OpenOptions},mem::{size_of,size_of_val},
-    os::windows::{ffi::OsStrExt,io::{AsHandle,AsRawHandle,FromRawHandle,OwnedHandle}},
+    os::windows::{ffi::OsStrExt,io::{AsHandle,AsRawHandle,BorrowedHandle,FromRawHandle,OwnedHandle}},
     path::Path,ptr::{null,null_mut},sync::Arc};
 use windows_sys::Win32::{Foundation::*,Security::SECURITY_ATTRIBUTES,
     System::{JobObjects::*,Pipes::CreatePipe,Threading::*}};
@@ -68,13 +68,28 @@ pub(crate) struct SuspendedChild{
 pub(crate) enum HelperKind{KeyboardMouse,Gamepad,Video}
 impl SuspendedChild{
     pub(crate) fn launch(executable:&Path,kind:HelperKind)->Result<Self>{
+        Self::launch_with_target(executable,kind,None)
+    }
+    pub(crate) fn launch_owned_video(executable:&Path,target:BorrowedHandle<'_>)->Result<Self>{
+        Self::launch_with_target(executable,HelperKind::Video,Some(target))
+    }
+    fn launch_with_target(executable:&Path,kind:HelperKind,target:Option<BorrowedHandle<'_>>)->Result<Self>{
         if !executable.is_absolute(){return Err(failure());}
         let text=executable.to_str().filter(|value|!value.contains('"')).ok_or_else(failure)?;
         let directory=executable.parent().ok_or_else(failure)?;
         let(child_input,parent_input)=pipe(true)?;let(parent_output,child_output)=pipe(false)?;
         let error=OpenOptions::new().write(true).open("NUL").map_err(|_|failure())?;
         if unsafe{SetHandleInformation(error.as_raw_handle(),HANDLE_FLAG_INHERIT,HANDLE_FLAG_INHERIT)}==0{return Err(failure());}
-        let inherited=[child_input.as_raw_handle(),child_output.as_raw_handle(),error.as_raw_handle()];
+        let game=if let Some(target)=target{
+            let mut duplicate=null_mut();let current=unsafe{GetCurrentProcess()};
+            // The only optional inherited capability is the original native
+            // game object, reduced to query/synchronize. Never accept a raw PID.
+            if unsafe{DuplicateHandle(current,target.as_raw_handle(),current,&mut duplicate,
+                PROCESS_QUERY_LIMITED_INFORMATION|PROCESS_SYNCHRONIZE,1,0)}==0{return Err(failure());}
+            Some(handle(duplicate)?)
+        }else{None};
+        let mut inherited=vec![child_input.as_raw_handle(),child_output.as_raw_handle(),error.as_raw_handle()];
+        if let Some(game)=&game{inherited.push(game.as_raw_handle());}
         let job=handle(unsafe{CreateJobObjectW(null(),null())})?;
         let mut limits=JOBOBJECT_EXTENDED_LIMIT_INFORMATION::default();
         limits.BasicLimitInformation.LimitFlags=JOB_OBJECT_LIMIT_ACTIVE_PROCESS|
@@ -87,7 +102,9 @@ impl SuspendedChild{
         attributes.set(PROC_THREAD_ATTRIBUTE_HANDLE_LIST,&inherited)?;
         attributes.set(PROC_THREAD_ATTRIBUTE_JOB_LIST,&jobs)?;
         let application=wide(executable.as_os_str())?;let directory=wide(directory.as_os_str())?;
-        let argument=match kind{HelperKind::KeyboardMouse=>"--stdio-input-v1",HelperKind::Gamepad=>"--stdio-gamepad-v2",HelperKind::Video=>"--stdio-video-v1"};
+        let argument=if let Some(game)=&game{format!("--stdio-owned-video-v2 {}",game.as_raw_handle()as usize)}else{
+            match kind{HelperKind::KeyboardMouse=>"--stdio-input-v1",HelperKind::Gamepad=>"--stdio-gamepad-v2",HelperKind::Video=>"--stdio-video-v1"}.into()
+        };
         let mut command=wide(OsStr::new(&format!("\"{text}\" {argument}")))?;
         let system=system_directory()?;let system=system.to_str().ok_or_else(failure)?;
         let mut environment=Vec::new();

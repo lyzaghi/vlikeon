@@ -10,8 +10,8 @@ The decimal argument must name an inherited native process handle with query/
 synchronize access. It is NOT a PID. The trusted parent must duplicate the
 original retained game handle with those exact rights, put only that handle
 plus private stdin/stdout/NUL on a creation-time handle allowlist, and retain
-its own original game/helper witnesses and installed file guard. This typed
-owned-v2 launch path and client are not yet implemented in the Rust parent.
+its own original game/helper witnesses and installed file guard. The Rust parent
+now authors this typed owned-v2 launch/client path; it is not product-integrated.
 Never grant broader handle inheritance or accept renderer/peer handle numbers
 to make this mode work. Parent supervision/native lease/admission remain due.
 
@@ -100,9 +100,10 @@ parent termination and remain unconfirmed. No unbounded I/O-thread join is added
 ## Remaining product work
 
 The C++ owned-v2 path connects actual capture, conversion and encoder source.
-Current Rust launch/client/bridge still use raw v1 and do not invoke it. Finish
-typed least-privilege handle launch, v2 request/receipt/age/sequence/keyframe
-validation, native admission/consent/Stop UI, installed packaging, actual codec/
+The Rust source now contains typed least-privilege owned-v2 launch, versioned
+request/receipt/age/sequence/keyframe validation and an internal owned bridge.
+No current service command invokes that bridge. Finish native admission/consent/
+Stop UI, installed packaging, actual codec/
 VUI/receiver negotiation and publication fencing/transport. Application audio,
 other platform services and all original item-56 scope remain open. No build,
 dialog, capture/driver, colour-vector, media or fault test was executed.

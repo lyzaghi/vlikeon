@@ -66,3 +66,45 @@ worker packaging/hash admission, capture/colour conversion, negotiated codec
 translation, receiver/media transport and UI integration, cross-platform service
 paths, provenance/distribution review and every required build/runtime/fault/
 latency/energy qualification. None is waived by these source primitives.
+
+## Owned-window v2 parent source
+
+`VideoWorker::spawn_owned` now supplies a private native HWND bound to the retained
+original game witness, and calls a typed launcher method that duplicates only
+PROCESS_QUERY_LIMITED_INFORMATION/SYNCHRONIZE with inheritance. Its exact numeric
+handle is passed as a fixed-mode argument; only that duplicate and the existing
+three stdio handles enter the creation-time handle list. The original game is
+not assigned to the helper's job and no raw renderer PID supplies authority.
+The parent drops its inheritable duplicate immediately after process creation.
+Helper containment stays one process/512 MiB; raw v1/input/gamepad paths keep
+their existing argument/handle behavior.
+
+Configure sends the immutable 69-byte v2 dictionary and validates the complete
+74-byte success receipt. The consent/setup request allows at most 45 seconds,
+while native lease observations still expire after 200 ms and overall original
+grant time is unchanged. A separate admitted native observer must keep running
+while the local user answers; a long pipe deadline does not grant that authority.
+Explicit Stop during a blocked prompt may need process termination and remains
+unconfirmed without its matching native receipt.
+
+Owned-v2 disallows raw Frame injection and automatically polls encoded output.
+The parent requires accepted capture sequences starting at one and increasing
+exactly by one, nonnegative increasing timestamps and a real first keyframe.
+Reported source age plus the FULL parent Poll round-trip must remain below
+250 ms. That residual budget and the 100 ms local queue budget survive packet
+copy/queue work; packets do not acquire a fresh source deadline on arrival.
+Queue overflow/expiry and malformed/foreign-version data permanently close.
+
+Reliable keyframe request replies yield a bounded monotonic next-frame fence.
+The I/O lane retains up to eight distinct unresolved fences and requires an
+actual keyframe at each fence before accepting that sequence. Repeated requests
+for the same unaccepted frame coalesce. Intent receipts alone do not confirm
+decoder refresh; existing dependent output is preserved in order.
+
+The broker-private `WindowsOwnedVideo` wrapper configures this mode, exposes
+unnegotiated packets/keyframe intent and confirmed revoke, with no raw producer
+API. The previous mailbox/raw-v1 wrapper rejects an owned-mode worker. Neither
+wrapper has a current installed-admission/service command or product caller.
+Final codec/VUI/receiver negotiation, publication fences, native observation and
+consent/Stop UI remain due. No launch, compiler, driver, capture, media, timing or
+test execution occurred for this source checkpoint.
