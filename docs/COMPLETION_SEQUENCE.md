@@ -2,6 +2,13 @@
 
 ## Current sequence — 1–109 outstanding tasks
 
+On the owner's continued source-work/next steering, item 56 now has initial
+private native codec-intersection and bounded raw-frame mailbox source in
+`native_video.rs`. `NATIVE_VIDEO_SERVICE.md` records the independent executable,
+OS encoder/capture backend, transport, authority and qualification still due.
+This does not complete item 55 or 56 and does not enable streaming. All build/test
+execution stays deferred; the original 51–109 scope is retained.
+
 This fork's current assignment: items 51 and 52 are accepted with evidence in
 `SAVE_ARCHIVE_INTERCHANGE.md` and `STORAGE_FAULT_QUALIFICATION.md`. On 2026-10-23,
 the owner deferred Linux build/runtime work for item 53, then deferred build/test

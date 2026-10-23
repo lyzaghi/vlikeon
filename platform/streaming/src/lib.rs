@@ -1,5 +1,6 @@
 #![forbid(unsafe_code)]
 mod protocol;
+pub mod native_video;
 pub use protocol::*;
 
 use omniplay_contracts::{ErrorCode,PlatformError,Result};
