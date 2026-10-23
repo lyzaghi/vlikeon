@@ -93,14 +93,19 @@ pub struct UnpresentedVideoFrame{pub owner:VideoOwner,pub frame:omniplay_stream_
 /// installed admission and native receive/document/pair observation are due.
 pub struct WindowsVideoDecoder{worker:VideoWorker,closed:bool}
 impl WindowsVideoDecoder{
+    pub fn owner(&self)->VideoOwner{self.worker.owner()}
+    pub fn check_authority(&self)->Result<()>{if self.closed{return Err(unavailable());}self.worker.remaining_authorized().map(|_|())}
     pub fn attach(mut worker:VideoWorker,profile:Profile)->Result<Self>{
         profile.validate()?;if !worker.decoder_mode(){return Err(unavailable());}
         worker.configure(VideoProfile{width:profile.width,height:profile.height,fps:profile.fps,bitrate:profile.bitrate_bps,require_hardware:false})?;
         worker.remaining_authorized()?;Ok(Self{worker,closed:false})
     }
     pub fn submit_admitted(&mut self,annex_b:Vec<u8>,timestamp_100ns:i64,receipt:omniplay_stream_input::video_client::DecoderReceipt)->Result<bool>{
+        self.submit_admitted_borrowed(&annex_b,timestamp_100ns,receipt)
+    }
+    pub fn submit_admitted_borrowed(&mut self,annex_b:&[u8],timestamp_100ns:i64,receipt:omniplay_stream_input::video_client::DecoderReceipt)->Result<bool>{
         if self.closed{return Err(unavailable());}
-        match self.worker.submit_compressed(annex_b,timestamp_100ns,receipt){
+        match self.worker.submit_compressed_borrowed(annex_b,timestamp_100ns,receipt){
             Ok(accepted)=>Ok(accepted),Err(error)=>{self.closed=true;let _=self.worker.close();Err(error)},
         }
     }

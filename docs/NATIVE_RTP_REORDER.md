@@ -41,3 +41,9 @@ They use inert layout bytes, not decodable video or an actual network. None ran.
 This is one bounded receive-ordering stage, not a complete jitter/playout buffer,
 audio synchronizer, SRTP session, ICE/TURN transport, decoder or UI. All original
 item-56 service/platform/codec/security/transport/qualification work remains open.
+
+The next source checkpoint adds generic trusted receipt metadata and returns the
+earliest original packet metadata with each assembled unit, including through
+duplicates and sequence wrap. A Windows source bridge uses opaque decoder
+receipts; see `NATIVE_VIDEO_RECEIVE_BRIDGE.md`. One additional metadata source
+case is authored, unexecuted; no current network/product caller exists.

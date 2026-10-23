@@ -27,6 +27,8 @@ pub struct VideoPacket{pub timestamp_100ns:i64,pub keyframe:bool,pub source_sequ
 #[derive(Clone,Copy)]
 pub struct DecoderReceipt{tick:u64,local:Instant}
 impl DecoderReceipt{
+    pub fn local_received_at(self)->Instant{self.local}
+    pub fn within_receive_age(self)->bool{self.live()}
     pub fn at_native_ingress()->Self{
         // Take the boot-clock reading first: both readings stay conservative
         // deadlines, and an interrupted capture cannot make the tick newer.
@@ -238,9 +240,13 @@ impl VideoWorker{
         Ok(packet.map(|value|value.packet))
     }
     pub fn submit_compressed(&mut self,bytes:Vec<u8>,timestamp_100ns:i64,receipt:DecoderReceipt)->Result<bool>{
+        self.submit_compressed_borrowed(&bytes,timestamp_100ns,receipt)
+    }
+    /// Caller retains an unconsumed dependent access unit for an in-order retry.
+    pub fn submit_compressed_borrowed(&mut self,bytes:&[u8],timestamp_100ns:i64,receipt:DecoderReceipt)->Result<bool>{
         if !self.shared.decode||self.profile.is_none()||bytes.is_empty()||bytes.len()>2*1024*1024||!(0..=18_000_000_000).contains(&timestamp_100ns){return Err(failure());}
         if !receipt.live(){self.shared.close();return Err(failure());}
-        let mut payload=Vec::with_capacity(16+bytes.len());payload.extend(timestamp_100ns.to_le_bytes());payload.extend(receipt.tick.to_le_bytes());payload.extend(bytes);
+        let mut payload=Vec::with_capacity(16+bytes.len());payload.extend(timestamp_100ns.to_le_bytes());payload.extend(receipt.tick.to_le_bytes());payload.extend_from_slice(bytes);
         let reply=self.call_with_receipt(FRAME,payload,Duration::from_millis(100),Some(receipt))?;
         match reply.as_slice(){[0,0,0,0]=>Ok(true),[1,0,0,0]=>Ok(false),_=>{self.shared.close();Err(failure())}}
     }

@@ -244,3 +244,10 @@ without a local game handle. A private broker wrapper returns only unpresented
 frames. `WINDOWS_DECODER_SUPERVISION.md` records required ingress/reorder/codec/
 native service and display gaps. No current product path calls v3, and no
 compiler, helper/decoder/media/clock operation or test ran.
+
+The next source checkpoint connects native receipt metadata through RTP ordering/
+assembly to mandatory actual-bitstream admission and retained decoder input.
+It preserves compressed backpressure/age/order and rebases RTP clock wrap into
+bounded decoder time. `NATIVE_VIDEO_RECEIVE_BRIDGE.md` records this source-only
+bridge, four new unexecuted cases and missing real SRTP/native/codec/service/UI
+implementations. No compiler, parser/clock, helper/decoder/media or test ran.

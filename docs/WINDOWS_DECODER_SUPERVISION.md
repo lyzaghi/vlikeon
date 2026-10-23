@@ -54,3 +54,8 @@ Remaining: real installed viewer admission/caller, native receiver authority,
 authenticated ingress/reorder/codec bridge, SRTP/ICE/TURN/RTCP/recovery, display/
 audio/UI and all original platform/device/fault/colour/latency qualification.
 No build, runtime pass or item completion is claimed.
+
+The subsequent source checkpoint adds metadata-preserving ordered assembly and
+a broker-private ingress/reorder/admission/decoder bridge. See
+`NATIVE_VIDEO_RECEIVE_BRIDGE.md`. It still has no actual authenticated ingress
+endpoint, full codec admission implementation or product caller.

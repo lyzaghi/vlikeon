@@ -3,18 +3,20 @@
 use crate::{invalid,unauthorized,native_h264_receive::{checked_sequence,Depacketizer,ReceivedAccessUnit},native_h264_rtp::PacketizationMode};
 use omniplay_contracts::{ErrorCode,PlatformError,Result};
 use std::{collections::BTreeMap,time::{Duration,Instant}};
-struct Queued{bytes:Vec<u8>,received:Instant}
-pub struct OrderedReceiver{
-    receiver:Depacketizer,payload_type:u8,ssrc:u32,next:u16,queue:BTreeMap<u16,Queued>,closed:bool,
+struct Queued<R>{bytes:Vec<u8>,received:Instant,metadata:R}
+pub struct ReceivedWithMetadata<R>{pub frame:ReceivedAccessUnit,pub metadata:R}
+pub struct OrderedReceiver<R=()>{
+    receiver:Depacketizer,payload_type:u8,ssrc:u32,next:u16,queue:BTreeMap<u16,Queued<R>>,closed:bool,
+    earliest:Option<(Instant,R)>,
 }
-impl OrderedReceiver{
+impl<R> OrderedReceiver<R>{
     /// initial_sequence must come from an authenticated capture-generation
     /// boundary. Do not infer it from whichever reordered datagram arrives first.
     pub fn new(mode:PacketizationMode,payload_type:u8,ssrc:u32,initial_sequence:u16,remaining:Duration)->Result<Self>{
         Ok(Self{receiver:Depacketizer::new(mode,payload_type,ssrc,remaining)?,payload_type,ssrc,next:initial_sequence,
-            queue:BTreeMap::new(),closed:false})
+            queue:BTreeMap::new(),closed:false,earliest:None})
     }
-    pub fn close(&mut self){self.closed=true;self.queue.clear();self.receiver.close();}
+    pub fn close(&mut self){self.closed=true;self.queue.clear();self.earliest=None;self.receiver.close();}
     fn check(&mut self,now:Instant)->Result<()>{
         if self.closed||self.queue.values().any(|value|now.duration_since(value.received)>Duration::from_millis(50)){
             self.close();return Err(unauthorized());
@@ -28,11 +30,13 @@ impl OrderedReceiver{
     /// duplicates/old retransmits yield no output, not renewed wait/age budgets.
     /// A conflicting duplicate, oversized jump, expired gap or buffer failure
     /// closes the generation. Missing dependencies are never silently skipped.
-    pub fn push(&mut self,bytes:&[u8])->Result<Vec<ReceivedAccessUnit>>{
-        let result=self.receive(bytes,Instant::now());if result.is_err(){self.close();}result
+    pub fn push_stamped(&mut self,bytes:&[u8],received:Instant,metadata:R)->Result<Vec<ReceivedWithMetadata<R>>>{
+        let result=self.receive(bytes,received,metadata);if result.is_err(){self.close();}result
     }
-    fn receive(&mut self,bytes:&[u8],received:Instant)->Result<Vec<ReceivedAccessUnit>>{
-        self.check(received)?;let sequence=checked_sequence(bytes,self.payload_type,self.ssrc)?;
+    fn receive(&mut self,bytes:&[u8],received:Instant,metadata:R)->Result<Vec<ReceivedWithMetadata<R>>>{
+        let now=Instant::now();self.check(now)?;
+        if received>now||now.duration_since(received)>Duration::from_millis(100){return Err(invalid());}
+        let sequence=checked_sequence(bytes,self.payload_type,self.ssrc)?;
         let distance=sequence.wrapping_sub(self.next);
         if distance>=0x8000{return Ok(Vec::new());} // Old authenticated retransmission.
         if distance>=64{return Err(invalid());}
@@ -41,17 +45,27 @@ impl OrderedReceiver{
         }
         if self.queue.len()>=64{return Err(invalid());}
         let mut owned=Vec::new();owned.try_reserve_exact(bytes.len()).map_err(|_|resource())?;owned.extend_from_slice(bytes);
-        self.queue.insert(sequence,Queued{bytes:owned,received});
+        self.queue.insert(sequence,Queued{bytes:owned,received,metadata});
         let mut frames=Vec::new();frames.try_reserve_exact(4).map_err(|_|resource())?;
         while let Some(packet)=self.queue.remove(&self.next){
+            // Keep only one original receipt for the current unit, plus each
+            // still-buffered packet's bounded metadata. No unbounded side map.
+            if self.earliest.as_ref().is_none_or(|(time,_)|packet.received<*time){self.earliest=Some((packet.received,packet.metadata));}
             if let Some(frame)=self.receiver.push_received(&packet.bytes,packet.received)?{
-                if frames.len()>=4{return Err(invalid());}frames.push(frame);
+                let(time,metadata)=self.earliest.take().ok_or_else(invalid)?;
+                if frames.len()>=4||time!=frame.received_at{return Err(invalid());}
+                frames.push(ReceivedWithMetadata{frame,metadata});
             }
             self.next=self.next.wrapping_add(1);
         }
         let now=Instant::now();self.check(now)?;
-        if frames.iter().any(|frame|now.duration_since(frame.received_at)>Duration::from_millis(100)){return Err(unauthorized());}
+        if frames.iter().any(|value|now.duration_since(value.frame.received_at)>Duration::from_millis(100)){return Err(unauthorized());}
         Ok(frames)
+    }
+}
+impl OrderedReceiver<()>{
+    pub fn push(&mut self,bytes:&[u8])->Result<Vec<ReceivedAccessUnit>>{
+        Ok(self.push_stamped(bytes,Instant::now(),())?.into_iter().map(|value|value.frame).collect())
     }
 }
 fn resource()->PlatformError{PlatformError::new(ErrorCode::ResourceLimit,"The native RTP reorder budget is unavailable")}
@@ -92,5 +106,14 @@ mod tests{
     #[test]fn old_authenticated_retransmit_is_not_delivered_twice(){
         let mut receiver=receiver();let packets=packets();for packet in &packets{receiver.push(packet).unwrap();}
         assert!(receiver.push(&packets[0]).unwrap().is_empty());assert!(receiver.tick().is_ok());
+    }
+    #[test]fn earliest_original_metadata_survives_reorder_and_duplicate(){
+        let mut receiver:OrderedReceiver<u8>=OrderedReceiver::new(PacketizationMode::NonInterleaved,102,17,65535,Duration::from_secs(30)).unwrap();
+        let packets=packets();let first=Instant::now();
+        assert!(receiver.push_stamped(&packets[1],first,7).unwrap().is_empty());
+        assert!(receiver.push_stamped(&packets[1],Instant::now(),99).unwrap().is_empty());
+        assert!(receiver.push_stamped(&packets[0],Instant::now(),8).unwrap().is_empty());
+        let result=receiver.push_stamped(&packets[2],Instant::now(),9).unwrap();
+        assert_eq!(result.len(),1);assert_eq!(result[0].metadata,7);assert_eq!(result[0].frame.received_at,first);
     }
 }
