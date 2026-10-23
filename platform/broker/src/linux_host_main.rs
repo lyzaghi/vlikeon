@@ -13,7 +13,20 @@ fn run()->omniplay_contracts::Result<()> {
     if !shape.is_file()||shape.uid()!=unsafe{libc::geteuid()}||shape.mode()&0o7777!=0o600||shape.nlink()!=1{return Err(omniplay_contracts::PlatformError::new(omniplay_contracts::ErrorCode::RuntimeUnavailable,"The Linux native-host lease is not private"));}
     let policy=HostPolicy{maximum_profiles:4,profile:DelegationPolicy{maximum_sessions:4,maximum_reserved_bytes:14*1024*1024*1024},cpu_cores:8};
     let host=NativeHostRoot::discover(lease,policy)?;let listener=linux_host_channel::systemd_listener(&socket)?;let mut idle=0u8;
-    loop{if linux_host_channel::wait(&listener,std::time::Duration::from_secs(60))?{linux_host_channel::serve_one(&listener,&host)?;idle=0;}else if host.quiescent()?{idle+=1;if idle>=5{return Ok(());}}else{idle=0;}}
+    loop{
+        if linux_host_channel::wait(&listener,std::time::Duration::from_secs(60))?{
+            linux_host_channel::serve_one(&listener,&host)?;idle=0;
+        }else{
+            // Unreadable resource state is not proof of an empty delegated
+            // tree. Keep the host alive instead of exiting into service-manager
+            // teardown of possibly active sessions. New grants still require
+            // the independent full inventory/admission in provision_profile.
+            match host.quiescent(){
+                Ok(true)=>{idle+=1;if idle>=5{return Ok(());}},
+                Ok(false)|Err(_)=>idle=0,
+            }
+        }
+    }
 }
 
 #[cfg(all(target_os="linux",target_arch="x86_64",target_env="gnu"))]

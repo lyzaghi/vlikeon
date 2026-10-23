@@ -10,8 +10,11 @@ work. This document tracks Linux implementation separately from execution.
   socket-activation admission. Propagate cgroup basename query errors before
   comparing the exact service/manager names.
 - Keep a malformed, disconnected or refused client from terminating the shared
-  native host. Listener and resource/quiescence admission errors remain fatal;
-  no alternative delegation or weaker grant is introduced.
+  native host. An unknown quiescence observation resets idle retirement instead
+  of counting as empty or exiting into service-manager teardown. New grants
+  still require the full independent resource inventory; no alternative
+  delegation or weaker grant is introduced. Listener failure remains fatal and
+  requires dedicated process-tree fault qualification.
 - Align ancillary buffers and adopt every received descriptor before rejecting
   extra descriptors, malformed replies or early EOF. Support fragmented stream
   replies without sending the same descriptor twice. Received cgroup authority
@@ -62,6 +65,13 @@ blocked by missing dbus development headers in the disposable runner, not a
 reported Rust source error at that stage. Bootstrap compilation reached a missing
 `sys/wait.h` declaration for WEXITED. Both are addressed in the next source;
 bootstrap build and full runtime/broker compilation remain pending new evidence.
+
+Batch039 source2008e16 now builds the static-pie C bootstrap successfully and
+repeats all eight socket passes. The broader broker check next encountered
+missing Wayland development headers, required by rfd's existing default feature.
+The next workflow supplies that SDK package too; no Cargo feature or isolation
+policy is removed to bypass the missing prerequisite. This is compilation and
+userland socket evidence, not an actual sandboxed launch on the runner.
 
 Antigravity executes only Codex-released batches on frozen inputs. Codex owns
 review, diagnosis, source/test edits and acceptance decisions. No source-copy,

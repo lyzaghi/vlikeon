@@ -38,8 +38,8 @@ jobs:
       - name: Provision broker development headers in disposable runner
         run: |
           sudo apt-get update
-          sudo apt-get install --yes --no-install-recommends libdbus-1-dev pkg-config
-          dpkg-query -W libdbus-1-dev pkg-config
+          sudo apt-get install --yes --no-install-recommends libdbus-1-dev libwayland-dev pkg-config
+          dpkg-query -W libdbus-1-dev libwayland-dev pkg-config
       - name: Compile Linux runtime and both broker executables
         run: cargo +1.89.0 check --locked -p omniplay-native-runtime -p omniplay-broker --all-targets
       - name: Confirm tracked source stayed unchanged
