@@ -1,0 +1,16 @@
+AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
++ actual - expected
+
++ undefined
+- 'resource_limit'
+
+    at E:\V10\work\vlikeon-items-50-109-01a16780\source-052c\qa\browser\storage-faults.cjs:82:17
+    at async mark (E:\V10\work\vlikeon-items-50-109-01a16780\source-052c\qa\browser\storage-faults.cjs:42:34)
+    at async main (E:\V10\work\vlikeon-items-50-109-01a16780\source-052c\qa\browser\storage-faults.cjs:75:5) {
+  generatedMessage: true,
+  code: 'ERR_ASSERTION',
+  actual: undefined,
+  expected: 'resource_limit',
+  operator: 'strictEqual',
+  diff: 'simple'
+}

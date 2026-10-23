@@ -1,0 +1,39 @@
+{
+  "item": 52,
+  "batch": "052e",
+  "scope": "Web storage faults; physical full disk remains pending",
+  "executor": "antigravity",
+  "source_manifest_sha256": "5f7449048d3ad97f92575c66d31518b7c915639aa37384cd17563e0c5bf2452a",
+  "inherited_native": {
+    "batch": "052a",
+    "compared_files": 184,
+    "source_manifest_sha256": "e7e299605a6617e371777e2d8519637446d4e31795276f65eed9f13aa6b1ef31"
+  },
+  "started_at": "2026-10-23T10:06:36.726Z",
+  "runner_pid": 18700,
+  "cases": [
+    {
+      "id": "assemble-web",
+      "args": [
+        "-B",
+        "tools/assemble_web.py",
+        "--without-cores"
+      ],
+      "exit_code": 0,
+      "elapsed_ms": 520,
+      "status": "passed"
+    },
+    {
+      "id": "web-storage-faults",
+      "args": [
+        "qa/browser/storage-faults.cjs"
+      ],
+      "exit_code": 0,
+      "elapsed_ms": 8413,
+      "status": "passed"
+    }
+  ],
+  "source_unchanged": true,
+  "status": "passed",
+  "finished_at": "2026-10-23T10:06:45.860Z"
+}

@@ -1,0 +1,15 @@
+const fs=require('node:fs'),path=require('node:path'),crypto=require('node:crypto'),{spawnSync}=require('node:child_process');
+const base=__dirname,source=base+'/source-052e',output=base+'/runs/052e',python='C:/Users/lyzag/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/python.exe';
+const hash=file=>crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex'),manifest=JSON.parse(fs.readFileSync(base+'/source-052e.json','utf8')),previous=JSON.parse(fs.readFileSync(base+'/source-052a.json','utf8'));
+const unchanged=()=>Object.entries(manifest.sha256).every(([name,sha])=>hash(path.join(source,name))===sha);
+if(fs.existsSync(output)||!unchanged())throw Error('Fresh output and immutable source required');fs.mkdirSync(output,{recursive:true});
+const nativeNames=[...new Set([...Object.keys(manifest.sha256),...Object.keys(previous.sha256)])].filter(name=>name.startsWith('platform/')||['Cargo.toml','Cargo.lock','qa/windows/storage-faults.cjs'].includes(name));
+const priorResult=JSON.parse(fs.readFileSync(base+'/runs/052a/result.json','utf8'));if(priorResult.status!=='passed'||nativeNames.some(name=>previous.sha256[name]!==manifest.sha256[name]))throw Error('Native inputs changed; new native tests required');
+const env={...process.env,PYTHONDONTWRITEBYTECODE:'1',VLIKEON_QA_OUTPUT:output,VLIKEON_WEB_BUNDLE:source+'/out/web',VLIKEON_CHROME:'C:/Program Files/Google/Chrome/Application/chrome.exe',VLIKEON_PLAYWRIGHT_MODULE:'C:/Users/lyzag/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright'};
+const report={item:52,batch:'052e',scope:'Web storage faults; physical full disk remains pending',executor:'antigravity',source_manifest_sha256:hash(base+'/source-052e.json'),inherited_native:{batch:'052a',compared_files:nativeNames.length,source_manifest_sha256:hash(base+'/source-052a.json')},started_at:new Date().toISOString(),runner_pid:process.pid,cases:[]};fs.writeFileSync(output+'/running.json',JSON.stringify(report,null,2));
+function run(id,command,args,timeout=180000){const start=Date.now(),result=spawnSync(command,args,{cwd:source,env,encoding:'utf8',windowsHide:true,timeout,maxBuffer:8*1024*1024});fs.writeFileSync(output+'/'+id+'.stdout.log',result.stdout??'');fs.writeFileSync(output+'/'+id+'.stderr.log',result.stderr??'');const passed=!result.error&&result.status===0;report.cases.push({id,args,exit_code:result.status,error:result.error?.message,elapsed_ms:Date.now()-start,status:passed?'passed':'failed'});fs.writeFileSync(output+'/progress.json',JSON.stringify(report,null,2));return passed;}
+if(run('assemble-web',python,['-B','tools/assemble_web.py','--without-cores']))run('web-storage-faults',process.execPath,['qa/browser/storage-faults.cjs']);
+report.source_unchanged=unchanged();report.status=report.source_unchanged&&report.cases.length===2&&report.cases.every(value=>value.status==='passed')?'passed':'failed';report.finished_at=new Date().toISOString();fs.writeFileSync(output+'/result.json',JSON.stringify(report,null,2));console.log(JSON.stringify(report));process.exitCode=report.status==='passed'?0:1;
+
+
+

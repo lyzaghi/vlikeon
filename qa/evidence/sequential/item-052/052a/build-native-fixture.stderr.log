@@ -1,0 +1,80 @@
+   Compiling proc-macro2 v1.0.107
+   Compiling unicode-ident v1.0.27
+   Compiling quote v1.0.47
+   Compiling version_check v0.9.5
+   Compiling generic-array v0.14.7
+   Compiling typenum v1.20.1
+   Compiling cfg-if v1.0.5
+   Compiling serde_core v1.0.229
+   Compiling crypto-common v0.1.7
+   Compiling block-buffer v0.10.4
+   Compiling syn v3.0.9
+   Compiling find-msvc-tools v0.1.15
+   Compiling semver v1.0.28
+   Compiling shlex v2.0.1
+   Compiling cc v1.9.0
+   Compiling rustc_version v0.4.1
+   Compiling digest v0.10.7
+   Compiling zmij v1.0.23
+   Compiling pkg-config v0.3.34
+   Compiling cpufeatures v0.2.17
+   Compiling getrandom v0.4.3
+   Compiling vcpkg v0.2.15
+   Compiling curve25519-dalek v4.1.3
+   Compiling syn v2.0.119
+   Compiling libsqlite3-sys v0.38.2
+   Compiling thiserror v2.0.20
+   Compiling serde v1.0.229
+   Compiling serde_json v1.0.151
+   Compiling foldhash v0.2.0
+   Compiling hashbrown v0.17.1
+   Compiling curve25519-dalek-derive v0.1.1
+   Compiling sha2 v0.10.9
+   Compiling serde_derive v1.0.229
+   Compiling thiserror-impl v2.0.20
+   Compiling signature v2.2.0
+   Compiling itoa v1.0.18
+   Compiling memchr v2.8.3
+   Compiling zeroize v1.8.2
+   Compiling subtle v2.6.1
+   Compiling ed25519 v2.2.3
+   Compiling uuid v1.25.0
+   Compiling hashlink v0.12.2
+   Compiling bitflags v2.13.2
+   Compiling fallible-streaming-iterator v0.1.9
+   Compiling smallvec v1.16.3
+   Compiling fallible-iterator v0.3.0
+   Compiling omniplay-contracts v0.1.0 (E:\V10\work\vlikeon-items-50-109-01a16780\source-052a\platform\contracts)
+   Compiling rusqlite v0.40.2
+   Compiling ed25519-dalek v2.2.0
+   Compiling encoding_rs v0.8.35
+   Compiling base64 v0.22.1
+   Compiling omniplay-core v0.1.0 (E:\V10\work\vlikeon-items-50-109-01a16780\source-052a\platform\core)
+warning: unused import: `io::Write`
+ --> platform\core\src\firmware.rs:5:34
+  |
+5 | use std::{fs::{File,OpenOptions},io::Write};
+  |                                  ^^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` on by default
+
+warning: variable does not need to be mutable
+  --> platform\core\src\save_payloads.rs:35:19
+   |
+35 |     if create{let mut builder=fs::DirBuilder::new();
+   |                   ----^^^^^^^
+   |                   |
+   |                   help: remove this `mut`
+   |
+   = note: `#[warn(unused_mut)]` on by default
+
+warning: variable does not need to be mutable
+  --> platform\core\src\save_orphan_recovery.rs:40:66
+   |
+40 |     let lease=save_payloads::lease(&database.root)?;let(metadata,mut file)={let tx=Transaction::new_unchecked(&database.connection,Transa...
+   |                                                                  ----^^^^
+   |                                                                  |
+   |                                                                  help: remove this `mut`
+
+warning: `omniplay-core` (lib) generated 3 warnings (run `cargo fix --lib -p omniplay-core` to apply 2 suggestions)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 42.67s

@@ -1,0 +1,95 @@
+{
+  "item": 52,
+  "scope": "Web IDB upgrades, abort, browser quota and renderer crash",
+  "status": "passed",
+  "cases": [
+    {
+      "id": "fresh-idb-schema-nine",
+      "status": "passed"
+    },
+    {
+      "id": "idb-1-to-nine-preserves-data",
+      "status": "passed"
+    },
+    {
+      "id": "idb-2-to-nine-preserves-data",
+      "status": "passed"
+    },
+    {
+      "id": "idb-3-to-nine-preserves-data",
+      "status": "passed"
+    },
+    {
+      "id": "idb-4-to-nine-preserves-data",
+      "status": "passed"
+    },
+    {
+      "id": "idb-5-to-nine-preserves-data",
+      "status": "passed"
+    },
+    {
+      "id": "idb-6-to-nine-preserves-data",
+      "status": "passed"
+    },
+    {
+      "id": "idb-7-to-nine-preserves-data",
+      "status": "passed"
+    },
+    {
+      "id": "idb-8-to-nine-preserves-data",
+      "status": "passed"
+    },
+    {
+      "id": "migration-abort-retains-old-schema-and-blob",
+      "status": "passed"
+    },
+    {
+      "id": "blocked-upgrade-rejects-and-retries-after-old-tab-close",
+      "status": "passed"
+    },
+    {
+      "id": "version-change-closes-old-store-and-future-schema-is-preserved",
+      "status": "passed"
+    },
+    {
+      "id": "abort-real-save-publication-rolls-back-all-stores",
+      "status": "passed"
+    },
+    {
+      "id": "real-browser-quota-error-preserves-save-and-retries",
+      "status": "passed"
+    },
+    {
+      "id": "renderer-crash-before-commit-rolls-back",
+      "status": "passed"
+    },
+    {
+      "id": "renderer-crash-after-commit-retains-write",
+      "status": "passed"
+    }
+  ],
+  "browser": "155.0.8059.85",
+  "quota_before_seed": {
+    "usage": 0,
+    "quota": 5242880,
+    "overrideActive": true,
+    "usageBreakdown": [
+      {
+        "storageType": "file_systems",
+        "usage": 0
+      },
+      {
+        "storageType": "indexeddb",
+        "usage": 0
+      },
+      {
+        "storageType": "cache_storage",
+        "usage": 0
+      },
+      {
+        "storageType": "service_workers",
+        "usage": 0
+      }
+    ]
+  }
+}

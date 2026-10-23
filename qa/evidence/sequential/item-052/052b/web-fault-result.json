@@ -1,0 +1,57 @@
+{
+  "item": 52,
+  "scope": "Web IDB upgrades, abort, browser quota and renderer crash",
+  "status": "failed",
+  "cases": [
+    {
+      "id": "fresh-idb-schema-nine",
+      "status": "passed"
+    },
+    {
+      "id": "idb-1-to-nine-preserves-data",
+      "status": "passed"
+    },
+    {
+      "id": "idb-2-to-nine-preserves-data",
+      "status": "passed"
+    },
+    {
+      "id": "idb-3-to-nine-preserves-data",
+      "status": "passed"
+    },
+    {
+      "id": "idb-4-to-nine-preserves-data",
+      "status": "passed"
+    },
+    {
+      "id": "idb-5-to-nine-preserves-data",
+      "status": "passed"
+    },
+    {
+      "id": "idb-6-to-nine-preserves-data",
+      "status": "passed"
+    },
+    {
+      "id": "idb-7-to-nine-preserves-data",
+      "status": "passed"
+    },
+    {
+      "id": "idb-8-to-nine-preserves-data",
+      "status": "passed"
+    },
+    {
+      "id": "migration-abort-retains-old-schema-and-blob",
+      "status": "passed"
+    },
+    {
+      "id": "blocked-upgrade-rejects-and-retries-after-old-tab-close",
+      "status": "passed"
+    },
+    {
+      "id": "version-change-closes-old-store-and-future-schema-is-preserved",
+      "status": "passed"
+    }
+  ],
+  "browser": "155.0.8059.85",
+  "error": "AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:\n+ actual - expected\n\n+ 'storage_failure'\n- 'cancelled'\n\n    at E:\\V10\\work\\vlikeon-items-50-109-01a16780\\source-052b\\qa\\browser\\storage-faults.cjs:73:17\n    at async mark (E:\\V10\\work\\vlikeon-items-50-109-01a16780\\source-052b\\qa\\browser\\storage-faults.cjs:42:34)\n    at async main (E:\\V10\\work\\vlikeon-items-50-109-01a16780\\source-052b\\qa\\browser\\storage-faults.cjs:69:5)"
+}

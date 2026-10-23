@@ -95,7 +95,7 @@ export class Store {
       // Bodies may await IDB requests only. Hashing, file reads, timers and
       // network work must finish before starting this transaction.
       const value=await body(context);await completed;return value;
-    }catch(error){abort();await completed.catch(()=>{});throw storageError(error);}
+    }catch(error){abort();await completed.catch(()=>{});checkAbort(signal);throw storageError(error);}
     finally{signal?.removeEventListener('abort',abort);}
   }
   async config(key,fallback=null){const value=await this.transaction(['config'],'readonly',tx=>tx.get('config',key));return value?.value??fallback;}

@@ -1,0 +1,38 @@
+{
+  "item": 52,
+  "batch": "052a",
+  "scope": "Native crash/abort/migration/SQLite capacity only; not physical full disk",
+  "executor": "antigravity",
+  "source_manifest_sha256": "e7e299605a6617e371777e2d8519637446d4e31795276f65eed9f13aa6b1ef31",
+  "started_at": "2026-10-23T09:41:19.935Z",
+  "runner_pid": 13904,
+  "cases": [
+    {
+      "id": "build-native-fixture",
+      "args": [
+        "build",
+        "-p",
+        "omniplay-core",
+        "--example",
+        "storage_faults",
+        "--locked",
+        "--offline"
+      ],
+      "exit_code": 0,
+      "elapsed_ms": 42850,
+      "status": "passed"
+    },
+    {
+      "id": "native-storage-faults",
+      "args": [
+        "qa/windows/storage-faults.cjs"
+      ],
+      "exit_code": 0,
+      "elapsed_ms": 5160,
+      "status": "passed"
+    }
+  ],
+  "source_unchanged": true,
+  "status": "passed",
+  "finished_at": "2026-10-23T09:42:08.175Z"
+}

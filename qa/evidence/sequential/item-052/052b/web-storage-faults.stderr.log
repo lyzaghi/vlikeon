@@ -1,0 +1,16 @@
+AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
++ actual - expected
+
++ 'storage_failure'
+- 'cancelled'
+
+    at E:\V10\work\vlikeon-items-50-109-01a16780\source-052b\qa\browser\storage-faults.cjs:73:17
+    at async mark (E:\V10\work\vlikeon-items-50-109-01a16780\source-052b\qa\browser\storage-faults.cjs:42:34)
+    at async main (E:\V10\work\vlikeon-items-50-109-01a16780\source-052b\qa\browser\storage-faults.cjs:69:5) {
+  generatedMessage: true,
+  code: 'ERR_ASSERTION',
+  actual: 'storage_failure',
+  expected: 'cancelled',
+  operator: 'strictEqual',
+  diff: 'simple'
+}

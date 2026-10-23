@@ -19,3 +19,8 @@ encoding_rs = "=0.8.35"
 
 [target.'cfg(unix)'.dependencies]
 libc = "=0.2.191"
+
+# QA examples pause actual save transactions at TEMP triggers. Product builds
+# do not enable SQL callbacks through this development-only dependency.
+[dev-dependencies]
+rusqlite = { workspace = true, features = ["functions"] }

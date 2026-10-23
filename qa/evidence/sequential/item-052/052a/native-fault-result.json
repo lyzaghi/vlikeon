@@ -1,0 +1,119 @@
+{
+  "item": 52,
+  "scope": "native crash/abort/SQLite capacity/migrations",
+  "status": "passed",
+  "cases": [
+    {
+      "id": "schema-0-to-15-preserves-data-and-reopen",
+      "status": "passed"
+    },
+    {
+      "id": "schema-1-to-15-preserves-data-and-reopen",
+      "status": "passed"
+    },
+    {
+      "id": "schema-2-to-15-preserves-data-and-reopen",
+      "status": "passed"
+    },
+    {
+      "id": "schema-3-to-15-preserves-data-and-reopen",
+      "status": "passed"
+    },
+    {
+      "id": "schema-4-to-15-preserves-data-and-reopen",
+      "status": "passed"
+    },
+    {
+      "id": "schema-5-to-15-preserves-data-and-reopen",
+      "status": "passed"
+    },
+    {
+      "id": "schema-6-to-15-preserves-data-and-reopen",
+      "status": "passed"
+    },
+    {
+      "id": "schema-7-to-15-preserves-data-and-reopen",
+      "status": "passed"
+    },
+    {
+      "id": "schema-8-to-15-preserves-data-and-reopen",
+      "status": "passed"
+    },
+    {
+      "id": "schema-9-to-15-preserves-data-and-reopen",
+      "status": "passed"
+    },
+    {
+      "id": "schema-10-to-15-preserves-data-and-reopen",
+      "status": "passed"
+    },
+    {
+      "id": "schema-11-to-15-preserves-data-and-reopen",
+      "status": "passed"
+    },
+    {
+      "id": "schema-12-to-15-preserves-data-and-reopen",
+      "status": "passed"
+    },
+    {
+      "id": "schema-13-to-15-preserves-data-and-reopen",
+      "status": "passed"
+    },
+    {
+      "id": "schema-14-to-15-preserves-data-and-reopen",
+      "status": "passed"
+    },
+    {
+      "id": "schema-15-to-15-preserves-data-and-reopen",
+      "status": "passed"
+    },
+    {
+      "id": "migration-10-sqlite-full-rollback-and-retry",
+      "status": "passed"
+    },
+    {
+      "id": "migration-11-sqlite-full-rollback-and-retry",
+      "status": "passed"
+    },
+    {
+      "id": "migration-12-sqlite-full-rollback-and-retry",
+      "status": "passed"
+    },
+    {
+      "id": "migration-13-sqlite-full-rollback-and-retry",
+      "status": "passed"
+    },
+    {
+      "id": "publication-abort-rollback-cleanup-retry",
+      "status": "passed"
+    },
+    {
+      "id": "publication-sqlite_full-rollback-cleanup-retry",
+      "status": "passed"
+    },
+    {
+      "id": "process-crash-reservation",
+      "status": "passed"
+    },
+    {
+      "id": "process-crash-payload_synced",
+      "status": "passed"
+    },
+    {
+      "id": "process-crash-metadata_inserted",
+      "status": "passed"
+    },
+    {
+      "id": "process-crash-pointer_published",
+      "status": "passed"
+    },
+    {
+      "id": "process-crash-head_updated",
+      "status": "passed"
+    },
+    {
+      "id": "process-crash-committed",
+      "status": "passed"
+    }
+  ]
+}
