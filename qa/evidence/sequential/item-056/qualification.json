@@ -16,7 +16,8 @@
     "Owned-v2 C++ worker source connects WGC, explicit SDR conversion and MF with inherited game handle, host-alive fences, capture sequence/age, reliable keyframe fence and combined Stop receipts",
     "Rust typed least-privilege original-game-handle owned-v2 launch/client, native sequence/age plus full RTT admission, keyframe-fence validation and private owned-video broker wrapper; no current product caller or execution evidence",
     "Typed exact-owner/document/capture/pair native observations and singleton independent observation-lane source; actual native observer implementation and service caller remain missing",
-    "Four additional native-authority admission test sources (separate from eight colour cases), none executed"
+    "Four additional native-authority admission test sources (separate from eight colour cases), none executed",
+    "Fixed installed-worker inventory/hash/current-broker admission, retained ancestor/file guards and private prepared-capture one-attempt launch handoff; no current service caller or executed admission"
   ],
   "static_review": "Source review and git diff whitespace check only",
   "build_executed": false,

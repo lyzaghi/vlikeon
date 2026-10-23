@@ -11,7 +11,7 @@ use windows_sys::Win32::{Foundation::*,System::{IO::CancelSynchronousIo,Threadin
 
 const CONFIGURE:u16=1;const FRAME:u16=2;const POLL:u16=3;const STOP:u16=4;const KEYFRAME:u16=5;
 static LIVE:AtomicBool=AtomicBool::new(false);
-static RETAINED:OnceLock<(Arc<ChildProcess>,File)>=OnceLock::new();
+static RETAINED:OnceLock<(Arc<ChildProcess>,File,Vec<File>)>=OnceLock::new();
 struct Permit{release:bool}
 impl Permit{fn acquire()->Result<Self>{LIVE.compare_exchange(false,true,Ordering::AcqRel,Ordering::Acquire).map_err(|_|failure())?;Ok(Self{release:true})}}
 impl Drop for Permit{fn drop(&mut self){if self.release{LIVE.store(false,Ordering::Release);}}}
@@ -27,14 +27,14 @@ struct Packets{queue:VecDeque<Queued>,bytes:usize}
 struct Lease{sequence:u64,deadline:Instant}
 struct Shared{
     process:Arc<ChildProcess>,target:ProcessWitness,owner:VideoOwner,deadline:Instant,window:Option<u64>,
-    _permit:Permit,artifact:Option<File>,closed:AtomicBool,revoking:AtomicBool,
+    _permit:Permit,artifact:Option<File>,installation_guards:Vec<File>,closed:AtomicBool,revoking:AtomicBool,
     lease:Mutex<Lease>,stop_deadline:Mutex<Option<Instant>>,pending:Mutex<Option<Instant>>,
     packets:Mutex<Packets>,io:OnceLock<OwnedHandle>,
 }
 impl Drop for Shared{fn drop(&mut self){
     if !self.process.exited().unwrap_or(false){
         self._permit.release=false;
-        if let Some(artifact)=self.artifact.take(){if let Err(value)=RETAINED.set((self.process.clone(),artifact)){std::mem::forget(value);}}
+        if let Some(artifact)=self.artifact.take(){if let Err(value)=RETAINED.set((self.process.clone(),artifact,std::mem::take(&mut self.installation_guards))){std::mem::forget(value);}}
     }
 }}
 impl Shared{
@@ -116,21 +116,26 @@ fn thread_handle(thread:&JoinHandle<()>)->Result<OwnedHandle>{
 }
 impl VideoWorker{
     pub fn spawn(executable:&Path,artifact:File,sha256:ContentHash,owner:VideoOwner,target:ProcessWitness,remaining:Duration)->Result<(Self,VideoAuthorityLease)>{
-        Self::spawn_mode(executable,artifact,sha256,owner,target,remaining,None)
+        Self::spawn_mode(executable,artifact,sha256,owner,target,remaining,None,Vec::new())
     }
     /// The HWND is private native capture context, not renderer authority.
     /// Native WGC confirmation remains mandatory inside the v2 worker.
     pub fn spawn_owned(executable:&Path,artifact:File,sha256:ContentHash,owner:VideoOwner,target:ProcessWitness,window:u64,remaining:Duration)->Result<(Self,VideoAuthorityLease)>{
+        Self::spawn_owned_guarded(executable,artifact,Vec::new(),sha256,owner,target,window,remaining)
+    }
+    /// Native installed admission supplies non-delete-sharing ancestor guards;
+    /// retain them through I/O retirement, including an unknown-exit tombstone.
+    pub fn spawn_owned_guarded(executable:&Path,artifact:File,guards:Vec<File>,sha256:ContentHash,owner:VideoOwner,target:ProcessWitness,window:u64,remaining:Duration)->Result<(Self,VideoAuthorityLease)>{
         let mut pid=0;
         if window==0||unsafe{windows_sys::Win32::UI::WindowsAndMessaging::GetWindowThreadProcessId(window as usize as HWND,&mut pid)}==0||pid!=target.identity().process_id{return Err(failure());}
-        Self::spawn_mode(executable,artifact,sha256,owner,target,remaining,Some(window))
+        Self::spawn_mode(executable,artifact,sha256,owner,target,remaining,Some(window),guards)
     }
-    fn spawn_mode(executable:&Path,artifact:File,sha256:ContentHash,owner:VideoOwner,target:ProcessWitness,remaining:Duration,window:Option<u64>)->Result<(Self,VideoAuthorityLease)>{
+    fn spawn_mode(executable:&Path,artifact:File,sha256:ContentHash,owner:VideoOwner,target:ProcessWitness,remaining:Duration,window:Option<u64>,installation_guards:Vec<File>)->Result<(Self,VideoAuthorityLease)>{
         if !owner.valid()||remaining.is_zero()||remaining>Duration::from_secs(1800)||target.exited(target.identity())?||ContentHash::parse(sha256.0.clone()).is_err(){return Err(failure());}
         let permit=Permit::acquire()?;let now=Instant::now();
         let child=if window.is_some(){SuspendedChild::launch_owned_video(executable,target.native_handle())?}else{SuspendedChild::launch(executable,HelperKind::Video)?};
         let(process,primary,input,output)=child.into_parts();
-        let shared=Arc::new(Shared{process,target,owner,deadline:now+remaining,window,_permit:permit,artifact:Some(artifact),
+        let shared=Arc::new(Shared{process,target,owner,deadline:now+remaining,window,_permit:permit,artifact:Some(artifact),installation_guards,
             closed:AtomicBool::new(false),revoking:AtomicBool::new(false),lease:Mutex::new(Lease{sequence:0,deadline:now+Duration::from_millis(300)}),
             stop_deadline:Mutex::new(None),pending:Mutex::new(None),packets:Mutex::new(Packets{queue:VecDeque::new(),bytes:0}),io:OnceLock::new()});
         let(sender,receiver)=mpsc::sync_channel(1);

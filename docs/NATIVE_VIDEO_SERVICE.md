@@ -184,3 +184,11 @@ source-only admission tests are authored, unexecuted. No current native
 document/capture/pair-revocation source implements the observer interface and no
 service caller starts it; real authority integration remains unfinished. This
 does not waive installed admission, receiver/transport/UI or platform evidence.
+
+The next source checkpoint adds installed inventory/hash admission for the fixed
+Windows helper and retains non-delete-sharing ancestor/file guards through
+worker/thread retirement. A private StreamInputs handoff matches prepared capture
+ownership/original process identity, consumes one attempt and recomputes lifetime
+after hash admission. No service command calls it. `WINDOWS_VIDEO_INSTALLATION.md`
+records exact behavior and missing package/native observation/UI/receiver work.
+No install, admission, helper launch, capture, build or test ran.

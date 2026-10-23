@@ -126,6 +126,11 @@ signed certificate or cached renderer bit is insufficient. Current service has
 no such native source implementation or lane caller yet. This source is therefore
 not evidence that real pairing revocation/document closure reaches the worker.
 
+The subsequent source checkpoint adds an installed-package admission path and
+private prepared-capture handoff. Directory guards now join the immutable file
+guard in Shared/tombstone ownership. `WINDOWS_VIDEO_INSTALLATION.md` records the
+fixed entry/hash/current-broker checks and remaining lifecycle/product gaps.
+
 The lane observes every 25 ms after a completed check and preserves that source's
 timestamp. If a source blocks or stops refreshing, the independent worker lease
 expires after its existing 200 ms; the lane cannot renew it after expiration.

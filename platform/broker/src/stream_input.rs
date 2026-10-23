@@ -18,7 +18,7 @@ pub fn available()->bool{
     #[cfg(not(windows))]{false}
 }
 struct Active{status:StreamInputStatus,worker:Option<InputWorker>,_artifact:File,#[cfg(windows)]_process:std::os::windows::io::OwnedHandle}
-struct Capture{id:Uuid,game:Uuid,pair:Uuid,session:Uuid,expires:u64,#[cfg(windows)]_process:std::os::windows::io::OwnedHandle,target:omniplay_stream_input::protocol::Target}
+struct Capture{id:Uuid,game:Uuid,pair:Uuid,session:Uuid,expires:u64,#[cfg(windows)]video_started:bool,#[cfg(windows)]_process:std::os::windows::io::OwnedHandle,target:omniplay_stream_input::protocol::Target}
 #[derive(Default)]pub struct StreamInputs{active:Option<Active>,capture:Option<Capture>}
 pub fn capture_available()->bool{cfg!(windows)&&policy().is_some_and(|p|p.enabled&&p.allow_browser_host&&!p.relay_origins.is_empty())}
 fn unavailable()->PlatformError{PlatformError::new(ErrorCode::UnsupportedCapability,"Owned native capture or input is unavailable for this target or installed product policy")}
@@ -37,12 +37,39 @@ impl StreamInputs{
             if target.process_id>i32::MAX as u32{return Err(unavailable());}
             let id=Uuid::new_v4();let expires=grant.expires_at_ms.min(omniplay_core::now_ms()+30*60*1000);
             let result=serde_json::json!({"capture_id":id,"game_id":game_id,"pair_id":pair_id,"session_id":session_id,"expires_at_ms":expires,"process_id":target.process_id,"creation_time":target.creation_time.to_string()});
-            database.record_audit("stream_capture.prepared",Some(game_id))?;self.capture=Some(Capture{id,game:game_id,pair:pair_id,session:session_id,expires,_process:process,target});Ok(result)
+            database.record_audit("stream_capture.prepared",Some(game_id))?;self.capture=Some(Capture{id,game:game_id,pair:pair_id,session:session_id,expires,video_started:false,_process:process,target});Ok(result)
         }
     }
     pub fn release_capture(&mut self,id:Uuid,session:Uuid)->Result<serde_json::Value>{
         if let Some(capture)=&self.capture{if capture.id!=id||capture.session!=session{return Err(PlatformError::new(ErrorCode::PermissionDenied,"Capture belongs to another session"));}self.capture=None;if let Some(active)=self.active.as_mut(){stop_active(active);}}
         Ok(serde_json::json!({"released":true,"capture_id":id}))
+    }
+    /// Private native-host handoff only, not a renderer service command. The
+    /// HWND must originate from the admitted native capture registration. The
+    /// caller starts the independent document/capture/pair observer BEFORE
+    /// configuring this worker. Pair/capture preparation alone is not current
+    /// revocation authority; dropping the returned lease closes the transport.
+    #[cfg(windows)]
+    pub(crate) fn spawn_owned_video(&mut self,expected:omniplay_stream_input::video_client::VideoOwner,window:u64,deadline_ms:u64)
+        ->Result<(omniplay_stream_input::video_client::VideoWorker,omniplay_stream_input::video_client::VideoAuthorityLease)>{
+        use std::{os::windows::io::AsHandle,time::Duration};
+        use omniplay_stream_input::{gamepad_process::ProcessWitness,video_client::VideoWorker};
+        if !capture_available(){return Err(unavailable());}
+        let capture=self.capture.as_mut().ok_or_else(unavailable)?;
+        let now=omniplay_core::now_ms();
+        if capture.video_started||expected.generation!=1||capture.id!=expected.capture||capture.game!=expected.game||
+            capture.pair!=expected.pair||capture.session!=expected.session||capture.expires<=now||deadline_ms<=now{return Err(unavailable());}
+        let target=omniplay_stream_input::target_identity(capture._process.as_handle())?;
+        if target.process_id!=capture.target.process_id||target.creation_time!=capture.target.creation_time{return Err(unavailable());}
+        // Consume this capture's single attempt before admission/launch. A
+        // partially completed setup cannot be replayed into another helper.
+        capture.video_started=true;
+        let worker=crate::stream_video_installation::admit()?;
+        let now=omniplay_core::now_ms();let expires=capture.expires.min(deadline_ms);
+        if expires<=now{return Err(unavailable());}
+        let target=ProcessWitness::from_child(capture._process.as_handle())?;
+        VideoWorker::spawn_owned_guarded(&worker.path,worker.artifact,worker.directories,worker.sha256,expected,target,window,
+            Duration::from_millis((expires-now).min(30*60*1000)))
     }
     pub fn arm(&mut self,database:&Database,installed:&mut InstalledGames,game_id:Uuid,pair_id:Uuid,session_id:Uuid,host_public_key:String,document:StreamGrantDocument,capture_id:Uuid,capture_window:String,deadline_ms:u64)->Result<StreamInputStatus>{
         if !available(){return Err(unavailable());}

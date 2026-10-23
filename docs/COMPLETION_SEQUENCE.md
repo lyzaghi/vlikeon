@@ -74,6 +74,13 @@ Four source admission tests are authored, not executed. Current service still
 lacks the actual native document/capture/pair-revocation observer implementation
 and caller; installed/product/receiver/UI and all original scope remain open.
 
+The next item-56 source checkpoint adds fixed installed-worker inventory/hash
+admission, retained ancestor/file guards, and a private prepared-capture handoff
+matching full owner/original process identity with a consumed single launch
+attempt and lifetime recheck after hashing. No current service command calls it;
+real packaging/native observation/lifecycle/receiver/UI remain due. No install,
+admission/launch/capture, compiler or test execution ran. Full scope stays open.
+
 This fork's current assignment: items 51 and 52 are accepted with evidence in
 `SAVE_ARCHIVE_INTERCHANGE.md` and `STORAGE_FAULT_QUALIFICATION.md`. On 2026-10-23,
 the owner deferred Linux build/runtime work for item 53, then deferred build/test
