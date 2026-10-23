@@ -30,7 +30,8 @@
     "Private C++ decoder-worker v3 source connects configure/compressed-frame/poll/Stop to Decoder, preserves original local receiver tick and raw NV12 deadline",
     "Rust distinct viewer decoder-v3 parent/job/pipe source, original boot/Instant receipts, exact accepted-input/NV12 output matching and broker-private unpresented-frame wrapper; no secure receiver/service/product caller or execution evidence",
     "Metadata-preserving ordered RTP assembly connected to mandatory codec-admission seam, bounded RTP clock rebasing and retained dependent decoder input; actual SRTP/admission/service/display implementations remain missing",
-    "Four additional source-only receipt-metadata and RTP-timeline cases, none executed"
+    "Four additional source-only receipt-metadata and RTP-timeline cases, none executed",
+    "Receive bridge retains confirmed Revoked versus CleanupRequired after native Stop failure, with fail-closed repeated revoke; no runtime qualification or product state/recovery integration"
   ],
   "static_review": "Source review and git diff whitespace check only",
   "build_executed": false,

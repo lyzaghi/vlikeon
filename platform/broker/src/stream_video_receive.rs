@@ -26,19 +26,22 @@ impl Timeline{
     }
 }
 struct Pending{bytes:Vec<u8>,timestamp:i64,receipt:DecoderReceipt}
+#[derive(Clone,Copy,Debug,PartialEq,Eq)]
+pub enum ReceiveState{Active,Revoked,CleanupRequired}
 pub struct NativeVideoReceiver<A:NativeH264Admission>{
     ordered:OrderedReceiver<DecoderReceipt>,decoder:WindowsVideoDecoder,admission:A,
-    owner:VideoOwner,pending:VecDeque<Pending>,timeline:Timeline,closed:bool,
+    owner:VideoOwner,pending:VecDeque<Pending>,timeline:Timeline,state:ReceiveState,
 }
 impl<A:NativeH264Admission> NativeVideoReceiver<A>{
     pub fn new(ordered:OrderedReceiver<DecoderReceipt>,decoder:WindowsVideoDecoder,admission:A)->Self{
-        let owner=decoder.owner();Self{ordered,decoder,admission,owner,pending:VecDeque::new(),timeline:Timeline::default(),closed:false}
+        let owner=decoder.owner();Self{ordered,decoder,admission,owner,pending:VecDeque::new(),timeline:Timeline::default(),state:ReceiveState::Active}
     }
+    pub fn state(&self)->ReceiveState{self.state}
     /// Native ingress captures receipt BEFORE authentication/reorder. The caller
     /// supplies only successfully authenticated/decrypted/anti-replayed RTP here.
     /// This method is not a raw network endpoint or a source of SRTP trust.
     pub fn push_authenticated(&mut self,bytes:&[u8],receipt:DecoderReceipt)->Result<()>{
-        if self.closed{return Err(unavailable());}
+        if self.state!=ReceiveState::Active{return Err(unavailable());}
         let result=(||{
             if !receipt.within_receive_age(){return Err(unavailable());}
             let frames=self.ordered.push_stamped(bytes,receipt.local_received_at(),receipt)?;
@@ -64,7 +67,7 @@ impl<A:NativeH264Admission> NativeVideoReceiver<A>{
     /// Run even when no new packets arrive. S_FALSE keeps compressed bytes for
     /// ordered retry, never skips a dependent picture to make a queue look fresh.
     pub fn tick(&mut self)->Result<()>{
-        if self.closed{return Err(unavailable());}let result=self.pump_inner();if result.is_err(){self.retire();}result
+        if self.state!=ReceiveState::Active{return Err(unavailable());}let result=self.pump_inner();if result.is_err(){self.retire();}result
     }
     pub fn take_unpresented(&mut self)->Result<Option<UnpresentedVideoFrame>>{
         self.tick()?;let result=self.decoder.take_unpresented();
@@ -73,12 +76,21 @@ impl<A:NativeH264Admission> NativeVideoReceiver<A>{
         }
         if result.is_err(){self.retire();}result
     }
-    fn retire(&mut self){self.closed=true;self.ordered.close();self.pending.clear();let _=self.decoder.revoke();}
+    fn retire(&mut self){
+        // Fence first. EOF/timeout/forced process retirement may close delivery
+        // without a native Stop receipt; retain that uncertainty for the caller.
+        self.state=ReceiveState::CleanupRequired;self.ordered.close();self.pending.clear();
+        if self.decoder.revoke().is_ok(){self.state=ReceiveState::Revoked;}
+    }
     pub fn revoke(&mut self)->Result<()>{
-        if self.closed{return Err(unavailable());}self.closed=true;self.ordered.close();self.pending.clear();self.decoder.revoke()
+        match self.state{
+            ReceiveState::Revoked=>Ok(()),
+            ReceiveState::CleanupRequired=>Err(unavailable()),
+            ReceiveState::Active=>{self.retire();if self.state==ReceiveState::Revoked{Ok(())}else{Err(unavailable())}},
+        }
     }
 }
-impl<A:NativeH264Admission> Drop for NativeVideoReceiver<A>{fn drop(&mut self){if !self.closed{self.retire();}}}
+impl<A:NativeH264Admission> Drop for NativeVideoReceiver<A>{fn drop(&mut self){if self.state==ReceiveState::Active{self.retire();}}}
 
 #[cfg(test)]
 mod tests{

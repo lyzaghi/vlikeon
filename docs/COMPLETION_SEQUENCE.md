@@ -135,6 +135,12 @@ There is still no actual SRTP/native ingress, full admission implementation or
 product/display caller. No build/parser/clock/helper/decoder/media/test ran;
 all original remaining scope and final evidence stay open.
 
+The receive bridge now retains explicit Active/confirmed-Revoked/CleanupRequired
+state instead of discarding failed native Stop results during error handling.
+Repeated revoke cannot turn unconfirmed cleanup into success. Source-only review
+also rejects impossible future buffered receipt clocks. No build/test or native
+execution occurred; product state/recovery integration remains due.
+
 This fork's current assignment: items 51 and 52 are accepted with evidence in
 `SAVE_ARCHIVE_INTERCHANGE.md` and `STORAGE_FAULT_QUALIFICATION.md`. On 2026-10-23,
 the owner deferred Linux build/runtime work for item 53, then deferred build/test

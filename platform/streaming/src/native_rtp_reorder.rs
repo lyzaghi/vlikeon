@@ -18,7 +18,7 @@ impl<R> OrderedReceiver<R>{
     }
     pub fn close(&mut self){self.closed=true;self.queue.clear();self.earliest=None;self.receiver.close();}
     fn check(&mut self,now:Instant)->Result<()>{
-        if self.closed||self.queue.values().any(|value|now.duration_since(value.received)>Duration::from_millis(50)){
+        if self.closed||self.queue.values().any(|value|now.checked_duration_since(value.received).is_none_or(|age|age>Duration::from_millis(50))){
             self.close();return Err(unauthorized());
         }
         if let Err(error)=self.receiver.tick(){self.close();return Err(error);}Ok(())

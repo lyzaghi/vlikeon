@@ -56,3 +56,11 @@ source, installed/native viewer admission/observer/service caller, full actual
 codec/parameter-set/VUI implementation, NACK/PLI/loss-generation recovery,
 display/audio/UI and all original platform/device/fault/latency qualification.
 The source connects stages but does not complete or enable end-to-end Remote Play.
+
+Receive state now distinguishes Active, confirmed Revoked and CleanupRequired.
+An error fences buffered data before Stop; only a positive combined native
+Stop/process-retirement result earns Revoked. The original operation error is
+returned while state retains cleanup uncertainty for the owning service. Repeated
+revoke is idempotently successful only for already confirmed Revoked, never for
+CleanupRequired. No current product registry persists or displays this state;
+actual lifecycle/recovery integration and qualification remain unfinished.
