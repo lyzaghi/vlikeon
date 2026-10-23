@@ -66,6 +66,9 @@ pub trait Provider{
     type Device;
     fn create(&mut self,slot:u8,owner:&Owner)->Result<Self::Device>;
     fn write(&mut self,device:&mut Self::Device,report:&Report)->Result<()>;
+    /// Retiring an allocated but uninitialized device must not create it just
+    /// to publish zero. Lazy providers override this with an existing-only path.
+    fn neutralize(&mut self,device:&mut Self::Device)->Result<()>{self.write(device,&Report::default())}
     fn detach(&mut self,device:&mut Self::Device)->Result<()>;
 }
 
@@ -111,7 +114,10 @@ impl<P:Provider> Gamepads<P>{
             if self.provider.write(&mut slot.device,&Report::default()).is_err(){let _=self.retire();return Err(unavailable());}
         }
         if self.deadline.is_none_or(|deadline|Instant::now()>=deadline){let _=self.retire();return Err(denied());}
-        self.state=State::Active;Ok(())
+        // Initialization/readiness can take longer than one input period.
+        // The remote input-gap clock starts only when the group becomes active;
+        // the overall authorization deadline still includes all setup time.
+        self.last_frame=Some(Instant::now());self.state=State::Active;Ok(())
     }
 
     fn matches(&self,owner:&Owner)->Result<()>{if self.owner.as_ref()!=Some(owner){return Err(denied());}Ok(())}
@@ -162,7 +168,7 @@ impl<P:Provider> Gamepads<P>{
         for mut slot in self.slots.drain(..){
             // Even if neutral fails, acknowledged detach can make the device
             // absent. A failed detach keeps the handle reserved for retry.
-            let _=self.provider.write(&mut slot.device,&Report::default());
+            let _=self.provider.neutralize(&mut slot.device);
             if self.provider.detach(&mut slot.device).is_err(){retained.push(slot);}
         }
         self.slots=retained;

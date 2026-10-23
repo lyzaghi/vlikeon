@@ -3,6 +3,8 @@ pub mod protocol;
 pub mod gamepad;
 #[cfg(all(target_os="linux",any(target_arch="x86_64",target_arch="aarch64")))]
 pub mod gamepad_uinput;
+#[cfg(all(feature="winuhid",target_os="windows",target_env="msvc",any(target_arch="x86_64",target_arch="aarch64")))]
+pub mod gamepad_winuhid;
 mod client;
 pub use client::InputWorker;
 #[cfg(windows)]mod windows;

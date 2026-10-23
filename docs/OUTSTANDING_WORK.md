@@ -66,7 +66,7 @@ Antigravity batches, while source work continues. Items 53 and 54 remain open.
 52. [x] Kiểm chứng lưu trữ khi đầy đĩa, crash, giao dịch bị hủy và nâng schema dữ liệu. Bằng chứng và giới hạn: `STORAGE_FAULT_QUALIFICATION.md`.
 53. [ ] Hoàn thiện capture cửa sổ game và âm thanh ứng dụng trên Linux. Hoãn build/runtime theo yêu cầu chủ dự án; thiếu sót giữ tại `LINUX_OWNED_CAPTURE.md`.
 54. [ ] Hoàn thiện capture cửa sổ game và âm thanh ứng dụng trên macOS. Mã đang triển khai và phần chưa kiểm chứng: `MACOS_OWNED_CAPTURE.md`.
-55. [ ] Hoàn thiện tích hợp virtual gamepad và phân quyền thiết bị điều khiển từ xa. Mã quyền/slot và backend uinput đang triển khai; phần còn thiếu tại `VIRTUAL_GAMEPAD_OWNERSHIP.md`. Build/test hoãn theo yêu cầu.
+55. [ ] Hoàn thiện tích hợp virtual gamepad và phân quyền thiết bị điều khiển từ xa. Đã viết mã quyền/slot, backend Linux uinput và ứng viên Windows HID chưa tích hợp; phần còn thiếu tại `VIRTUAL_GAMEPAD_OWNERSHIP.md`. Build/test hoãn theo yêu cầu.
 56. [ ] Hoàn thiện dịch vụ capture/encode native độc lập và lựa chọn codec.
 57. [ ] Hoàn thiện nhận diện quyền sở hữu tiến trình game con được launcher khởi chạy.
 58. [ ] Hoàn thiện vòng đời credential ghép đôi trên native và mobile.

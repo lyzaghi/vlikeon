@@ -28,6 +28,8 @@ partially failed device-creation attempt. A group is scoped to one host session;
 new-session construction does not replace broker/service replay protection.
 Neutral states are written to each created device before active state. If any
 creation/update fails, all created devices are neutralized and removed.
+The input-gap clock starts at successful activation; the authorization deadline
+still includes all device setup/readiness time.
 
 Frames use explicit slot numbers, not connected-list positions. Duplicates,
 unknown slots, invalid trigger/axis values or oversized snapshots retire the
@@ -86,6 +88,84 @@ and supported product behavior, not hidden behind an ownership label.
 Linux build/runtime remains deferred under item 53. Authoring this backend
 does not install, build, load, enable or test it on any machine.
 
+## Windows WinUHid candidate
+
+`engines/gamepad-windows/` contains an original generic HID descriptor, report
+encoder and private C adapter. `gamepad_winuhid.rs` bridges it to the private
+provider trait behind Cargo feature `winuhid`, off by default. The unchanged
+product input helper does not construct this provider. This is authored source,
+not a driver approval or completed Windows gamepad implementation.
+
+The candidate uses [WinUHid](https://github.com/cgutman/WinUHid) at immutable
+commit `d6cebbef5c7909168d1f881185be8f607d6aefd4`, whose public header, client,
+precompiled-header source, driver ABI header and MIT notice have explicit SHA-256
+pins. The CMake recipe accepts an explicit local checkout, verifies raw file
+bytes and copies only those selected files into a private build staging folder.
+It never fetches, installs or elevates. A checkout with CRLF conversion must not
+be silently accepted as the pinned raw bytes. Compile only from a new, trusted
+build directory and admitted immutable inputs; hashes do not stop concurrent
+writers or approve the separate installed kernel driver.
+
+The library is statically linked. There is no DLL search, arbitrary device path,
+renderer-selected identity, custom driver IOCTL entry point or impersonated
+controller hardware ID. Vendor/product IDs must come from an assigned identity
+in a future admitted package; no default or borrowed IDs are supplied. A nonzero
+ID or driver interface version 1 is insufficient proof of provenance. Upstream
+MIT attribution is recorded in `NOTICE` and `security/dependencies.json`; a later
+build copies the full upstream license, which release packaging must retain.
+That does not close the final dependency/driver distribution review.
+
+The 16-byte input report carries twelve generic buttons, four symmetric signed
+stick axes, two unsigned analog triggers and a null-state eight-way hat. Standard
+D-pad bits map to the hat; opposing directions cancel. Neutral sticks/triggers,
+no buttons and hat value 8 form the release state. This is a generic HID gamepad,
+not XInput emulation, automatic standard browser mapping or an established game
+compatibility claim. Trigger independence and four-controller ordering still
+need real-game qualification. No output reports, vibration or accessory support
+is implemented.
+
+Reservation returns an opaque process-local token before any driver allocation.
+The manager owns that token before the first neutral write creates/starts a
+device. A separate `neutralize` provider operation ensures retiring an unused
+reservation cannot accidentally create a controller. Each created device gets
+a fresh container GUID and GUID instance string. Start must be followed by a
+successful observation of that exact container in the present HID inventory
+before initial write succeeds; a one-second readiness loop is not a guarantee
+that underlying OS/driver calls return within that time.
+
+Retire prohibits further writes, attempts neutral and closes the private client
+connection. The pinned upstream driver passes the container GUID to VHF and its
+file-close callback invokes synchronous `VhfDelete(..., TRUE)`; this source review
+does not prove behavior of an independently installed driver. The adapter also
+queries the present HID inventory through [SetupAPI device properties](https://learn.microsoft.com/en-us/windows/win32/api/setupapi/nf-setupapi-setupdigetdevicepropertyw)
+and matches [the exact container GUID](https://learn.microsoft.com/en-us/windows-hardware/drivers/install/devpkey-device-containerid).
+Only an observed-present device followed by a successful absence query frees its
+slot. Property/enumeration failures, inventory overflow and a device still
+present keep cleanup pending. A creation attempt that was never observed present
+retains its reservation even after close: absence alone cannot rule out delayed
+enumeration. A cleanup retry can observe a late exact-container arrival and
+subsequent absence. If it never becomes observable, resolving that case needs
+external helper retirement and reviewed recovery; there is no automatic
+force-release or PnP removal operation.
+
+Rust drop attempts the same cleanup. If it fails, the bounded C++ registry keeps
+the closing record, up to four slots, and a later reservation retries confirmed
+cleanup. No still-active slot is reclaimed. This registry is process-local, not
+global arbitration; helper process loss and delayed PnP removal remain unverified.
+Tokens are monotonic and never reused; retrying a confirmed retired token is
+idempotent and cannot operate on a replacement device in the same logical slot.
+Several pinned upstream calls wait indefinitely. The library must remain disabled
+until an independently supervised helper, exact provider/driver admission,
+cross-process slot arbitration and crash/blocked-call cleanup are integrated.
+The helper must not report successful revoke merely because it exited.
+
+Future linkage requires the MSVC target matching the Rust architecture, the
+authored `vlikeon-winpad` static library and its explicit native library search
+directory, plus Windows `setupapi`, `hid` and `ole32`. There is deliberately no
+Cargo build script that runs CMake or locates arbitrary binaries. CMake configure,
+compiler/linker and all device operations remain deferred; these source recipes
+have not been executed or accepted.
+
 ## Receiving browser sampling
 
 `engines/streaming/input.js::sampleStandardGamepads` now preserves browser
@@ -111,10 +191,11 @@ the explicit slot tuples accepted by the private group.
    with broker/helper IPC and the authenticated capture/pair/session. Current
    `InputWorker` v1, status shape, native forwarder and host policy do not expose
    this provider yet; version them coherently before advertising support.
-2. Implement Windows and macOS providers and required driver/entitlement/package
-   paths, with current API verification, explicit installation consent where
-   needed and revocation. No existing Windows input helper gains gamepads from
-   this module. Any provider choice needs license/provenance review.
+2. Finish the Windows candidate's supervised helper, assigned device identity,
+   signed-driver admission, installed package and unresolved-creation recovery;
+   implement the macOS provider/entitlement path. Explicit installation consent
+   is required where needed. No existing Windows input helper gains gamepads
+   from this module. Final provider license/provenance review remains open.
 3. Add independent helper watchdog observations, single-owner cross-process
    slot arbitration, local/remote controller coexistence and supported global
    device visibility semantics. Complete cleanup receipts before reassignment.

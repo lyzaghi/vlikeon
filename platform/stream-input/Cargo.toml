@@ -5,6 +5,12 @@ edition.workspace = true
 rust-version.workspace = true
 publish.workspace = true
 
+[features]
+default = []
+# Private adapter only; no broker capability or automatic driver/build install.
+# Requires the separately admitted, explicitly linked C++ static library.
+winuhid = []
+
 [dependencies]
 omniplay-contracts.workspace = true
 serde.workspace = true

@@ -1,0 +1,30 @@
+{
+  "item": 55,
+  "status": "incomplete_source_authored_verification_deferred",
+  "owner_steering": "2026-10-23: build and test later; continue source work",
+  "executor_when_resumed": "Antigravity",
+  "review_and_fix_owner": "Codex",
+  "source_scope": [
+    "Private host authorization, stable slots, full snapshots, release sequence and retained failed cleanup",
+    "Linux uinput candidate with existing device permission only",
+    "Standard browser gamepad sampling with sparse stable indices",
+    "Default-off Windows generic HID candidate, pinned WinUHid static client recipe and exact-container cleanup query"
+  ],
+  "static_review": "Source/API review and git diff whitespace check only; no compiler or runtime validation",
+  "passed_test_cases": [],
+  "build_executed": false,
+  "test_executed": false,
+  "driver_installed_by_this_work": false,
+  "device_operations_executed": false,
+  "product_integrated": false,
+  "advertised_gamepad_capability": false,
+  "pending": [
+    "Broker/native permission UI and authenticated capture/pair/session integration",
+    "Independent supervised helper, fresh host observations and cross-process device arbitration",
+    "Windows assigned HID identity, exact signed driver/package admission and unresolved-creation recovery",
+    "macOS provider and entitlement/package path",
+    "Real device readiness, game ordering, analog compatibility and haptics/accessory scope",
+    "All target compilation, real device/permission/lifecycle/fault qualification and acceptance"
+  ],
+  "details": "docs/VIRTUAL_GAMEPAD_OWNERSHIP.md"
+}

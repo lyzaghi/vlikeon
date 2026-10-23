@@ -1,0 +1,16 @@
+{
+  "schema_version": 1,
+  "repository": "https://github.com/cgutman/WinUHid",
+  "revision": "d6cebbef5c7909168d1f881185be8f607d6aefd4",
+  "license": "MIT",
+  "files": {
+    "WinUHid/WinUHid.h": "1762701801d34f6fd7a00c0a943c0d84f82426a5228c6331b2ee83be90b8bed5",
+    "WinUHid/WinUHid.cpp": "2ff5ba793fe7991ca5954b8b45754f2ac1535e43367c45dee7bd68a8af430e2e",
+    "WinUHid/pch.h": "95e406b3c39e354102e949bc7b7978b552908f8a84699e0bdc4ffcebd4de3261",
+    "WinUHid Driver/Public.h": "4c2c8cc2d5244e2d4aa5373f8ea265338910b1def913a0de97d052c7ff62770a",
+    "LICENSE": "89a57a9a583a1a54000016fb9c5322c6b0a9c0a8136e21a3c8c2bb18992c3a62"
+  },
+  "driver_installed": false,
+  "build_executed": false,
+  "runtime_qualified": false
+}

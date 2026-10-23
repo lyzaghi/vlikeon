@@ -15,3 +15,9 @@ see engines/isolation-linux/uapi/ for exact source, license and exception files.
 security/dependencies.json records selected source provenance and outstanding
 distribution reviews. This notice does not approve binary distribution, assert
 a completed license audit or imply endorsement by any third party.
+
+The optional Windows virtual-gamepad recipe references WinUHid, copyright
+2025 Cameron Gutman, under MIT. Its source/header/license hashes are recorded
+in engines/gamepad-windows/winuhid-source.json. No WinUHid source or binary is
+vendored by that recipe; a later build must preserve the complete upstream
+MIT notice, copied by the recipe, in the actual distribution.

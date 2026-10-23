@@ -10,6 +10,14 @@ gamepads and device permissions). Build/test execution is now deferred; do not
 dispatch new Antigravity batches until resumed by the owner. Items 53–55 remain
 unchecked. Other chats' assignments and remaining 1–109 obligations are retained.
 
+Item 55 source checkpoints: private owner/slot lifecycle, Linux uinput and stable
+standard-browser sampling are authored. A default-off Windows WinUHid candidate
+now adds a hash-pinned static client recipe, generic HID reports and retained
+cleanup records until exact-container disappearance. This is not integrated
+with broker/native consent, signed-driver admission or a supervised helper;
+macOS gamepad implementation remains due. `VIRTUAL_GAMEPAD_OWNERSHIP.md` records
+the source and remaining scope. No item-55 build/test or driver install has run.
+
 The owner now requests the individually numbered tasks in
 [`OUTSTANDING_WORK.md`](OUTSTANDING_WORK.md), completed in order. Task 1 source
 integration is complete at commit `35f3271`; task 2 alignment is recorded in

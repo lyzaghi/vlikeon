@@ -188,6 +188,16 @@
       "distribution_status":"source_pinned_native_build_dependency_inventory_and_verification_pending"
     },
     {
+      "name":"WinUHid",
+      "repository":"https://github.com/cgutman/WinUHid.git",
+      "revision":"d6cebbef5c7909168d1f881185be8f607d6aefd4",
+      "license":"MIT",
+      "included_scope":"Optional generic HID gamepad adapter source recipe referencing five hash-locked upstream client/header/license files; no third-party source or driver binary materialized, no build, install, product admission or runtime qualification",
+      "notice_source":"https://github.com/cgutman/WinUHid/blob/d6cebbef5c7909168d1f881185be8f607d6aefd4/LICENSE",
+      "source_lock":"engines/gamepad-windows/winuhid-source.json",
+      "distribution_status":"source_api_and_license_inspected; driver_signature_provenance_package_assigned_identity_runtime_and_final_distribution_review_pending"
+    },
+    {
       "name":"nlohmann/json",
       "repository":"https://github.com/nlohmann/json.git",
       "version":"3.12.0",
