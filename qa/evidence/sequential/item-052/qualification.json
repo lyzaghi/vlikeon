@@ -3,7 +3,7 @@
   "status": "incomplete",
   "accepted_by": "Codex",
   "executor": "Antigravity",
-  "reviewed_at": "2026-10-23T10:09:36.814Z",
+  "reviewed_at": "2026-10-23T10:55:39.717Z",
   "completed_checks": {
     "native": {
       "batch": "052a",
@@ -14,10 +14,27 @@
       "batch": "052e",
       "cases": 16,
       "source_manifest_sha256": "5f7449048d3ad97f92575c66d31518b7c915639aa37384cd17563e0c5bf2452a"
+    },
+    "physical": {
+      "batch": "052g",
+      "cases": 4,
+      "source_manifest_sha256": "3eff97cfd394ef3e10f52998694dc4d9d27373e85d1d8df411ee69f3eddbd1fd",
+      "filesystem": "NTFS",
+      "image_maximum_bytes": 268435456,
+      "volume_bytes": 251588608,
+      "raw_error": {
+        "code": "ENOSPC",
+        "errno": -4055,
+        "syscall": "write",
+        "message": "ENOSPC: no space left on device, write"
+      },
+      "failed_save_preserves_original": true,
+      "reopen_cleans_staging": true,
+      "retry_same_identity_succeeds": true
     }
   },
   "pending": [
-    "Actual NTFS exhaustion on private VHDX, save failure, recovery and retry"
+    "Windows UAC confirmation and verified detach of the owned QA VHDX"
   ],
   "runtime_inputs": {
     "native": {
@@ -471,6 +488,10 @@
       "tools/web_system_assets_policy.py": "bdff70b036d6c5dde078d3c8f6b2a35f9186b8e1790758bb847c36116baa86a1",
       "tools/web_thread_policy.py": "1d56e984e57ed7dc2d6c1a0f2631ea224e3883121013fdfff0ba4066e2bf091a",
       "tools/windows_actor_imports.py": "e2838baf6125df51349e0bc6bfeb1ff4c6abf53d7f4a1611d23ec766d22f82b0"
+    },
+    "physical": {
+      "qa/windows/storage-full-disk.cjs": "36e7d7efb3a374da42f7843b158541819d66d5f1ca017e17f62da841aa686731",
+      "qa/windows/storage-fault-volume.ps1": "fd6ea344d93779565411ad98774535d40e6e9333082c13daaca295607ad25cb3"
     }
   },
   "limits": [
@@ -479,9 +500,12 @@
     "Does not close other OS/device, profile backup, corruption recovery or PWA packaging tasks"
   ],
   "volume_preparation": {
-    "status": "not_executed",
-    "reason": "Windows PowerShell script execution disabled; process-only RemoteSigned permission requested",
-    "image_created": false,
-    "policy_changed": false
-  }
+    "status": "executed_detach_awaiting_uac",
+    "owner_approved_uac": true,
+    "owner_approved_process_policy": "RemoteSigned",
+    "persistent_policy_changed": false,
+    "image_created": true,
+    "prepared_receipt": "volume/volume-prepared.json"
+  },
+  "total_passed_cases": 48
 }

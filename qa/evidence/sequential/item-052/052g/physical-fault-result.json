@@ -1,0 +1,63 @@
+{
+  "item": 52,
+  "scope": "Actual NTFS disk-full on private 256-MiB VHDX; recovery and retry",
+  "status": "passed",
+  "cases": [
+    {
+      "id": "private-ntfs-write-returns-enospc",
+      "status": "passed"
+    },
+    {
+      "id": "physical-full-save-fails-without-publishing-progress",
+      "status": "passed"
+    },
+    {
+      "id": "reopen-validates-original-data-and-cleans-staging",
+      "status": "passed"
+    },
+    {
+      "id": "same-save-id-retries-after-space-is-released",
+      "status": "passed"
+    }
+  ],
+  "volume": {
+    "UniqueId": "\\\\?\\Volume{d442c5b7-0938-4322-b103-12d3b77e27d3}\\",
+    "FileSystem": "NTFS",
+    "FileSystemLabel": "VLIKEON_QA052",
+    "Size": 251588608,
+    "SizeRemaining": 236392448
+  },
+  "before": {
+    "total_bytes": 251588608,
+    "available_bytes": 236392448
+  },
+  "exhaustion": {
+    "written_bytes": 234881024,
+    "error": {
+      "code": "ENOSPC",
+      "errno": -4055,
+      "syscall": "write",
+      "message": "ENOSPC: no space left on device, write"
+    },
+    "capacity": {
+      "total_bytes": 251588608,
+      "available_bytes": 192512
+    }
+  },
+  "before_save": {
+    "total_bytes": 251588608,
+    "available_bytes": 1241088
+  },
+  "after_release": {
+    "total_bytes": 251588608,
+    "available_bytes": 234942464
+  },
+  "volume_after": {
+    "UniqueId": "\\\\?\\Volume{d442c5b7-0938-4322-b103-12d3b77e27d3}\\",
+    "FileSystem": "NTFS",
+    "FileSystemLabel": "VLIKEON_QA052",
+    "Size": 251588608,
+    "SizeRemaining": 227733504
+  },
+  "finished_at": "2026-10-23T10:49:34.284Z"
+}

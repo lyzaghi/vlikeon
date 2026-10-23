@@ -1,8 +1,8 @@
 # Item 52 — storage fault and migration qualification
 
-Status: open. Native batch `052a` passed 28 cases and Web batch `052e` passed
-16 cases. Physical disk-full qualification remains pending the private VHDX.
-Neither batch alone completes item 52.
+Status: 48 fault checks passed: native `052a` (28), Web `052e` (16) and physical
+NTFS full disk `052g` (four). Closure awaits Windows UAC confirmation and
+verified detach of the owned QA VHDX. Item 52 remains unchecked until cleanup.
 
 The required matrix covers actual filesystem exhaustion, SQLite capacity
 failure, interruption before and after save publication, aborted transactions,
@@ -28,7 +28,7 @@ assertions and unchanged inputs. Results are retained under
 | Web transaction cancellation | `052e`, one case | Abort after actual save insertion; metadata, blobs, origins, revisions, head and usage roll back; caller receives `cancelled` |
 | Browser quota | `052e`, one case | Verified active 5-MiB CDP quota before opening IDB; 8-MiB save raises actual `QuotaExceededError`, maps to `resource_limit`, preserves old stores and retries after releasing override |
 | Web renderer crash | `052e`, two cases | Crash actual save transaction after head write while held open, or after commit resolves; reopen preserves either all old stores or the complete new save/head/origin/revision/accounting |
-| Physical NTFS full disk | Pending | Must observe filesystem `ENOSPC`, failed actual save publication, unchanged original data, cleanup and successful retry on the owned VHDX |
+| Physical NTFS full disk | `052g`, four cases | Actual filesystem `ENOSPC`, failed 8-MiB save publication, unchanged original data, staging cleanup on reopen and successful same-identity retry on the owned VHDX |
 
 The native callbacks live only in the QA example; the SQLite `functions`
 feature is enabled by a development dependency. No fault switches or SQL
@@ -44,6 +44,22 @@ space grant. The fixture now sets and verifies quota before opening IDB.
 actual save publication. Earlier failed runs are retained, not counted as
 additional passing coverage. Chromium's bucket space cache is described in
 its [implementation](https://chromium.googlesource.com/chromium/src/+/1c9524c5d3627044b0cf0a0b679978e82b702279/content/browser/indexed_db/instance/bucket_context.cc).
+
+Physical batch `052f` stopped before fixture writes: `DiskImage | Get-Disk`
+bound a null `Number` under the ordinary token. `052g` instead verifies the
+image's exact `DevicePath` against the receipt's `PhysicalDrive` identity,
+then explicitly queries that disk number and rechecks size, boot/system
+flags, partition access path, NTFS label and volume identity. It does not
+grant administrative rights to the test or remove identity checks.
+
+The 256-MiB image contained a 251,588,608-byte NTFS volume. The filler wrote
+234,881,024 bytes before a real `write` returned `ENOSPC` (errno `-4055`),
+with 192,512 bytes reported available. Releasing only the owned 1-MiB reserve
+left 1,241,088 bytes: the actual 8-MiB save failed with `storage_failure`.
+Its old save/hash/head and database integrity remained valid. The failed
+attempt left one journaled staging entry, which reopen cleaned after filler
+release. Retrying the same save identity then produced valid 8-MiB progress
+and advanced the head; both original and new payload hashes were checked.
 
 These are Windows native and headless Chrome `155.0.8059.85` observations.
 They do not establish power-loss, filesystem-controller durability, other
@@ -68,8 +84,17 @@ The owner authorized the UAC step. The first preparation launches exited before
 creating the volume workspace: Windows PowerShell reported that script
 execution is disabled. No image was created or attached. Read-only diagnosis
 found no configured policy scopes, so the effective default blocks `.ps1`
-execution. A separate request to allow `RemoteSigned` **only for the preparation
-process** is pending; no execution policy has been changed.
+execution. The owner subsequently authorized `RemoteSigned` **only for the
+preparation process**. Preparation succeeded using that process argument,
+without changing account or machine policy. The preparation receipt and
+diagnostics are retained in the evidence directory.
+
+After `052g`, the filler/reserve files were removed. Detach of the exact owned
+image was requested through a separate `diskpart` UAC operation, with no
+execution-policy change. At this checkpoint Windows `consent.exe` is still
+awaiting confirmation; no detach is claimed. The retained image and synthetic
+profile remain at the explicitly named QA path. No second prepare or detach
+operation should be started while that request is unresolved.
 
 Preparation command (UAC and a permitted script execution policy required):
 
@@ -77,7 +102,7 @@ Preparation command (UAC and a permitted script execution policy required):
 powershell.exe -NoProfile -File E:\V10\OmniPlay\qa\windows\storage-fault-volume.ps1 -Mode Prepare -Workspace E:\V10\work\vlikeon-items-50-109-01a16780\full-disk-052
 ```
 
-`qa/windows/storage-full-disk.cjs` is prepared but has not run. It resolves the
+`qa/windows/storage-full-disk.cjs` passed in `052g`. It resolves the
 receipt to the attached non-system image/partition, validates NTFS volume
 identity and mount path, and checks capacity before every bounded filler
 write. It stops at 320 MiB maximum, requires actual `ENOSPC`, releases only an

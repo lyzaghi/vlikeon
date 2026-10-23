@@ -1,0 +1,9 @@
+{
+  "pid": 35608,
+  "script": "E:\\V10\\OmniPlay\\qa\\windows\\storage-fault-volume.ps1",
+  "sha256": "FD6EA344D93779565411AD98774535D40E6E9333082C13DAACA295607AD25CB3",
+  "requested_at": "2026-10-23T10:45:23.3203958Z",
+  "execution_policy": "RemoteSigned",
+  "policy_scope": "Process",
+  "diagnostic": "E:\\V10\\work\\vlikeon-items-50-109-01a16780\\volume-052-approved-prepare.log"
+}

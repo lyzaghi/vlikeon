@@ -1,0 +1,38 @@
+{
+  "item": 52,
+  "batch": "052g",
+  "scope": "Physical NTFS exhaustion, failed save publication and recovery on private 256-MiB VHDX",
+  "executor": "antigravity",
+  "source_manifest_sha256": "3eff97cfd394ef3e10f52998694dc4d9d27373e85d1d8df411ee69f3eddbd1fd",
+  "started_at": "2026-10-23T10:49:03.128Z",
+  "runner_pid": 39344,
+  "cases": [
+    {
+      "id": "build-native-fixture",
+      "args": [
+        "build",
+        "-p",
+        "omniplay-core",
+        "--example",
+        "storage_faults",
+        "--locked",
+        "--offline"
+      ],
+      "exit_code": 0,
+      "elapsed_ms": 21492,
+      "status": "passed"
+    },
+    {
+      "id": "physical-storage-full",
+      "args": [
+        "qa/windows/storage-full-disk.cjs"
+      ],
+      "exit_code": 0,
+      "elapsed_ms": 9674,
+      "status": "passed"
+    }
+  ],
+  "source_unchanged": true,
+  "status": "passed",
+  "finished_at": "2026-10-23T10:49:34.550Z"
+}

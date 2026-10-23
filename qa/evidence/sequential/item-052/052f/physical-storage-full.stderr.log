@@ -1,0 +1,30 @@
+AssertionError [ERR_ASSERTION]: Get-Disk : Cannot validate argument on parameter 'Number'. The argument is null. Provide a valid value for the 
+argument, and then try running the command again.
+At line:1 char:269
++ ... ched){throw 'Image not attached'}; $disks=@($image | Get-Disk); if($d ...
++                                                          ~~~~~~~~
+    + CategoryInfo          : InvalidData: (MSFT_DiskImage ...torageType = 3):PSObject) [Get-Disk], ParameterBindingVa 
+   lidationException
+    + FullyQualifiedErrorId : ParameterArgumentValidationError,Get-Disk
+ 
+
+
+1 !== 0
+
+    at identity (E:\V10\work\vlikeon-items-50-109-01a16780\source-052f\qa\windows\storage-full-disk.cjs:11:177)
+    at main (E:\V10\work\vlikeon-items-50-109-01a16780\source-052f\qa\windows\storage-full-disk.cjs:22:37)
+    at Object.<anonymous> (E:\V10\work\vlikeon-items-50-109-01a16780\source-052f\qa\windows\storage-full-disk.cjs:48:1)
+    at Module._compile (node:internal/modules/cjs/loader:1872:14)
+    at Object..js (node:internal/modules/cjs/loader:2003:10)
+    at Module.load (node:internal/modules/cjs/loader:1594:32)
+    at Module._load (node:internal/modules/cjs/loader:1396:12)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:255:19)
+    at Module.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:154:5)
+    at node:internal/main/run_main_module:33:47 {
+  generatedMessage: false,
+  code: 'ERR_ASSERTION',
+  actual: 1,
+  expected: 0,
+  operator: 'strictEqual',
+  diff: 'simple'
+}

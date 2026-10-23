@@ -8,3 +8,5 @@ qa/evidence/sequential/item-052/**/*.log whitespace=-blank-at-eof
 # Preserve the executed evidence runner/request copies, including final newlines.
 qa/evidence/sequential/item-052/run-*.cjs whitespace=-blank-at-eof
 qa/evidence/sequential/item-052/request-*.md whitespace=-blank-at-eof
+# Preserve PowerShell's original wrapped diagnostic, including trailing spaces.
+qa/evidence/sequential/item-052/052f/physical-storage-full.stderr.log whitespace=-blank-at-eol,-blank-at-eof

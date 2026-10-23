@@ -1,7 +1,8 @@
-# Item 52 — partial qualification, still open
+# Item 52 — fault checks passed, fixture cleanup pending
 
-`qualification.json` records 28 passing native cases from `052a` and 16
-passing Web cases from `052e`. Codex reviewed actual command exits, exercised
+`qualification.json` records 28 passing native cases from `052a`, 16
+passing Web cases from `052e` and four physical NTFS full-disk cases from
+`052g`. Codex reviewed actual command exits, exercised
 assertions and current source hashes; Antigravity executed the tests only.
 The requirement matrix and limitations are in
 [`docs/STORAGE_FAULT_QUALIFICATION.md`](../../../../docs/STORAGE_FAULT_QUALIFICATION.md).
@@ -13,11 +14,17 @@ actual save-publication transaction, before or after commit. Only `052a` and
 `052e` are used for current accepted coverage, without double-counting runs.
 Native request/result logs and phase markers are synthetic fixture evidence.
 
-Physical NTFS disk-full execution has **not occurred**. The owner authorized
-UAC, but Windows PowerShell blocked `.ps1` execution before the helper created
-its workspace. A separate process-only `RemoteSigned` permission request is
-pending. No VHDX exists and no execution policy has changed. The prepared
-physical test and volume helper are not passing evidence.
+Physical NTFS disk-full execution **passed** in `052g`: real `write` `ENOSPC`,
+failed save without publication, original progress preserved, staging cleaned
+on reopen and same-save-identity retry after space release. `052f` stopped
+before fixture writes because a disk-image pipeline bound null `Number`;
+`052g` verifies exact image `DevicePath` before explicitly resolving its disk.
+
+The owner authorized UAC and process-only `RemoteSigned` for preparation.
+The VHDX was created, attached and used. Account/machine policy was not changed.
+The filler and reserve are gone. A UAC request to detach this exact image is
+still waiting for Windows confirmation; fixture cleanup and item closure are
+pending. `volume/volume-prepared.json` records preparation, not detach.
 
 Frozen manifests identify actual execution inputs. `runtime_inputs` in the
 qualification records the current relevant native and Web inputs compared

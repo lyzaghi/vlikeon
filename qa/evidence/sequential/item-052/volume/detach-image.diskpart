@@ -1,0 +1,3 @@
+select vdisk file="E:\V10\work\vlikeon-items-50-109-01a16780\full-disk-052\vlikeon-storage-052.vhdx"
+detach vdisk
+exit

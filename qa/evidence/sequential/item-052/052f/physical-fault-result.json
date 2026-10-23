@@ -1,0 +1,8 @@
+{
+  "item": 52,
+  "scope": "Actual NTFS disk-full on private 256-MiB VHDX; recovery and retry",
+  "status": "failed",
+  "cases": [],
+  "error": "AssertionError [ERR_ASSERTION]: Get-Disk : Cannot validate argument on parameter 'Number'. The argument is null. Provide a valid value for the \r\nargument, and then try running the command again.\r\nAt line:1 char:269\r\n+ ... ched){throw 'Image not attached'}; $disks=@($image | Get-Disk); if($d ...\r\n+                                                          ~~~~~~~~\r\n    + CategoryInfo          : InvalidData: (MSFT_DiskImage ...torageType = 3):PSObject) [Get-Disk], ParameterBindingVa \r\n   lidationException\r\n    + FullyQualifiedErrorId : ParameterArgumentValidationError,Get-Disk\r\n \r\n\n\n1 !== 0\n\n    at identity (E:\\V10\\work\\vlikeon-items-50-109-01a16780\\source-052f\\qa\\windows\\storage-full-disk.cjs:11:177)\n    at main (E:\\V10\\work\\vlikeon-items-50-109-01a16780\\source-052f\\qa\\windows\\storage-full-disk.cjs:22:37)\n    at Object.<anonymous> (E:\\V10\\work\\vlikeon-items-50-109-01a16780\\source-052f\\qa\\windows\\storage-full-disk.cjs:48:1)\n    at Module._compile (node:internal/modules/cjs/loader:1872:14)\n    at Object..js (node:internal/modules/cjs/loader:2003:10)\n    at Module.load (node:internal/modules/cjs/loader:1594:32)\n    at Module._load (node:internal/modules/cjs/loader:1396:12)\n    at wrapModuleLoad (node:internal/modules/cjs/loader:255:19)\n    at Module.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:154:5)\n    at node:internal/main/run_main_module:33:47",
+  "finished_at": "2026-10-23T10:46:47.303Z"
+}

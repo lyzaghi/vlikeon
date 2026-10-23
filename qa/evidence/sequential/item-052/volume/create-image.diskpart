@@ -1,0 +1,4 @@
+create vdisk file="E:\V10\work\vlikeon-items-50-109-01a16780\full-disk-052\vlikeon-storage-052.vhdx" maximum=256 type=expandable
+select vdisk file="E:\V10\work\vlikeon-items-50-109-01a16780\full-disk-052\vlikeon-storage-052.vhdx"
+attach vdisk
+exit
