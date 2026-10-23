@@ -164,6 +164,22 @@ HRESULT Decoder::copy_frame(IMFSample* decoded,DecodedFrame& frame){
     HRESULT unlocked=two->Unlock2D();return FAILED(copied)?copied:unlocked;
   }
   if(queried!=E_NOINTERFACE)return queried;
+  // Legacy IMF2DBuffer does not expose accessible memory extents. Do not use
+  // Lock2D with an invented allocation bound, or Lock with the old surface
+  // stride after MF has converted it to contiguous layout. Ask the provider
+  // for a bounded canonical copy and use its packed coded-height plane layout.
+  ComPtr<IMF2DBuffer> legacy;queried=buffer.As(&legacy);
+  if(SUCCEEDED(queried)){
+    DWORD length=0;VLK_DEC_TRY(legacy->GetContiguousLength(&length));
+    const uint64_t expected=uint64_t(frame.width)*(coded_height_+coded_height_/2);
+    if(expected>16*1024*1024||length!=expected)return E_INVALIDARG;
+    std::vector<uint8_t> contiguous;
+    try{contiguous.resize(length);}catch(const std::bad_alloc&){return E_OUTOFMEMORY;}
+    VLK_DEC_TRY(legacy->ContiguousCopyTo(contiguous.data(),length));
+    return copy_rows(contiguous.data(),static_cast<LONG>(frame.width),contiguous.data(),length,
+        frame.width,frame.height,coded_height_,frame.nv12);
+  }
+  if(queried!=E_NOINTERFACE)return queried;
   BYTE* base=nullptr;DWORD current=0;VLK_DEC_TRY(buffer->Lock(&base,nullptr,&current));
   HRESULT copied=copy_rows(base,static_cast<LONG>(stride_),base,current,frame.width,frame.height,coded_height_,frame.nv12);
   HRESULT unlocked=buffer->Unlock();return FAILED(copied)?copied:unlocked;

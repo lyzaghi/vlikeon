@@ -147,6 +147,12 @@ An inert media-type fixture target is authored and excluded from normal builds;
 no build/test/API/media operation ran. Full codec/VUI/source/transport/product
 and supported-device qualification remain unfinished.
 
+Decoder source now explicitly normalizes legacy IMF2DBuffer through bounded
+GetContiguousLength/ContiguousCopyTo before visible-plane copy, keeping canonical
+width stride separate from native padded surface stride. Plain Lock remains
+only for non-2D buffers. No copy/provider/build/test ran; actual buffer/device
+qualification and all original remaining product requirements stay open.
+
 This fork's current assignment: items 51 and 52 are accepted with evidence in
 `SAVE_ARCHIVE_INTERCHANGE.md` and `STORAGE_FAULT_QUALIFICATION.md`. On 2026-10-23,
 the owner deferred Linux build/runtime work for item 53, then deferred build/test

@@ -107,3 +107,17 @@ to keep the copied CMake tree complete. No fixture/compiler/dictionary API or
 decoder ran; these are not actual SPS/VUI/colour or receiver/display evidence.
 Metadata reasoning follows Microsoft's [picture aspect ratio](https://learn.microsoft.com/en-us/windows/win32/medfound/picture-aspect-ratio)
 and [uncompressed video types](https://learn.microsoft.com/en-us/windows/win32/medfound/uncompressed-video-media-types).
+
+The next static review adds an explicit legacy IMF2DBuffer path between bounded
+IMF2DBuffer2 locks and ordinary IMFMediaBuffer locks. Legacy 2D buffers do not
+expose accessible memory extents through Lock2D, so no invented extent is used.
+GetContiguousLength must equal the admitted full coded NV12 surface size before
+a bounded allocation; ContiguousCopyTo then supplies canonical packed bytes.
+Visible rows are copied with width stride and UV starts after coded Y height.
+The original padded surface stride is never reused for this canonical copy.
+Provider copy failure and unexpected length remain terminal. Ordinary Lock is
+used only when both 2D interfaces are absent. Source reasoning follows
+[ContiguousCopyTo](https://learn.microsoft.com/en-us/windows/win32/api/mfobjects/nf-mfobjects-imf2dbuffer-contiguouscopyto)
+and [GetContiguousLength](https://learn.microsoft.com/en-us/windows/win32/api/mfobjects/nf-mfobjects-imf2dbuffer-getcontiguouslength).
+No lock/copy/provider API, build or test was executed; real buffer/device
+compatibility and original receiver/product completion remain unqualified.
