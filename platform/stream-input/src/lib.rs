@@ -7,6 +7,7 @@ pub mod gamepad_protocol;
 #[cfg(windows)]pub mod gamepad_process;
 #[cfg(windows)]mod gamepad_child;
 #[cfg(windows)]pub mod gamepad_client;
+#[cfg(windows)]pub mod video_client;
 #[cfg(all(target_os="linux",any(target_arch="x86_64",target_arch="aarch64")))]
 pub mod gamepad_uinput;
 #[cfg(all(feature="winuhid",target_os="windows",target_env="msvc",any(target_arch="x86_64",target_arch="aarch64")))]

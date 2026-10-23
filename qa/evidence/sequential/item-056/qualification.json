@@ -7,7 +7,8 @@
     "Owned bounded NV12/BGRA raw-frame mailbox with capture-generation, sequence, timestamp, receipt-age and lifetime fences",
     "Unintegrated macOS VideoToolbox H.264/HEVC encoder source with explicit hardware requirement, bounded submissions/output, shared callback lifetime and terminal output fences",
     "Unintegrated Windows Media Foundation H.264 NV12 encoder source, sync/async MFT lifecycle, bounded pending/output, keyframe/timestamp/deadline fences and separate stop receipts",
-    "Independent Windows encoder-worker executable source recipe, bounded pipe protocol, separate reader/writer/MTA actor, parent keepalive and superseding Stop acknowledgment; not built, installed or product-integrated"
+    "Independent Windows encoder-worker executable source recipe, bounded pipe protocol, separate reader/writer/MTA actor, parent keepalive and superseding Stop acknowledgment; not built, installed or product-integrated",
+    "Unintegrated Windows Rust video parent client, typed creation-time job, original process witnesses, independent native lease/pipe watchdog, accepted-frame matching and bounded Stop/retirement source"
   ],
   "static_review": "Source review and git diff whitespace check only",
   "build_executed": false,

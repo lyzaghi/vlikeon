@@ -131,3 +131,12 @@ artifact admission, job/process supervision, native capture/conversion, actual
 receiver codec/bitstream negotiation, host authority integration and transport
 publication fences are still missing. `engines/encode-windows/PROTOCOL.md` records
 the exact contract. All original item-56 completion requirements remain open.
+
+The next source checkpoint adds a private Rust Windows parent client and
+independent process/authority/pipe watchdog in `video_client.rs`, using the typed
+creation-time Video job launcher, original process witnesses, bounded packet
+ownership and matching Stop receipts. `WINDOWS_VIDEO_SUPERVISION.md` records
+the exact lease, memory, timeout, cleanup and caller-publication requirements.
+No current product command calls it. Installed admission, live native capture/
+document/pair observation, codec/receiver integration and all qualification remain
+unfinished. No build, helper/encoder execution or test ran.

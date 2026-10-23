@@ -1,0 +1,224 @@
+//! Candidate private Windows video transport. Installed artifact admission,
+//! actual capture/negotiation and live document/pair consent belong to the host.
+//! No current product command invokes this module.
+use crate::{failure,gamepad_child::{ChildProcess,HelperKind,SuspendedChild},gamepad_process::ProcessWitness};
+use omniplay_contracts::{ContentHash,Result};
+use std::{collections::VecDeque,fs::File,io::{Read,Write},os::windows::io::{AsRawHandle,FromRawHandle,OwnedHandle},
+    path::Path,sync::{Arc,Mutex,OnceLock,atomic::{AtomicBool,Ordering},mpsc::{self,SyncSender}},
+    thread::JoinHandle,time::{Duration,Instant}};
+use uuid::Uuid;
+use windows_sys::Win32::{Foundation::*,System::{IO::CancelSynchronousIo,Threading::*}};
+
+const CONFIGURE:u16=1;const FRAME:u16=2;const POLL:u16=3;const STOP:u16=4;
+static LIVE:AtomicBool=AtomicBool::new(false);
+static RETAINED:OnceLock<(Arc<ChildProcess>,File)>=OnceLock::new();
+struct Permit{release:bool}
+impl Permit{fn acquire()->Result<Self>{LIVE.compare_exchange(false,true,Ordering::AcqRel,Ordering::Acquire).map_err(|_|failure())?;Ok(Self{release:true})}}
+impl Drop for Permit{fn drop(&mut self){if self.release{LIVE.store(false,Ordering::Release);}}}
+#[derive(Clone,Copy,Debug,PartialEq,Eq)]
+pub struct VideoOwner{pub capture:Uuid,pub game:Uuid,pub pair:Uuid,pub session:Uuid,pub generation:u64}
+impl VideoOwner{fn valid(self)->bool{[self.capture,self.game,self.pair,self.session].iter().all(|id|!id.is_nil())&&(1..=1_000_000).contains(&self.generation)}}
+#[derive(Clone,Copy)]
+pub struct VideoProfile{pub width:u32,pub height:u32,pub fps:u32,pub bitrate:u32,pub require_hardware:bool}
+impl VideoProfile{fn valid(self)->bool{matches!((self.width,self.height),(1280,720)|(1920,1080))&&matches!(self.fps,30|60)&&(500_000..=30_000_000).contains(&self.bitrate)}}
+pub struct VideoPacket{pub timestamp_100ns:i64,pub keyframe:bool,pub bytes:Vec<u8>,pub sequence_header:Vec<u8>}
+struct Queued{packet:VideoPacket,deadline:Instant}
+struct Packets{queue:VecDeque<Queued>,bytes:usize}
+struct Lease{sequence:u64,deadline:Instant}
+struct Shared{
+    process:Arc<ChildProcess>,target:ProcessWitness,owner:VideoOwner,deadline:Instant,
+    _permit:Permit,artifact:Option<File>,closed:AtomicBool,revoking:AtomicBool,
+    lease:Mutex<Lease>,stop_deadline:Mutex<Option<Instant>>,pending:Mutex<Option<Instant>>,
+    packets:Mutex<Packets>,io:OnceLock<OwnedHandle>,
+}
+impl Drop for Shared{fn drop(&mut self){
+    if !self.process.exited().unwrap_or(false){
+        self._permit.release=false;
+        if let Some(artifact)=self.artifact.take(){if let Err(value)=RETAINED.set((self.process.clone(),artifact)){std::mem::forget(value);}}
+    }
+}}
+impl Shared{
+    fn authority_live(&self)->bool{
+        !self.closed.load(Ordering::Acquire)&&!self.revoking.load(Ordering::Acquire)&&Instant::now()<self.deadline&&
+        self.lease.lock().is_ok_and(|lease|Instant::now()<lease.deadline)&&
+        self.target.exited(self.target.identity()).is_ok_and(|exited|!exited)
+    }
+    fn transport_live(&self)->bool{
+        if self.closed.load(Ordering::Acquire){return false;}
+        if self.revoking.load(Ordering::Acquire){return self.stop_deadline.lock().is_ok_and(|deadline|deadline.is_some_and(|value|Instant::now()<value));}
+        self.authority_live()
+    }
+    fn close(&self){
+        self.closed.store(true,Ordering::Release);
+        if let Ok(mut packets)=self.packets.lock(){packets.queue.clear();packets.bytes=0;}
+        if let Some(io)=self.io.get(){unsafe{CancelSynchronousIo(io.as_raw_handle());}}
+    }
+}
+/// Only a trusted native observer refreshes this handle. A received media packet
+/// or an automatic Poll never establishes document/pair/capture authority.
+pub struct VideoAuthorityLease{shared:Arc<Shared>}
+impl VideoAuthorityLease{
+    pub fn observe(&self,sequence:u64,checked_at:Instant)->Result<()>{
+        let now=Instant::now();
+        if !self.shared.authority_live()||checked_at>now||now.duration_since(checked_at)>Duration::from_millis(100){return Err(failure());}
+        let mut lease=self.shared.lease.lock().map_err(|_|failure())?;
+        if now>=lease.deadline||sequence<=lease.sequence||sequence>10_000_000{return Err(failure());}
+        lease.sequence=sequence;lease.deadline=checked_at+Duration::from_millis(200);Ok(())
+    }
+    pub fn close(&self){self.shared.close();}
+}
+impl Drop for VideoAuthorityLease{fn drop(&mut self){self.close();}}
+struct Call{kind:u16,payload:Vec<u8>,reply:SyncSender<Result<Vec<u8>>>,timeout:Duration}
+pub struct VideoWorker{shared:Arc<Shared>,sender:Option<SyncSender<Call>>,threads:Vec<JoinHandle<()>>,profile:Option<VideoProfile>,sha256:ContentHash}
+fn thread_handle(thread:&JoinHandle<()>)->Result<OwnedHandle>{
+    let current=unsafe{GetCurrentProcess()};let mut handle=std::ptr::null_mut();
+    if unsafe{DuplicateHandle(current,thread.as_raw_handle(),current,&mut handle,THREAD_TERMINATE|THREAD_SYNCHRONIZE,0,0)}==0||handle.is_null()||handle==INVALID_HANDLE_VALUE{return Err(failure());}
+    Ok(unsafe{OwnedHandle::from_raw_handle(handle)})
+}
+impl VideoWorker{
+    pub fn spawn(executable:&Path,artifact:File,sha256:ContentHash,owner:VideoOwner,target:ProcessWitness,remaining:Duration)->Result<(Self,VideoAuthorityLease)>{
+        if !owner.valid()||remaining.is_zero()||remaining>Duration::from_secs(1800)||target.exited(target.identity())?||ContentHash::parse(sha256.0.clone()).is_err(){return Err(failure());}
+        let permit=Permit::acquire()?;let now=Instant::now();
+        let child=SuspendedChild::launch(executable,HelperKind::Video)?;
+        let(process,primary,input,output)=child.into_parts();
+        let shared=Arc::new(Shared{process,target,owner,deadline:now+remaining,_permit:permit,artifact:Some(artifact),
+            closed:AtomicBool::new(false),revoking:AtomicBool::new(false),lease:Mutex::new(Lease{sequence:0,deadline:now+Duration::from_millis(300)}),
+            stop_deadline:Mutex::new(None),pending:Mutex::new(None),packets:Mutex::new(Packets{queue:VecDeque::new(),bytes:0}),io:OnceLock::new()});
+        let(sender,receiver)=mpsc::sync_channel(1);
+        let mut client=Self{shared:shared.clone(),sender:Some(sender),threads:Vec::new(),profile:None,sha256};
+        let io_shared=shared.clone();
+        let io=std::thread::Builder::new().name("vlikeon-video-io".into()).spawn(move||io_loop(input,output,io_shared,receiver)).map_err(|_|failure())?;
+        let handle=thread_handle(&io);client.threads.push(io);shared.io.set(handle?).map_err(|_|failure())?;
+        let watch=shared.clone();
+        client.threads.push(std::thread::Builder::new().name("vlikeon-video-watch".into()).spawn(move||{
+            while watch.transport_live()&&watch.pending.lock().is_ok_and(|deadline|deadline.is_none_or(|value|Instant::now()<value))&&
+                watch.packets.lock().is_ok_and(|packets|packets.queue.front().is_none_or(|packet|Instant::now()<packet.deadline))&&
+                watch.io.get().is_some_and(|io|unsafe{WaitForSingleObject(io.as_raw_handle(),0)}==WAIT_TIMEOUT)&&watch.process.exited().is_ok_and(|value|!value){
+                std::thread::sleep(Duration::from_millis(8));
+            }
+            watch.close();let _=watch.process.stop(1000);
+        }).map_err(|_|failure())?);
+        SuspendedChild::resume(&primary)?;
+        Ok((client,VideoAuthorityLease{shared}))
+    }
+    pub fn owner(&self)->VideoOwner{self.shared.owner}
+    pub fn helper_sha256(&self)->&ContentHash{&self.sha256}
+    pub fn helper_witness(&self)->Result<ProcessWitness>{self.shared.process.witness()}
+    fn call(&self,kind:u16,payload:Vec<u8>,timeout:Duration)->Result<Vec<u8>>{
+        if !(if kind==STOP{self.shared.transport_live()}else{self.shared.authority_live()}){return Err(failure());}
+        let(reply,receive)=mpsc::sync_channel(1);
+        let result=(||{
+            self.sender.as_ref().ok_or_else(failure)?.try_send(Call{kind,payload,reply,timeout}).map_err(|_|failure())?;
+            receive.recv_timeout(timeout+Duration::from_millis(50)).map_err(|_|failure())?
+        })();
+        if result.is_err(){self.shared.close();}result
+    }
+    pub fn configure(&mut self,profile:VideoProfile)->Result<bool>{
+        if self.profile.is_some()||!profile.valid(){return Err(failure());}
+        let remaining=self.shared.deadline.saturating_duration_since(Instant::now()).as_millis();
+        if remaining==0||remaining>1_800_000{return Err(failure());}
+        let mut payload=Vec::with_capacity(61);payload.extend(self.shared.owner.capture.as_bytes());payload.extend(self.shared.owner.session.as_bytes());
+        payload.extend(self.shared.owner.generation.to_le_bytes());
+        for value in [profile.width,profile.height,profile.fps,profile.bitrate,remaining as u32]{payload.extend(value.to_le_bytes());}
+        payload.push(u8::from(profile.require_hardware));
+        let reply=self.call(CONFIGURE,payload.clone(),Duration::from_secs(5))?;
+        if reply.len()!=66||reply[..4]!=[0;4]||reply[4..65]!=payload[..]||reply[65]>1||profile.require_hardware&&reply[65]!=1{self.shared.close();return Err(failure());}
+        self.profile=Some(profile);Ok(reply[65]!=0)
+    }
+    /// Tight NV12. False means the worker did not accept this raw frame.
+    pub fn submit(&mut self,bytes:Vec<u8>,timestamp_100ns:i64,keyframe:bool)->Result<bool>{
+        let profile=self.profile.ok_or_else(failure)?;
+        if timestamp_100ns<0||bytes.len()!=(profile.width*profile.height*3/2)as usize{return Err(failure());}
+        let mut payload=Vec::with_capacity(9+bytes.len());payload.extend(timestamp_100ns.to_le_bytes());payload.push(u8::from(keyframe));payload.extend(bytes);
+        let reply=self.call(FRAME,payload,Duration::from_millis(250))?;
+        match reply.as_slice(){[0,0,0,0]=>Ok(true),[1,0,0,0]=>Ok(false),_=>{self.shared.close();Err(failure())}}
+    }
+    pub fn take_packet(&mut self)->Result<Option<VideoPacket>>{
+        if !self.shared.authority_live(){self.shared.close();return Err(failure());}
+        let mut packets=self.shared.packets.lock().map_err(|_|failure())?;
+        if packets.queue.front().is_some_and(|packet|Instant::now()>=packet.deadline){drop(packets);self.shared.close();return Err(failure());}
+        let packet=packets.queue.pop_front();
+        if let Some(value)=&packet{packets.bytes-=value.packet.bytes.len()+value.packet.sequence_header.len();}
+        drop(packets);
+        if !self.shared.authority_live()||packet.as_ref().is_some_and(|value|Instant::now()>=value.deadline){self.shared.close();return Err(failure());}
+        Ok(packet.map(|value|value.packet))
+    }
+    pub fn stop_confirmed(&mut self)->Result<()>{
+        if self.shared.revoking.load(Ordering::Acquire){return Err(failure());}
+        *self.shared.stop_deadline.lock().map_err(|_|failure())?=Some(Instant::now()+Duration::from_millis(1000));
+        self.shared.revoking.store(true,Ordering::Release);
+        if let Ok(mut packets)=self.shared.packets.lock(){packets.queue.clear();packets.bytes=0;}
+        let receipt=self.call(STOP,Vec::new(),Duration::from_millis(750));
+        let retired=self.close();
+        if receipt?.as_slice()!=[0,0,0,0]{return Err(failure());}retired
+    }
+    pub fn close(&mut self)->Result<()>{
+        self.shared.close();self.sender.take();let result=self.shared.process.stop(1000);
+        let mut retained=Vec::new();for thread in self.threads.drain(..){if thread.is_finished(){let _=thread.join();}else{retained.push(thread);}}self.threads=retained;result
+    }
+}
+impl Drop for VideoWorker{fn drop(&mut self){let _=self.close();}}
+
+fn exchange(input:&mut File,output:&mut File,shared:&Shared,id:&mut u64,kind:u16,payload:&[u8],timeout:Duration)->Result<(u16,Vec<u8>)>{
+    if !shared.transport_live()||*id>=10_000_000||payload.len()>3_110_409{return Err(failure());}
+    *id+=1;*shared.pending.lock().map_err(|_|failure())?=Some(Instant::now()+timeout);
+    let mut header=Vec::with_capacity(20);header.extend(b"VLKV");header.extend(1u16.to_le_bytes());header.extend(kind.to_le_bytes());header.extend(id.to_le_bytes());header.extend((payload.len()as u32).to_le_bytes());
+    input.write_all(&header).and_then(|_|input.write_all(payload)).map_err(|_|failure())?;
+    let mut reply=[0u8;20];output.read_exact(&mut reply).map_err(|_|failure())?;
+    let reply_kind=u16::from_le_bytes([reply[6],reply[7]]);
+    let length=u32::from_le_bytes(reply[16..20].try_into().map_err(|_|failure())?)as usize;
+    if &reply[..4]!=b"VLKV"||reply[4..6]!=[1,0]||u64::from_le_bytes(reply[8..16].try_into().map_err(|_|failure())?)!=*id||
+        !matches!(reply_kind,0x8000|0x8001)||length>2*1024*1024+65536+17||
+        (reply_kind==0x8001&&kind!=POLL)||(reply_kind==0x8000&&!matches!(length,4|66)){return Err(failure());}
+    let mut bytes=vec![0u8;length];output.read_exact(&mut bytes).map_err(|_|failure())?;
+    let pending=shared.pending.lock().map_err(|_|failure())?.take().ok_or_else(failure)?;
+    // During explicit Stop, finish reading one already-issued Poll solely to
+    // preserve framing. The I/O loop discards that result before publication.
+    if Instant::now()>=pending||!shared.transport_live(){return Err(failure());}
+    if reply_kind==0x8000&&(bytes.len()<4||bytes[3]&0x80!=0){return Err(failure());}
+    Ok((reply_kind,bytes))
+}
+fn io_loop(mut input:File,mut output:File,shared:Arc<Shared>,receiver:mpsc::Receiver<Call>){
+    let run=(||->Result<()>{
+        let mut id=0;let mut configured=false;let mut last_poll=Instant::now();let mut first_input=true;
+        let mut accepted:VecDeque<(i64,bool,Instant)>=VecDeque::new();
+        while shared.transport_live(){
+            if !shared.revoking.load(Ordering::Acquire)&&accepted.front().is_some_and(|(_,_,submitted)|submitted.elapsed()>=Duration::from_millis(250)){return Err(failure());}
+            if configured&&!shared.revoking.load(Ordering::Acquire)&&last_poll.elapsed()>=Duration::from_millis(8){
+                let(kind,bytes)=exchange(&mut input,&mut output,&shared,&mut id,POLL,&[],Duration::from_millis(250))?;
+                last_poll=Instant::now();
+                if shared.revoking.load(Ordering::Acquire){
+                    // Drain an in-flight Poll without accepting any media.
+                }else if kind==0x8001{
+                    if bytes.len()<17||bytes[8]>1{return Err(failure());}
+                    let pts=i64::from_le_bytes(bytes[..8].try_into().map_err(|_|failure())?);
+                    let size=u32::from_le_bytes(bytes[9..13].try_into().map_err(|_|failure())?)as usize;
+                    let header=u32::from_le_bytes(bytes[13..17].try_into().map_err(|_|failure())?)as usize;
+                    let(expected,force,submitted)=accepted.pop_front().ok_or_else(failure)?;
+                    if pts!=expected||force&&bytes[8]!=1||size==0||size>2*1024*1024||header>65536||bytes.len()!=17+size+header||submitted.elapsed()>=Duration::from_millis(250){return Err(failure());}
+                    let packet=VideoPacket{timestamp_100ns:pts,keyframe:bytes[8]!=0,bytes:bytes[17..17+size].to_vec(),sequence_header:bytes[17+size..].to_vec()};
+                    let mut packets=shared.packets.lock().map_err(|_|failure())?;
+                    if !shared.authority_live()||packets.queue.len()>=4||packets.bytes+size+header>4*1024*1024{return Err(failure());}
+                    packets.bytes+=size+header;packets.queue.push_back(Queued{packet,deadline:(submitted+Duration::from_millis(250)).min(Instant::now()+Duration::from_millis(100))});
+                }else if bytes.as_slice()!=[1,0,0,0]{return Err(failure());}
+            }
+            let call=match receiver.recv_timeout(Duration::from_millis(8)){Ok(value)=>value,Err(mpsc::RecvTimeoutError::Timeout)=>continue,Err(_)=>break};
+            if call.kind!=STOP&&shared.revoking.load(Ordering::Acquire){return Err(failure());}
+            if (!configured&&call.kind!=CONFIGURE&&call.kind!=STOP)||(configured&&call.kind==CONFIGURE){return Err(failure());}
+            let submitted=Instant::now();
+            let(kind,reply)=exchange(&mut input,&mut output,&shared,&mut id,call.kind,&call.payload,call.timeout)?;
+            if kind!=0x8000{return Err(failure());}
+            if call.kind==CONFIGURE{
+                if reply.len()!=66||reply[..4]!=[0;4]||reply[4..65]!=call.payload[..]||reply[65]>1||call.payload[60]!=0&&reply[65]!=1{return Err(failure());}
+                configured=true;
+            }
+            if call.kind==FRAME&&reply.as_slice()==[0,0,0,0]{
+                if accepted.len()>=6||call.payload.len()<9{return Err(failure());}
+                let pts=i64::from_le_bytes(call.payload[..8].try_into().map_err(|_|failure())?);
+                accepted.push_back((pts,call.payload[8]!=0||first_input,submitted));first_input=false;
+            }
+            call.reply.try_send(Ok(reply)).map_err(|_|failure())?;
+            if call.kind==STOP{break;}
+        }Ok(())
+    })();let _=run;shared.close();
+}

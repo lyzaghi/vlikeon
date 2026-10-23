@@ -1,6 +1,6 @@
 //! Normal-user trusted helper launch, not a sandbox for untrusted executables.
 //! Admission/hash verification and an immutable executable guard belong to the
-//! native broker. Used by the keyboard helper and candidate gamepad transport.
+//! native broker. Used by keyboard and candidate gamepad/video transports.
 use crate::{failure,gamepad_process::ProcessWitness,system_directory};
 use omniplay_contracts::Result;
 use std::{ffi::OsStr,fs::{File,OpenOptions},mem::{size_of,size_of_val},
@@ -64,7 +64,8 @@ pub(crate) struct SuspendedChild{
     pub(crate) process:Arc<ChildProcess>,thread:OwnedHandle,
     pub(crate) input:File,pub(crate) output:File,
 }
-pub(crate) enum HelperKind{KeyboardMouse,Gamepad}
+#[derive(Clone,Copy)]
+pub(crate) enum HelperKind{KeyboardMouse,Gamepad,Video}
 impl SuspendedChild{
     pub(crate) fn launch(executable:&Path,kind:HelperKind)->Result<Self>{
         if !executable.is_absolute(){return Err(failure());}
@@ -78,14 +79,15 @@ impl SuspendedChild{
         let mut limits=JOBOBJECT_EXTENDED_LIMIT_INFORMATION::default();
         limits.BasicLimitInformation.LimitFlags=JOB_OBJECT_LIMIT_ACTIVE_PROCESS|
             JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE|JOB_OBJECT_LIMIT_PROCESS_MEMORY|JOB_OBJECT_LIMIT_DIE_ON_UNHANDLED_EXCEPTION;
-        limits.BasicLimitInformation.ActiveProcessLimit=1;limits.ProcessMemoryLimit=128*1024*1024;
+        limits.BasicLimitInformation.ActiveProcessLimit=1;
+        limits.ProcessMemoryLimit=match kind{HelperKind::Video=>512*1024*1024,_=>128*1024*1024};
         if unsafe{SetInformationJobObject(job.as_raw_handle(),JobObjectExtendedLimitInformation,
             (&limits as*const JOBOBJECT_EXTENDED_LIMIT_INFORMATION).cast(),size_of_val(&limits)as u32)}==0{return Err(failure());}
         let jobs=[job.as_raw_handle()];let mut attributes=Attributes::new()?;
         attributes.set(PROC_THREAD_ATTRIBUTE_HANDLE_LIST,&inherited)?;
         attributes.set(PROC_THREAD_ATTRIBUTE_JOB_LIST,&jobs)?;
         let application=wide(executable.as_os_str())?;let directory=wide(directory.as_os_str())?;
-        let argument=match kind{HelperKind::KeyboardMouse=>"--stdio-input-v1",HelperKind::Gamepad=>"--stdio-gamepad-v2"};
+        let argument=match kind{HelperKind::KeyboardMouse=>"--stdio-input-v1",HelperKind::Gamepad=>"--stdio-gamepad-v2",HelperKind::Video=>"--stdio-video-v1"};
         let mut command=wide(OsStr::new(&format!("\"{text}\" {argument}")))?;
         let system=system_directory()?;let system=system.to_str().ok_or_else(failure)?;
         let mut environment=Vec::new();
