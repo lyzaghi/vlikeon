@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'wasm-unsafe-eval'; worker-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; media-src 'self' blob:; object-src 'none'; base-uri 'none'; form-action 'none'">
+  <meta name="color-scheme" content="dark">
+  <title>Vlikeon Demo</title>
+  <link rel="icon" href="logo.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="demo.css">
+  <script type="module" src="demo.js"></script>
+</head>
+<body>
+  <aside class="sidebar">
+    <a class="brand" href="#main"><img src="logo.svg" width="38" height="38" alt=""><span>vlikeon<small>YOUR PLAY SPACE</small></span></a>
+    <span class="eyebrow nav-title">KHÔNG GIAN CHƠI</span>
+    <div class="nav-active"><span aria-hidden="true">▦</span> Thư viện <b>01</b></div>
+    <div class="sidebar-game"><span class="mini-orb" aria-hidden="true"></span><div>Vlike Grid<small>Game Boy · Vlike Original</small></div></div>
+    <div class="sidebar-bottom"><span class="local-dot"></span><div>Chơi ngay, lưu tại máy<small>Không cần tài khoản</small></div></div>
+  </aside>
+  <main id="main">
+    <header><span>Thư viện <span class="slash">/</span> <strong>Vlike Original</strong></span><span class="demo-badge">WINDOWS DEMO <span>0.1</span></span></header>
+    <section class="intro"><div><p class="eyebrow">ÍT THIẾT LẬP. NHIỀU CUỘC CHƠI.</p><h1>Không gian chơi của bạn.</h1><p>Một game gốc. Một cú chạm. Bắt đầu ngay tại đây.</p></div><span class="offline-pill"><i></i> Chơi ngoại tuyến</span></section>
+    <section class="game-layout">
+      <div class="stage" id="stage">
+        <div class="stage-top"><span><i class="live-dot"></i> VLIKE GRID</span><span id="runtime-state">SẴN SÀNG</span></div>
+        <div class="screen" id="screen">
+          <div id="cover" class="cover"><div class="orbit orbit-one"></div><div class="orbit orbit-two"></div><div class="cover-ship" aria-hidden="true">✦</div><p class="eyebrow">A VLIKE ORIGINAL</p><h2>VLIKE<br><em>GRID</em></h2><p>Đi tìm những đốm sáng.</p></div>
+          <div id="canvas-wrap" hidden><canvas width="160" height="144" id="game-canvas" aria-label="Màn hình game Vlike Grid"></canvas></div>
+          <div id="busy" class="busy" hidden role="status"><span class="spinner"></span><span id="busy-text">Đang chuẩn bị game…</span></div>
+        </div>
+        <div class="stage-footer"><span id="frame-status">Game Boy · 160 × 144</span><button id="fullscreen" class="icon-button" title="Toàn màn hình" aria-label="Toàn màn hình">⛶</button></div>
+      </div>
+      <aside class="details"><span class="genre">ARCADE · GAME BOY</span><h2>Vlike Grid</h2><p class="description">Lái đốm sáng qua lưới và thu thập những quả cầu. Điểm số nằm ngay trong game. Chơi theo nhịp của bạn.</p><div class="game-tags"><span>1 người chơi</span><span>Game gốc</span><span>Không cần BIOS riêng</span></div>
+        <button id="play" class="primary-button"><span aria-hidden="true">▶</span> Chơi ngay</button>
+        <div class="session-actions"><button id="pause" class="secondary-button" disabled>Tạm dừng</button><button id="restart" class="secondary-button" disabled>Chơi lại</button></div>
+        <div class="save-box"><div><span class="eyebrow">ĐIỂM DỪNG CỦA BẠN</span><p id="save-status">Chưa có điểm lưu</p></div><div class="session-actions"><button id="save" class="secondary-button" disabled>Lưu điểm dừng</button><button id="restore" class="secondary-button" disabled>Khôi phục</button></div></div>
+        <div class="controls-help"><span class="eyebrow">CÁCH CHƠI</span><p><kbd>↑</kbd><kbd>←</kbd><kbd>↓</kbd><kbd>→</kbd><span>hoặc WASD để di chuyển</span></p><p><kbd>Space</kbd><span>Tạm dừng / tiếp tục</span></p><p class="controller-hint" id="gamepad-status">Hỗ trợ tay cầm chuẩn Gamepad</p></div>
+      </aside>
+    </section>
+    <div class="touch-controls" aria-label="Điều khiển hướng"><button data-direction="4" aria-label="Lên">↑</button><div><button data-direction="6" aria-label="Trái">←</button><button data-direction="5" aria-label="Xuống">↓</button><button data-direction="7" aria-label="Phải">→</button></div></div>
+    <div id="notice" role="status" aria-live="polite">Chọn “Chơi ngay” để bắt đầu.</div>
+    <footer>Vlikeon Game Hub · Bản demo kỹ thuật có thể chơi <span>Game gốc của Vlike · Giả lập bằng SameBoy</span><button id="about">Thông tin &amp; giấy phép</button></footer>
+    <dialog id="about-dialog"><button id="about-close" class="secondary-button">Đóng</button><pre id="about-text"></pre></dialog>
+  </main>
+</body>
+</html>

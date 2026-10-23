@@ -1,0 +1,40 @@
+{
+  "batch_id": "vlikeon-048",
+  "cases": [
+    {
+      "id": "package",
+      "exit_code": 0
+    },
+    {
+      "id": "native-window-open",
+      "passed": true,
+      "url": "https://demo.vlikeon.local/index.html"
+    },
+    {
+      "id": "game-frames-input-pause",
+      "passed": true,
+      "initial_sha256": "3d3d9bc3388f8cf6a6f2a0463b01d261d1fd9ceb7a680594b6f0ba64116f2ba2",
+      "moved_sha256": "06aab70c5bb7f861215277e40de0a334fcb36dd02fb9ed7603cce9137e7be678",
+      "metrics": "Game Boy · 60 khung hình/giây · 160 × 144"
+    },
+    {
+      "id": "checkpoint-restore",
+      "passed": true,
+      "restored_sha256": "06aab70c5bb7f861215277e40de0a334fcb36dd02fb9ed7603cce9137e7be678"
+    },
+    {
+      "id": "native-final-save-exit",
+      "passed": true
+    },
+    {
+      "id": "reopen-persistent-restore",
+      "passed": true,
+      "sha256": "06aab70c5bb7f861215277e40de0a334fcb36dd02fb9ed7603cce9137e7be678"
+    }
+  ],
+  "page_errors": [],
+  "started_at": "2026-10-23T04:16:22.141Z",
+  "status": "completed",
+  "source_unchanged": true,
+  "finished_at": "2026-10-23T04:16:30.938Z"
+}

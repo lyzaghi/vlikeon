@@ -64,6 +64,9 @@ function environment(command,data){
   if(command&0x20000)return 0;
   const code=command&0xffff;
   switch(code){
+    case 81: // GET_TARGET_SAMPLE_RATE: avoid a core's multi-MHz fallback.
+      if(!Number.isInteger(data)||data<=0||data%4||data>core.HEAPU8.length-4)return 0;
+      core.HEAPU32[data>>>2]=48000;return 1;
     case 3: core.HEAPU8[data]=1;return 1; // GET_CAN_DUPE
     case 9: core.HEAPU32[data>>>2]=allocateString('/system');return 1;
     case 10:{const format=core.HEAPU32[data>>>2];if(format>2)return 0;pixelFormat=format;return 1;}
