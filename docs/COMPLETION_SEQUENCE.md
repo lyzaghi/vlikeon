@@ -37,6 +37,14 @@ and Stop-receipt-plus-retirement confirmation. No compile, helper launch or test
 ran. Product admission/capture/observation/receiver integration and every original
 remaining service/platform requirement are still open.
 
+The next item-56 source checkpoint connects the raw mailbox, explicit SDR
+BGRA-to-NV12 conversion and Windows worker inside a broker-private module. It
+preserves raw receipt age and pending keyframe intent, requests matching MF
+colour metadata and returns only unnegotiated packets. Eight colour/buffer/
+identity regression cases are authored, not executed. Native capture producer,
+installed/native admission, actual receiver/transport/UI integration, other
+platform completion and all build/runtime/final evidence remain due.
+
 This fork's current assignment: items 51 and 52 are accepted with evidence in
 `SAVE_ARCHIVE_INTERCHANGE.md` and `STORAGE_FAULT_QUALIFICATION.md`. On 2026-10-23,
 the owner deferred Linux build/runtime work for item 53, then deferred build/test

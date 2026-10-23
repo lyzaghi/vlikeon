@@ -8,7 +8,10 @@
     "Unintegrated macOS VideoToolbox H.264/HEVC encoder source with explicit hardware requirement, bounded submissions/output, shared callback lifetime and terminal output fences",
     "Unintegrated Windows Media Foundation H.264 NV12 encoder source, sync/async MFT lifecycle, bounded pending/output, keyframe/timestamp/deadline fences and separate stop receipts",
     "Independent Windows encoder-worker executable source recipe, bounded pipe protocol, separate reader/writer/MTA actor, parent keepalive and superseding Stop acknowledgment; not built, installed or product-integrated",
-    "Unintegrated Windows Rust video parent client, typed creation-time job, original process witnesses, independent native lease/pipe watchdog, accepted-frame matching and bounded Stop/retirement source"
+    "Unintegrated Windows Rust video parent client, typed creation-time job, original process witnesses, independent native lease/pipe watchdog, accepted-frame matching and bounded Stop/retirement source",
+    "Explicit SDR colour contract, owned sRGB BGRA-to-limited BT.709 NV12 reference conversion/padding normalization and matching MF colour fields",
+    "Broker-private mailbox/conversion/worker bridge retaining raw receipt age and pending keyframe intent; output remains unnegotiated, no current product command or capture producer",
+    "Eight authored Rust colour/buffer/identity regression cases, none executed"
   ],
   "static_review": "Source review and git diff whitespace check only",
   "build_executed": false,

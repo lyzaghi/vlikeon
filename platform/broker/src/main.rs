@@ -11,6 +11,7 @@ mod native_work_jobs;
 mod stream_input;
 mod stream_gamepad;
 mod stream_gamepad_recovery;
+#[cfg(windows)]mod stream_video;
 
 use omniplay_contracts::{ErrorCode, PlatformError, Request, Response};
 use omniplay_core::Database;

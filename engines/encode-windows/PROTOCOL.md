@@ -49,6 +49,10 @@ Main Level 4.2; the actual bitstream/type still requires receiver admission.
 
 Payload: nonnegative signed-64-bit timestamp in 100 ns units (8 bytes), forced
 keyframe flag 0/1 (1 byte), then width*height*3/2 tightly packed NV12 bytes.
+The byte contract is SDR BT.709 primaries/transfer/matrix, limited range and
+centered 2x2 chroma. Full-range, unknown/HDR or differently sited NV12 requires
+explicit conversion first. MF requests these colour fields; actual coded VUI
+and receiver colour still require validation before publication.
 Maximum complete payload: 3,110,409 bytes. Queued commands older than 100 ms are
 rejected. Encoder processing age separately starts before its raw copy. Timestamps
 increase across accepted frames. Reply `0x8000` contains a 4-byte HRESULT: S_OK

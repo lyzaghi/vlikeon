@@ -28,6 +28,13 @@ HRESULT make_type(const Configuration& c,bool encoded,IMFMediaType** result){
   VLK_TRY(MFSetAttributeRatio(type.Get(),MF_MT_FRAME_RATE,c.fps,1));
   VLK_TRY(MFSetAttributeRatio(type.Get(),MF_MT_PIXEL_ASPECT_RATIO,1,1));
   VLK_TRY(type->SetUINT32(MF_MT_INTERLACE_MODE,MFVideoInterlace_Progressive));
+  // Worker v1 accepts SDR BT.709 limited-range NV12 with centered 2x2 chroma.
+  // Actual coded VUI/headers still require receiver-side admission.
+  VLK_TRY(type->SetUINT32(MF_MT_VIDEO_PRIMARIES,MFVideoPrimaries_BT709));
+  VLK_TRY(type->SetUINT32(MF_MT_TRANSFER_FUNCTION,MFVideoTransFunc_709));
+  VLK_TRY(type->SetUINT32(MF_MT_YUV_MATRIX,MFVideoTransferMatrix_BT709));
+  VLK_TRY(type->SetUINT32(MF_MT_VIDEO_NOMINAL_RANGE,MFNominalRange_16_235));
+  VLK_TRY(type->SetUINT32(MF_MT_VIDEO_CHROMA_SITING,MFVideoChromaSubsampling_MPEG1));
   if(encoded){
     VLK_TRY(type->SetUINT32(MF_MT_AVG_BITRATE,c.bitrate));
     VLK_TRY(type->SetUINT32(MF_MT_MPEG2_PROFILE,eAVEncH264VProfile_Main));

@@ -10,6 +10,10 @@ use uuid::Uuid;
 pub enum Codec{H264,Vp8,Vp9,Av1,Hevc}
 #[derive(Clone,Copy,Debug,PartialEq,Eq)]
 pub enum PixelFormat{Nv12,Bgra8}
+/// Explicit SDR contract. Unknown/HDR/transparent surfaces require admission or
+/// composition by the native producer before constructing an opaque RGB frame.
+#[derive(Clone,Copy,Debug,PartialEq,Eq)]
+pub enum ColourEncoding{SrgbOpaque,Bt709LimitedCentered}
 #[derive(Clone,Copy,Debug,PartialEq,Eq)]
 pub struct Profile{pub width:u32,pub height:u32,pub fps:u32,pub bitrate_bps:u32}
 impl Profile{
@@ -60,17 +64,19 @@ pub fn select_encoder<'a>(local:&'a[EncoderCapability],receiver:&[CodecIdentity]
 /// capture requires a new mailbox rather than reopening a stopped generation.
 #[derive(Clone,Copy,Debug,PartialEq,Eq)]
 pub struct Binding{pub capture:Uuid,pub session:Uuid,pub generation:u64}
-impl Binding{fn valid(self)->bool{!self.capture.is_nil()&&!self.session.is_nil()&&self.generation>0}}
+impl Binding{fn valid(self)->bool{!self.capture.is_nil()&&!self.session.is_nil()&&(1..=1_000_000).contains(&self.generation)}}
 pub struct Frame{
     pub binding:Binding,pub sequence:u64,pub timestamp_us:u64,
-    pub width:u32,pub height:u32,pub format:PixelFormat,
+    pub width:u32,pub height:u32,pub format:PixelFormat,pub colour:ColourEncoding,
     /// BGRA row stride, or the shared NV12 Y/UV row stride.
     pub stride:u32,pub bytes:Vec<u8>,
 }
 impl Frame{
+    pub(crate) fn validate_for_conversion(&self,binding:Binding,profile:Profile)->Result<()>{self.validate(binding,profile,self.format)}
     fn validate(&self,binding:Binding,profile:Profile,format:PixelFormat)->Result<()>{
-        if self.binding!=binding||self.sequence==0||self.sequence>u64::from(u32::MAX)||
-            self.width!=profile.width||self.height!=profile.height||self.format!=format{return Err(invalid());}
+        if !binding.valid()||self.binding!=binding||self.sequence==0||self.sequence>u64::from(u32::MAX)||
+            self.width!=profile.width||self.height!=profile.height||self.format!=format||
+            !matches!((format,self.colour),(PixelFormat::Bgra8,ColourEncoding::SrgbOpaque)|(PixelFormat::Nv12,ColourEncoding::Bt709LimitedCentered)){return Err(invalid());}
         let minimum=match format{PixelFormat::Bgra8=>self.width.checked_mul(4),PixelFormat::Nv12=>Some(self.width)}.ok_or_else(invalid)?;
         if self.stride<minimum||self.stride>minimum+4096||self.stride%4!=0{return Err(invalid());}
         let rows=match format{PixelFormat::Bgra8=>self.height,PixelFormat::Nv12=>self.height+self.height/2};
@@ -101,10 +107,15 @@ impl FrameMailbox{
         state.frames.push_back(Queued{frame,received:Instant::now()});Ok(())
     }
     pub fn take_latest(&self)->Result<Option<Frame>>{
+        Ok(self.take_latest_timed()?.map(|(frame,_)|frame))
+    }
+    /// Preserve native local receipt time through conversion. Do not start a
+    /// fresh frame-age budget after slow mailbox/conversion work.
+    pub fn take_latest_timed(&self)->Result<Option<(Frame,Instant)>>{
         let mut state=self.state.lock().map_err(|_|unauthorized())?;
         if state.closed||Instant::now()>=self.deadline{state.closed=true;state.frames.clear();return Err(unauthorized());}
         let latest=state.frames.pop_back();state.frames.clear();
-        Ok(latest.filter(|value|value.received.elapsed()<=Duration::from_millis(100)).map(|value|value.frame))
+        Ok(latest.filter(|value|value.received.elapsed()<=Duration::from_millis(100)).map(|value|(value.frame,value.received)))
     }
     /// Stops delivery before native teardown. This is not an OS stop receipt;
     /// the owning service must separately retain unresolved backend cleanup.

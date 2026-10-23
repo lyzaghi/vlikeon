@@ -140,3 +140,12 @@ the exact lease, memory, timeout, cleanup and caller-publication requirements.
 No current product command calls it. Installed admission, live native capture/
 document/pair observation, codec/receiver integration and all qualification remain
 unfinished. No build, helper/encoder execution or test ran.
+
+An internal Windows broker bridge now connects admitted raw mailboxes through
+explicit SDR colour conversion to worker submissions. Local raw-frame receipt
+age survives conversion, keyframe intent survives raw backpressure, and output
+remains explicitly unnegotiated. MF types request matching BT.709 limited-range
+centered-chroma metadata. `NATIVE_VIDEO_COLOUR.md` records colour contracts,
+references, eight unexecuted source cases and remaining capture/negotiation/
+product work. No real capture producer, service command or media publication
+path is connected by this checkpoint; no build/test was executed.

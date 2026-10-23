@@ -102,6 +102,10 @@ impl VideoWorker{
         Ok((client,VideoAuthorityLease{shared}))
     }
     pub fn owner(&self)->VideoOwner{self.shared.owner}
+    pub fn remaining_authorized(&self)->Result<Duration>{
+        if !self.shared.authority_live(){return Err(failure());}
+        Ok(self.shared.deadline.saturating_duration_since(Instant::now()))
+    }
     pub fn helper_sha256(&self)->&ContentHash{&self.sha256}
     pub fn helper_witness(&self)->Result<ProcessWitness>{self.shared.process.witness()}
     fn call(&self,kind:u16,payload:Vec<u8>,timeout:Duration)->Result<Vec<u8>>{
