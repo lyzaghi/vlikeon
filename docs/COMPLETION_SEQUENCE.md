@@ -16,6 +16,13 @@ capture and certificate deadlines are checked before computing worker lifetime.
 The descendant chooser/capture binding still needs implementation; no build,
 test, dialog, helper or native API was executed for this checkpoint.
 
+Item 57 now also authors bounded native window discovery and retained choices
+for exact game-job members, with caption bounds, original observation expiry
+and re-admission of the selected window/process. Core host-only methods expose
+these typed choices, not a raw PID/handle command. Broker/UI selection and
+descendant capture registration remain unconnected; no native API, build or
+test execution was performed and the item is still incomplete.
+
 On the owner's continued source-work/next steering, item 56 now has initial
 private native codec-intersection and bounded raw-frame mailbox source in
 `native_video.rs`. `NATIVE_VIDEO_SERVICE.md` records the independent executable,

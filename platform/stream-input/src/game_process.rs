@@ -2,6 +2,7 @@
 //! This job is an ownership scope, not an untrusted-code sandbox. It deliberately
 //! has no kill-on-close, quotas, breakaway allowance or process termination API.
 use crate::gamepad_process::ProcessWitness;
+pub use crate::game_windows::GameWindow;
 use omniplay_contracts::{ErrorCode,PlatformError,Result};
 use std::{ffi::OsStr,fs::OpenOptions,mem::{size_of,size_of_val},
     os::windows::{ffi::OsStrExt,io::{AsHandle,AsRawHandle,BorrowedHandle,FromRawHandle,OwnedHandle}},
@@ -123,6 +124,11 @@ impl OwnedGameProcess{
     /// Direct-root compatibility path. A live descendant is never guessed when
     /// the launcher exits; the native chooser must select and admit its handle.
     pub fn root_handle(&self)->Result<OwnedHandle>{self.admit_selected(self.root.as_handle())}
+
+    /// Bounded host-only choices; the caller must present an explicit choice
+    /// and then obtain native capture consent. Discovery is not authorization.
+    pub fn windows(&self)->Result<Vec<GameWindow>>{crate::game_windows::enumerate(self)}
+    pub fn admit_window(&self,selected:&GameWindow)->Result<OwnedHandle>{selected.admit(self)}
 
     /// Only for a handle from the host's native window selection. Membership
     /// does not itself authorize capture/input or select a window. No PID,

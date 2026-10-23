@@ -56,6 +56,33 @@ operations, before computing the worker's remaining lifetime. This prepares
 input for a future correctly bound descendant capture; it does not supply the
 missing native chooser or change current root-only capture preparation.
 
+## Native window choice source
+
+`game_windows.rs` now authors host-only top-level window discovery for a retained
+game job. `InstalledGames::stream_windows` returns at most 32 private choices,
+each holding its actual read-only process handle, exact creation identity,
+window and native observation time. Discovery visits at most 8,192 windows and
+checks a 250-ms budget between operations and on return. A limit/error discards
+the result, rather than presenting a silently truncated choice list. Individual
+unreadable/nonmember/dead processes are omitted; this is not proof that no other
+game window exists. The OS calls themselves do not have a hard timeout.
+
+The probe ignores the broker's own windows and invisible/minimized/non-top-level
+windows. It reads a bounded 512-unit caption only after membership admission,
+removing control and bidi-direction formatting characters for display. Titles
+never establish ownership. Protected, cloaked, unsupported or newly created
+windows may still be absent or refused by the later capture backend.
+
+Choices have no deserializer, caller-controlled process/window constructor or
+automatic first-choice behavior. `stream_window_process` rechecks the selected
+choice against the exact game job, process identity/liveness, visible HWND/PID
+and a 30-second lifetime. Another session's choice is refused. This is source
+for the future chooser/capability flow; no broker command, UI selection or
+descendant media-token registration is connected yet. Final local capture
+consent and revocation remain mandatory. HWND reuse within the same live process
+is not proven impossible by these observations and needs capture-lifetime
+binding/qualification rather than a claim of atomic OS selection.
+
 ## Remaining scope
 
 - Connect the native chooser's selected process handle to the prepared capture,

@@ -93,6 +93,21 @@ impl InstalledGames {
         game.child.admit_selected(selected)
     }
 
+    /// These native choices hold process objects, not caller-supplied PIDs.
+    #[cfg(windows)]
+    pub fn stream_windows(&mut self,database:&Database,game_id:Uuid)->Result<Vec<omniplay_stream_input::game_process::GameWindow>>{
+        self.poll(database)?;
+        let game=self.running.values().find(|value|value.info.game_id==game_id).ok_or_else(||PlatformError::new(ErrorCode::InvalidState,"The selected installed game session is no longer active"))?;
+        game.child.windows()
+    }
+
+    #[cfg(windows)]
+    pub fn stream_window_process(&mut self,database:&Database,game_id:Uuid,selected:&omniplay_stream_input::game_process::GameWindow)->Result<std::os::windows::io::OwnedHandle>{
+        self.poll(database)?;
+        let game=self.running.values().find(|value|value.info.game_id==game_id).ok_or_else(||PlatformError::new(ErrorCode::InvalidState,"The selected installed game session is no longer active"))?;
+        game.child.admit_window(selected)
+    }
+
     fn poll(&mut self,database:&Database)->Result<()> {
         let mut exited=Vec::new();
         for (id,game) in &mut self.running {
