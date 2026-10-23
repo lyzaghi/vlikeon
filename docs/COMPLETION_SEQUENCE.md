@@ -17,6 +17,11 @@ cleanup records until exact-container disappearance. This is not integrated
 with broker/native consent, signed-driver admission or a supervised helper;
 macOS gamepad implementation remains due. `VIRTUAL_GAMEPAD_OWNERSHIP.md` records
 the source and remaining scope. No item-55 build/test or driver install has run.
+The subsequent source checkpoint adds two-step device reservation/activation,
+pre-creation Windows container identities, a separate parent-heartbeat lease,
+real Windows target/activity observations and a default-off private v2 helper
+actor/reader. Parent supervision, durable cleanup records and product integration
+remain unfinished; this is not an additional accepted item.
 
 The owner now requests the individually numbered tasks in
 [`OUTSTANDING_WORK.md`](OUTSTANDING_WORK.md), completed in order. Task 1 source

@@ -21,6 +21,11 @@ typedef struct VLKWinPadReport {
 // Zero return means success; other returns are Windows error codes.
 uint32_t vlk_winpad_reserve(uint8_t slot, uint16_t vendor, uint16_t product,
                            uint64_t* token);
+// Raw Windows GUID bytes (not UUID network order), available at reservation.
+uint32_t vlk_winpad_container(uint64_t token, uint8_t container[16]);
+// Read-only exact-container observation: 0 absent, 1 present, 2 unknown.
+// Absence alone, without earlier presence/removal receipt, proves no cleanup.
+uint32_t vlk_winpad_presence(const uint8_t container[16]);
 uint32_t vlk_winpad_write(uint64_t token, const VLKWinPadReport* report);
 
 // Always revokes further writes, best-effort neutralizes, closes the private

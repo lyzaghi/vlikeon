@@ -8,7 +8,9 @@
     "Private host authorization, stable slots, full snapshots, release sequence and retained failed cleanup",
     "Linux uinput candidate with existing device permission only",
     "Standard browser gamepad sampling with sparse stable indices",
-    "Default-off Windows generic HID candidate, pinned WinUHid static client recipe and exact-container cleanup query"
+    "Default-off Windows generic HID candidate, pinned WinUHid static client recipe and exact-container cleanup query",
+    "Two-step prepare/activate, pre-creation Windows container identities and non-reviving parent heartbeat lease",
+    "Windows process/foreground/local activity observations and opt-in private v2 helper actor/reader"
   ],
   "static_review": "Source/API review and git diff whitespace check only; no compiler or runtime validation",
   "passed_test_cases": [],
@@ -20,7 +22,8 @@
   "advertised_gamepad_capability": false,
   "pending": [
     "Broker/native permission UI and authenticated capture/pair/session integration",
-    "Independent supervised helper, fresh host observations and cross-process device arbitration",
+    "Parent-side v2 client, external process supervision, durable cleanup ledger and cross-process device arbitration",
+    "Combined keyboard/gamepad helper observation and injection attribution",
     "Windows assigned HID identity, exact signed driver/package admission and unresolved-creation recovery",
     "macOS provider and entitlement/package path",
     "Real device readiness, game ordering, analog compatibility and haptics/accessory scope",

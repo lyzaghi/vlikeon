@@ -11,6 +11,7 @@
 #include "hid_report.hpp"
 #include <array>
 #include <cwchar>
+#include <cstring>
 #include <limits>
 #include <memory>
 #include <mutex>
@@ -87,7 +88,6 @@ DWORD retire(Device& device) noexcept {
 }
 DWORD initialize(Device& device) noexcept {
     if (WinUHidGetDriverInterfaceVersion()!=1) return ERROR_REVISION_MISMATCH;
-    if (FAILED(CoCreateGuid(&device.container))) return ERROR_GEN_FAILURE;
     wchar_t instance[39]{};
     if (StringFromGUID2(device.container,instance,39)!=39) return ERROR_GEN_FAILURE;
     WINUHID_DEVICE_CONFIG config{};
@@ -130,10 +130,32 @@ extern "C" std::uint32_t vlk_winpad_reserve(std::uint8_t slot,std::uint16_t vend
         if (devices[slot]) return ERROR_BUSY;
         if (next_token==std::numeric_limits<std::uint64_t>::max()) return ERROR_TOO_MANY_CMDS;
         auto device=std::make_unique<Device>();
+        if (FAILED(CoCreateGuid(&device->container))) return ERROR_GEN_FAILURE;
         device->token=next_token++;device->vendor=vendor;device->product=product;
         *token=device->token;devices[slot]=std::move(device);return ERROR_SUCCESS;
     } catch (const std::bad_alloc&) {return ERROR_NOT_ENOUGH_MEMORY;}
       catch (...) {return ERROR_GEN_FAILURE;}
+}
+extern "C" std::uint32_t vlk_winpad_container(std::uint64_t token,std::uint8_t container[16]) {
+    if (!container) return ERROR_INVALID_PARAMETER;
+    std::memset(container,0,16);
+    try {
+        std::lock_guard lock(mutex);
+        const auto* device=find(token);
+        if (!device || device->closing) return ERROR_INVALID_HANDLE;
+        static_assert(sizeof(device->container)==16);
+        std::memcpy(container,&device->container,16);return ERROR_SUCCESS;
+    } catch (...) {return ERROR_GEN_FAILURE;}
+}
+extern "C" std::uint32_t vlk_winpad_presence(const std::uint8_t container[16]) {
+    if (!container) return 2;
+    GUID id{};static_assert(sizeof(id)==16);std::memcpy(&id,container,16);
+    const GUID zero{};if (IsEqualGUID(id,zero)) return 2;
+    switch (presence(id)) {
+    case Presence::Absent:return 0;
+    case Presence::Present:return 1;
+    default:return 2;
+    }
 }
 extern "C" std::uint32_t vlk_winpad_write(std::uint64_t token,const VLKWinPadReport* report) {
     if (!report || report->reserved!=0) return ERROR_INVALID_PARAMETER;

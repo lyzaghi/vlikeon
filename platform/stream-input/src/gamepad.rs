@@ -22,7 +22,7 @@ pub struct Owner{
     pub epoch:u32,pub target:TargetBinding,
 }
 impl Owner{
-    fn valid(&self)->bool{
+    pub(crate) fn valid(&self)->bool{
         [self.grant,self.game,self.pair,self.session,self.capture].iter().all(|id|!id.is_nil())&&
         (1..=1_000_000).contains(&self.epoch)&&self.target.process_id>0&&
         self.target.creation_time>0&&self.target.window>0
@@ -70,10 +70,13 @@ pub trait Provider{
     /// to publish zero. Lazy providers override this with an existing-only path.
     fn neutralize(&mut self,device:&mut Self::Device)->Result<()>{self.write(device,&Report::default())}
     fn detach(&mut self,device:&mut Self::Device)->Result<()>;
+    /// Stable provider identity for an external cleanup observer. Windows lazy
+    /// reservation supplies this before OS creation; not all providers can.
+    fn cleanup_identity(&self,_device:&Self::Device)->Option<Uuid>{None}
 }
 
 #[derive(Clone,Copy,Debug,PartialEq,Eq)]
-pub enum State{Idle,Active,CleanupRequired}
+pub enum State{Idle,Preparing,Active,CleanupRequired}
 struct Slot<D>{number:u8,device:D}
 
 /// One host-authorized group, up to four exclusive player slots. The service
@@ -88,11 +91,27 @@ impl<P:Provider> Gamepads<P>{
     pub fn state(&self)->State{self.state}
     pub fn owner(&self)->Option<Owner>{self.owner}
     pub fn reserved_slots(&self)->Vec<u8>{self.slots.iter().map(|slot|slot.number).collect()}
+    /// No identity is invented for a backend lacking external observation.
+    pub fn cleanup_identities(&self)->Result<Vec<(u8,Uuid)>>{
+        let identities:Vec<_>=self.slots.iter().map(|slot|self.provider.cleanup_identity(&slot.device)
+            .filter(|id|!id.is_nil()).map(|id|(slot.number,id)).ok_or_else(unavailable)).collect::<Result<_>>()?;
+        if identities.iter().map(|(_,id)|*id).collect::<BTreeSet<_>>().len()!=identities.len(){return Err(unavailable());}
+        Ok(identities)
+    }
 
     /// Called only after native host consent naming the peer, game, exact
     /// slots and system-visible nature of virtual controllers. A pairing's
     /// generic input bit alone does not supply this consent.
     pub fn authorize(&mut self,owner:Owner,numbers:&[u8],remaining:Duration,
+        host:&HostObservation,system_visible_gamepad_consent:bool)->Result<()>{
+        self.prepare(owner,numbers,remaining,host,system_visible_gamepad_consent)?;
+        self.activate(&owner,host)
+    }
+
+    /// Two-phase helpers publish the provider identities to their supervisor
+    /// after prepare and require its acknowledgment before activate. OS creation
+    /// is deferred only by lazy providers; Linux uinput create is already live.
+    pub fn prepare(&mut self,owner:Owner,numbers:&[u8],remaining:Duration,
         host:&HostObservation,system_visible_gamepad_consent:bool)->Result<()>{
         if self.state!=State::Idle||!self.slots.is_empty(){return Err(unavailable());}
         let unique:BTreeSet<_>=numbers.iter().copied().collect();
@@ -100,7 +119,7 @@ impl<P:Provider> Gamepads<P>{
            !system_visible_gamepad_consent||remaining.is_zero()||remaining>MAX_LIFETIME||
            numbers.is_empty()||numbers.len()>4||unique.len()!=numbers.len()||numbers.iter().any(|slot|*slot>3){return Err(denied());}
         self.owner=Some(owner);self.last_epoch=owner.epoch;self.sequence=0;
-        self.deadline=Some(Instant::now()+remaining);self.last_frame=Some(Instant::now());
+        self.deadline=Some(Instant::now()+remaining);self.last_frame=None;
         // Consume this authorization epoch even when provider creation fails;
         // retry requires fresh host consent, not replay of a partial attempt.
         self.state=State::CleanupRequired;
@@ -110,6 +129,13 @@ impl<P:Provider> Gamepads<P>{
                 Err(_)=>{let _=self.retire();return Err(unavailable());}
             }
         }
+        if self.deadline.is_none_or(|deadline|Instant::now()>=deadline){let _=self.retire();return Err(denied());}
+        self.state=State::Preparing;Ok(())
+    }
+
+    pub fn activate(&mut self,owner:&Owner,host:&HostObservation)->Result<()>{
+        self.matches(owner)?;self.tick(host)?;
+        if self.state!=State::Preparing{return Err(denied());}
         for slot in &mut self.slots{
             if self.provider.write(&mut slot.device,&Report::default()).is_err(){let _=self.retire();return Err(unavailable());}
         }
@@ -126,11 +152,11 @@ impl<P:Provider> Gamepads<P>{
     /// than silently resuming. New authority must have a strictly newer epoch.
     pub fn tick(&mut self,host:&HostObservation)->Result<()>{
         if self.state==State::CleanupRequired{return self.retire();}
-        if self.state!=State::Active{return Ok(());}
+        if !matches!(self.state,State::Preparing|State::Active){return Ok(());}
         let now=Instant::now();
         if self.owner.as_ref().is_none_or(|owner|!host.permits(owner))||
            self.deadline.is_none_or(|deadline|now>=deadline)||
-           self.last_frame.is_none_or(|last|now.duration_since(last)>INPUT_GAP){return self.retire();}
+           (self.state==State::Active&&self.last_frame.is_none_or(|last|now.duration_since(last)>INPUT_GAP)){return self.retire();}
         Ok(())
     }
 

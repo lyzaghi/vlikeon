@@ -128,7 +128,8 @@ Reservation returns an opaque process-local token before any driver allocation.
 The manager owns that token before the first neutral write creates/starts a
 device. A separate `neutralize` provider operation ensures retiring an unused
 reservation cannot accidentally create a controller. Each created device gets
-a fresh container GUID and GUID instance string. Start must be followed by a
+a fresh container GUID at reservation, available to the parent before device
+creation, and a GUID instance string. Start must be followed by a
 successful observation of that exact container in the present HID inventory
 before initial write succeeds; a one-second readiness loop is not a guarantee
 that underlying OS/driver calls return within that time.
@@ -166,6 +167,78 @@ Cargo build script that runs CMake or locates arbitrary binaries. CMake configur
 compiler/linker and all device operations remain deferred; these source recipes
 have not been executed or accepted.
 
+## Private helper lifecycle and parent lease
+
+`gamepad.rs` now separates prepare/reservation from activation. `authorize`
+still composes both for an in-process caller, while the private Windows helper
+uses the explicit two-step flow. Provider cleanup identities must be non-nil
+and unique. The Windows adapter exposes its reserved GUID before any device
+creation and a read-only exact-container presence query for a future external
+supervisor. UUID/native GUID conversion is explicit, including little-endian
+Windows GUID fields. Linux does not yet supply this external identity contract;
+the new supervised path refuses to invent one for that backend.
+
+`gamepad_host.rs` composes that lifecycle with OS observations and a private
+parent lease. Construction admits an initial 300 ms lease after a validated
+parent prepare request. Thereafter, the independent pipe reader must renew it
+with a strictly increasing sequence and the exact grant/game/pair/session/
+capture/epoch/process/window binding. Each renewal must affirm the current
+document, capture and pairing lifetime. EOF/drop, false lifetime flags, replay,
+wrong identity or a missed deadline permanently close authority. Remote input
+packets do not renew this lease, and late heartbeats cannot revive it.
+
+The actor polls target ownership, foreground and local activity independently
+of remote frames. There is up to 30 seconds for initial foreground/quiet
+readiness, five seconds to acknowledge prepared identities, a fixed overall
+authorization deadline and the existing 250 ms active-input gap. Once stopped,
+the host object cannot rearm. Failed detach remains `cleanup_required`, retried
+at most once per 100 ms by this orchestration; this is a retry cadence, not a
+promise that an underlying OS operation returns within 100 ms.
+
+`gamepad_windows_host.rs` holds the actual process handle, verifies creation
+time and observes the exact foreground window/PID, visibility, minimization,
+local keyboard/mouse activity and override keys through OS calls. The parent
+cannot attest to those observations over IPC. It reuses the existing local
+activity hook implementation's counter-only privacy behavior and limitations;
+raw input, silent hook removal and local physical-controller coexistence still
+need stronger qualification/integration where required. This observer currently
+assumes one gamepad helper/authorization per process. Simultaneous keyboard and
+gamepad forwarding must compose local observation/injection attribution in the
+same trusted helper design; separate existing v1 keyboard and v2 gamepad helpers
+must not be enabled together as if that integration were finished.
+
+`gamepad_protocol.rs` and `gamepad_worker.rs` author private stdio protocol 2.
+The existing 16 KiB framing bounds apply. Requests bind the entire owner, use
+increasing request IDs and deny unknown fields. Prepare carries both absolute
+grant/capture expiry and bounded remaining lifetime; the earlier limit becomes
+a monotonic deadline including local guard setup. The reader handles heartbeats
+without queueing behind provider calls; a full two-command actor queue closes
+authority instead of blocking the heartbeat reader. Heartbeats consume request
+IDs but have no reply. Prepare sends `complete:false` while waiting for the
+target, then one final `complete:true` receipt for the same request ID. Status
+requests can complete while prepare is waiting, so a parent must correlate by
+ID and completion rather than assume reply IDs arrive in increasing order.
+
+The parent must retain the exact prepared slot/container list **before** sending
+Activate; an empty, changed, reordered or partial acknowledgment is refused.
+Returned identity sets are optional: `null` means unknown and must never be
+treated as an empty/removed set. An active receipt follows actual initial
+neutral writes and present-container observation. Cleanup retains actual
+unresolved identities; helper exit code 3 means cleanup is still required.
+Neither exit code 0 nor any process exit can replace the parent validating the
+known identity set and actual cleanup receipts. With no completed external
+supervisor/journal, no product path may yet launch this candidate.
+
+The helper source entry is `--stdio-gamepad-v2`; it returns unavailable (exit 2)
+unless built for Windows x86-64/ARM64 MSVC with the default-off `winuhid` feature
+and explicitly linked library. No current broker uses it. The existing
+`--stdio-input-v1` path and keyboard/mouse capability remain unchanged. The
+private wire's native-consent boolean and provider IDs must originate in an
+admitted native broker/package; they are not a renderer permission API.
+The reader/actor design does not preempt a blocked driver call. Independent
+process supervision, durable parent cleanup records, global slot arbitration,
+parent-side client integration and signed admission are still required.
+
 ## Receiving browser sampling
 
 `engines/streaming/input.js::sampleStandardGamepads` now preserves browser
@@ -190,7 +263,9 @@ the explicit slot tuples accepted by the private group.
 1. Integrate provider admission, exact signed artifacts and host permission UI
    with broker/helper IPC and the authenticated capture/pair/session. Current
    `InputWorker` v1, status shape, native forwarder and host policy do not expose
-   this provider yet; version them coherently before advertising support.
+   this provider yet. The private v2 actor/reader source exists but its parent
+   client, durable supervisor/cleanup ledger and combined keyboard/gamepad flow
+   are not wired. Version the product path coherently before advertising support.
 2. Finish the Windows candidate's supervised helper, assigned device identity,
    signed-driver admission, installed package and unresolved-creation recovery;
    implement the macOS provider/entitlement path. Explicit installation consent

@@ -1,10 +1,19 @@
 #![deny(unsafe_op_in_unsafe_fn)]
 pub mod protocol;
 pub mod gamepad;
+pub mod gamepad_host;
+pub mod gamepad_protocol;
+#[cfg(windows)]pub mod gamepad_windows_host;
 #[cfg(all(target_os="linux",any(target_arch="x86_64",target_arch="aarch64")))]
 pub mod gamepad_uinput;
 #[cfg(all(feature="winuhid",target_os="windows",target_env="msvc",any(target_arch="x86_64",target_arch="aarch64")))]
 pub mod gamepad_winuhid;
+#[cfg(all(feature="winuhid",target_os="windows",target_env="msvc",any(target_arch="x86_64",target_arch="aarch64")))]
+mod gamepad_worker;
+#[cfg(all(feature="winuhid",target_os="windows",target_env="msvc",any(target_arch="x86_64",target_arch="aarch64")))]
+pub fn run_gamepad_worker()->i32{gamepad_worker::run()}
+#[cfg(not(all(feature="winuhid",target_os="windows",target_env="msvc",any(target_arch="x86_64",target_arch="aarch64"))))]
+pub fn run_gamepad_worker()->i32{2}
 mod client;
 pub use client::InputWorker;
 #[cfg(windows)]mod windows;

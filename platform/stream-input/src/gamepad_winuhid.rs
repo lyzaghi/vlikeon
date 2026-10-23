@@ -4,6 +4,7 @@
 //! Calls may block: the future owned helper needs an external watchdog.
 use crate::gamepad::{Owner,Provider,Report};
 use omniplay_contracts::{ErrorCode,PlatformError,Result};
+use uuid::Uuid;
 
 #[repr(C)]
 struct NativeReport{sticks:[i16;4],triggers:[u16;2],buttons:u16,reserved:u16}
@@ -14,6 +15,8 @@ const _:()=assert!(std::mem::size_of::<NativeReport>()==16);
 #[link(name="ole32")]
 unsafe extern "C"{
     fn vlk_winpad_reserve(slot:u8,vendor:u16,product:u16,token:*mut u64)->u32;
+    fn vlk_winpad_container(token:u64,container:*mut u8)->u32;
+    fn vlk_winpad_presence(container:*const u8)->u32;
     fn vlk_winpad_write(token:u64,report:*const NativeReport)->u32;
     fn vlk_winpad_retire(token:u64)->u32;
 }
@@ -21,6 +24,8 @@ fn failure()->PlatformError{PlatformError::new(ErrorCode::RuntimeUnavailable,
     "The admitted Windows virtual gamepad is unavailable or its removal is not confirmed")}
 
 pub struct WinUHidProvider{vendor:u16,product:u16}
+#[derive(Clone,Copy,Debug,PartialEq,Eq)]
+pub enum DevicePresence{Absent,Present,Unknown}
 impl WinUHidProvider{
     /// Values must come from the installed package's assigned HID identity.
     /// Nonzero values are shape validation, not proof of assignment/admission.
@@ -28,8 +33,16 @@ impl WinUHidProvider{
     pub fn new(vendor:u16,product:u16)->Result<Self>{
         if vendor==0||product==0{return Err(failure());}Ok(Self{vendor,product})
     }
+    /// For the independent supervisor, not a substitute for a removal receipt.
+    /// A never-observed attempted device cannot be cleared by absence alone.
+    pub fn presence(container:Uuid)->DevicePresence{
+        if container.is_nil(){return DevicePresence::Unknown;}
+        let bytes=container.to_bytes_le();
+        // SAFETY: exact 16-byte native GUID representation, borrowed for call.
+        match unsafe{vlk_winpad_presence(bytes.as_ptr())}{0=>DevicePresence::Absent,1=>DevicePresence::Present,_=>DevicePresence::Unknown}
+    }
 }
-pub struct WinUHidDevice{token:Option<u64>,initialized:bool}
+pub struct WinUHidDevice{token:Option<u64>,initialized:bool,container:Uuid}
 impl WinUHidDevice{
     fn retire(&mut self)->Result<()>{
         let Some(token)=self.token else{return Ok(());};
@@ -56,7 +69,14 @@ impl Provider for WinUHidProvider{
         // before the first neutral write can allocate any driver resources.
         let status=unsafe{vlk_winpad_reserve(slot,self.vendor,self.product,&mut token)};
         if status!=0||token==0{return Err(failure());}
-        Ok(WinUHidDevice{token:Some(token),initialized:false})
+        // Own the reservation immediately, so even a failed identity read drops
+        // it through the existing-only cleanup path without creating a device.
+        let mut device=WinUHidDevice{token:Some(token),initialized:false,container:Uuid::nil()};
+        let mut bytes=[0;16];
+        // SAFETY: private live token and exact writable GUID-sized buffer.
+        if unsafe{vlk_winpad_container(token,bytes.as_mut_ptr())}!=0{return Err(failure());}
+        device.container=Uuid::from_bytes_le(bytes);
+        if device.container.is_nil(){return Err(failure());}Ok(device)
     }
     fn write(&mut self,device:&mut Self::Device,report:&Report)->Result<()>{
         let token=device.token.ok_or_else(failure)?;
@@ -74,4 +94,5 @@ impl Provider for WinUHidProvider{
         if device.initialized{self.write(device,&Report::default())}else{Ok(())}
     }
     fn detach(&mut self,device:&mut Self::Device)->Result<()>{device.retire()}
+    fn cleanup_identity(&self,device:&Self::Device)->Option<Uuid>{device.token.map(|_|device.container)}
 }
