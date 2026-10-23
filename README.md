@@ -1,114 +1,114 @@
-# Vlikeon Browser
+<p align="center">
+  <img src="branding/vlikeon/github/banner.svg" width="100%" alt="Vlikeon Browser — Browse. Play. Keep your progress.">
+</p>
 
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="branding/vlikeon/png/display-1024.png">
-  <img src="branding/vlikeon/png/light-1024.png" width="192" alt="Vlikeon Browser — Open View neon logo">
-</picture>
+<p align="center">
+  <strong>A Chromium-first gaming browser by Vlike.</strong><br>
+  One workspace for the web, your game library and the progress you want to keep.
+</p>
 
-**Gaming Superbrowser by Vlike**
+<p align="center">
+  <a href="docs/PLAYABLE_DEMO.md">Windows demo</a> ·
+  <a href="docs/PUBLIC_STATUS.md">Project status</a> ·
+  <a href="docs/ARCHITECTURE.md">Architecture</a> ·
+  <a href="ROADMAP.md">Roadmap</a> ·
+  <a href="CONTRIBUTING.md">Contribute</a> ·
+  <a href="README.vi.md">Tiếng Việt</a>
+</p>
 
-An experimental Chromium-first browser project bringing a game hub, isolated
-native engine adapters, save management and remote-play workflows into one
-workspace. Vlikeon is the new public name of the project previously called
-OmniPlay.
+## A browser built around play
 
-**Status: active development; full browser and production release qualification
-remain open.** A separate Windows Game Hub demo has scoped execution evidence.
-The Windows x64 development Chromium build has completed with independent
-output integrity checks. Runtime acceptance remains open. No qualified production
-installer, compatibility list or controlled benchmark is available.
+Vlikeon brings browser and game workflows into one open-source project: a shared
+Game Hub, permission-scoped engine integration, local save management and
+remote-play coordination. Our goal is to make moving between browsing, playing
+and returning to a game feel coherent, while keeping ownership and permissions
+explicit.
 
-[Tiếng Việt](README.vi.md) · [Roadmap](ROADMAP.md) ·
-[Contributing](CONTRIBUTING.md) · [Security](SECURITY.md) ·
-[License scope](LICENSING.md)
+**Active development.** A Windows Game Hub demo is available, and a Windows x64
+Chromium development build has completed its recorded build/integrity checks.
+The full browser is not a production-qualified release. Platform coverage,
+compatibility, security review and release acceptance remain in progress.
 
-[Transparent logo and platform icon assets](branding/vlikeon/README.vi.md)
+## Explore the work
 
-## Current evidence and demo
+| Area | What we are building | Source |
+| --- | --- | --- |
+| Browser & Game Hub | A consistent library and session experience alongside the web | [`browser/`](browser/), [`apps/`](apps/) |
+| Runtime boundaries | Explicit permissions, session ownership and native/Web engine adapters | [`platform/`](platform/), [`engines/`](engines/) |
+| Progress & recovery | Save import, history, recovery and optional encrypted synchronization | [`platform/core/`](platform/core/), [`services/`](services/) |
+| Remote play | Host pairing, stream coordination and input lifecycles | [`engines/streaming/`](engines/streaming/) |
+| Reproducible delivery | Pinned dependencies, source preparation and reviewed distribution inputs | [`tools/`](tools/), [`security/`](security/) |
 
-- [Windows Chromium build](docs/WINDOWS_CHROMIUM_BUILD.md): full `chrome` target,
-  frozen source identity and independently checked x64 output hashes. This
-  development build has no runtime or production release acceptance.
-- [Windows demo and its limits](docs/PLAYABLE_DEMO.md): a standalone Win32 window
-  with WebView2, an original Game Boy game and a WebAssembly core. It is a
-  separate technical demo; current source changes need their own qualification.
-- [Source integration checkpoint](docs/SOURCE_INTEGRATION.md), commit `35f3271`:
-  53 Rust, 13 JavaScript and 19 Python cases passed; four Windows fixture cases
-  remain ignored. The synthetic audio contract and fixture-configured native
-  worker/helper build passed. Development regeneration reproduced 435 files.
-- [Ordered outstanding work](docs/OUTSTANDING_WORK.md): current 1–109 task
-  identifiers. Older 1–17 numbers describe product areas, not this task list.
+These are development areas, not a claim that every feature is ready to ship.
+Desktop and Android target Chromium integration; iOS/iPadOS uses WebKit.
 
-Evidence applies to its recorded inputs and scope. These counts overlap earlier
-verification batches and must not be added as new distinct coverage.
+## Try the Windows Game Hub demo
 
-## What we are building
+The [technical prerelease](https://github.com/lyzaghi/vlikeon/releases/tag/v0.1.0-demo.1)
+includes an original Game Boy game in a standalone Win32/WebView2 application.
+It demonstrates the game, input, pause and save/resume workflow without requiring
+a commercial ROM or an account.
 
-- A browser and game hub with a consistent library and session workflow.
-- Permission-scoped native runtime integration and explicit resource ownership.
-- Save import, recovery and encrypted synchronization workflows.
-- Remote-play coordination and desktop, mobile and web product surfaces.
-- Reproducible source preparation with pinned dependencies and explicit
-  distribution admission for third-party engines.
+- **Platform:** Windows x64; Microsoft WebView2 Runtime required.
+- **Package:** portable ZIP; unsigned executable.
+- **Scope:** a standalone Game Hub demo, separate from the full Chromium browser.
+- **Instructions, hashes and evidence:** [demo guide](docs/PLAYABLE_DEMO.md).
 
-These describe intended behavior and authored source areas, **not verified
-shipping features**. Desktop and Android target Chromium integration; iOS source
-targets WebKit. Device, platform, compatibility and release qualification remain open.
+## Engineering with evidence
 
-## Start here
+We distinguish source implementation, executed checks and release acceptance.
+Every result belongs to its recorded revision and environment.
 
-1. Read the [current status](docs/PUBLIC_STATUS.md) and [roadmap](ROADMAP.md).
-2. Explore the source map below and [architecture](docs/ARCHITECTURE.md).
-3. Read [CONTRIBUTING.md](CONTRIBUTING.md) before proposing a change.
-4. Review [licensing boundaries](LICENSING.md) before distributing any build.
-
-This is a source-review entry point. A clean-clone build has not been verified;
-there is no supported end-user installation command yet. Tools and recipes are
-authored source; exact executed scopes are recorded in the evidence above.
-Antigravity executes assigned checks; Codex reviews results and owns fixes.
-
-## Source map
-
-| Directory | Responsibility |
+| Checkpoint | Read the evidence |
 | --- | --- |
-| `browser/` | Chromium pins, reference snapshots, patches and integration |
-| `apps/` | Game hub, web, Android and iOS product surfaces |
-| `platform/` | Rust contracts, broker, storage and platform/runtime boundaries |
-| `engines/` | Native, web and streaming runtime integration |
-| `services/` | Account, encrypted synchronization and signaling services |
-| `security/` | Dependency provenance, release trust and distribution decisions |
-| `packaging/` | Platform packaging source and policies |
-| `qa/` | Acceptance/test source and scoped execution records under `qa/evidence/` |
-| `tools/` | Source acquisition, adaptation, staging and build recipes |
-| `docs/` | Architecture, requirements and implementation records |
+| Windows Chromium development build and output integrity | [Windows build record](docs/WINDOWS_CHROMIUM_BUILD.md) |
+| Standalone Game Hub demo behavior | [Demo qualification and limits](docs/PLAYABLE_DEMO.md) |
+| Selected shared-source tests and native fixture builds | [Source integration checkpoint](docs/SOURCE_INTEGRATION.md) |
+| Remaining implementation and acceptance tasks | [Outstanding work](docs/OUTSTANDING_WORK.md) |
 
-Large upstream checkouts, generated `out/` snapshots, local data and secrets
-are excluded from Git. References to local snapshots are authoring records,
-not downloadable releases.
+A verified full-product clean-clone build and supported production installation
+path are still open. Earlier passing results do not qualify later source changes.
 
-## Contributing
+## Understand the architecture
 
-Early contributions can help review lifecycle and containment boundaries,
-document build prerequisites, review dependency provenance and improve focused
-acceptance cases. Discuss substantial changes before implementation. Do not
-upload commercial game assets, manufacturer BIOS, credentials or private saves.
+```text
+Browser surfaces  →  Game Hub  →  Contracts & permission broker
+                                      ├─ Library, saves & recovery
+                                      ├─ Native / Web engine adapters
+                                      └─ Remote-play coordination
+                                               │
+                                  Optional accounts & encrypted sync
+```
 
-We do not currently claim community adoption, production use, completed audits
-or third-party endorsement.
+The architecture separates browser requests, file grants, runtime sessions and
+save ownership. Read the [architecture map](docs/ARCHITECTURE.md) for the intended
+boundaries and the [public status](docs/PUBLIC_STATUS.md) for their current scope.
 
-## License and attribution
+## Build with us
 
-Original project material without a separate notice is offered under
-[Apache-2.0](LICENSE). Existing MIT/ISC notices, Chromium-derived files and all
-third-party components retain their own licenses. The root license does not
-relicense upstream code or approve combined binary distribution. See
-[LICENSING.md](LICENSING.md), [NOTICE](NOTICE) and
-[the dependency inventory](security/dependencies.json).
+Contributions are welcome in focused areas: lifecycle and permission review,
+build reproducibility, device qualification, accessibility, documentation and
+dependency provenance.
 
-Selected upstream sources include replacement firmware/fonts and embedded
-assets requiring review; this repository does not grant rights to game content
-or manufacturer BIOS.
+1. Read the [contribution guide](CONTRIBUTING.md) and [roadmap](ROADMAP.md).
+2. Pick an existing [issue](https://github.com/lyzaghi/vlikeon/issues), or discuss
+   a concrete problem before starting a substantial change.
+3. Submit a focused pull request with a clear explanation and exact verification
+   scope. Source review and reproduced behavior should be identified separately.
 
-Internal names, crate identifiers, protocol fields and paths still use
-`omniplay` where changing them requires a separately reviewed migration.
-The public naming change does not imply that migration has been completed.
+For sensitive findings, follow the [security policy](SECURITY.md). Please use
+synthetic or permission-cleared fixtures; keep credentials, private saves,
+commercial games and manufacturer BIOS out of contributions.
+
+## License & project identity
+
+Original project material is [Apache-2.0](LICENSE), unless a file has another
+notice. Chromium-derived material and third-party components keep their own
+licenses. See [license scope](LICENSING.md), [NOTICE](NOTICE) and the
+[dependency inventory](security/dependencies.json) before distributing binaries.
+
+Vlikeon is the public name of the project formerly called OmniPlay. Some internal
+paths and protocols retain `omniplay` during the ongoing migration.
+[Brand assets](branding/vlikeon/README.md) use the existing Open View mark.
+
+<p align="center"><strong>Vlikeon Browser</strong> · Gaming Superbrowser by Vlike</p>

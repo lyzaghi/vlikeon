@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="440" viewBox="0 0 1280 440" role="img" aria-labelledby="title desc">
+  <title id="title">Vlikeon Browser</title>
+  <desc id="desc">The Open View neon mark beside Vlikeon Browser. Browse. Play. Keep your progress. A Chromium-first gaming browser by Vlike.</desc>
+  <defs>
+    <linearGradient id="background" x2="1" y2="1"><stop stop-color="#080e1b"/><stop offset="1" stop-color="#15132c"/></linearGradient>
+    <linearGradient id="neon" x2="0" y2="1"><stop stop-color="#00e5ff"/><stop offset=".52" stop-color="#885cff"/><stop offset="1" stop-color="#ff2bd6"/></linearGradient>
+    <linearGradient id="line"><stop stop-color="#00e5ff"/><stop offset=".55" stop-color="#885cff"/><stop offset="1" stop-color="#ff2bd6"/></linearGradient>
+    <pattern id="grid" width="48" height="48" patternUnits="userSpaceOnUse"><path d="M48 0H0V48" fill="none" stroke="#879ac0" stroke-opacity=".07"/></pattern>
+  </defs>
+  <rect width="1280" height="440" rx="24" fill="url(#background)"/>
+  <rect width="1280" height="440" rx="24" fill="url(#grid)"/>
+  <path d="M1060 0 830 440M1200 0 970 440" stroke="#8a5cff" stroke-opacity=".1" stroke-width="72"/>
+  <rect x="32" y="32" width="1216" height="376" rx="16" fill="none" stroke="#526080" stroke-opacity=".3"/>
+  <g transform="translate(44 74) scale(1.1)" fill="none" stroke="url(#neon)" stroke-width="6" stroke-linejoin="round">
+    <path d="M48 76 68 56H100L120 156V200H64L48 184Z"/>
+    <path d="M208 76 188 56H156L136 156V200H192L208 184Z"/>
+  </g>
+  <g font-family="Segoe UI,Arial,sans-serif">
+    <text x="348" y="112" fill="#89d8e8" font-size="15" font-weight="600" letter-spacing="4">THE VLIKE PROJECT</text>
+    <text x="344" y="199" fill="#f5f7ff" font-size="68" font-weight="700" letter-spacing="-2">Vlikeon Browser</text>
+    <text x="348" y="253" fill="#dadfeb" font-size="27">Browse. Play. Keep your progress.</text>
+    <text x="348" y="298" fill="#9aa9c1" font-size="19">A Chromium-first gaming browser by Vlike.</text>
+    <text x="348" y="365" fill="#a4b2cb" font-size="13" letter-spacing="2">OPEN SOURCE  /  BROWSER + GAME HUB  /  ACTIVE DEVELOPMENT</text>
+  </g>
+  <path d="M348 325H1160" stroke="url(#line)" stroke-width="2" opacity=".7"/>
+</svg>
