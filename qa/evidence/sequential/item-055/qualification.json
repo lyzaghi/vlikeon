@@ -13,7 +13,9 @@
     "Windows process/foreground/local activity observations and opt-in private v2 helper actor/reader",
     "Bounded SQLite parent ownership journal with committed activation intent and exact-snapshot cleanup reconciliation",
     "Parent-side reply/authority orchestration and original Windows child-process-handle retirement witness",
-    "Six authored journal regression cases; execution deferred, no OS behavior qualified"
+    "Six authored journal regression cases; execution deferred, no OS behavior qualified",
+    "Windows private transport, creation-time job containment, independent authority lease and separate pipe writer/reader/watchdog source",
+    "Concrete WindowsParentChannel adapter for broker orchestration, not exposed by current service commands"
   ],
   "static_review": "Source/API review and git diff whitespace check only; no compiler or runtime validation",
   "passed_test_cases": [],
@@ -25,7 +27,7 @@
   "advertised_gamepad_capability": false,
   "pending": [
     "Broker/native permission UI and authenticated capture/pair/session integration",
-    "Real parent-side v2 transport/authority writer, external process supervision and cross-process device arbitration",
+    "Native authority observer/service wiring, transport compilation/OS qualification and cross-process device arbitration",
     "Journal service integration and boot/process startup recovery after loss of the original child handle",
     "Combined keyboard/gamepad helper observation and injection attribution",
     "Windows assigned HID identity, exact signed driver/package admission and unresolved-creation recovery",

@@ -27,6 +27,12 @@ pre-activation durable intent, parent-side reply/authority orchestration and an
 original-process-handle Windows retirement witness. No current service path
 constructs them; real supervised transport, global arbitration, startup recovery
 and signed/native admission remain due. Build/test is still deferred.
+The latest checkpoint authors the Windows private pipe transport, creation-time
+job association, independent authority lease, prioritized heartbeat writer and
+reader/watchdog termination path, plus its concrete broker channel adapter.
+These sources are not launched by current service commands. Native authority
+observation/service wiring, global arbitration, startup recovery, provider/native
+admission and all build/runtime qualification remain open.
 
 The owner now requests the individually numbered tasks in
 [`OUTSTANDING_WORK.md`](OUTSTANDING_WORK.md), completed in order. Task 1 source

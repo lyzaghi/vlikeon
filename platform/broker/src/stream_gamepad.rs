@@ -216,6 +216,38 @@ impl<T:ParentChannel> Drop for GamepadSupervisor<T>{
     fn drop(&mut self){self.sealed=true;let _=self.channel.stop();}
 }
 
+/// Concrete normal-user Windows transport adapter. Its client retains the supplied
+/// verified executable file guard through all worker-thread lifetimes. It does not itself
+/// approve that file, its hash, the signed driver or native consent; construction
+/// remains private to a future admitted service path.
+#[cfg(windows)]
+pub struct WindowsParentChannel{
+    client:omniplay_stream_input::gamepad_client::GamepadClient,
+    helper:ProcessIdentity,
+}
+#[cfg(windows)]
+impl WindowsParentChannel{
+    pub fn from_prepared(client:omniplay_stream_input::gamepad_client::GamepadClient)->Result<Self>{
+        let identity=client.helper_witness()?.identity();
+        Ok(Self{client,helper:ProcessIdentity{process_id:identity.process_id,creation_time:identity.creation_time}})
+    }
+    pub fn witness(&self)->Result<omniplay_stream_input::gamepad_process::ProcessWitness>{self.client.helper_witness()}
+}
+#[cfg(windows)]
+impl ParentChannel for WindowsParentChannel{
+    fn helper(&self)->ProcessIdentity{self.helper}
+    fn helper_sha256(&self)->&ContentHash{self.client.helper_sha256()}
+    fn exchange(&mut self,binding:Binding,action:Action,timeout:Duration)->Result<(u64,Reply)>{
+        if binding.owner()!=self.client.owner(){let _=self.client.stop();return Err(invalid());}
+        self.client.exchange(action,timeout)
+    }
+    fn heartbeat(&mut self,binding:Binding)->Result<u64>{
+        if binding.owner()!=self.client.owner(){let _=self.client.stop();return Err(invalid());}
+        self.client.heartbeat()
+    }
+    fn stop(&mut self)->Result<()>{self.client.stop()}
+}
+
 /// Live-parent recovery from the actual launch handle plus native provider
 /// inventory. Startup after broker loss needs a separate boot/process recovery
 /// witness; reopening a PID here would weaken the exact-instance requirement.
@@ -226,6 +258,7 @@ impl WindowsRecoveryObserver{
     pub fn from_child(child:std::os::windows::io::BorrowedHandle<'_>)->Result<Self>{
         omniplay_stream_input::gamepad_process::ProcessWitness::from_child(child).map(|process|Self{process})
     }
+    pub fn from_witness(process:omniplay_stream_input::gamepad_process::ProcessWitness)->Self{Self{process}}
 }
 #[cfg(all(feature="windows-gamepad",target_os="windows",target_env="msvc",any(target_arch="x86_64",target_arch="aarch64")))]
 impl RecoveryObserver for WindowsRecoveryObserver{

@@ -300,10 +300,10 @@ substitute another process's exit status. The optional broker feature
 query for live-parent reconciliation. It does not enable any service command,
 change the current keyboard helper, install a driver or launch a process.
 
-The real `ParentChannel` transport/independent authority writer, creation-time
-process supervision, cross-profile/OS reservation and startup recovery after the
-original process handle is lost remain unfinished. No current service constructs
-this supervisor or invokes its journal; therefore current app capability stays
+The Windows transport and creation-time job/watchdog source is described below.
+The actual native authority source, cross-profile/OS reservation and startup
+recovery after the original process handle is lost remain unfinished. No current
+service constructs this supervisor or invokes its journal; current app capability stays
 false. One profile journal is not a machine-global lease, an OS attestation or
 permission to clear another profile's device. Startup recovery must obtain a
 positive boot/process retirement witness; access refusal or PID lookup failure
@@ -317,6 +317,78 @@ child exit, synthetic SQL write failure, outer-transaction refusal and unknown/
 foreign pending sets (some share one case). They have not been executed. Fake
 process/container observations test journal decisions only; they cannot qualify
 Windows PnP removal, driver cleanup, disk-full or real process crash behavior.
+
+## Windows private transport source
+
+`gamepad_child.rs` authors a normal-user launch with an unnamed private Job
+Object assigned through `PROC_THREAD_ATTRIBUTE_JOB_LIST` in `CreateProcessW`.
+The helper starts suspended; the parent verifies membership, records the real
+process witness, starts I/O/watchdog threads, then resumes it. The job has one
+active process, a 128-MiB process memory limit and kill-on-close. It is not an
+AppContainer or permission to execute an untrusted program. The caller must
+admit the exact installed executable and supply its immutable verified file
+guard before launch. Only private stdin/stdout pipes and NUL stderr are in the
+explicit inherited-handle list; neither job/process handles nor unrelated broker
+handles are inherited. The environment contains only SystemRoot/WINDIR and a
+System32 PATH. No elevation, shell, driver installation or arbitrary argument
+forwarding is supplied.
+
+`gamepad_client.rs` authors concrete parent transport with separate reader,
+writer and watchdog threads. One process-local permit bounds it to one transport
+instance. Commands/replies use bounded channels of two entries and the existing
+16-KiB length framing. The writer alone assigns all request IDs, including
+automatic/explicit heartbeats, so heartbeats cannot overtake an allocated but
+unsent command ID. It prioritizes an automatic heartbeat every 50 ms even under
+continuous input commands, and sends them only after the worker's initial
+waiting receipt and while native parent authority remains live.
+
+That authority belongs to a separate `AuthorityLease` held by the broker's
+independent native observer. Initial setup has a 300 ms lease. Refresh requires
+the exact owner, increasing lease sequence, current document/capture/pairing and
+a monotonic observation no older than 100 ms. Its expiry is observation time
+plus 200 ms. Missing/false/replayed/stale renewal or dropping that lease closes
+transport permanently; automatic heartbeats cannot extend it themselves. The
+native observer is still not connected to the current service, so no timer or
+peer frame may be substituted for actual current native authority.
+
+The reader validates owner/protocol, reply shape, ID, pending operation and
+deadline. Prepare allows one initial waiting receipt followed by one final
+receipt; an unexpected reply or duplicate completion closes transport. The
+watchdog separately checks authority, overall deadline, pending reply/write
+deadlines, I/O-thread liveness and original child exit at an 8 ms polling target.
+The initial Prepare receipt has five seconds; final preparation has 35 seconds;
+other calls have caller-bounded timeouts up to five seconds; each pipe write
+has a 200 ms watchdog deadline. Successful activation/input/release also sets
+a separate 350 ms parent input deadline; status/heartbeat cannot renew it. This
+is an independent stop fallback if the helper's 250 ms input-gap cleanup blocks
+in the provider. A terminal cleanup/revoked receipt closes transport after
+delivery, preserving that receipt for journal reconciliation.
+These are authored scheduling/timeout policies,
+not measured guarantees about OS scheduling or driver cancellation.
+
+Stop closes further writes, requests `CancelSynchronousIo`, terminates only the
+owned job/child and waits at most one second per termination attempt. It joins
+only threads already known to have finished. Cancellation is a request, not a
+completion receipt; unresolved I/O retains shared ownership of the process-local
+permit and executable file guard until the last thread/lease retires. That
+prevents repeated launches from accumulating stuck transport threads or losing
+the admitted executable guard. If the last owner still cannot confirm process
+exit, one process-local tombstone retains the job and file guard and blocks new
+transport launches until process restart/recovery. No force-release API is
+provided; this conservative stop needs real OS fault qualification and startup
+recovery integration. No helper exit, job termination or I/O cancellation
+deletes the durable device journal. Device cleanup still requires exact process/
+container evidence through the parent journal/reconciliation path.
+
+`WindowsParentChannel` now adapts this client to the broker orchestration and
+exposes a duplicate original process witness for recovery. The default app still
+does not construct/launch it, provide native consent, refresh its authority or
+advertise gamepad support. The WinUHid worker still requires explicit native
+linkage and its default-off feature. Platform builds, process/job containment,
+heartbeat timing, I/O faults, stalled driver calls and crash/PnP cleanup all
+remain unexecuted and unaccepted. Local implementation follows the Microsoft
+[process attribute contract](https://learn.microsoft.com/en-us/windows/win32/api/processthreadsapi/nf-processthreadsapi-updateprocthreadattribute)
+and [synchronous I/O cancellation contract](https://learn.microsoft.com/en-us/windows/win32/api/ioapiset/nf-ioapiset-cancelsynchronousio).
 
 ## Receiving browser sampling
 
@@ -343,8 +415,9 @@ the explicit slot tuples accepted by the private group.
    with broker/helper IPC and the authenticated capture/pair/session. Current
    `InputWorker` v1, status shape, native forwarder and host policy do not expose
    this provider yet. The private v2 actor/reader, parent orchestration and durable
-   cleanup ledger are authored, but real supervised transport, native authority
-   writer, service integration and combined keyboard/gamepad flow are not wired.
+   cleanup ledger and Windows supervised transport are authored, but the native
+   authority source, service integration and combined keyboard/gamepad flow are
+   not wired.
    Version the product path coherently before advertising support.
 2. Finish the Windows candidate's supervised helper, assigned device identity,
    signed-driver admission, installed package and unresolved-creation recovery;
