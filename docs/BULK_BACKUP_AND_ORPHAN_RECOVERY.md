@@ -98,12 +98,19 @@ including unknown filenames and Web Blobs with invalid/missing metadata.
 See `MANUAL_DATA_RECOVERY.md` for its executed acceptance and limits. This does
 not upgrade unknown bytes into a compatible or authenticated save.
 
-## Acceptance still required
+## Executed qualification and remaining gates
 
-Four additional Rust fixtures cover archive roundtrip/retry/head preservation,
-corrupt-before-write rejection, active-session refusal and exact orphan-copy
-recovery. They are authored, not compiled or executed. Later execution must
-also cover native/PWA interchange, origin-history limits, explicit reimport
-after purge, concurrent restoration, full disk, partial completion, source
-replacement, cursor budgets, denied/link/reparse roots and actual device storage.
-Full-profile/database repair and physical storage quota controls remain open.
+The initial source-authoring phase above did not execute acceptance. Sequential
+item 51 now qualifies native/PWA archive interchange through 25 executed groups
+and runs the four Rust roundtrip/retry/head-preservation, corrupt-before-write,
+active-session and exact orphan-copy fixtures. Origin-history limits, explicit
+reimport after purge, partial missing/active-game outcomes and archive size/
+structure/integrity boundaries have actual evidence in
+`SAVE_ARCHIVE_INTERCHANGE.md`. Item 50 separately qualifies manual retained-byte
+preservation and extraction as documented in `MANUAL_DATA_RECOVERY.md`.
+
+Concurrent restoration/fault policy, full disk, crash, transaction abort, schema
+upgrade, all device/file providers, orphan cursor budgets and other storage
+platform gates remain subject to their numbered tasks. Full-profile/database
+repair and physical storage quota controls remain open. Archive interchange
+does not imply those separate gates have passed.

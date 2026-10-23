@@ -1,0 +1,15 @@
+AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+
+false !== true
+
+    at assertImported (E:\V10\work\vlikeon-items-50-109-01a16780\source-051e\qa\browser\backup-interop.cjs:18:10)
+    at E:\V10\work\vlikeon-items-50-109-01a16780\source-051e\qa\browser\backup-interop.cjs:157:32
+    at async mark (E:\V10\work\vlikeon-items-50-109-01a16780\source-051e\qa\browser\backup-interop.cjs:70:36)
+    at async main (E:\V10\work\vlikeon-items-50-109-01a16780\source-051e\qa\browser\backup-interop.cjs:151:5) {
+  generatedMessage: true,
+  code: 'ERR_ASSERTION',
+  actual: false,
+  expected: true,
+  operator: 'strictEqual',
+  diff: 'simple'
+}

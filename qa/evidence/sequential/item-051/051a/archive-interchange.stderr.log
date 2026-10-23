@@ -1,0 +1,10 @@
+page.evaluate: WebPlatformError: Saved progress origin metadata is inconsistent.
+    at storageError (http://127.0.0.1:63980/web/errors.js:9:45)
+    at Store.transaction (http://127.0.0.1:63980/web/idb.js:98:63)
+    at async commit (eval at evaluate (:311:30), <anonymous>:10:23)
+    at async eval (eval at evaluate (:311:30), <anonymous>:15:147)
+    at async <anonymous>:337:30
+    at page (E:\V10\work\vlikeon-items-50-109-01a16780\source-051a\qa\browser\backup-interop.cjs:39:18)
+    at async main (E:\V10\work\vlikeon-items-50-109-01a16780\source-051a\qa\browser\backup-interop.cjs:66:47) {
+  log: []
+}

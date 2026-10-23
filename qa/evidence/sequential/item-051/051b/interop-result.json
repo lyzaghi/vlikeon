@@ -1,0 +1,53 @@
+{
+  "item": 51,
+  "status": "failed",
+  "cases": [
+    {
+      "id": "native-to-web-preserves-bytes-origins-heads",
+      "status": "passed"
+    },
+    {
+      "id": "same-archive-derives-identical-import-ids",
+      "status": "passed"
+    },
+    {
+      "id": "retry-is-idempotent-on-both-implementations",
+      "status": "passed"
+    },
+    {
+      "id": "web-to-native-captured-legacy-remote-imported",
+      "status": "passed"
+    },
+    {
+      "id": "native-web-native-and-web-native-web-reexport-references",
+      "status": "passed"
+    },
+    {
+      "id": "explicit-purge-reimport-keeps-suppression-and-new-identities",
+      "status": "passed"
+    },
+    {
+      "id": "partial-missing-and-active-games-report-per-entry",
+      "status": "passed"
+    },
+    {
+      "id": "damaged-restored-generation-is-not-overwritten-on-retry",
+      "status": "passed"
+    },
+    {
+      "id": "reject-extra-fields-before-write",
+      "status": "passed"
+    },
+    {
+      "id": "reject-duplicate-save-before-write",
+      "status": "passed"
+    },
+    {
+      "id": "reject-wrong-payload-before-write",
+      "status": "passed"
+    }
+  ],
+  "artifacts": {},
+  "browser": "155.0.8059.85",
+  "error": "AssertionError [ERR_ASSERTION]: legacy-false-missing-parent accepted\n\ntrue !== false\n\n    at E:\\V10\\work\\vlikeon-items-50-109-01a16780\\source-051b\\qa\\browser\\backup-interop.cjs:120:40\n    at async mark (E:\\V10\\work\\vlikeon-items-50-109-01a16780\\source-051b\\qa\\browser\\backup-interop.cjs:69:36)\n    at async main (E:\\V10\\work\\vlikeon-items-50-109-01a16780\\source-051b\\qa\\browser\\backup-interop.cjs:117:41)"
+}

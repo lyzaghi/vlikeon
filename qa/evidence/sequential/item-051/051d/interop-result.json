@@ -1,0 +1,117 @@
+{
+  "item": 51,
+  "status": "passed",
+  "cases": [
+    {
+      "id": "native-to-web-preserves-bytes-origins-heads",
+      "status": "passed"
+    },
+    {
+      "id": "same-archive-derives-identical-import-ids",
+      "status": "passed"
+    },
+    {
+      "id": "retry-is-idempotent-on-both-implementations",
+      "status": "passed"
+    },
+    {
+      "id": "web-to-native-captured-legacy-remote-imported",
+      "status": "passed"
+    },
+    {
+      "id": "native-web-native-and-web-native-web-reexport-references",
+      "status": "passed"
+    },
+    {
+      "id": "explicit-purge-reimport-keeps-suppression-and-new-identities",
+      "status": "passed"
+    },
+    {
+      "id": "partial-missing-and-active-games-report-per-entry",
+      "status": "passed"
+    },
+    {
+      "id": "damaged-restored-generation-is-not-overwritten-on-retry",
+      "status": "passed"
+    },
+    {
+      "id": "sixty-four-entry-boundary-and-overflow",
+      "status": "passed"
+    },
+    {
+      "id": "sixteen-prior-references-preserved-and-reexport-overflow-refused",
+      "status": "passed"
+    },
+    {
+      "id": "exact-128mib-total-and-overflow-before-publication",
+      "status": "passed"
+    },
+    {
+      "id": "reject-extra-fields-before-write",
+      "status": "passed"
+    },
+    {
+      "id": "reject-duplicate-save-before-write",
+      "status": "passed"
+    },
+    {
+      "id": "reject-wrong-payload-before-write",
+      "status": "passed"
+    },
+    {
+      "id": "reject-legacy-false-missing-parent-before-write",
+      "status": "passed"
+    },
+    {
+      "id": "reject-canonical-false-missing-parent-before-write",
+      "status": "passed"
+    },
+    {
+      "id": "reject-origin-history-overflow-before-write",
+      "status": "passed"
+    },
+    {
+      "id": "reject-magic",
+      "status": "passed"
+    },
+    {
+      "id": "reject-truncated",
+      "status": "passed"
+    },
+    {
+      "id": "reject-trailer",
+      "status": "passed"
+    },
+    {
+      "id": "reject-trailing",
+      "status": "passed"
+    },
+    {
+      "id": "reject-manifest-length",
+      "status": "passed"
+    },
+    {
+      "id": "reject-utf8",
+      "status": "passed"
+    }
+  ],
+  "artifacts": {
+    "native.opbackup": {
+      "sha256": "0210c28131eb38213debcd9ce126cfe11092078f64be5ff7e3ea6a3710f525c8",
+      "bytes": 12281
+    },
+    "web.opbackup": {
+      "sha256": "f6e16e546fd6776f23ab6b4355fb0adc78bed572b840bb759463b02a95f01305",
+      "bytes": 12182
+    },
+    "web-reexport.opbackup": {
+      "sha256": "eb0ddf13e5dccc8817f93fc7c7af1e2aa46001ad43e68933033d1fd672bc5e6e",
+      "bytes": 29514
+    },
+    "native-reexport.opbackup": {
+      "sha256": "6288ca592e723f2c16eb12155db3953cb24b170f41cf98dd0c583ccc87694ded",
+      "bytes": 29381
+    }
+  },
+  "browser": "155.0.8059.85"
+}

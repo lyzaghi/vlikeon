@@ -1,0 +1,30 @@
+   Compiling omniplay-contracts v0.1.0 (E:\V10\work\vlikeon-items-50-109-01a16780\source-051g\platform\contracts)
+   Compiling omniplay-core v0.1.0 (E:\V10\work\vlikeon-items-50-109-01a16780\source-051g\platform\core)
+warning: unused import: `io::Write`
+ --> platform\core\src\firmware.rs:5:34
+  |
+5 | use std::{fs::{File,OpenOptions},io::Write};
+  |                                  ^^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` on by default
+
+warning: variable does not need to be mutable
+  --> platform\core\src\save_payloads.rs:35:19
+   |
+35 |     if create{let mut builder=fs::DirBuilder::new();
+   |                   ----^^^^^^^
+   |                   |
+   |                   help: remove this `mut`
+   |
+   = note: `#[warn(unused_mut)]` on by default
+
+warning: variable does not need to be mutable
+  --> platform\core\src\save_orphan_recovery.rs:40:66
+   |
+40 |     let lease=save_payloads::lease(&database.root)?;let(metadata,mut file)={let tx=Transaction::new_unchecked(&database.connection,Transa...
+   |                                                                  ----^^^^
+   |                                                                  |
+   |                                                                  help: remove this `mut`
+
+warning: `omniplay-core` (lib) generated 3 warnings (run `cargo fix --lib -p omniplay-core` to apply 2 suggestions)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 20.64s

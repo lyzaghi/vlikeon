@@ -1,5 +1,13 @@
 # Backup and orphan recovery — future execution scope
 
+Current evidence note: sequential item 51 now executes the native/PWA archive
+interchange subset and archive boundaries described below; see
+`docs/SAVE_ARCHIVE_INTERCHANGE.md` and
+`qa/evidence/sequential/item-051/acceptance.json`. Other fault, orphan-inventory,
+provider and platform cases in this historical plan remain unqualified. The
+source-authoring restriction below records the original phase, not the user's
+later authorization to execute the numbered tests.
+
 Authored only. This is not a released Antigravity batch or test result. Keep the
 owner's source-first phase; dispatch no commands from this document.
 

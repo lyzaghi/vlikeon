@@ -2,3 +2,5 @@
 # Unified patch context lines consist of one required leading space.
 browser/patches/*.patch whitespace=-blank-at-eol
 engines/isolation-linux/uapi/** text eol=lf
+# Retain the exact diagnostic stdout's intentional blank line at EOF.
+qa/evidence/sequential/item-051/**/*.log whitespace=-blank-at-eof

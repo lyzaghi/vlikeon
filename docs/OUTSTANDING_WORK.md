@@ -55,7 +55,7 @@ Unchecked items remain open, including items with authored but unqualified sourc
 48. [ ] Hoàn thiện tái dựng metadata nhập game và cấu trúc bộ đĩa nhiều tệp.
 49. [ ] Hoàn thiện quota vật lý và tính toán các tham chiếu đang giữ dữ liệu.
 50. [x] Hoàn thiện công cụ phục hồi thủ công cho dữ liệu thiếu metadata đáng tin cậy. Bằng chứng và giới hạn: `MANUAL_DATA_RECOVERY.md`.
-51. [ ] Kiểm chứng trao đổi archive sao lưu giữa bản native và Web/PWA.
+51. [x] Kiểm chứng trao đổi archive sao lưu giữa bản native và Web/PWA. Bằng chứng và giới hạn: `SAVE_ARCHIVE_INTERCHANGE.md`.
 52. [ ] Kiểm chứng lưu trữ khi đầy đĩa, crash, giao dịch bị hủy và nâng schema dữ liệu.
 53. [ ] Hoàn thiện capture cửa sổ game và âm thanh ứng dụng trên Linux.
 54. [ ] Hoàn thiện capture cửa sổ game và âm thanh ứng dụng trên macOS.

@@ -1,0 +1,9 @@
+
+running 4 tests
+test backup_recovery_tests::active_session_returns_explicit_restore_failure_without_changing_head ... ok
+test backup_recovery_tests::archive_roundtrip_preserves_heads_origin_references_and_retry_identity ... ok
+test backup_recovery_tests::damaged_archive_refuses_before_any_generation_is_imported ... ok
+test backup_recovery_tests::exact_orphan_payload_repairs_a_copy_without_adopting_unknown_metadata ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 10 filtered out; finished in 0.50s
+

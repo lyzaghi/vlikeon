@@ -1,0 +1,14 @@
+AssertionError [ERR_ASSERTION]: legacy-false-missing-parent accepted
+
+true !== false
+
+    at E:\V10\work\vlikeon-items-50-109-01a16780\source-051b\qa\browser\backup-interop.cjs:120:40
+    at async mark (E:\V10\work\vlikeon-items-50-109-01a16780\source-051b\qa\browser\backup-interop.cjs:69:36)
+    at async main (E:\V10\work\vlikeon-items-50-109-01a16780\source-051b\qa\browser\backup-interop.cjs:117:41) {
+  generatedMessage: false,
+  code: 'ERR_ASSERTION',
+  actual: true,
+  expected: false,
+  operator: 'strictEqual',
+  diff: 'simple'
+}

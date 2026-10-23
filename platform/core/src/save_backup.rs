@@ -38,9 +38,10 @@ fn validate_origin(metadata:&SaveMetadata,origin:&SaveOrigin)->Result<()>{
     metadata.validate()?;
     if origin.schema_version!=1||origin.save_id!=metadata.id{return Err(corrupt());}
     if origin.kind==SaveOriginKind::LegacyProjection{
-        if origin.canonical_metadata.is_some()||origin.canonical_hash.is_some()||origin.imported_from.is_some()||origin.imported_from_hash.is_some(){return Err(corrupt());}
+        if origin.canonical_metadata.is_some()||origin.canonical_hash.is_some()||origin.imported_from.is_some()||origin.imported_from_hash.is_some()||origin.missing_parent{return Err(corrupt());}
     }else{
         let canonical=origin.canonical_metadata.as_ref().ok_or_else(corrupt)?;canonical.validate()?;
+        if origin.missing_parent&&canonical.parent_id.is_none(){return Err(corrupt());}
         if canonical.id!=metadata.id||!same_payload(canonical,metadata)||canonical.created_at_ms!=metadata.created_at_ms||canonical.device_id!=metadata.device_id||canonical.label!=metadata.label||origin.canonical_hash.as_ref()!=Some(&save_origin_hash(canonical)?){return Err(corrupt());}
     }
     if (origin.kind==SaveOriginKind::Imported)!=origin.imported_from.is_some()||origin.imported_from.is_some()!=origin.imported_from_hash.is_some(){return Err(corrupt());}

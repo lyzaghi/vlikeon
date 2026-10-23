@@ -1,0 +1,48 @@
+{
+  "item": 51,
+  "batch": "051d",
+  "executor": "antigravity",
+  "source_manifest_sha256": "faac4062929602667483290945f6adab204571958318bd2bb68543b884681978",
+  "started_at": "2026-10-23T09:15:29.601Z",
+  "runner_pid": 11872,
+  "cases": [
+    {
+      "id": "native-example",
+      "args": [
+        "build",
+        "-p",
+        "omniplay-core",
+        "--example",
+        "backup_interop",
+        "--locked",
+        "--offline"
+      ],
+      "exit_code": 0,
+      "elapsed_ms": 21353,
+      "status": "passed"
+    },
+    {
+      "id": "web-assembly",
+      "args": [
+        "-B",
+        "tools/assemble_web.py",
+        "--without-cores"
+      ],
+      "exit_code": 0,
+      "elapsed_ms": 626,
+      "status": "passed"
+    },
+    {
+      "id": "archive-interchange",
+      "args": [
+        "qa/browser/backup-interop.cjs"
+      ],
+      "exit_code": 0,
+      "elapsed_ms": 84617,
+      "status": "passed"
+    }
+  ],
+  "source_unchanged": true,
+  "status": "passed",
+  "finished_at": "2026-10-23T09:17:16.422Z"
+}

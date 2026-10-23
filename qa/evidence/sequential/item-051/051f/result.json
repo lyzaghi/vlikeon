@@ -1,0 +1,65 @@
+{
+  "item": 51,
+  "batch": "051f",
+  "executor": "antigravity",
+  "source_manifest_sha256": "d6d8c204ad811736123c691e950ad23ab2a29ed7efb88b6c8288eaec9a549fec",
+  "started_at": "2026-10-23T09:22:25.657Z",
+  "runner_pid": 34984,
+  "cases": [
+    {
+      "id": "native-example",
+      "args": [
+        "build",
+        "-p",
+        "omniplay-core",
+        "--example",
+        "backup_interop",
+        "--locked",
+        "--offline"
+      ],
+      "exit_code": 0,
+      "elapsed_ms": 21439,
+      "status": "passed"
+    },
+    {
+      "id": "native-regression",
+      "args": [
+        "test",
+        "-p",
+        "omniplay-core",
+        "--lib",
+        "--locked",
+        "--offline",
+        "backup_recovery_tests",
+        "--",
+        "--test-threads=1"
+      ],
+      "exit_code": 0,
+      "elapsed_ms": 7758,
+      "status": "passed"
+    },
+    {
+      "id": "web-assembly",
+      "args": [
+        "-B",
+        "tools/assemble_web.py",
+        "--without-cores"
+      ],
+      "exit_code": 0,
+      "elapsed_ms": 562,
+      "status": "passed"
+    },
+    {
+      "id": "archive-interchange",
+      "args": [
+        "qa/browser/backup-interop.cjs"
+      ],
+      "exit_code": 1,
+      "elapsed_ms": 84143,
+      "status": "failed"
+    }
+  ],
+  "source_unchanged": true,
+  "status": "failed",
+  "finished_at": "2026-10-23T09:24:19.781Z"
+}
