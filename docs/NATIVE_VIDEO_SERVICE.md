@@ -149,3 +149,12 @@ centered-chroma metadata. `NATIVE_VIDEO_COLOUR.md` records colour contracts,
 references, eight unexecuted source cases and remaining capture/negotiation/
 product work. No real capture producer, service command or media publication
 path is connected by this checkpoint; no build/test was executed.
+
+The subsequent source checkpoint adds a separate WGC/D3D11 Windows capture
+class with retained original process/native item, local confirmation, bounded
+raw frame ownership, SDR display admission and GPU aspect-fit BGRA readback.
+`WINDOWS_OWNED_VIDEO_CAPTURE.md` records its behavior, caller obligations and
+limitations. It is not connected to the encoder worker/Rust bridge/product UI;
+no capture, dialog, build or test ran. Private native capture transport/admission,
+application audio, actual colour/receiver/transport integration and all original
+platform/service qualification requirements remain unfinished.

@@ -9,6 +9,12 @@ separate reader/writer threads and an MTA encoder actor. It has not been built,
 run, installed or connected to capture/broker/transport. The exact wire contract,
 keepalive/Stop behavior and required external supervision are in [PROTOCOL.md](PROTOCOL.md).
 
+The static recipe also includes a separate WGC/D3D11 owned-window capture
+candidate (`vlikeon_capture.hpp`, `src/capture.cpp`) with native confirmation,
+original-process checks, bounded raw frames and GPU aspect-fit BGRA scaling.
+It is not called by the encoder worker or Rust bridge. Exact behavior/limits:
+[WINDOWS_OWNED_VIDEO_CAPTURE.md](../../docs/WINDOWS_OWNED_VIDEO_CAPTURE.md).
+
 This standalone static-library recipe supplies an H.264 Main Level 4.2 NV12
 Media Foundation adapter for 720p/1080p at 30/60 FPS. It enumerates system MFTs
 with bounded activation attempts and admits a single input/output stream. A

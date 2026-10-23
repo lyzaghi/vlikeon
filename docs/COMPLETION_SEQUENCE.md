@@ -45,6 +45,13 @@ identity regression cases are authored, not executed. Native capture producer,
 installed/native admission, actual receiver/transport/UI integration, other
 platform completion and all build/runtime/final evidence remain due.
 
+Item 56 now also has separate WGC/D3D11 owned-window capture source: original
+process/native item retention, default-No local confirmation, bounded callbacks,
+SDR display checks and GPU aspect-fit opaque BGRA readback. It remains unconnected
+to the encoder worker/Rust frame bridge and unbuilt/unexecuted. Native capture
+transport, host admission/lifecycle/UI, application audio, other platforms and
+every original item-56 product/qualification requirement remain open.
+
 This fork's current assignment: items 51 and 52 are accepted with evidence in
 `SAVE_ARCHIVE_INTERCHANGE.md` and `STORAGE_FAULT_QUALIFICATION.md`. On 2026-10-23,
 the owner deferred Linux build/runtime work for item 53, then deferred build/test
