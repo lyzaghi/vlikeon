@@ -87,14 +87,15 @@ def main():
     # The color boot programs embed SameBoy's own logo. Generate the tile stream
     # with RGBDS, then reproduce the upstream PB12 encoding in portable Python.
     tiles=generated/"SameBoyLogo.2bpp"
-    run([args.rgbgfx,"-h","-u","-o",tiles,CORE/"BootROMs/SameBoyLogo.png"],CORE)
+    # Match upstream's RGBDS >= 0.7 flags. -h now means help, not traversal.
+    run([args.rgbgfx,"-Z","-u","-c","embedded","-o",tiles,CORE/"BootROMs/SameBoyLogo.png"],CORE)
     (generated/"SameBoyLogo.pb12").write_bytes(pb12(tiles.read_bytes()))
     generated_sources = []
     for name in BOOTS:
         source = CORE / "BootROMs" / f"{name}_boot.asm"
         obj = generated / f"{name}_boot.o"
         binary = generated / f"{name}_boot.bin"
-        run([args.rgbasm,"-h","-I",str(generated)+os.sep, "-I", str(CORE / "BootROMs") + os.sep, "-o", obj, source], CORE / "BootROMs")
+        run([args.rgbasm,"-I",str(generated)+os.sep, "-I", str(CORE / "BootROMs") + os.sep, "-o", obj, source], CORE / "BootROMs")
         run([args.rgblink, "-x", "-o", binary, obj], CORE / "BootROMs")
         data = binary.read_bytes()
         if not data or len(data) > 65536:
