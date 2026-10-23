@@ -1,0 +1,2 @@
+usage: build_macos_capture.py [-h] --cmake CMAKE --architecture {arm64,x86_64}
+build_macos_capture.py: error: A real Mac with an existing Xcode macOS SDK is required

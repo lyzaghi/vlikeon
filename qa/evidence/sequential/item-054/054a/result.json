@@ -1,0 +1,33 @@
+{
+  "item": 54,
+  "batch": "054a",
+  "scope": "Portable bounded media ownership and build recipe refusal only; no macOS SDK/ScreenCaptureKit execution",
+  "executor": "Antigravity",
+  "cases": [
+    {
+      "id": "build-real-mailbox-fixture",
+      "status": "passed",
+      "exit_code": 0
+    },
+    {
+      "id": "bounded-media-ownership-and-concurrent-close",
+      "status": "passed",
+      "exit_code": 0
+    },
+    {
+      "id": "parse-mac-build-recipe",
+      "status": "passed",
+      "exit_code": 0
+    },
+    {
+      "id": "refuse-mac-build-on-windows",
+      "status": "passed",
+      "exit_code": 2
+    }
+  ],
+  "source_manifest_sha256": "3e8a47976545df94956dfc0ccc6d9ccdaab23d7f9447ab7f2dcef44b8d655302",
+  "started_at": "2026-10-23T15:11:01.277Z",
+  "status": "passed",
+  "source_unchanged": true,
+  "finished_at": "2026-10-23T15:11:05.035Z"
+}

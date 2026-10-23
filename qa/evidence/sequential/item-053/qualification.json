@@ -1,6 +1,7 @@
 {
   "item": 53,
   "status": "incomplete",
+  "owner_steering": "2026-10-23: defer Linux build/runtime work and continue to item 54; no completion claimed",
   "executor": "Antigravity",
   "reviewed_by": "Codex",
   "checks": [

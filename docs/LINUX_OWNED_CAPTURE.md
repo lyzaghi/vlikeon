@@ -4,6 +4,10 @@ Status: open. There is no Linux owned-capture adapter in the current product.
 The host probe below is prerequisite tooling, not an implementation or a
 capture acceptance result. Streaming policy remains disabled.
 
+On 2026-10-23 the owner deferred Linux build/runtime work and directed this chat
+to the next numbered item, macOS capture (54). Retain all implementation and
+runtime gaps below. No Linux build, SSH login or VM installation is being run.
+
 ## Current source boundaries
 
 `platform/broker/src/stream_input.rs::capture_available` is Windows-only.

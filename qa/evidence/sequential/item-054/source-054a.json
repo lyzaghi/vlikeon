@@ -1,0 +1,12 @@
+{
+  "item": 54,
+  "batch": "054a",
+  "sha256": {
+    "engines/capture-macos/CMakeLists.txt": "c6b399616f44d78a6d6146596c88b74261835028038bddc64f5e3169e4189091",
+    "engines/capture-macos/include/VLKMacCapture.h": "16156a528d51b34ed124e8593b825f8d28913b052f6ac2f50affa51d4582f8bd",
+    "engines/capture-macos/include/bounded_samples.hpp": "e76e576843969e2bc691615a1c926ff9c0ae6bb08b76460880e2dd2d3e684928",
+    "engines/capture-macos/src/capture.mm": "04eef2182ecfc5ce06f6cc969a6c83b1101f8b6aa01480cf1c4450fdd64a248f",
+    "qa/macos/capture-mailbox.cpp": "762732cb453e6e2e1281b244c4ff7b046a02f0e9b4c8e2106c791440ea65261c",
+    "tools/build_macos_capture.py": "1b26f0d9d2cb3b7d140c67d11fc3074253228c3e12394fba248eebed968397b9"
+  }
+}

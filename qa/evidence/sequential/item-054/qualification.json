@@ -1,0 +1,32 @@
+{
+  "item": 54,
+  "status": "incomplete",
+  "executor": "Antigravity",
+  "reviewed_by": "Codex",
+  "batch": "054a",
+  "source_manifest_sha256": "3e8a47976545df94956dfc0ccc6d9ccdaab23d7f9447ab7f2dcef44b8d655302",
+  "source_sha256": {
+    "engines/capture-macos/CMakeLists.txt": "c6b399616f44d78a6d6146596c88b74261835028038bddc64f5e3169e4189091",
+    "engines/capture-macos/include/VLKMacCapture.h": "16156a528d51b34ed124e8593b825f8d28913b052f6ac2f50affa51d4582f8bd",
+    "engines/capture-macos/include/bounded_samples.hpp": "e76e576843969e2bc691615a1c926ff9c0ae6bb08b76460880e2dd2d3e684928",
+    "engines/capture-macos/src/capture.mm": "04eef2182ecfc5ce06f6cc969a6c83b1101f8b6aa01480cf1c4450fdd64a248f",
+    "qa/macos/capture-mailbox.cpp": "762732cb453e6e2e1281b244c4ff7b046a02f0e9b4c8e2106c791440ea65261c",
+    "tools/build_macos_capture.py": "1b26f0d9d2cb3b7d140c67d11fc3074253228c3e12394fba248eebed968397b9"
+  },
+  "passed_checks": [
+    "Actual portable media mailbox compiled with optimized warning-clean C++20",
+    "Bounded ownership, eviction, consumer retention and 100 concurrent close runs",
+    "Python build recipe parses",
+    "Build recipe refuses Windows with exit 2"
+  ],
+  "macos_sdk_compiled": false,
+  "capture_executed": false,
+  "product_integrated": false,
+  "linux_build_executed": false,
+  "pending": [
+    "macOS SDK build and API corrections",
+    "Broker-owned macOS process/capture admission",
+    "Signed package and private media/WebRTC integration",
+    "Real Mac window/audio isolation and lifecycle qualification"
+  ]
+}

@@ -5,6 +5,10 @@ Antigravity executes assigned tests only; Codex owns review, fixes and acceptanc
 These are the new 1–109 identifiers, distinct from the historical 17-area roadmap.
 Unchecked items remain open, including items with authored but unqualified source.
 
+Owner steering on 2026-10-23: defer Linux build/runtime work in item 53 and
+continue with item 54 (macOS capture). Item 53 remains open; no Linux host,
+VM installation, SSH access or new Linux build/test is authorized by this move.
+
 1. [x] Tích hợp các thay đổi mã nguồn đang nằm ngoài commit thành các phiên bản thống nhất, có thể tái tạo. Bằng chứng và giới hạn: `SOURCE_INTEGRATION.md`.
 2. [x] Đồng bộ README, roadmap và tài liệu trạng thái với kết quả phát triển, kiểm thử thực tế. Đối chiếu: `DOCUMENTATION_ALIGNMENT.md`.
 3. [ ] Build trình duyệt Chromium Vlikeon hoàn chỉnh trên Windows.
@@ -57,8 +61,8 @@ Unchecked items remain open, including items with authored but unqualified sourc
 50. [x] Hoàn thiện công cụ phục hồi thủ công cho dữ liệu thiếu metadata đáng tin cậy. Bằng chứng và giới hạn: `MANUAL_DATA_RECOVERY.md`.
 51. [x] Kiểm chứng trao đổi archive sao lưu giữa bản native và Web/PWA. Bằng chứng và giới hạn: `SAVE_ARCHIVE_INTERCHANGE.md`.
 52. [x] Kiểm chứng lưu trữ khi đầy đĩa, crash, giao dịch bị hủy và nâng schema dữ liệu. Bằng chứng và giới hạn: `STORAGE_FAULT_QUALIFICATION.md`.
-53. [ ] Hoàn thiện capture cửa sổ game và âm thanh ứng dụng trên Linux.
-54. [ ] Hoàn thiện capture cửa sổ game và âm thanh ứng dụng trên macOS.
+53. [ ] Hoàn thiện capture cửa sổ game và âm thanh ứng dụng trên Linux. Hoãn build/runtime theo yêu cầu chủ dự án; thiếu sót giữ tại `LINUX_OWNED_CAPTURE.md`.
+54. [ ] Hoàn thiện capture cửa sổ game và âm thanh ứng dụng trên macOS. Mã đang triển khai và phần chưa kiểm chứng: `MACOS_OWNED_CAPTURE.md`.
 55. [ ] Hoàn thiện tích hợp virtual gamepad và phân quyền thiết bị điều khiển từ xa.
 56. [ ] Hoàn thiện dịch vụ capture/encode native độc lập và lựa chọn codec.
 57. [ ] Hoàn thiện nhận diện quyền sở hữu tiến trình game con được launcher khởi chạy.

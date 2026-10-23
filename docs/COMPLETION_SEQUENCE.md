@@ -2,6 +2,12 @@
 
 ## Current sequence — 1–109 outstanding tasks
 
+This fork's current assignment: items 51 and 52 are accepted with evidence in
+`SAVE_ARCHIVE_INTERCHANGE.md` and `STORAGE_FAULT_QUALIFICATION.md`. On 2026-10-23,
+the owner deferred Linux build/runtime work for item 53 and moved this fork to
+item 54, macOS capture. Item 53 remains unchecked. Other chats' assignments and
+the remaining 1–109 obligations remain unchanged.
+
 The owner now requests the individually numbered tasks in
 [`OUTSTANDING_WORK.md`](OUTSTANDING_WORK.md), completed in order. Task 1 source
 integration is complete at commit `35f3271`; task 2 alignment is recorded in
