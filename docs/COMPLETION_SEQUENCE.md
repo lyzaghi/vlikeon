@@ -1,6 +1,22 @@
 # User-ordered completion sequence
 
-## This chat's latest transition — items 15 then 16
+## Current sequence — 1–109 outstanding tasks
+
+The owner now requests the individually numbered tasks in
+[`OUTSTANDING_WORK.md`](OUTSTANDING_WORK.md), completed in order. Task 1 source
+integration is complete at commit `35f3271`; task 2 alignment is recorded in
+[`DOCUMENTATION_ALIGNMENT.md`](DOCUMENTATION_ALIGNMENT.md). Next is task 3,
+the Windows Chromium build. [`SOURCE_INTEGRATION.md`](SOURCE_INTEGRATION.md)
+records the executed scope and open gates. No full product area is closed by
+source integration alone.
+
+All sections below are historical records using the older 1–17 product-area
+numbers. Phrases such as "current", "latest" and "now" in those records describe
+their assignment at the time. Their unclosed obligations remain active, but
+their ordering and source-only execution timing do not override the current
+1–109 list or the owner's Antigravity execution-only policy.
+
+## Historical transition — product areas 15 then 16
 
 On 2026-10-23 the owner requested noting the Android/iOS gaps and moving this
 chat to security/licensing/release preparation (15), then consolidated

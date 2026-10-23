@@ -6,7 +6,7 @@ These are the new 1–109 identifiers, distinct from the historical 17-area road
 Unchecked items remain open, including items with authored but unqualified source.
 
 1. [x] Tích hợp các thay đổi mã nguồn đang nằm ngoài commit thành các phiên bản thống nhất, có thể tái tạo. Bằng chứng và giới hạn: `SOURCE_INTEGRATION.md`.
-2. [ ] Đồng bộ README, roadmap và tài liệu trạng thái với kết quả phát triển, kiểm thử thực tế.
+2. [x] Đồng bộ README, roadmap và tài liệu trạng thái với kết quả phát triển, kiểm thử thực tế. Đối chiếu: `DOCUMENTATION_ALIGNMENT.md`.
 3. [ ] Build trình duyệt Chromium Vlikeon hoàn chỉnh trên Windows.
 4. [ ] Build trình duyệt Chromium Vlikeon hoàn chỉnh trên Linux.
 5. [ ] Build trình duyệt Chromium Vlikeon hoàn chỉnh trên macOS.

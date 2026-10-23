@@ -12,15 +12,32 @@ native engine adapters, save management and remote-play workflows into one
 workspace. Vlikeon is the new public name of the project previously called
 OmniPlay.
 
-**Status: source development, not a verified release.** No qualified installer,
-compatibility list or measured performance result is available. The source has
-not undergone its consolidated build and verification pass.
+**Status: active development; full browser and production release qualification
+remain open.** A separate Windows Game Hub demo has scoped execution evidence.
+The integrated source checkpoint passed selected tests and deterministic resource
+generation; it is not a complete Chromium browser build. No qualified production
+installer, compatibility list or controlled benchmark is available.
 
 [Tiếng Việt](README.vi.md) · [Roadmap](ROADMAP.md) ·
 [Contributing](CONTRIBUTING.md) · [Security](SECURITY.md) ·
 [License scope](LICENSING.md)
 
 [Transparent logo and platform icon assets](branding/vlikeon/README.vi.md)
+
+## Current evidence and demo
+
+- [Windows demo and its limits](docs/PLAYABLE_DEMO.md): a standalone Win32 window
+  with WebView2, an original Game Boy game and a WebAssembly core. It is a
+  separate technical demo; current source changes need their own qualification.
+- [Source integration checkpoint](docs/SOURCE_INTEGRATION.md), commit `35f3271`:
+  53 Rust, 13 JavaScript and 19 Python cases passed; four Windows fixture cases
+  remain ignored. The synthetic audio contract and fixture-configured native
+  worker/helper build passed. Development regeneration reproduced 435 files.
+- [Ordered outstanding work](docs/OUTSTANDING_WORK.md): current 1–109 task
+  identifiers. Older 1–17 numbers describe product areas, not this task list.
+
+Evidence applies to its recorded inputs and scope. These counts overlap earlier
+verification batches and must not be added as new distinct coverage.
 
 ## What we are building
 
@@ -44,8 +61,8 @@ targets WebKit. Device, platform, compatibility and release qualification remain
 
 This is a source-review entry point. A clean-clone build has not been verified;
 there is no supported end-user installation command yet. Tools and recipes are
-authored source, not proof of successful execution. The maintainer is authoring
-the implementation before one consolidated verification pass.
+authored source; exact executed scopes are recorded in the evidence above.
+Antigravity executes assigned checks; Codex reviews results and owns fixes.
 
 ## Source map
 
@@ -58,7 +75,7 @@ the implementation before one consolidated verification pass.
 | `services/` | Account, encrypted synchronization and signaling services |
 | `security/` | Dependency provenance, release trust and distribution decisions |
 | `packaging/` | Platform packaging source and policies |
-| `qa/` | Authored acceptance cases and test source, not executed evidence |
+| `qa/` | Acceptance/test source and scoped execution records under `qa/evidence/` |
 | `tools/` | Source acquisition, adaptation, staging and build recipes |
 | `docs/` | Architecture, requirements and implementation records |
 

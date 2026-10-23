@@ -1,5 +1,15 @@
 # Item 16 — consolidated verification
 
+This is historical product area 16, still open; current task identifiers are
+1–109 in [`OUTSTANDING_WORK.md`](OUTSTANDING_WORK.md). The formerly uncommitted
+source described below was integrated at `35f3271`. Later scoped qualification
+is recorded in [`SOURCE_INTEGRATION.md`](SOURCE_INTEGRATION.md): 53 Rust cases
+(including the earlier 42 plus 11), the repeated 13 release and 13 browser cases,
+six patch cases, native audio contract, fixture-configured native build and
+deterministic development assets. Four explicit Windows cases remain ignored.
+Do not sum reruns across snapshots as new distinct coverage. Full application
+acceptance is not established. The following batch history remains unchanged.
+
 The owner explicitly moved this chat to 15 then 16 on 2026-10-23. Exact frozen
 verification batches are now authorized; source-only timing does not prevent
 these batches. Antigravity executes the assigned commands only. Codex reviews
@@ -73,7 +83,7 @@ needed in the published indexes.
 
 | Area | Qualification still required |
 | --- | --- |
-| Rust/shared services | Workspace library tests, all-target build/check, executable/integration cases and Windows-specific lifecycle/fault coverage |
+| Rust/shared services | Retain scoped workspace/all-target evidence; complete missing Windows lifecycle/fault coverage, executable behavior and checks for subsequent source changes |
 | Native cores | Actual pinned full core builds and original-media compatibility/save/audio/graphics/input/fault tests; fixture evidence is separate |
 | Desktop browser | Real Chromium builds, profiles/private tabs, native bridge ownership, permission/download/capture/update/install/repair behavior |
 | Windows | Actual production containment/core/presentation/device/save/storage matrix, including deferred item 2 |

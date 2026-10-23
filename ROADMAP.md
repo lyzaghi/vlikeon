@@ -1,9 +1,16 @@
 # Roadmap
 
-Planned work, not promised release dates or verified features. Product development
-is paused at the owner's request while preparing GitHub presentation. There is
-no measured completion percentage. Detailed sequence:
-[`docs/COMPLETION_SEQUENCE.md`](docs/COMPLETION_SEQUENCE.md).
+Active development, with no promised release dates or measured completion
+percentage. The authoritative task sequence is
+[`docs/OUTSTANDING_WORK.md`](docs/OUTSTANDING_WORK.md), numbered 1–109.
+Source integration task 1 is complete at `35f3271`; task 2 documentation alignment
+is recorded in [`DOCUMENTATION_ALIGNMENT.md`](docs/DOCUMENTATION_ALIGNMENT.md).
+The next task is the Windows Chromium build (task 3). Completed source
+integration does not close the historical desktop product area below.
+
+The table uses the historical 17 product-area identifiers for traceability.
+[`docs/COMPLETION_SEQUENCE.md`](docs/COMPLETION_SEQUENCE.md) retains prior
+assignments and deferrals; its historical ordering does not override 1–109.
 
 | Order | Area | Status |
 | --- | --- | --- |
@@ -22,9 +29,21 @@ no measured completion percentage. Detailed sequence:
 | 13 | Performance, routing and assistant | Completion review and qualification pending |
 | 14 | Installation, repair and updates | Completion review and qualification pending |
 | 15 | Security, licenses and release | Review and qualification pending |
-| 16 | Consolidated verification | Not run |
+| 16 | Consolidated verification | Selected Windows/shared-source batches passed; full matrix open |
+| 17 | Overall review and closure | Open; final decision follows remaining implementation and evidence |
 
-## Before the first experimental release
+## Established evidence
+
+- [Windows Game Hub demo](docs/PLAYABLE_DEMO.md): scoped standalone WebView2 demo,
+  not the full Chromium browser. Existing demo evidence does not qualify later
+  product source.
+- [Integrated source](docs/SOURCE_INTEGRATION.md): selected Rust/JS/Python tests,
+  synthetic audio contract, fixture-configured native compilation and repeatable
+  development resource generation. Four Windows fixture cases remain ignored.
+- [Historical verification](docs/ITEM16_VERIFICATION.md): exact frozen inputs,
+  actual failures and limited passing scopes. Counts overlap later reruns.
+
+## Before a full-browser experimental release
 
 - Establish a repeatable clean-clone build and record exact toolchains.
 - Execute the verification matrix and fix failures with traceable evidence.
@@ -33,4 +52,5 @@ no measured completion percentage. Detailed sequence:
 - Qualify installers, updates, recovery and platform containment.
 - Publish release notes with evidence-backed limitations.
 
-No dated milestone, release tag or passing CI badge is implied here.
+The separate demo does not satisfy these full-browser release gates. No dated
+milestone, full-browser release tag or passing CI badge is implied here.

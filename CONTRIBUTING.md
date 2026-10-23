@@ -2,12 +2,13 @@
 
 Start with [public status](docs/PUBLIC_STATUS.md),
 [architecture](docs/ARCHITECTURE.md) and [roadmap](ROADMAP.md).
-The source has not passed consolidated execution or device qualification.
+Selected checks have executed; full application/device qualification remains
+open. See [source evidence](docs/SOURCE_INTEGRATION.md) for exact scope.
 
 ## Discuss a change
 
-Use an issue for a concrete bug, design question or focused proposal once the
-repository is public. Include the source path, expected behavior and whether
+Use an issue for a concrete bug, design question or focused proposal in the
+public repository. Include the source path, expected behavior and whether
 the finding comes from source review or actual execution. Do not label an
 inferred defect as a reproduced failure without evidence.
 
@@ -23,8 +24,8 @@ corrections can go directly to a pull request.
    If nothing ran, say so. Authored tests are not passing results.
 5. Exclude unrelated changes, generated output, upstream checkouts and binaries.
 
-There is no verified clean-clone build guide yet. The maintainer is authoring
-source before one consolidated verification pass. Contributors who independently
+There is no verified full-product clean-clone build guide yet. Assigned frozen
+batches have tested selected source scopes. Contributors who independently
 run a check should report their environment and evidence; that does not establish
 whole-product qualification.
 

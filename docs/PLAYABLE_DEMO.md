@@ -8,6 +8,11 @@ browser or a qualification of the remaining platform roadmap.
 
 ## Use
 
+Published technical prerelease:
+[v0.1.0-demo.1](https://github.com/lyzaghi/vlikeon/releases/tag/v0.1.0-demo.1).
+Its ZIP digest matches the qualified archive below. This existing demo has not
+been rebuilt as part of the later source-integration/documentation tasks.
+
 Extract the entire portable bundle into a writable directory and open
 `VlikeonDemo.exe`. Microsoft Edge WebView2 Runtime must already be installed.
 No administrator privileges, development server, account or commercial ROM is

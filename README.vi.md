@@ -11,9 +11,25 @@ Vlikeon Browser là tên công khai mới của dự án OmniPlay: trình duyệ
 Chromium, hướng tới kết hợp Game Hub, runtime native được cô lập, quản lý save
 và điều phối remote play trong cùng một không gian làm việc.
 
-**Dự án đang phát triển mã nguồn. Chưa có bản phát hành đã được kiểm chứng.**
-Chưa chạy đợt build và kiểm thử tổng hợp; không có cam kết tương thích game,
-benchmark, bộ cài được chứng nhận hay kết luận kiểm toán bảo mật.
+**Dự án đang phát triển; trình duyệt đầy đủ và bản production chưa được kiểm chứng.**
+Demo Game Hub Windows riêng đã có bằng chứng chạy thử giới hạn. Bản tích hợp
+mã nguồn đã qua các kiểm tra được giao và tái tạo tài nguyên; chưa phải kết quả
+build Chromium hoàn chỉnh. Chưa có bộ cài production được xác nhận, danh sách
+tương thích game, benchmark có kiểm soát hay kết luận kiểm toán bảo mật.
+
+## Bằng chứng hiện có
+
+- [Demo Windows và giới hạn](docs/PLAYABLE_DEMO.md): cửa sổ Win32 dùng WebView2,
+  game Game Boy gốc và core WebAssembly. Bằng chứng demo chỉ áp dụng đúng bản đó.
+- [Bản tích hợp nguồn](docs/SOURCE_INTEGRATION.md), commit `35f3271`: 53 ca Rust,
+  13 ca JavaScript và 19 ca Python đạt; bốn ca Windows cần fixture riêng vẫn bỏ
+  qua. Hợp đồng âm thanh giả lập và build worker/helper với cấu hình fixture đã
+  đạt. Sinh lại tài nguyên cho kết quả khớp 435 tệp.
+- [Danh sách công việc 1–109](docs/OUTSTANDING_WORK.md) là thứ tự hiện hành;
+  số nhóm 1–17 cũ dùng để tra cứu các mảng sản phẩm.
+
+Không cộng các ca trùng với đợt kiểm thử trước thành thành tích mới. Antigravity
+chỉ thực thi kiểm thử; Codex xem kết quả, quyết định và thực hiện sửa lỗi.
 
 ## Định hướng
 
@@ -25,8 +41,7 @@ benchmark, bộ cài được chứng nhận hay kết luận kiểm toán bảo
 
 Đây là mục tiêu sản phẩm và các vùng mã nguồn đã được soạn, chưa phải danh sách
 tính năng được xác nhận hoạt động. Desktop/Android hướng tới Chromium; iOS dùng
-WebKit. Công việc phát triển sản phẩm đang tạm dừng theo yêu cầu của chủ dự án
-để chuẩn bị công bố GitHub.
+WebKit. Mã nguồn đã công khai trên GitHub và công việc phát triển đang tiếp tục.
 
 ## Bắt đầu tìm hiểu
 

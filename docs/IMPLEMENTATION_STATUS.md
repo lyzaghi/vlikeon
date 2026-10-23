@@ -1,5 +1,33 @@
 # Implementation status
 
+## Current summary — 2026-10-23
+
+The current task authority is [`OUTSTANDING_WORK.md`](OUTSTANDING_WORK.md),
+numbered 1–109. Integrated source task 1 is complete at `35f3271`; task 2 alignment
+is recorded in [`DOCUMENTATION_ALIGNMENT.md`](DOCUMENTATION_ALIGNMENT.md).
+The next task is 3 (Windows Chromium build). The older 1–17
+identifiers below refer to product areas, not these individual tasks.
+
+[`SOURCE_INTEGRATION.md`](SOURCE_INTEGRATION.md) records current checkpoint
+qualification: 53 Rust, 13 JavaScript and 19 Python cases passed; four Windows
+fixture cases remain ignored. The synthetic native audio contract and
+fixture-configured worker/separate-helper build passed; 435 development outputs
+reproduced exactly. Evidence applies to frozen inputs, not every platform or
+game. Earlier failed batches are preserved; overlapping passes are not new
+coverage. [`PLAYABLE_DEMO.md`](PLAYABLE_DEMO.md) records the separate Windows
+WebView2 demo, whose earlier evidence does not qualify later runtime changes.
+
+Full Chromium builds, production cores, actual device/platform behavior,
+installers, performance, security review and release approval remain open.
+Antigravity executes assigned tests only; Codex reviews and decides fixes.
+
+## Historical source and verification journal
+
+The entries below retain original assignment-time wording, snapshot identities,
+failures and open obligations. "Current", "latest", "not run" and completion
+claims in this journal apply to their described snapshot and scope. They do not
+supersede the summary above, the new task numbering or later scoped evidence.
+
 Antigravity batch029 built the current CRT-restoration worker and both updated
 qualification DLLs on frozen v50/base3823f29. Batch030 passed all3 private scratch
 environment cases,13 lifecycle and19 wire cases on those exact hashes. Codex
