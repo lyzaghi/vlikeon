@@ -107,3 +107,27 @@ capture/conversion, receiver negotiation and publication fencing. This candidate
 does not yet connect to the Rust selection primitives, capture or product UI.
 `engines/encode-windows/README.md` records exact behavior, API references and
 unsupported paths. No Windows configure/build, MFT activation or test was run.
+
+## Windows independent encoder worker source
+
+The Windows recipe now also defines `omniplay-video-worker.exe` with exact
+`--stdio-video-v1` entry and pipe-only input/output. A separate bounded reader,
+bounded writer and COM MTA actor connect real NV12 submissions to the encoder
+library. The binary protocol covers immutable capture/session/generation labels,
+finite configuration, raw frame submission, output polling and terminal Stop.
+Labels do not establish capture/owner permission. There is no window capture,
+file/network output, arbitrary backend path or renderer command surface.
+
+The actor polls independently of arriving commands, retains the original overall
+lifetime and requires a responsive private parent lease. Stop supersedes unsent
+ordinary replies, fences delivery before OS teardown and returns the actual stop
+HRESULT. A partial outgoing frame cannot be followed by an apparently valid Stop
+receipt on the same corrupted stream. Existing OS calls/writes can still block;
+parent supervision and rejection of late media remain mandatory. Bounded queues
+and atomic flags do not preempt the OS or prove process retirement.
+
+The worker is authored, not built/run/installed or called by the product. Installed
+artifact admission, job/process supervision, native capture/conversion, actual
+receiver codec/bitstream negotiation, host authority integration and transport
+publication fences are still missing. `engines/encode-windows/PROTOCOL.md` records
+the exact contract. All original item-56 completion requirements remain open.

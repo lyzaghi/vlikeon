@@ -23,6 +23,13 @@ product feature. No configure/build, MFT activation or runtime/test was run.
 Capture/conversion, supervision/transport, other codecs, Linux and full original
 item-56 service/qualification requirements remain open.
 
+The next item-56 source checkpoint adds an independent Windows encoder-worker
+executable recipe and pipe protocol, connecting finite NV12 commands to MF and
+bounded output replies. Reader/writer/actor ownership, parent keepalive, original
+lifetime and superseding Stop receipts are authored. This has not been built or
+run; installed admission, external process supervision, native capture/conversion,
+receiver/transport/product integration and remaining platform scope stay due.
+
 This fork's current assignment: items 51 and 52 are accepted with evidence in
 `SAVE_ARCHIVE_INTERCHANGE.md` and `STORAGE_FAULT_QUALIFICATION.md`. On 2026-10-23,
 the owner deferred Linux build/runtime work for item 53, then deferred build/test

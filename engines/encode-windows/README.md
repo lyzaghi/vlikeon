@@ -3,6 +3,12 @@
 Source only. No CMake configure/build, encoder activation, COM/MF call, frame,
 GPU/device operation or test was executed. No product capability is enabled.
 
+The recipe now also authors an independent encoder-process entry point,
+`omniplay-video-worker.exe --stdio-video-v1`, with bounded private-pipe commands,
+separate reader/writer threads and an MTA encoder actor. It has not been built,
+run, installed or connected to capture/broker/transport. The exact wire contract,
+keepalive/Stop behavior and required external supervision are in [PROTOCOL.md](PROTOCOL.md).
+
 This standalone static-library recipe supplies an H.264 Main Level 4.2 NV12
 Media Foundation adapter for 720p/1080p at 30/60 FPS. It enumerates system MFTs
 with bounded activation attempts and admits a single input/output stream. A
