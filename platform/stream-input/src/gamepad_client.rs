@@ -165,6 +165,10 @@ impl GamepadClient{
             let id=receive.recv_timeout(end.saturating_duration_since(Instant::now())).map_err(|_|failure())??;
             let reply=self.replies.recv_timeout(end.saturating_duration_since(Instant::now())).map_err(|_|failure())?;
             if reply.id!=id||!reply.complete||reply.binding.owner()!=self.shared.owner{return Err(failure());}
+            // A terminal receipt can still prove cleanup after authority loss.
+            // A nonterminal reply cannot turn an already closed transport live.
+            if !matches!(reply.phase.as_str(),"cleanup_required"|"revoked")&&
+               (!self.shared.live()||!self.shared.deadlines_valid()){return Err(failure());}
             Ok((id,reply))
         })();
         if result.is_err(){self.shared.close();}result
@@ -215,12 +219,16 @@ fn reader(mut output:File,shared:Arc<Shared>,sender:SyncSender<Reply>){
                 call.waiting=true;call.initial_deadline=None;shared.ready.store(true,Ordering::Release);continue;
             }
             if call.prepare&&!call.waiting{return Err(failure());}
+            let terminal=matches!(reply.phase.as_str(),"cleanup_required"|"revoked");
+            if !terminal&&!shared.live(){return Err(failure());}
             if reply.phase=="active"&&reply.status=="ok"&&call.refresh_input{
                 // Independent fallback if the helper's own 250-ms input-gap
                 // cleanup blocks. Status/heartbeats cannot renew this deadline.
-                *shared.input_deadline.lock().map_err(|_|failure())?=Some(Instant::now()+Duration::from_millis(350));
+                let mut deadline=shared.input_deadline.lock().map_err(|_|failure())?;
+                let now=Instant::now();
+                if deadline.is_some_and(|deadline|now>=deadline){return Err(failure());}
+                *deadline=Some(now+Duration::from_millis(350));
             }
-            let terminal=matches!(reply.phase.as_str(),"cleanup_required"|"revoked");
             *pending=None;drop(pending);
             if sender.try_send(reply).is_err(){return Err(failure());}
             if terminal{break;}
@@ -243,22 +251,22 @@ fn writer(mut input:File,shared:Arc<Shared>,receiver:mpsc::Receiver<Call>){
             if automatic{sends.push((Action::Heartbeat{document_alive:true,capture_alive:true,pair_authorized:true},Duration::from_millis(200),None));}
             if let Some(call)=call{sends.push((call.action,call.timeout,Some(call.assigned)));}
             for(action,timeout,assigned)in sends{
-            let heartbeat=matches!(&action,Action::Heartbeat{..});let prepare=matches!(&action,Action::Prepare{..});
-            if first!=prepare||(!first&&prepare)||heartbeat&&!shared.ready.load(Ordering::Acquire){return Err(failure());}
-            if !shared.live(){return Err(failure());}
-            sequence+=1;if sequence>wire::MAX_ID{return Err(failure());}
-            if !heartbeat{
-                let mut pending=shared.pending.lock().map_err(|_|failure())?;
-                if pending.is_some(){return Err(failure());}
-                *pending=Some(Pending{id:sequence,deadline:Instant::now()+timeout,
-                    initial_deadline:prepare.then(||Instant::now()+Duration::from_secs(5)),prepare,waiting:false,
-                    refresh_input:matches!(&action,Action::Activate{..}|Action::Input{..}|Action::Release{..})});
-            }
-            *shared.writing.lock().map_err(|_|failure())?=Some(Instant::now()+Duration::from_millis(200));
-            protocol::write(&Request{protocol:wire::VERSION,id:sequence,binding:shared.owner.into(),action},&mut input).map_err(|_|failure())?;
-            *shared.writing.lock().map_err(|_|failure())?=None;
-            first=false;if heartbeat{last_heartbeat=Instant::now();}
-            if let Some(assigned)=assigned{if assigned.try_send(Ok(sequence)).is_err(){return Err(failure());}}
+                let heartbeat=matches!(&action,Action::Heartbeat{..});let prepare=matches!(&action,Action::Prepare{..});
+                if first!=prepare||heartbeat&&!shared.ready.load(Ordering::Acquire){return Err(failure());}
+                if !shared.live()||!shared.deadlines_valid(){return Err(failure());}
+                sequence+=1;if sequence>wire::MAX_ID{return Err(failure());}
+                if !heartbeat{
+                    let mut pending=shared.pending.lock().map_err(|_|failure())?;
+                    if pending.is_some(){return Err(failure());}
+                    *pending=Some(Pending{id:sequence,deadline:Instant::now()+timeout,
+                        initial_deadline:prepare.then(||Instant::now()+Duration::from_secs(5)),prepare,waiting:false,
+                        refresh_input:matches!(&action,Action::Activate{..}|Action::Input{..}|Action::Release{..})});
+                }
+                *shared.writing.lock().map_err(|_|failure())?=Some(Instant::now()+Duration::from_millis(200));
+                protocol::write(&Request{protocol:wire::VERSION,id:sequence,binding:shared.owner.into(),action},&mut input).map_err(|_|failure())?;
+                *shared.writing.lock().map_err(|_|failure())?=None;
+                first=false;if heartbeat{last_heartbeat=Instant::now();}
+                if let Some(assigned)=assigned{if assigned.try_send(Ok(sequence)).is_err(){return Err(failure());}}
             }
         }
         Ok(())

@@ -363,6 +363,9 @@ a separate 350 ms parent input deadline; status/heartbeat cannot renew it. This
 is an independent stop fallback if the helper's 250 ms input-gap cleanup blocks
 in the provider. A terminal cleanup/revoked receipt closes transport after
 delivery, preserving that receipt for journal reconciliation.
+The reader checks the old input deadline before extending it, and the caller
+rechecks live authority after receiving a nonterminal reply. A late active/input
+reply cannot revive an expired gap while waiting for the watchdog's next tick.
 These are authored scheduling/timeout policies,
 not measured guarantees about OS scheduling or driver cancellation.
 
