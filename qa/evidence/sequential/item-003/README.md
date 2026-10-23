@@ -1,7 +1,9 @@
-# Task 3 — Windows Chromium build evidence, in progress
+# Task 3 — accepted Windows Chromium development build
 
-These indexes establish repaired Git dependency input admission only. They do
-not mark the full browser build complete. Antigravity executed the audits;
+The dependency indexes below establish repaired Git dependency input admission.
+The separate [`build/`](build/qualification.json) evidence establishes the
+completed full Windows x64 `chrome` target and independent output integrity.
+Antigravity executed the audits and acceptance checker;
 Codex reviewed raw logs, decided recovery and owns source changes. Long-running
 compilation is supervised directly by Codex after the initial CLI process loss.
 
@@ -18,6 +20,16 @@ The original product overlay was re-admitted against frozen original/new bytes.
 The active recipe is the original frozen recipe; the new production checker
 is independently verified and becomes part of future prepared-source receipts.
 
-Full browser success still requires actual compilation exit zero, final browser
-entry point and its receipt. No passing browser behavior, release distribution,
-production core admission or device compatibility is implied.
+The initial compiler supervisor timed out at eight hours, but its surviving
+compiler completed 57,301 steps successfully. That batch remains failed. After
+verified descendant exit and stale-lock reconciliation, `003-build-g` confirmed
+the same frozen full target up to date, exited zero and produced the receipt.
+Antigravity turn `0011` ran the published checker with exit zero. Its report
+binds unchanged prepared inputs, an AMD64 PE32+ browser entry point and seven
+selected output hashes/sizes. Raw execution/log digests retain the failure and
+successful confirmation separately. See `../../../../docs/WINDOWS_CHROMIUM_BUILD.md`.
+
+No passing browser behavior, release distribution, clean-clone reproducibility,
+production core admission or device compatibility is implied. The evidence
+qualifies frozen tree `14f1b8d0e7c68aed365cf4d5c05ee3ed7c34f935`; later parallel
+source changes require their own qualification. Large binaries remain local.

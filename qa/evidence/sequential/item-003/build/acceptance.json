@@ -1,0 +1,40 @@
+{
+  "schema_version": 1,
+  "item": 3,
+  "passed": true,
+  "scope": "Exact development Chromium chrome build and selected output integrity only; no browser launch/device/release acceptance",
+  "receipt_sha256": "aea626c44588ca9ac1265599d5126f5729937999c8c5eb17fc1b0426745e4d5a",
+  "preparation_sha256": "7960511a6c9ac5ccfb7bb59bdfc13d079a2c19627d2ebb81931c62963912a9da",
+  "artifacts": {
+    "chrome.exe": {
+      "bytes": 3910656,
+      "sha256": "ef891f1d2a673fbe21e0156d95e95c0ca62d3f5efd04be831bdbde4bc686b907"
+    },
+    "chrome.dll": {
+      "bytes": 429797376,
+      "sha256": "1cd01da86c8d70b9bd6c211784a7b50c7e9010ba88cfc72686e9f69a85d002d8"
+    },
+    "chrome_elf.dll": {
+      "bytes": 1013248,
+      "sha256": "41116a23a54baa28cf2d53bec1b0ea33ff550df590336789c2d9eef61c89af63"
+    },
+    "resources.pak": {
+      "bytes": 47885480,
+      "sha256": "a4881af88042cb0c8cf8a538a636e2d1f2f4e4d7b0ba17d7020819e4eece9cbf"
+    },
+    "icudtl.dat": {
+      "bytes": 10819840,
+      "sha256": "495c45cc7a65562ec461f860c310c6b66e006acd96833f61d1aa31f77fe18cf1"
+    },
+    "v8_context_snapshot.bin": {
+      "bytes": 3430400,
+      "sha256": "b90149d59287097a15719e9c34c11222f35be51e6ffd426abb5984ae440710e8"
+    },
+    "locales/en-US.pak": {
+      "bytes": 593065,
+      "sha256": "fdc083ecf18dbfc5b88ef491d7f9aeba7814bc1f35582e24273a94dc41e4323d"
+    }
+  },
+  "frozen_inputs_unchanged": true,
+  "architecture": "AMD64 PE32+"
+}

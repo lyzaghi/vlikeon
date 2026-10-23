@@ -14,8 +14,8 @@ OmniPlay.
 
 **Status: active development; full browser and production release qualification
 remain open.** A separate Windows Game Hub demo has scoped execution evidence.
-The integrated source checkpoint passed selected tests and deterministic resource
-generation; it is not a complete Chromium browser build. No qualified production
+The Windows x64 development Chromium build has completed with independent
+output integrity checks. Runtime acceptance remains open. No qualified production
 installer, compatibility list or controlled benchmark is available.
 
 [Tiếng Việt](README.vi.md) · [Roadmap](ROADMAP.md) ·
@@ -26,6 +26,9 @@ installer, compatibility list or controlled benchmark is available.
 
 ## Current evidence and demo
 
+- [Windows Chromium build](docs/WINDOWS_CHROMIUM_BUILD.md): full `chrome` target,
+  frozen source identity and independently checked x64 output hashes. This
+  development build has no runtime or production release acceptance.
 - [Windows demo and its limits](docs/PLAYABLE_DEMO.md): a standalone Win32 window
   with WebView2, an original Game Boy game and a WebAssembly core. It is a
   separate technical demo; current source changes need their own qualification.

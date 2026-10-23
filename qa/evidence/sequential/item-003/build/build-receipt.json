@@ -1,0 +1,21 @@
+{
+  "binary_bytes": 3910656,
+  "binary_relative_path": "workspace/src/out/OmniPlay/chrome.exe",
+  "binary_sha256": "ef891f1d2a673fbe21e0156d95e95c0ca62d3f5efd04be831bdbde4bc686b907",
+  "browser": "not_started",
+  "compiler": "completed",
+  "configuration": "completed",
+  "dependency_revisions_sha256": "cbd3ced9993adb46935d35088ad2fbe04dcd6bbe9d8b03a54c0e4a55cad04606",
+  "depot_tools_revision": "4be4e4628e093c4ad50210db5dcfa05a88280bda",
+  "development_only": true,
+  "distribution_approved": false,
+  "git_sha256": "851535ccc041bed536a23b17200cd51e7b06e266a527f4eaf8338b5c256c6466",
+  "gn_sha256": "b93058ed15b621815827a5b6c9fa396f57197ba2fe265b63cea8bd856253bddb",
+  "preparation_sha256": "7960511a6c9ac5ccfb7bb59bdfc13d079a2c19627d2ebb81931c62963912a9da",
+  "python_sha256": "db92608495a8ad6f0435fcfef502d2b393b0ca78086af5f7cc0344c146aa487c",
+  "reproducibility_verified": false,
+  "schema_version": 1,
+  "target": "windows-x86_64",
+  "upstream_revision": "0e66b94549a8bd85f03fbdf189b752d6e7b63c32",
+  "verification": "not_run"
+}

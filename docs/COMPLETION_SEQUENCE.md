@@ -26,8 +26,10 @@ remain unfinished; this is not an additional accepted item.
 The owner now requests the individually numbered tasks in
 [`OUTSTANDING_WORK.md`](OUTSTANDING_WORK.md), completed in order. Task 1 source
 integration is complete at commit `35f3271`; task 2 alignment is recorded in
-[`DOCUMENTATION_ALIGNMENT.md`](DOCUMENTATION_ALIGNMENT.md). Next is task 3,
-the Windows Chromium build. [`SOURCE_INTEGRATION.md`](SOURCE_INTEGRATION.md)
+[`DOCUMENTATION_ALIGNMENT.md`](DOCUMENTATION_ALIGNMENT.md). Task 3, the Windows
+Chromium development build, is accepted in [`WINDOWS_CHROMIUM_BUILD.md`](WINDOWS_CHROMIUM_BUILD.md).
+Task 4 follows in the build chat's sequence; this fork's source assignment above
+is unchanged. [`SOURCE_INTEGRATION.md`](SOURCE_INTEGRATION.md)
 records the executed scope and open gates. No full product area is closed by
 source integration alone.
 

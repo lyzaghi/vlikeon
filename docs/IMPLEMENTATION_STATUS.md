@@ -5,7 +5,9 @@
 The current task authority is [`OUTSTANDING_WORK.md`](OUTSTANDING_WORK.md),
 numbered 1–109. Integrated source task 1 is complete at `35f3271`; task 2 alignment
 is recorded in [`DOCUMENTATION_ALIGNMENT.md`](DOCUMENTATION_ALIGNMENT.md).
-The next task is 3 (Windows Chromium build). The older 1–17
+Task 3 [Windows Chromium build](WINDOWS_CHROMIUM_BUILD.md) is accepted for its
+frozen x64 development inputs and output integrity. Task 4 is next in the build
+sequence; parallel source assignments remain in the task list. The older 1–17
 identifiers below refer to product areas, not these individual tasks.
 
 [`SOURCE_INTEGRATION.md`](SOURCE_INTEGRATION.md) records current checkpoint
@@ -17,7 +19,7 @@ game. Earlier failed batches are preserved; overlapping passes are not new
 coverage. [`PLAYABLE_DEMO.md`](PLAYABLE_DEMO.md) records the separate Windows
 WebView2 demo, whose earlier evidence does not qualify later runtime changes.
 
-Full Chromium builds, production cores, actual device/platform behavior,
+Linux/macOS Chromium builds, Windows browser runtime acceptance, production cores, actual device/platform behavior,
 installers, performance, security review and release approval remain open.
 Antigravity executes assigned tests only; Codex reviews and decides fixes.
 

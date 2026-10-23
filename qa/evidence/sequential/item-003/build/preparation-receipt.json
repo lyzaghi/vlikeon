@@ -1,0 +1,707 @@
+{
+  "browser": "not_started",
+  "compiler": "not_started",
+  "configuration": "not_started",
+  "development_only": true,
+  "distribution_approved": false,
+  "schema_version": 1,
+  "source_bytes": 1305235,
+  "source_files": 138,
+  "source_inventory": [
+    {
+      "bytes": 350,
+      "path": "overlay/chrome/app/theme/chromium/BRANDING",
+      "sha256": "cb93a2a12d2c2e620762e471efe50675bb8ddaca3d3561675fab434c7df28316"
+    },
+    {
+      "bytes": 8676,
+      "path": "overlay/chrome/browser/extensions/api/desktop_capture/desktop_capture_api.cc",
+      "sha256": "fff12510f690e97147bba6f0f376fb1fa0a46ab79398412c457c4432ce8b0c1e"
+    },
+    {
+      "bytes": 14139,
+      "path": "overlay/chrome/browser/extensions/api/desktop_capture/desktop_capture_base.cc",
+      "sha256": "94f966eda51ed3ccabd75488e6f20d7fb3af62370099052b902c2bcb011a67f2"
+    },
+    {
+      "bytes": 5300,
+      "path": "overlay/chrome/browser/extensions/api/desktop_capture/desktop_capture_base.h",
+      "sha256": "bc38e5bf5afbf6e319ba7ee2c4b35fc9b0548915ba0aa8bc737ca627d8b263f1"
+    },
+    {
+      "bytes": 14867,
+      "path": "overlay/chrome/browser/extensions/api/messaging/launch_context_win.cc",
+      "sha256": "cfd26f9dc0480424188894a1054a7484fc9598f9b762ee8ac3c5807b82179c51"
+    },
+    {
+      "bytes": 5696,
+      "path": "overlay/chrome/browser/extensions/component_extensions_allowlist/allowlist.cc",
+      "sha256": "2d75375226588ae8426756ba0f21de45df616e855e343847bc2cea61dedf4133"
+    },
+    {
+      "bytes": 33702,
+      "path": "overlay/chrome/browser/extensions/component_loader.cc",
+      "sha256": "3376d911e50cea0e8205ba470600079577bf7a31c998409100137cc6c65caf83"
+    },
+    {
+      "bytes": 7673,
+      "path": "overlay/chrome/browser/media/webrtc/desktop_media_picker.h",
+      "sha256": "23e261e24b57477c5eb76057c3312e17b7cb3ee71e32961fc9557869d8e02033"
+    },
+    {
+      "bytes": 22757,
+      "path": "overlay/chrome/browser/resources/component_extension_resources.grd",
+      "sha256": "496a8d801e21e9314442f84a850f3d8186592bb13557faaa0b56e68253ecdc7a"
+    },
+    {
+      "bytes": 23640,
+      "path": "overlay/chrome/browser/resources/omniplay_game_hub/app.js",
+      "sha256": "67779b8a8e63ad657f275a91dd5e6f78e2e9cd9dee6012bede602874a79f21f5"
+    },
+    {
+      "bytes": 3725,
+      "path": "overlay/chrome/browser/resources/omniplay_game_hub/appearance.js",
+      "sha256": "5b857bb15fe3268b6641b1bfe615d7248c9357f851db45f684159dfd14471876"
+    },
+    {
+      "bytes": 21076,
+      "path": "overlay/chrome/browser/resources/omniplay_game_hub/background.js",
+      "sha256": "2a40274956c83504125980e6e03a1cfacbf32eb0f542a0705734a84bac417c5c"
+    },
+    {
+      "bytes": 6436,
+      "path": "overlay/chrome/browser/resources/omniplay_game_hub/bridge.js",
+      "sha256": "7cf49df3df265118c1711a235680f0519b458eaa5969ea730cb2ce902b7085dc"
+    },
+    {
+      "bytes": 9677,
+      "path": "overlay/chrome/browser/resources/omniplay_game_hub/browser-dashboard.js",
+      "sha256": "3c3f49c63e1bacf690eb876ead2a66e0cd2ddf3b52d73e3f823b5163209432f0"
+    },
+    {
+      "bytes": 11192,
+      "path": "overlay/chrome/browser/resources/omniplay_game_hub/browser-service.js",
+      "sha256": "18fe6301cb7a2918fcef894d72c4684ea9cf8ea1485f0b71f3eabd4a8c52c1cd"
+    },
+    {
+      "bytes": 4544,
+      "path": "overlay/chrome/browser/resources/omniplay_game_hub/canvas-pointer.js",
+      "sha256": "705575f37937c004714bb48142f121e4c3ab6475a2ca571b826fe6fa8477c5d2"
+    },
+    {
+      "bytes": 1361,
+      "path": "overlay/chrome/browser/resources/omniplay_game_hub/compatibility.js",
+      "sha256": "53ae8d178d4ce45cca185c61d729166a150e19aece522a2664c4af64f456636f"
+    },
+    {
+      "bytes": 1452,
+      "path": "overlay/chrome/browser/resources/omniplay_game_hub/component-context.js",
+      "sha256": "5f25b30bb9b3567084bc750ff7a4fee5d082612b0dedd6909eb618a9e300d4b7"
+    },
+    {
+      "bytes": 7919,
+      "path": "overlay/chrome/browser/resources/omniplay_game_hub/component-ownership.js",
+      "sha256": "707e0fd5f5f600a46242e05b9c8d4eb2b42fe33fa860f9a2977396bb454fe3db"
+    },
+    {
+      "bytes": 4948,
+      "path": "overlay/chrome/browser/resources/omniplay_game_hub/controller-profile.js",
+      "sha256": "6c56d12eddcd238fbf69830ee53a080f006ef4f8acb63ea47e73aef90bf1017c"
+    },
+    {
+      "bytes": 13766,
+      "path": "overlay/chrome/browser/resources/omniplay_game_hub/controller-settings.js",
+      "sha256": "040cd2536a896645358a17687e858270b0f07796447c49824481ea3f6c660899"
+    },
+    {
+      "bytes": 4061,
+      "path": "overlay/chrome/browser/resources/omniplay_game_hub/controllers.js",
+      "sha256": "e3cde5f43922a28761164aef22259fffd2939a7176426f18c00baf774128b7c6"
+    },
+    {
+      "bytes": 8792,
+      "path": "overlay/chrome/browser/resources/omniplay_game_hub/core-option-settings.js",
+      "sha256": "ad5f4bd29f613cd0411a98d220bfc178291216e9eb86145878fd48f5f10cae28"
+    },
+    {
+      "bytes": 69,
+      "path": "overlay/chrome/browser/resources/omniplay_game_hub/cores/catalog.json",
+      "sha256": "6d6e2ada14a3af7c6c9aa9d8f6b135ae35ca501a019d455fadc86841cc507f4e"
+    },
+    {
+      "bytes": 6831,
+      "path": "overlay/chrome/browser/resources/omniplay_game_hub/device-information.js",
+      "sha256": "7c971cbf5db4af52ffd5e8a5ce4197db080060d64d0fb82e460e84d8ff943d00"
+    },
+    {
+      "bytes": 2919,
+      "path": "overlay/chrome/browser/resources/omniplay_game_hub/firmware-client.js",
+      "sha256": "1aec2feb81ad12df43e69c19ff68ac2b44d572c1d36a7e73e02d33af8a43f2ce"
+    },
+    {
+      "bytes": 4954,
+      "path": "overlay/chrome/browser/resources/omniplay_game_hub/firmware-settings.js",
+      "sha256": "8b019c097ecaf5b6a6abee241512880065b5cb29d7234c890135ae801f4ed3f2"
+    },
+    {
+      "bytes": 2594,
+      "path": "overlay/chrome/browser/resources/omniplay_game_hub/game-input.js",
+      "sha256": "d0d82796375f0e39721902a9d2af34781333ed81eaa8d04cfe5f16010a6d55a7"
+    },
+    {
+      "bytes": 5924,
+      "path": "overlay/chrome/browser/resources/omniplay_game_hub/game-settings.js",
+      "sha256": "3738548d890009c7737f4bb9cb3ea6fde5b3240299aeb979875eb1b377bb2814"
+    },
+    {
+      "bytes": 3552,
+      "path": "overlay/chrome/browser/resources/omniplay_game_hub/gamepad-haptics.js",
+      "sha256": "55bb769011c5197a33501e7e8c2b19ba346288763cbbe08f6858fdc4962b9007"
+    },
+    {
+      "bytes": 1544,
+      "path": "overlay/chrome/browser/resources/omniplay_game_hub/gamepad-ports.js",
+      "sha256": "a5225c0ec08b37cb566357c120f43b014748548f075fc8a1962fffcae0430e69"
+    },
+    {
+      "bytes": 7717,
+      "path": "overlay/chrome/browser/resources/omniplay_game_hub/i18n.js",
+      "sha256": "32f864936c592f5c1ad2ec275f6d333d811f1e0b2f809c55a7a6aa142d72ed99"
+    },
+    {
+      "bytes": 9928,
+      "path": "overlay/chrome/browser/resources/omniplay_game_hub/index.html",
+      "sha256": "f2ba6bb9161da6b63118d5cff46d7dafac0104de9e18466f71cc30a7737864d2"
+    },
+    {
+      "bytes": 2431,
+      "path": "overlay/chrome/browser/resources/omniplay_game_hub/input-profile.js",
+      "sha256": "95b1f11a26b2825483d2e4af59be16a804adb824bf61d5317a0dcfddcad2f5ff"
+    },
+    {
+      "bytes": 8511,
+      "path": "overlay/chrome/browser/resources/omniplay_game_hub/input-settings.js",
+      "sha256": "222065b62a400ac009e55993bfb9800801c3bd7fd81f951d1896e5ebb46d5e71"
+    },
+    {
+      "bytes": 6981,
+      "path": "overlay/chrome/browser/resources/omniplay_game_hub/library-import.js",
+      "sha256": "7d858a7ca76f2522d6b7edd94bdd5f39b3cb6be9c8bd8e40c8708171e144def2"
+    },
+    {
+      "bytes": 5646,
+      "path": "overlay/chrome/browser/resources/omniplay_game_hub/library-recovery.js",
+      "sha256": "dcd1e6fb7de010c4dd9065f29d79233d9e0ee0df9989bc1bdf0e590e8a2fd41b"
+    },
+    {
+      "bytes": 1197,
+      "path": "overlay/chrome/browser/resources/omniplay_game_hub/manifest.json",
+      "sha256": "6b485407dd7ffd2fe1d50d33266c8d7a14545334370fad67f421ec0f5abd1003"
+    },
+    {
+      "bytes": 2928,
+      "path": "overlay/chrome/browser/resources/omniplay_game_hub/media-client.js",
+      "sha256": "14c61fe36f38983a94044da71f5300a034b1eb34dae2f4bd872c6ae96da7ec71"
+    },
+    {
+      "bytes": 4961,
+      "path": "overlay/chrome/browser/resources/omniplay_game_hub/native-media-client.js",
+      "sha256": "cf351f9b4c158b4c105a229621a3a1b9c44fce42601332d19b1fb276c9ef00e2"
+    },
+    {
+      "bytes": 26221,
+      "path": "overlay/chrome/browser/resources/omniplay_game_hub/native-player.js",
+      "sha256": "f3ba6975623beec32e2f140e682a9b01a645f40fab6f55495e271c86ff94e4b7"
+    },
+    {
+      "bytes": 14248,
+      "path": "overlay/chrome/browser/resources/omniplay_game_hub/native-work-maintenance.js",
+      "sha256": "1252e0d612b0021e566e177e88b5ba45a5ff963e5fbf4c15d6986f3c4626cae3"
+    },
+    {
+      "bytes": 3724,
+      "path": "overlay/chrome/browser/resources/omniplay_game_hub/performance-history.js",
+      "sha256": "3581b84838613db8426d3006ef305773aca97d58e99fe3f53bedf858998e4875"
+    },
+    {
+      "bytes": 41064,
+      "path": "overlay/chrome/browser/resources/omniplay_game_hub/player.js",
+      "sha256": "4faf69637a2491542d90392e0608d295b673954473806f8dd3091daa2c36fa2a"
+    },
+    {
+      "bytes": 27890,
+      "path": "overlay/chrome/browser/resources/omniplay_game_hub/remote-play.js",
+      "sha256": "3494ce2550c2fb61f9e98c2f5b91ccefe832baaac3ee3dc7d32bb92679ca9012"
+    },
+    {
+      "bytes": 16198,
+      "path": "overlay/chrome/browser/resources/omniplay_game_hub/remote-touch.js",
+      "sha256": "c0da6a983bb5a173cd931c65b77a50f9a6a744bc4d3f79ff15ae4870eaded64c"
+    },
+    {
+      "bytes": 4381,
+      "path": "overlay/chrome/browser/resources/omniplay_game_hub/runtime/audio-worklet.js",
+      "sha256": "dc1c053d897058b9bb8d851497a158a770855b4b08abff3cf7865ba85f9e4d72"
+    },
+    {
+      "bytes": 3745,
+      "path": "overlay/chrome/browser/resources/omniplay_game_hub/runtime/benchmark.js",
+      "sha256": "224c6b3a1e3364a918457de9dc761fa7829a556935efa91f36b36bac2bba564d"
+    },
+    {
+      "bytes": 5215,
+      "path": "overlay/chrome/browser/resources/omniplay_game_hub/runtime/core-assets.js",
+      "sha256": "a6df29085d57612484056f4d5a8edcdbc1578984513cbcf3172539e5656b77b0"
+    },
+    {
+      "bytes": 4521,
+      "path": "overlay/chrome/browser/resources/omniplay_game_hub/runtime/core-options.js",
+      "sha256": "55b9c1a6fece511ecb02bb4ce98823d53cfcbf8d23df7984c9b02bc3e9fc0091"
+    },
+    {
+      "bytes": 1257,
+      "path": "overlay/chrome/browser/resources/omniplay_game_hub/runtime/core-resources.js",
+      "sha256": "da5241cad0bf61ee713c01ab98bfadf3c905317bdfd8056bd9049c5693388ead"
+    },
+    {
+      "bytes": 5014,
+      "path": "overlay/chrome/browser/resources/omniplay_game_hub/runtime/disc-control.js",
+      "sha256": "473d1ee124869ab5ba11e637466ddc2e6a7a5574cade7a04b9c2817a9d99f9cd"
+    },
+    {
+      "bytes": 3999,
+      "path": "overlay/chrome/browser/resources/omniplay_game_hub/runtime/firmware.js",
+      "sha256": "01ed7451299c8d3560e0af49a0ae2aa39f02a2f421448cac8a61e93d42ba2d1e"
+    },
+    {
+      "bytes": 4923,
+      "path": "overlay/chrome/browser/resources/omniplay_game_hub/runtime/hardware-video.js",
+      "sha256": "0e8f0e0f3c49aecca9f1b5f1303ff0d41ce619e06b842d50eba9bfa8ce4303ae"
+    },
+    {
+      "bytes": 3956,
+      "path": "overlay/chrome/browser/resources/omniplay_game_hub/runtime/libretro-calls.js",
+      "sha256": "3a43e201d86c42cfbc940e99423005cea35241bb75c94a7ed122f009543edcf5"
+    },
+    {
+      "bytes": 40301,
+      "path": "overlay/chrome/browser/resources/omniplay_game_hub/runtime/libretro-worker.js",
+      "sha256": "a7c35a59542536caea6186b226998cab438ed797179dd7b4d29964659754caca"
+    },
+    {
+      "bytes": 5477,
+      "path": "overlay/chrome/browser/resources/omniplay_game_hub/runtime/md-portable.js",
+      "sha256": "d20ffc3019b3d673471a911feab7f1d55390bbf58c9a03257eca588997fbda44"
+    },
+    {
+      "bytes": 4179,
+      "path": "overlay/chrome/browser/resources/omniplay_game_hub/runtime/media-filesystem.js",
+      "sha256": "bf306ad1221943d552eb820407ff923fc29ea7f8c0a41cccc260c4da20e851ed"
+    },
+    {
+      "bytes": 4658,
+      "path": "overlay/chrome/browser/resources/omniplay_game_hub/runtime/media-manifest.js",
+      "sha256": "c71c7cbdfe5b46bb687522af9158a0e46c16f95fad909dc00ead99cf3a556bbc"
+    },
+    {
+      "bytes": 8110,
+      "path": "overlay/chrome/browser/resources/omniplay_game_hub/runtime/media-stage.js",
+      "sha256": "bde434f6bdb42d884b8e3eabb158332037a3bc8cef242d53db3a3fc32b55f750"
+    },
+    {
+      "bytes": 745,
+      "path": "overlay/chrome/browser/resources/omniplay_game_hub/runtime/memory-policy.js",
+      "sha256": "6f8d2828b97658d9cc17393a68a01bc2b3415653b8473bc3547d76eb6dff825f"
+    },
+    {
+      "bytes": 4185,
+      "path": "overlay/chrome/browser/resources/omniplay_game_hub/runtime/native-media.js",
+      "sha256": "5c86c3527595ab65841eef51a2c017df1d2fce6e86938786f5d3d32a7fd09ce4"
+    },
+    {
+      "bytes": 22497,
+      "path": "overlay/chrome/browser/resources/omniplay_game_hub/runtime/runtime.js",
+      "sha256": "7c60a9c94dc641aa5f4f0f4fde9f22b00f799fa9b12b60a32a14fb23384c9b4d"
+    },
+    {
+      "bytes": 5129,
+      "path": "overlay/chrome/browser/resources/omniplay_game_hub/runtime/saved-file-codec.js",
+      "sha256": "e31a64a8c50ef61c106fe6be3c80285759f298c5657ee3072a1db7f014cccd79"
+    },
+    {
+      "bytes": 5409,
+      "path": "overlay/chrome/browser/resources/omniplay_game_hub/runtime/saved-file-session.js",
+      "sha256": "7f86d6ff5291961018a89d53919d463fe784c52aaaa004eb2dcafeb64b8afc90"
+    },
+    {
+      "bytes": 11686,
+      "path": "overlay/chrome/browser/resources/omniplay_game_hub/runtime/saved-files.js",
+      "sha256": "fb768e6ab8de91d8e569abaedeecd38b4bb2c981b3d81229e2ee13a629e6db7a"
+    },
+    {
+      "bytes": 3759,
+      "path": "overlay/chrome/browser/resources/omniplay_game_hub/runtime/sha256.js",
+      "sha256": "cc3084329978c58bda35399d26ec88379fd3c060336b4c238438b3a24aa0c469"
+    },
+    {
+      "bytes": 1976,
+      "path": "overlay/chrome/browser/resources/omniplay_game_hub/runtime/thread-callbacks.js",
+      "sha256": "61bdba07a90a8f19ac94a12dd6105c716eac8727facb1bebbab180e0e27f3b27"
+    },
+    {
+      "bytes": 2166,
+      "path": "overlay/chrome/browser/resources/omniplay_game_hub/runtime/thread-messages.js",
+      "sha256": "84cb2628c761b808af2a2d0ee67ca00b2018e771369d46af627c95245675b9e9"
+    },
+    {
+      "bytes": 2905,
+      "path": "overlay/chrome/browser/resources/omniplay_game_hub/runtime/thread-policy.js",
+      "sha256": "5b2b7e52ead19a37b8ec0ce1784b094587c5f7d281ab7ae42b8c8c4fd7665e1d"
+    },
+    {
+      "bytes": 6714,
+      "path": "overlay/chrome/browser/resources/omniplay_game_hub/runtime/thread-relay.js",
+      "sha256": "5c9b2cf5bc2da258002eb0cf03866fb7c9e5cd951177c5b7db999d9bcd1a1966"
+    },
+    {
+      "bytes": 2561,
+      "path": "overlay/chrome/browser/resources/omniplay_game_hub/runtime/thread-wasm.js",
+      "sha256": "ea5facb062420d4e5dd2d68feb116cc3a6eb63d0959bbe62311e5141a5791e1a"
+    },
+    {
+      "bytes": 4618,
+      "path": "overlay/chrome/browser/resources/omniplay_game_hub/save-client.js",
+      "sha256": "cc5acf76725ce63e373e7188b117f108f8097a1f27d90cc4ecc957692958b666"
+    },
+    {
+      "bytes": 20558,
+      "path": "overlay/chrome/browser/resources/omniplay_game_hub/save-history.js",
+      "sha256": "bfade96af0c4fe6acf0d8601271951eba36d0d6d2f016ce8dc00f40d906594b1"
+    },
+    {
+      "bytes": 4640,
+      "path": "overlay/chrome/browser/resources/omniplay_game_hub/save-maintenance.js",
+      "sha256": "19acc359f0ee476a5505fb2229be39ba0ba30f9481a4f9e2a81fc42df5ba8d2c"
+    },
+    {
+      "bytes": 4926,
+      "path": "overlay/chrome/browser/resources/omniplay_game_hub/save-origin.js",
+      "sha256": "1c39202e45b729cc189592cf6688d7c65c2ff0488d99f1a56dabe645877caf46"
+    },
+    {
+      "bytes": 13736,
+      "path": "overlay/chrome/browser/resources/omniplay_game_hub/streaming/capture.js",
+      "sha256": "03e31752661d38448bc18c5ca500200002a3b4b28840363960f2d3d6d299dfa5"
+    },
+    {
+      "bytes": 156,
+      "path": "overlay/chrome/browser/resources/omniplay_game_hub/streaming/config.json",
+      "sha256": "164d226a029bcda498426a6db2945347a75ed430b654ec990c0c600b9b2fafef"
+    },
+    {
+      "bytes": 2345,
+      "path": "overlay/chrome/browser/resources/omniplay_game_hub/streaming/control-profile.js",
+      "sha256": "bb22025e853f625de31f49720cd0d88cfd5631883f5db6234eb672175f940a4a"
+    },
+    {
+      "bytes": 8915,
+      "path": "overlay/chrome/browser/resources/omniplay_game_hub/streaming/crypto.js",
+      "sha256": "9388f0a4eba77700385f115cdd4186bc810c0f82ec05b5af8aadf15432f97821"
+    },
+    {
+      "bytes": 7480,
+      "path": "overlay/chrome/browser/resources/omniplay_game_hub/streaming/input.js",
+      "sha256": "aadc6b081d47b766d1d77d6630ca7d252107db66544eff58d69f5de8ed636b48"
+    },
+    {
+      "bytes": 5146,
+      "path": "overlay/chrome/browser/resources/omniplay_game_hub/streaming/media-policy.js",
+      "sha256": "6c56484ab4c53fbe1b270816afae9f1d1ce955afa3b04c0e852dc0715623bcd5"
+    },
+    {
+      "bytes": 5509,
+      "path": "overlay/chrome/browser/resources/omniplay_game_hub/streaming/native-input.js",
+      "sha256": "1b4db1ad786bd6d3d1d51bdff649769458656b4e1f9358938cf0cc664a62278b"
+    },
+    {
+      "bytes": 10107,
+      "path": "overlay/chrome/browser/resources/omniplay_game_hub/streaming/pairing.js",
+      "sha256": "4f21b2d995b98d2733f485e808d86f941024707030abf36f29f7964227d2b4b5"
+    },
+    {
+      "bytes": 4463,
+      "path": "overlay/chrome/browser/resources/omniplay_game_hub/streaming/qos.js",
+      "sha256": "c00082defae718cb9973167347f14960f913324daabd0c17d6d5dbea20313d12"
+    },
+    {
+      "bytes": 2718,
+      "path": "overlay/chrome/browser/resources/omniplay_game_hub/streaming/relay.js",
+      "sha256": "3c30f260e786f94e7d7c2b5b518ef7421bec7eb57d9a19c123510c91d5d9a609"
+    },
+    {
+      "bytes": 25307,
+      "path": "overlay/chrome/browser/resources/omniplay_game_hub/streaming/rtc.js",
+      "sha256": "2c702d43c2176725cc6b6e66f66abd7da500e748d786b0b044631122ce856126"
+    },
+    {
+      "bytes": 8559,
+      "path": "overlay/chrome/browser/resources/omniplay_game_hub/streaming/storage.js",
+      "sha256": "ddb0447d2ca72bb44d530074eac6afb7c57dfa0881e9bf363869952b1f98c74e"
+    },
+    {
+      "bytes": 6202,
+      "path": "overlay/chrome/browser/resources/omniplay_game_hub/streaming/transport.js",
+      "sha256": "afb6c40d346d85a65a7c674a3a54909368524e989fae320aebbb91dab0de593a"
+    },
+    {
+      "bytes": 37823,
+      "path": "overlay/chrome/browser/resources/omniplay_game_hub/styles.css",
+      "sha256": "7478289cd00a21d2c6cac8922721c55c7c12559a33a11482b9157b56f2c20bd7"
+    },
+    {
+      "bytes": 29130,
+      "path": "overlay/chrome/browser/resources/omniplay_game_hub/sync-settings.js",
+      "sha256": "a23065de81c1617573a8617a014236a11fc095c56f2268b65d3841958fd4b40c"
+    },
+    {
+      "bytes": 11711,
+      "path": "overlay/chrome/browser/resources/omniplay_game_hub/touch-controls.js",
+      "sha256": "f20c87e2da42a6eafdbf5489a9e82ae25f7437c47f7f5b90d35b82f3cd3b812d"
+    },
+    {
+      "bytes": 8234,
+      "path": "overlay/chrome/browser/resources/omniplay_game_hub/touch-layout-editor.js",
+      "sha256": "028ae1d0527e7b99ca5f7ab349f79e6db40e8b0956e79b89c906535f43350913"
+    },
+    {
+      "bytes": 2341,
+      "path": "overlay/chrome/browser/resources/omniplay_game_hub/touch-profile.js",
+      "sha256": "669ffdf60488e19c1b610fe23d858d44263e0994f86b6d2f1b0c6d37178e1ecc"
+    },
+    {
+      "bytes": 5168,
+      "path": "overlay/chrome/browser/resources/omniplay_game_hub/touch-settings.js",
+      "sha256": "d92842c861b8c2cfb2d156aacbc0342564d9f9d6d6731eea47ef5901adfb8911"
+    },
+    {
+      "bytes": 6100,
+      "path": "overlay/chrome/browser/resources/omniplay_game_hub/unused-content.js",
+      "sha256": "3f8778b32b6493de32b198895e11c0a998e7520b12024b665077d9f1c76716a5"
+    },
+    {
+      "bytes": 4940,
+      "path": "overlay/chrome/browser/resources/omniplay_game_hub/update-settings.js",
+      "sha256": "2ce5b60a1e0c14047b67494abd86cc3055d12756e78423e156debcfa1b1b6968"
+    },
+    {
+      "bytes": 58910,
+      "path": "overlay/chrome/browser/ui/views/desktop_capture/desktop_media_picker_views.cc",
+      "sha256": "55a7738e2c148c411675a7c827f6b963e3aa60b339cdff99ae622723e4e2adad"
+    },
+    {
+      "bytes": 18464,
+      "path": "overlay/chrome/common/chrome_paths.cc",
+      "sha256": "db0436db7163158b7b0351b17dc486fd074818ffe380f8193e4769cfb1b8413e"
+    },
+    {
+      "bytes": 5952,
+      "path": "overlay/chrome/common/chrome_paths_linux.cc",
+      "sha256": "67086fe5ee075a10687e66fa72dd645ff3d028a0102fc4df0fe6a4375a1fb9a5"
+    },
+    {
+      "bytes": 7325,
+      "path": "overlay/chrome/common/chrome_paths_mac.mm",
+      "sha256": "7d5c2eeef372a4c86a93898f741fb8cd537abdabd0f89643faf60c75b77ec5ab"
+    },
+    {
+      "bytes": 7917,
+      "path": "overlay/chrome/common/extensions/api/desktop_capture.json",
+      "sha256": "2f28c9aaa3998614c2f4087ca8894ddf914563e21a3750f0a4200259e385ef27"
+    },
+    {
+      "bytes": 5395,
+      "path": "overlay/chrome/install_static/chromium_install_modes.h",
+      "sha256": "7f0a5c9401bffe7e185bb27518c61b5fe720a443cb220c7ed742c8085f903b0f"
+    },
+    {
+      "bytes": 170,
+      "path": "recipe/args.gn",
+      "sha256": "c4d93d6c0a76ef0f0a892cab93a361fedaf3438c503612476300e4c364bc4775"
+    },
+    {
+      "bytes": 31751,
+      "path": "recipe/browser/patches/0001-omniplay-game-hub.patch",
+      "sha256": "2fa202085686fedc39d0cf0778d7e4a9297c217949e2a422c1de80203cd479db"
+    },
+    {
+      "bytes": 7312,
+      "path": "recipe/browser/patches/0003-owned-game-capture.patch",
+      "sha256": "1270ed1d735a59570c243dce6c3be15d39daf40afd4b9d3c8dbbd8e41cc67248"
+    },
+    {
+      "bytes": 3909,
+      "path": "recipe/browser/patches/series.json",
+      "sha256": "164c40798e75042ff18f0dca35d6189713ac9db4e93414de42a757baf2352c3d"
+    },
+    {
+      "bytes": 478,
+      "path": "recipe/browser/upstream.lock.json",
+      "sha256": "744c9cde26392e5d9361c6f41d22481889fc8022b1db5d3f64040d5ca633aed1"
+    },
+    {
+      "bytes": 25209,
+      "path": "recipe/docs/COMPLETION_SEQUENCE.md",
+      "sha256": "4a3452a4151799cc7536bbf8b54ba3f4e50ff50683e1ba2e2c3166208f9ca07f"
+    },
+    {
+      "bytes": 9948,
+      "path": "recipe/docs/DESKTOP_BROWSER_BUILD.md",
+      "sha256": "ab25228c61a880b5000f9f9d07f5b28b19e691ae6b88172a0d5d3405d7c1da1f"
+    },
+    {
+      "bytes": 3734,
+      "path": "recipe/qa/browser/DESKTOP_ACCEPTANCE.md",
+      "sha256": "0d59cba7241e40fa73a71e76d0467c4ff7ad95d05782a6a36fb5741dc06b72ad"
+    },
+    {
+      "bytes": 3300,
+      "path": "recipe/qa/browser/component-context.test.mjs",
+      "sha256": "d36301cb1992d55705e028ccb3d9e6302c5b595b8d104f1763c9dc1002579f8e"
+    },
+    {
+      "bytes": 6209,
+      "path": "recipe/qa/browser/component-ownership.test.mjs",
+      "sha256": "feece58b73d17a448592709389a51bc754f4bf655341f5390bc224e414babea5"
+    },
+    {
+      "bytes": 567,
+      "path": "recipe/security/component_identity.json",
+      "sha256": "700f7f9692b20b456b8d92acc5e0b300400c85cf5d9a0d55809ab48f58a55b88"
+    },
+    {
+      "bytes": 53,
+      "path": "recipe/security/game_hub_origin.txt",
+      "sha256": "f73f9c203bce62e7e706b7d9a6608328d0745e74938a86b5cddbaec29c157c3a"
+    },
+    {
+      "bytes": 14134,
+      "path": "recipe/tools/build_desktop_browser.py",
+      "sha256": "e2ba4c978ab2044ab68b33e76c441afa1151082b91a7f8d502ad45a8152540f7"
+    },
+    {
+      "bytes": 8430,
+      "path": "recipe/tools/desktop_capture_audio_patch.py",
+      "sha256": "1efe10532fa764b01ab8351a1019814aaa689b18f0e53b86268cca4febf4af93"
+    },
+    {
+      "bytes": 8229,
+      "path": "recipe/tools/game_hub_assets.py",
+      "sha256": "280750524ed7d340e0c926d8b9a06aaa02164840747faa6f563c3b6013bdcce8"
+    },
+    {
+      "bytes": 9801,
+      "path": "recipe/tools/generate_browser_patch.py",
+      "sha256": "a130da30b56506d0b48d5854d57d756f4c11add4dd546e04ce10e21836f7eea5"
+    },
+    {
+      "bytes": 9290,
+      "path": "recipe/tools/prepare_chromium_upgrade.py",
+      "sha256": "31fd48b2b57af6ce742c927fa4d97ddb08b19625c5ca29771cf9c5d134aeed98"
+    },
+    {
+      "bytes": 5864,
+      "path": "recipe/tools/prepare_desktop_browser.py",
+      "sha256": "f94b1ce853f92a7102403b06b968b67d692fce20385b9833943492f8c3f704b0"
+    },
+    {
+      "bytes": 2982,
+      "path": "recipe/tools/source_patch.py",
+      "sha256": "32b209742688e7fbd76501b93d37656cc76d87657182d57a1bb524f562eedf78"
+    },
+    {
+      "bytes": 3439,
+      "path": "recipe/tools/stage_browser_integration.py",
+      "sha256": "763baa5856ad559803328627045188fc6779d72010ef798d9b28237fc97c58d0"
+    },
+    {
+      "bytes": 375,
+      "path": "upstream/chrome/app/theme/chromium/BRANDING",
+      "sha256": "15ac20cb8744ebac0815961059231baefa71fd4ed3023cb2094aaf8a34ae423b"
+    },
+    {
+      "bytes": 6009,
+      "path": "upstream/chrome/browser/extensions/api/desktop_capture/desktop_capture_api.cc",
+      "sha256": "ab0f776a594a363190c22753b9f2da34604c73d11dde10fb67d5652e2e4565db"
+    },
+    {
+      "bytes": 10974,
+      "path": "upstream/chrome/browser/extensions/api/desktop_capture/desktop_capture_base.cc",
+      "sha256": "ffd3070cf14e18876f01b9c140972124edba1719b2661122b09cb2f96c3c8faa"
+    },
+    {
+      "bytes": 4814,
+      "path": "upstream/chrome/browser/extensions/api/desktop_capture/desktop_capture_base.h",
+      "sha256": "dddbd8e06c5b31963953d113b184c9984b7e2ea9c23e8b16a225b2a7ad32a760"
+    },
+    {
+      "bytes": 14527,
+      "path": "upstream/chrome/browser/extensions/api/messaging/launch_context_win.cc",
+      "sha256": "8a43d375f2f71b2eb20576e4b3b73d8e2e58cab2c6d46438a57aa1238e5962e5"
+    },
+    {
+      "bytes": 5476,
+      "path": "upstream/chrome/browser/extensions/component_extensions_allowlist/allowlist.cc",
+      "sha256": "03d9d5d4cccd3b74ec2b8e4d486945aa3501499f1dbd9e319b1ed1fa3b275ad5"
+    },
+    {
+      "bytes": 33385,
+      "path": "upstream/chrome/browser/extensions/component_loader.cc",
+      "sha256": "2f885d17e75792dac3c7deeb8f00850677b0a3bf82c3acebe65f18887edea04b"
+    },
+    {
+      "bytes": 7465,
+      "path": "upstream/chrome/browser/media/webrtc/desktop_media_picker.h",
+      "sha256": "550b6cee1463ee8098d288bcc0805bb348a0e71c695ef3d24c039239e5e43a28"
+    },
+    {
+      "bytes": 7303,
+      "path": "upstream/chrome/browser/resources/component_extension_resources.grd",
+      "sha256": "1c895106a9e658cf9b3dc6a492ea2b4d751f78bd875ec77e3171e3b8365d84de"
+    },
+    {
+      "bytes": 58809,
+      "path": "upstream/chrome/browser/ui/views/desktop_capture/desktop_media_picker_views.cc",
+      "sha256": "70d10392dd2a882646d63ea5266d36829438ee763a9106b1c6d81de1a127d079"
+    },
+    {
+      "bytes": 18464,
+      "path": "upstream/chrome/common/chrome_paths.cc",
+      "sha256": "fc7e97434d4c9e592fe859b69ba9a83945d836e0a1c3f2b0e52701850952c0df"
+    },
+    {
+      "bytes": 5952,
+      "path": "upstream/chrome/common/chrome_paths_linux.cc",
+      "sha256": "e4d5a3c62d12f018b5e37dc86a474570ae278b36f772863802f1663e923d33cc"
+    },
+    {
+      "bytes": 7325,
+      "path": "upstream/chrome/common/chrome_paths_mac.mm",
+      "sha256": "d1dfa65cbd46600c6340aa51fa3ebdc5559aa91d20f78a375364a0af6ab3e588"
+    },
+    {
+      "bytes": 6109,
+      "path": "upstream/chrome/common/extensions/api/desktop_capture.json",
+      "sha256": "9c64346570865b8debf1ed6168487a7a65edb821c7e65d71b6d27baa255e5ea2"
+    },
+    {
+      "bytes": 5395,
+      "path": "upstream/chrome/install_static/chromium_install_modes.h",
+      "sha256": "f1e173ce85627969b995e1844a9260d31aef8f4b27ccdca9ac728b60c4f23cd1"
+    }
+  ],
+  "source_only": true,
+  "target": "windows-x86_64",
+  "upstream_repository": "https://chromium.googlesource.com/chromium/src.git",
+  "upstream_revision": "0e66b94549a8bd85f03fbdf189b752d6e7b63c32",
+  "verification": "not_run"
+}

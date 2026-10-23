@@ -1,0 +1,98 @@
+{
+  "schema_version": 1,
+  "item": 3,
+  "status": "accepted_build_only",
+  "frozen_git_tree": "14f1b8d0e7c68aed365cf4d5c05ee3ed7c34f935",
+  "upstream_revision": "0e66b94549a8bd85f03fbdf189b752d6e7b63c32",
+  "chromium_version": "155.0.8059.85",
+  "compilation": {
+    "batch": "003-build-f",
+    "runner_result": "failed_timeout",
+    "surviving_compiler_log": "Build Succeeded: 57301 steps",
+    "duration": "9h22m42.18s",
+    "confirmation_batch": "003-build-g",
+    "confirmation_exit_code": 0,
+    "confirmation_log": "Build Succeeded: 0 steps; ninja: no work to do."
+  },
+  "independent_test": {
+    "executor": "Antigravity",
+    "model": "gemini-3.8-flash-high",
+    "turn": "0011",
+    "tool": "run_command",
+    "step_index": 175,
+    "exit_code": 0,
+    "bridge_exit_code": 0,
+    "scope": "Exact development Chromium chrome build and selected output integrity only; no browser launch/device/release acceptance"
+  },
+  "raw_logs": {
+    "003-build-f.stdout": {
+      "bytes": 18336611,
+      "sha256": "e6344410f081be07a748838fab7da08a3c18ad4178cf15b173eb423a916e8653"
+    },
+    "003-build-f.stderr": {
+      "bytes": 186,
+      "sha256": "2e42ba32513fc683c20d1534fa788bdbdff06511a36c81877e18152869efb262"
+    },
+    "003-build-g.stdout": {
+      "bytes": 836,
+      "sha256": "6f8de6b916093eb87671f1cf8fd78b2d46070cc7e7d1e27f92d26ece879feaf6"
+    },
+    "003-build-g.stderr": {
+      "bytes": 177,
+      "sha256": "9ab22eb4a1992a312982034394233a755f8c8caa95b9dfff8ea70bc4fbadaad8"
+    },
+    "post-timeout-processes": {
+      "bytes": 92640,
+      "sha256": "c46aa55c1cc0f7cf9db9eb9760da3634117f78fa280c62906fecd92bdafbe1e2"
+    },
+    "post-siso-reconciliation": {
+      "bytes": 456,
+      "sha256": "2ef8f7c71b26cf3ddfba749bef6bb4e3866e7ed9307b97504616b04ffabca918"
+    },
+    "antigravity.events": {
+      "bytes": 43503,
+      "sha256": "750347b1f460e15ffdbdd7d53204e312116621740fd201a37ecb8a94fe42a6c6"
+    },
+    "antigravity.result": {
+      "bytes": 5857,
+      "sha256": "7e4107d689096b1f3b276c9634d05557149cf35c69593bd6cd19f36b3cb3d5c2"
+    }
+  },
+  "published_files": {
+    "build-receipt.json": {
+      "bytes": 1036,
+      "sha256": "aea626c44588ca9ac1265599d5126f5729937999c8c5eb17fc1b0426745e4d5a"
+    },
+    "preparation-receipt.json": {
+      "bytes": 27885,
+      "sha256": "7960511a6c9ac5ccfb7bb59bdfc13d079a2c19627d2ebb81931c62963912a9da"
+    },
+    "build-journal.json": {
+      "bytes": 444,
+      "sha256": "e2cb6e9d314b2f8cd67b0ac2ae7505d8c7eeff3cc187da41d4dfbe24a9a2dd2c"
+    },
+    "dependency-revisions.txt": {
+      "bytes": 41347,
+      "sha256": "cbd3ced9993adb46935d35088ad2fbe04dcd6bbe9d8b03a54c0e4a55cad04606"
+    },
+    "acceptance.json": {
+      "bytes": 1468,
+      "sha256": "702191dd144b037f9209bf384502af2461923221df2e917a5335ea12b92dc864"
+    },
+    "acceptance-checker.py": {
+      "bytes": 3982,
+      "sha256": "7a2eeff5f3dc28e37a69e41ab46a10111f7a1a000b203b42ef31d03bcff6444d"
+    },
+    "confirmation-result.json": {
+      "bytes": 423,
+      "sha256": "0042e0797780a974b6a557bb9444d1957c428353d8b48799f80883963ab49376"
+    },
+    "timeout-result.json": {
+      "bytes": 554,
+      "sha256": "2048fdbc6c0aa7cbb385f6a44a600c68f76c87a947f7c2511d8061cc0a49d8fb"
+    }
+  },
+  "runtime_verified": false,
+  "reproducibility_verified": false,
+  "distribution_approved": false
+}

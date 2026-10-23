@@ -1,0 +1,12 @@
+{
+  "failed": null,
+  "identity": {
+    "depot_tools_revision": "4be4e4628e093c4ad50210db5dcfa05a88280bda",
+    "git_sha256": "851535ccc041bed536a23b17200cd51e7b06e266a527f4eaf8338b5c256c6466",
+    "preparation_sha256": "7960511a6c9ac5ccfb7bb59bdfc13d079a2c19627d2ebb81931c62963912a9da",
+    "python_sha256": "db92608495a8ad6f0435fcfef502d2b393b0ca78086af5f7cc0344c146aa487c"
+  },
+  "phase": "built",
+  "running": null,
+  "schema_version": 1
+}

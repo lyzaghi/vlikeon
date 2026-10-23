@@ -81,12 +81,55 @@ against frozen original/new bytes, reapplies the original overlay and continues
 GN/compilation. No check was waived, and no product source or pin was substituted.
 
 Batch `003-build-f` completed GN configuration and entered the actual full
-`chrome` compilation phase. The active journal is `configured`, running
-`chromium_compilation`. This is progress, not a successful build result.
+`chrome` compilation phase. Its supervisor reached the eight-hour subprocess
+limit on 2026-10-23 at 14:56 UTC and returned `ETIMEDOUT`; the batch result remains
+failed. Windows retained the scoped autoninja/Siso/compiler descendants, whose
+process identity and advancing build log were independently observed after the
+recipe parent exited. The existing journal remains `configured`, running
+`chromium_compilation`; this cannot establish a surviving recipe or completion.
+Codex continues read-only supervision of the exact surviving compiler process.
+No duplicate build, source/configuration change or live-lock removal is allowed.
+After those processes actually finish, their logs and descendants must be
+reconciled before a fresh invocation of the same frozen recipe can confirm the
+full incremental target and produce its receipt. Retain the timeout result even
+if that later invocation succeeds. This remains progress, not a successful build.
 Dependency check reports and raw-log digests are published separately under
 `../qa/evidence/sequential/item-003/`; all earlier failed attempts stay retained.
 
-No build receipt has been accepted.
+## Accepted Windows x64 development build
+
+The surviving compiler completed on 2026-10-23 at 16:19 UTC with
+`Build Succeeded: 57301 steps` after 9h22m42.18s. Codex then verified every
+scoped parent/descendant absent, retained the stale lock/journal evidence and
+removed only the exact stale build lock. Batch `003-build-g` invoked the same
+frozen recipe without resetting source, configuration or the journal. The full
+`chrome` target reported `ninja: no work to do` and `Build Succeeded: 0 steps`;
+the recipe exited zero and created a `built` journal and final build receipt.
+
+Antigravity executed the independent acceptance checker once (turn `0011`,
+exit zero). Codex reviewed the raw execution event, receipt, journal and output
+inventory. The checker confirmed unchanged 138 prepared inputs, AMD64 PE32+
+entry point and hashes/sizes of seven selected browser outputs. Task 3 is
+accepted for this development build. The original timeout batch remains failed.
+
+- Frozen product Git tree: `14f1b8d0e7c68aed365cf4d5c05ee3ed7c34f935`.
+- Chromium: `155.0.8059.85`, revision
+  `0e66b94549a8bd85f03fbdf189b752d6e7b63c32`.
+- Preparation SHA-256:
+  `7960511a6c9ac5ccfb7bb59bdfc13d079a2c19627d2ebb81931c62963912a9da`.
+- `chrome.exe`: 3,910,656 bytes, SHA-256
+  `ef891f1d2a673fbe21e0156d95e95c0ca62d3f5efd04be831bdbde4bc686b907`.
+- Local output: `E:\V10\cw3b\out\w\workspace\src\out\OmniPlay`.
+- [Published receipts, checker, selected output hashes and raw-log digests](../qa/evidence/sequential/item-003/build/qualification.json).
+
+This component debug build is not a signed installer or a production release.
+The receipt retains `browser: not_started`, `verification: not_run`,
+`reproducibility_verified: false` and `distribution_approved: false`. The
+separate acceptance report establishes build integrity only. Runtime Game Hub,
+profiles, permissions and native bridge remain task 6; Linux/macOS builds and
+clean-clone reproducibility remain open. This build qualifies the frozen tree
+above, not later source changes from parallel work.
+
 Original failed snapshots/logs remain retained in the assigned local QA area;
 do not reinterpret them as successful build attempts or count prechecks as
 compiled Chromium. Update this record after inspecting terminal build evidence.

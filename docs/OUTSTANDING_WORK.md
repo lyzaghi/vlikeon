@@ -14,7 +14,7 @@ Antigravity batches, while source work continues. Items 53 and 54 remain open.
 
 1. [x] Tích hợp các thay đổi mã nguồn đang nằm ngoài commit thành các phiên bản thống nhất, có thể tái tạo. Bằng chứng và giới hạn: `SOURCE_INTEGRATION.md`.
 2. [x] Đồng bộ README, roadmap và tài liệu trạng thái với kết quả phát triển, kiểm thử thực tế. Đối chiếu: `DOCUMENTATION_ALIGNMENT.md`.
-3. [ ] Build trình duyệt Chromium Vlikeon hoàn chỉnh trên Windows.
+3. [x] Build trình duyệt Chromium Vlikeon hoàn chỉnh trên Windows. Bằng chứng build x64 và giới hạn kiểm chứng: `WINDOWS_CHROMIUM_BUILD.md`.
 4. [ ] Build trình duyệt Chromium Vlikeon hoàn chỉnh trên Linux.
 5. [ ] Build trình duyệt Chromium Vlikeon hoàn chỉnh trên macOS.
 6. [ ] Kiểm chứng Game Hub, tab, hồ sơ thường/riêng tư, quyền truy cập và native bridge trong trình duyệt thật.

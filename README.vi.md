@@ -12,13 +12,16 @@ Chromium, hướng tới kết hợp Game Hub, runtime native được cô lập
 và điều phối remote play trong cùng một không gian làm việc.
 
 **Dự án đang phát triển; trình duyệt đầy đủ và bản production chưa được kiểm chứng.**
-Demo Game Hub Windows riêng đã có bằng chứng chạy thử giới hạn. Bản tích hợp
-mã nguồn đã qua các kiểm tra được giao và tái tạo tài nguyên; chưa phải kết quả
-build Chromium hoàn chỉnh. Chưa có bộ cài production được xác nhận, danh sách
+Demo Game Hub Windows riêng đã có bằng chứng chạy thử giới hạn. Bản Chromium
+Windows x64 dành cho phát triển đã build hoàn chỉnh và kiểm tra tính nguyên vẹn
+đầu ra; kiểm chứng vận hành vẫn còn mở. Chưa có bộ cài production được xác nhận, danh sách
 tương thích game, benchmark có kiểm soát hay kết luận kiểm toán bảo mật.
 
 ## Bằng chứng hiện có
 
+- [Build Chromium Windows](docs/WINDOWS_CHROMIUM_BUILD.md): full target `chrome`,
+  nguồn đóng băng và hash đầu ra x64 được kiểm tra độc lập. Đây là bản phát triển;
+  chưa nghiệm thu hành vi trình duyệt hay phát hành production.
 - [Demo Windows và giới hạn](docs/PLAYABLE_DEMO.md): cửa sổ Win32 dùng WebView2,
   game Game Boy gốc và core WebAssembly. Bằng chứng demo chỉ áp dụng đúng bản đó.
 - [Bản tích hợp nguồn](docs/SOURCE_INTEGRATION.md), commit `35f3271`: 53 ca Rust,

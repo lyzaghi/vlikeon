@@ -5,8 +5,10 @@ percentage. The authoritative task sequence is
 [`docs/OUTSTANDING_WORK.md`](docs/OUTSTANDING_WORK.md), numbered 1–109.
 Source integration task 1 is complete at `35f3271`; task 2 documentation alignment
 is recorded in [`DOCUMENTATION_ALIGNMENT.md`](docs/DOCUMENTATION_ALIGNMENT.md).
-The next task is the Windows Chromium build (task 3). Completed source
-integration does not close the historical desktop product area below.
+Task 3 [Windows Chromium build](docs/WINDOWS_CHROMIUM_BUILD.md) is complete for
+its frozen x64 development inputs and output integrity. The next task in this
+chat's sequence is 4 (Linux build); parallel assignments remain in the task list.
+This does not close runtime acceptance or the historical desktop product area.
 
 The table uses the historical 17 product-area identifiers for traceability.
 [`docs/COMPLETION_SEQUENCE.md`](docs/COMPLETION_SEQUENCE.md) retains prior
@@ -14,7 +16,7 @@ assignments and deferrals; its historical ordering does not override 1–109.
 
 | Order | Area | Status |
 | --- | --- | --- |
-| 1 | Chromium desktop and Game Hub | Source authored; qualification pending |
+| 1 | Chromium desktop and Game Hub | Windows x64 development build accepted; runtime and other desktop hosts pending |
 | 2 | Windows runtime and containment | Source in progress; qualification pending |
 | 3 | Linux runtime and containment | Completion review and qualification pending |
 | 4 | macOS runtime and containment | Completion review and qualification pending |
@@ -34,6 +36,8 @@ assignments and deferrals; its historical ordering does not override 1–109.
 
 ## Established evidence
 
+- [Windows Chromium development build](docs/WINDOWS_CHROMIUM_BUILD.md): full
+  `chrome` target and independent selected output integrity; no runtime or release acceptance.
 - [Windows Game Hub demo](docs/PLAYABLE_DEMO.md): scoped standalone WebView2 demo,
   not the full Chromium browser. Existing demo evidence does not qualify later
   product source.
