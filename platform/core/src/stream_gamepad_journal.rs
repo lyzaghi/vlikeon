@@ -288,6 +288,10 @@ mod tests{
         fn helper_exited(&mut self,_identity:ProcessIdentity)->Result<bool>{Ok(self.exited)}
         fn presence(&mut self,_container:Uuid)->Presence{self.presence}
     }
+    fn shared_directory(fixture:&Fixture)->std::path::PathBuf{
+        let directory=fixture.path.0.join("coordination");
+        std::fs::create_dir(&directory).unwrap();std::fs::create_dir(directory.join("profiles")).unwrap();directory
+    }
     #[test]fn stale_reservation_cannot_clear_identical_replacement(){
         let mut fixture=Fixture::new();let old=fixture.reserve();
         let mut observer=Observer{exited:true,presence:Presence::Absent};
@@ -372,18 +376,20 @@ mod tests{
         use crate::stream_gamepad_arbitration::Arbitration;
         let mut first=Fixture::new();let mut second=Fixture::new();
         let a=first.reserve();let b=second.reserve();
-        let mut shared=Arbitration::open(&first.path.0).unwrap();
-        let mut competing=Arbitration::open(&first.path.0).unwrap();
+        let directory=shared_directory(&first);
+        let mut shared=Arbitration::initialize_new(&directory).unwrap();
+        let mut competing=Arbitration::open(&directory).unwrap();
         shared.reserve(&first.database,&a).unwrap();
         assert!(competing.reserve(&second.database,&b).is_err());drop(shared);
-        let reopened=Arbitration::open(&first.path.0).unwrap();
+        let reopened=Arbitration::open(&directory).unwrap();
         assert_eq!(reopened.pending().unwrap().unwrap().reservation(),a.record.reservation());
         assert!(competing.reserve(&second.database,&b).is_err());
     }
     #[test]fn shared_mirror_refuses_a_stale_profile_revision(){
         use crate::stream_gamepad_arbitration::Arbitration;
         let mut fixture=Fixture::new();let reserved=fixture.reserve();
-        let mut shared=Arbitration::open(&fixture.path.0).unwrap();shared.reserve(&fixture.database,&reserved).unwrap();
+        let directory=shared_directory(&fixture);
+        let mut shared=Arbitration::initialize_new(&directory).unwrap();shared.reserve(&fixture.database,&reserved).unwrap();
         let attempted=begin_activation(&mut fixture.database,&reserved).unwrap();
         shared.mirror(&fixture.database,&attempted).unwrap();
         assert!(shared.mirror(&fixture.database,&reserved).is_err());
@@ -392,7 +398,8 @@ mod tests{
     #[test]fn shared_release_keeps_profile_proof_and_cannot_delete_replacement(){
         use crate::stream_gamepad_arbitration::Arbitration;
         let mut first=Fixture::new();let mut second=Fixture::new();let a=first.reserve();let b=second.reserve();
-        let mut shared=Arbitration::open(&first.path.0).unwrap();shared.reserve(&first.database,&a).unwrap();
+        let directory=shared_directory(&first);
+        let mut shared=Arbitration::initialize_new(&directory).unwrap();shared.reserve(&first.database,&a).unwrap();
         let mut observer=Observer{exited:false,presence:Presence::Absent};
         assert!(shared.release(&first.database,&a,&mut observer).is_err());
         observer.exited=true;
@@ -406,11 +413,40 @@ mod tests{
     #[test]fn deleted_profile_proof_cannot_force_clear_shared_ownership(){
         use crate::stream_gamepad_arbitration::Arbitration;
         let mut fixture=Fixture::new();let reserved=fixture.reserve();
-        let mut shared=Arbitration::open(&fixture.path.0).unwrap();shared.reserve(&fixture.database,&reserved).unwrap();
+        let directory=shared_directory(&fixture);
+        let mut shared=Arbitration::initialize_new(&directory).unwrap();shared.reserve(&fixture.database,&reserved).unwrap();
         let mut observer=Observer{exited:true,presence:Presence::Absent};
         let(proof,ready)=reconcile_retained(&mut fixture.database,&reserved,&mut observer).unwrap();assert!(ready);
         assert!(matches!(reconcile(&mut fixture.database,&proof,&mut observer).unwrap(),Reconciliation::Removed));
         assert!(shared.release(&fixture.database,&proof,&mut observer).is_err());
         assert!(shared.pending().unwrap().is_some());
+    }
+    #[test]fn ordinary_open_does_not_recreate_a_lost_coordination_store(){
+        use crate::stream_gamepad_arbitration::Arbitration;
+        let fixture=Fixture::new();let directory=shared_directory(&fixture);
+        assert!(Arbitration::open(&directory).is_err());
+        assert!(!directory.join("native-gamepad-ownership.sqlite3").exists());
+        let shared=Arbitration::initialize_new(&directory).unwrap();
+        assert!(Arbitration::initialize_new(&directory).is_err());
+        assert!(shared.pending().unwrap().is_none());
+    }
+    #[test]fn explicit_shared_bootstrap_refuses_profile_debt_even_if_corrupt(){
+        use crate::stream_gamepad_arbitration::Arbitration;
+        let fixture=Fixture::new();let directory=shared_directory(&fixture);
+        let root=directory.join("profiles").join(fixture.profile.to_string());
+        let database=Database::open(&root).unwrap();
+        database.connection.execute("INSERT INTO preferences(key,value) VALUES(?1,'unreadable ownership')",[KEY]).unwrap();
+        assert!(Arbitration::initialize_new(&directory).is_err());
+        assert!(!directory.join("native-gamepad-ownership.sqlite3").exists());
+        database.connection.execute("DELETE FROM preferences WHERE key=?1",[KEY]).unwrap();
+        let shared=Arbitration::initialize_new(&directory).unwrap();assert!(shared.pending().unwrap().is_none());
+    }
+    #[cfg(windows)]#[test]fn windows_live_store_cannot_be_renamed(){
+        use crate::stream_gamepad_arbitration::Arbitration;
+        let fixture=Fixture::new();let directory=shared_directory(&fixture);
+        let shared=Arbitration::initialize_new(&directory).unwrap();
+        let path=directory.join("native-gamepad-ownership.sqlite3");
+        assert!(std::fs::rename(&path,directory.join("moved.sqlite3")).is_err());
+        assert!(path.exists());assert!(shared.pending().unwrap().is_none());
     }
 }

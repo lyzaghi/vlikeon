@@ -49,6 +49,11 @@ and retains profile retirement proof until shared ownership is released. Optiona
 startup recovery respects shared debt. Twelve regression cases are authored,
 not run. Shared-root/ACL admission, lost-store/foreign-profile recovery, actual
 concurrency/OS qualification and product input activation remain unfinished.
+The following source checkpoint makes ordinary coordination open existing-only,
+separates debt-free profile-inventory bootstrap with create-new semantics, and
+retains Windows non-delete-sharing file/directory guards. Fifteen regression
+cases are authored (one Windows-only); none ran. Native bootstrap/repair and
+actual ACL/SQLite/OS validation remain due, with gamepad capability still false.
 
 The owner now requests the individually numbered tasks in
 [`OUTSTANDING_WORK.md`](OUTSTANDING_WORK.md), completed in order. Task 1 source

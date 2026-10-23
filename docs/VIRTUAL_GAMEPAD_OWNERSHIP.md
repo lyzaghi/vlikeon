@@ -310,7 +310,7 @@ positive process retirement witness; access refusal or PID lookup failure
 alone must not satisfy the observer trait. Signed helper/driver admission and
 native consent remain mandatory before wiring any runtime path.
 
-Twelve journal/coordination regression cases are authored behind `cfg(test)` for the later
+Fifteen journal/coordination regression cases (one Windows-only) are authored behind `cfg(test)` for the later
 Antigravity batch: stale reservation/replacement, reopen after lost activation
 reply, never-observed absence and later presence/absence, cleanup receipt before
 child exit, synthetic SQL write failure, outer-transaction refusal and unknown/
@@ -502,16 +502,56 @@ than treating that as successful cleanup.
 The optional startup recovery lane now uses that shared store as well. Recovery
 of a row belonging to another profile still needs the installed profile resolver/
 recovery UX; this lane does not follow arbitrary paths or clear foreign owners.
-Admission after deletion/restoration/loss of the coordination store must inventory
-existing profile debts before allowing any new activation. That install/recovery
-gate, ACL/ancestor hardening and real concurrent/crash/disk-fault qualification
-remain required before product activation; source authoring does not prove them.
+Admission after deletion/restoration/loss of the coordination store cannot assume
+it is a new installation. The explicit debt-free initialization source below is
+separate from ordinary open; debt-bearing repair, install/ACL admission and real
+concurrent/crash/disk-fault qualification remain required before product activation.
 
 Four additional regression cases are authored for later execution: two profile
 connections competing for one persistent row, stale mirror refusal, correct
 two-store release and replacement protection, and refusal after profile proof
 was deleted too early. Combined with the earlier eight cases, twelve are
-authored; none has run. Current product capability remains false.
+authored at that checkpoint; none has run. Current product capability remains false.
+
+## Missing-store refusal and explicit initialization
+
+Ordinary `Arbitration::open` now opens an existing store without SQLite CREATE
+and rejects missing, empty or incomplete initialization. Startup/activation
+does not silently replace a lost coordinator with an empty reservation table.
+`initialize_new` is a separate native install/bootstrap API; current service
+startup does not invoke it. It requires the existing private application root
+and `profiles` directory, walks at most 4,096 canonical UUID profile directories,
+and reads each existing profile database without creating or migrating it.
+Unreadable/missing databases, unexpected entries, wrong schema/device identity
+and **any** gamepad ownership row, even corrupt data, refuse initialization.
+
+Only a debt-free inventory can reach `create_new` for the coordinator. An
+existing file, including an incomplete earlier initialization, is never
+overwritten or deleted. Failure after creation leaves that file for reviewed
+native recovery. SQLite then initializes only that newly created ordinary file.
+Cooperating current brokers cannot activate while the store is missing or its
+header is incomplete. Mixed older brokers without these ownership rules are
+outside this admission contract and must not remain active during install or
+repair; exact binary/version admission is still required.
+
+On Windows, each live store retains ordinary-file and directory handles allowing
+read/write sharing but excluding FILE_SHARE_DELETE, plus OPEN_REPARSE_POINT
+and directory BACKUP_SEMANTICS. SQLite can still share/lock the database, while
+ordinary delete/rename/replacement requests are refused until those guards
+close. The connection drops before its guards. This follows the Microsoft
+[file sharing contract](https://learn.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-createfilew),
+but real NTFS/file-filter/SQLite interaction has not been exercised. Unix source
+uses no-follow descriptors; those descriptors do not establish equivalent
+delete/rename exclusion, so no Linux arbitration qualification is claimed.
+All ancestor/ACL admission remains under the trusted install-root boundary.
+
+Three additional regression cases are authored: missing-store open refuses
+implicit recreation and bootstrap refuses overwriting; even corrupt profile
+debt blocks initialization; and a Windows live-store rename must be refused.
+There are now fifteen authored cases (fourteen on other platforms), all deferred.
+No coordination file, profile inventory, driver or recovery operation was run
+while authoring this checkpoint. Native bootstrap/repair UX and lost-store
+reconstruction with actual retained devices remain unfinished.
 
 ## Receiving browser sampling
 

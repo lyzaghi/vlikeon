@@ -4,7 +4,7 @@
 use crate::{Database,stream_gamepad_journal::{self as journal,Record,Snapshot,Phase,RecoveryObserver},util::storage_error};
 use omniplay_contracts::{ErrorCode,PlatformError,Result};
 use rusqlite::{Connection,TransactionBehavior,params};
-use std::path::Path;
+use std::{fs::{File,OpenOptions},path::Path};
 const APPLICATION:u32=0x564c4750;
 fn invalid()->PlatformError{PlatformError::new(ErrorCode::CorruptData,"Shared gamepad ownership requires confirmed native recovery")}
 fn busy()->PlatformError{PlatformError::new(ErrorCode::Busy,"Another native gamepad group still owns the shared reservation")}
@@ -12,7 +12,7 @@ fn conflict()->PlatformError{PlatformError::new(ErrorCode::Conflict,"Shared game
 
 /// One group of up to four slots, matching the current single-group host model.
 /// Persisted ownership is never deleted by object Drop, expiry or process loss.
-pub struct Arbitration{connection:Connection}
+pub struct Arbitration{connection:Connection,_file:File,_directory:File}
 impl Arbitration{
     /// The install service supplies an existing private coordination directory.
     /// Its ACL/ancestor integrity is a prerequisite; no renderer-selected path,
@@ -20,21 +20,38 @@ impl Arbitration{
     pub fn open(directory:&Path)->Result<Self>{
         if !directory.is_absolute(){return Err(invalid());}
         ordinary(directory,true)?;let path=directory.join("native-gamepad-ownership.sqlite3");
-        match std::fs::symlink_metadata(&path){Ok(_)=>ordinary(&path,false)?,
-            Err(error)if error.kind()==std::io::ErrorKind::NotFound=>{},Err(error)=>return Err(storage_error(error))}
+        let guard=directory_guard(directory)?;ordinary(&path,false)?;
+        let file=file_guard(&path,false)?;
+        Self::connect(&path,file,guard,false)
+    }
+    /// Explicit install/bootstrap entry, never automatic repair. Admission of
+    /// the private root and current broker protocol is a prerequisite. All
+    /// existing native profiles must be readable and have NO ownership debt.
+    /// create_new refuses to overwrite an old, empty or partially initialized
+    /// coordinator. Failure leaves it for reviewed recovery, never deletion.
+    pub fn initialize_new(directory:&Path)->Result<Self>{
+        if !directory.is_absolute(){return Err(invalid());}
+        ordinary(directory,true)?;let guard=directory_guard(directory)?;
+        require_debt_free_profiles(directory)?;
+        let path=directory.join("native-gamepad-ownership.sqlite3");
+        let file=file_guard(&path,true)?;
+        Self::connect(&path,file,guard,true)
+    }
+    fn connect(path:&Path,file:File,directory:File,initialize:bool)->Result<Self>{
         let mut connection=Connection::open_with_flags(&path,rusqlite::OpenFlags::SQLITE_OPEN_READ_WRITE|
-            rusqlite::OpenFlags::SQLITE_OPEN_CREATE|rusqlite::OpenFlags::SQLITE_OPEN_NO_MUTEX).map_err(storage_error)?;
+            rusqlite::OpenFlags::SQLITE_OPEN_NO_MUTEX).map_err(storage_error)?;
         connection.busy_timeout(std::time::Duration::from_millis(100)).map_err(storage_error)?;
         // Refuse a foreign database before changing its journal mode.
-        validate_header(&connection)?;
+        if validate_header(&connection)?&&!initialize{return Err(invalid());}
         connection.execute_batch("PRAGMA trusted_schema=OFF; PRAGMA journal_mode=WAL; PRAGMA synchronous=FULL;").map_err(storage_error)?;
         let tx=connection.transaction_with_behavior(TransactionBehavior::Immediate).map_err(storage_error)?;
         if validate_header(&tx)?{
+            if !initialize{return Err(invalid());}
             tx.execute_batch("CREATE TABLE gamepad_owner(singleton INTEGER PRIMARY KEY CHECK(singleton=1),record TEXT NOT NULL CHECK(length(CAST(record AS BLOB)) BETWEEN 1 AND 8192)) STRICT;
                 PRAGMA application_id=1447839568; PRAGMA user_version=1;").map_err(storage_error)?;
         }
         tx.commit().map_err(storage_error)?;
-        let store=Self{connection};store.durable()?;let _=store.pending()?;Ok(store)
+        let store=Self{connection,_file:file,_directory:directory};store.durable()?;let _=store.pending()?;Ok(store)
     }
     fn durable(&self)->Result<()>{
         let mode:String=self.connection.query_row("PRAGMA journal_mode",[],|row|row.get(0)).map_err(storage_error)?;
@@ -114,4 +131,55 @@ fn ordinary(path:&Path,directory:bool)->Result<()>{
     let mut linked=shape.file_type().is_symlink();
     #[cfg(windows)]{use std::os::windows::fs::MetadataExt;linked|=shape.file_attributes()&0x400!=0;}
     if linked||(directory&&!shape.is_dir())||(!directory&&!shape.is_file()){return Err(invalid());}Ok(())
+}
+fn file_guard(path:&Path,create:bool)->Result<File>{
+    let mut options=OpenOptions::new();options.read(true).write(true).create_new(create);
+    #[cfg(windows)]{use std::os::windows::fs::OpenOptionsExt;
+        // No FILE_SHARE_DELETE: retain the same named coordinator throughout
+        // every live connection. OPEN_REPARSE_POINT refuses a link's target.
+        options.share_mode(3).custom_flags(0x0020_0000);
+    }
+    #[cfg(unix)]{use std::os::unix::fs::OpenOptionsExt;options.mode(0o600).custom_flags(libc::O_NOFOLLOW|libc::O_CLOEXEC);}
+    let file=options.open(path).map_err(storage_error)?;
+    let shape=file.metadata().map_err(storage_error)?;
+    if !shape.is_file(){return Err(invalid());}
+    #[cfg(windows)]{use std::os::windows::fs::MetadataExt;if shape.file_attributes()&0x400!=0{return Err(invalid());}}
+    Ok(file)
+}
+fn directory_guard(path:&Path)->Result<File>{
+    let mut options=OpenOptions::new();options.read(true);
+    #[cfg(windows)]{use std::os::windows::fs::OpenOptionsExt;
+        options.share_mode(3).custom_flags(0x0200_0000|0x0020_0000);
+    }
+    #[cfg(unix)]{use std::os::unix::fs::OpenOptionsExt;options.custom_flags(libc::O_DIRECTORY|libc::O_NOFOLLOW|libc::O_CLOEXEC);}
+    let file=options.open(path).map_err(storage_error)?;let shape=file.metadata().map_err(storage_error)?;
+    if !shape.is_dir(){return Err(invalid());}
+    #[cfg(windows)]{use std::os::windows::fs::MetadataExt;if shape.file_attributes()&0x400!=0{return Err(invalid());}}
+    Ok(file)
+}
+fn require_debt_free_profiles(directory:&Path)->Result<()>{
+    use rusqlite::OptionalExtension;
+    let profiles=directory.join("profiles");ordinary(&profiles,true)?;let _guard=directory_guard(&profiles)?;
+    let mut count=0;
+    for entry in std::fs::read_dir(&profiles).map_err(storage_error)?{
+        count+=1;if count>4096{return Err(invalid());}
+        let entry=entry.map_err(storage_error)?;let name=entry.file_name().into_string().map_err(|_|invalid())?;
+        let profile=uuid::Uuid::parse_str(&name).map_err(|_|invalid())?;
+        if profile.is_nil()||profile.to_string()!=name{return Err(invalid());}
+        let root=entry.path();ordinary(&root,true)?;let _profile=directory_guard(&root)?;
+        let database=root.join("omniplay.sqlite3");ordinary(&database,false)?;
+        let connection=Connection::open_with_flags(database,rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY|
+            rusqlite::OpenFlags::SQLITE_OPEN_NO_MUTEX).map_err(storage_error)?;
+        connection.busy_timeout(std::time::Duration::from_millis(100)).map_err(storage_error)?;
+        connection.execute_batch("PRAGMA trusted_schema=OFF;").map_err(storage_error)?;
+        let version:u32=connection.query_row("PRAGMA user_version",[],|row|row.get(0)).map_err(storage_error)?;
+        let(bytes,device):(i64,String)=connection.query_row("SELECT length(CAST(value AS BLOB)),substr(value,1,38) FROM preferences WHERE key='device_id'",[],|row|Ok((row.get(0)?,row.get(1)?))).map_err(storage_error)?;
+        let id=uuid::Uuid::parse_str(&device).map_err(|_|invalid())?;
+        if version!=crate::database::CURRENT_SCHEMA_VERSION||bytes!=36||id.is_nil()||id.to_string()!=device{return Err(invalid());}
+        // Any row, including corrupt/unknown content, retains ownership. Do not
+        // decode it as empty or run cleanup/migrations during bootstrap.
+        let debt:Option<u32>=connection.query_row("SELECT 1 FROM preferences WHERE key='native_gamepad_ownership_v1'",[],|row|row.get(0)).optional().map_err(storage_error)?;
+        if debt.is_some(){return Err(busy());}
+    }
+    Ok(())
 }
