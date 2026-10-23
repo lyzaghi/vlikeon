@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "item": 4,
+  "status": "source_prepared_awaiting_linux_host",
+  "target": "linux-x86_64",
+  "development_only": true,
+  "source_commit": "e527bf2a01df2a42d5cbd6bca91072719420329a",
+  "source_git_tree": "c90b68c0cb3cf9bff4462473a3c8be5969bb54b0",
+  "source_archive_sha256": "47a77fb9780922b5d5e024f053a2e7dc95065c6a4defa4d989a12ba3b2c10b84",
+  "preparation_sha256": "a3a16d38cf0ee69a9171624d804c81dff1145bcd82a6e66407c9a3e639e540c3",
+  "transfer_archive_sha256": "a6ed3df3723e4c22bf0777c59aed632a400356f2504a5d16664990d301de3c3a",
+  "source_files": 141,
+  "source_bytes": 1329785,
+  "upstream_revision": "0e66b94549a8bd85f03fbdf189b752d6e7b63c32",
+  "intended_depot_tools_revision": "4be4e4628e093c4ad50210db5dcfa05a88280bda",
+  "configuration": "not_started",
+  "compiler": "not_started",
+  "browser": "not_started",
+  "verification": "not_run",
+  "distribution_approved": false,
+  "host_requirement": "Linux x86-64 with at least 100 GB free storage; host not yet supplied"
+}
