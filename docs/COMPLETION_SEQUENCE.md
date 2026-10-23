@@ -15,6 +15,14 @@ explicit hardware-required creation and permanent delivery fences. This is not
 a macOS build, service/capture connection, codec compatibility or runtime pass.
 Windows/Linux encoders and every remaining item-56 service obligation stay open.
 
+The subsequent item-56 checkpoint authors a Windows Media Foundation H.264 NV12
+encoder candidate with sync/async MFT handling, bounded pending/output memory,
+keyframe/timestamp/deadline fences and failed-stop reference retention. It is a
+private static library, not the completed independent service or an enabled
+product feature. No configure/build, MFT activation or runtime/test was run.
+Capture/conversion, supervision/transport, other codecs, Linux and full original
+item-56 service/qualification requirements remain open.
+
 This fork's current assignment: items 51 and 52 are accepted with evidence in
 `SAVE_ARCHIVE_INTERCHANGE.md` and `STORAGE_FAULT_QUALIFICATION.md`. On 2026-10-23,
 the owner deferred Linux build/runtime work for item 53, then deferred build/test

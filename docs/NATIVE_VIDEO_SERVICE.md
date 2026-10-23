@@ -86,5 +86,24 @@ API contracts were reviewed against Apple's
 [hardware-required selection](https://developer.apple.com/documentation/videotoolbox/kvtvideoencoderspecification_requirehardwareacceleratedvideoencoder),
 and [session invalidation](https://developer.apple.com/documentation/videotoolbox/vtcompressionsessioninvalidate(_:)).
 No macOS SDK compilation, encoder/device execution or callback/timing test ran.
-Windows/Linux backends, actual service/capture/transport integration, native
+Windows/Linux backend completion, actual service/capture/transport integration, native
 authority wiring and all remaining final scope remain due.
+
+## Windows encoder source candidate
+
+`engines/encode-windows` adds a separate static-library recipe and real Media
+Foundation API path for H.264 Main Level 4.2 with tightly packed NV12 input. Both
+synchronous output pulling and asynchronous NeedInput/HaveOutput event credits
+are authored. It bounds accepted pending frames, MF buffer requests, packet and
+header sizes, output queue memory and receipt age. A hardware-required request
+admits only a registered hardware MFT; actual GPU execution is not established.
+
+Checked low-latency/no-B-frame settings, strict output timestamps and requested
+keyframe receipts enforce the current backend contract. Slow input/OS operations
+cannot earn a fresh processing clock. Close fences output; explicit stop retains
+references on failed teardown. NoWait event reads do not preempt OS methods.
+The future service must supervise the process and supply live authority checks,
+capture/conversion, receiver negotiation and publication fencing. This candidate
+does not yet connect to the Rust selection primitives, capture or product UI.
+`engines/encode-windows/README.md` records exact behavior, API references and
+unsupported paths. No Windows configure/build, MFT activation or test was run.

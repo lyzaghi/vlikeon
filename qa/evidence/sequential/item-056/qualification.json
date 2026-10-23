@@ -5,13 +5,14 @@
   "source_scope": [
     "Private codec capability intersection and explicit preference/fallback selection",
     "Owned bounded NV12/BGRA raw-frame mailbox with capture-generation, sequence, timestamp, receipt-age and lifetime fences",
-    "Unintegrated macOS VideoToolbox H.264/HEVC encoder source with explicit hardware requirement, bounded submissions/output, shared callback lifetime and terminal output fences"
+    "Unintegrated macOS VideoToolbox H.264/HEVC encoder source with explicit hardware requirement, bounded submissions/output, shared callback lifetime and terminal output fences",
+    "Unintegrated Windows Media Foundation H.264 NV12 encoder source, sync/async MFT lifecycle, bounded pending/output, keyframe/timestamp/deadline fences and separate stop receipts"
   ],
   "static_review": "Source review and git diff whitespace check only",
   "build_executed": false,
   "test_executed": false,
   "native_service_integrated": false,
-  "os_encoder_source_authored": ["macOS VideoToolbox candidate; not SDK-compiled or run"],
+  "os_encoder_source_authored": ["macOS VideoToolbox candidate; not SDK-compiled or run", "Windows Media Foundation candidate; not compiled, activated or run"],
   "passed_test_cases": [],
   "remaining_scope": "docs/NATIVE_VIDEO_SERVICE.md"
 }
