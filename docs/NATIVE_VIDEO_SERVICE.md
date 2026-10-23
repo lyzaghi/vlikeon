@@ -251,3 +251,10 @@ It preserves compressed backpressure/age/order and rebases RTP clock wrap into
 bounded decoder time. `NATIVE_VIDEO_RECEIVE_BRIDGE.md` records this source-only
 bridge, four new unexecuted cases and missing real SRTP/native/codec/service/UI
 implementations. No compiler, parser/clock, helper/decoder/media or test ran.
+
+Static review now rejects ambiguous decoder crop/colour metadata and rechecks
+the actual current type after every output sample. Shared metadata admission
+and an excluded inert dictionary fixture target are authored, not built/run.
+The fixture source joins future build snapshots without becoming a normal worker
+build target. `WINDOWS_NATIVE_VIDEO_DECODER.md` records compatibility limitations
+and remaining bitstream/device/presentation qualification. Full scope stays open.

@@ -1,4 +1,5 @@
 #include "vlikeon_decoder.hpp"
+#include "vlikeon_decode_type.hpp"
 #include <mfapi.h>
 #include <mferror.h>
 #include <wmcodecdsp.h>
@@ -74,21 +75,14 @@ HRESULT Decoder::select_output(){
   for(DWORD i=0;i<64;++i){
     ComPtr<IMFMediaType> type;HRESULT result=transform_->GetOutputAvailableType(0,i,&type);
     if(result==MF_E_NO_MORE_TYPES)break;VLK_DEC_TRY(result);
-    GUID subtype{};VLK_DEC_TRY(type->GetGUID(MF_MT_SUBTYPE,&subtype));if(subtype!=MFVideoFormat_NV12)continue;
-    UINT32 width=0,height=0;VLK_DEC_TRY(MFGetAttributeSize(type.Get(),MF_MT_FRAME_SIZE,&width,&height));
-    if(width!=config_.width||height<config_.height||height>((config_.height+15)&~15u)||height%2)continue;
-    if(height!=config_.height){
-      MFVideoArea visible{};UINT32 length=0;
-      result=type->GetBlob(MF_MT_MINIMUM_DISPLAY_APERTURE,reinterpret_cast<UINT8*>(&visible),sizeof(visible),&length);
-      if(FAILED(result)||length!=sizeof(visible)||visible.OffsetX.value||visible.OffsetX.fract||visible.OffsetY.value||visible.OffsetY.fract||
-          visible.Area.cx!=static_cast<LONG>(config_.width)||visible.Area.cy!=static_cast<LONG>(config_.height))continue;
-    }
-    UINT32 interlace=MFGetAttributeUINT32(type.Get(),MF_MT_INTERLACE_MODE,MFVideoInterlace_Unknown);
-    if(interlace!=MFVideoInterlace_Progressive)continue;
-    UINT32 stride=MFGetAttributeUINT32(type.Get(),MF_MT_DEFAULT_STRIDE,0);
-    if(stride<width||stride>width+4096)continue;
+    uint32_t height=0,stride=0;
+    if(FAILED(detail::decode_type(type.Get(),config_.width,config_.height,false,height,stride)))continue;
     result=transform_->SetOutputType(0,type.Get(),0);
-    if(SUCCEEDED(result)){coded_height_=height;stride_=stride;return S_OK;}
+    if(SUCCEEDED(result)){
+      ComPtr<IMFMediaType> actual;VLK_DEC_TRY(transform_->GetOutputCurrentType(0,&actual));
+      VLK_DEC_TRY(detail::decode_type(actual.Get(),config_.width,config_.height,false,height,stride));
+      coded_height_=height;stride_=stride;return S_OK;
+    }
   }return MF_E_INVALIDMEDIATYPE;
 }
 HRESULT Decoder::live(){
@@ -141,6 +135,13 @@ HRESULT Decoder::read_output(){
   ComPtr<IMFSample> decoded;if(output.pSample==allocated.Get())decoded=allocated;else if(output.pSample)decoded.Attach(output.pSample);
   if(output.pEvents)output.pEvents->Release();if(FAILED(result))return result;
   if(flags||(output.dwStatus&~static_cast<DWORD>(MFT_OUTPUT_DATA_BUFFER_INCOMPLETE))||!decoded||pending_.empty())return E_UNEXPECTED;
+  // Validate the actual current type AFTER ProcessOutput, not only a candidate
+  // type from initial enumeration. A copied NV12 buffer does not reveal colour
+  // or crop. Missing/conflicting actual metadata is not silently filled in.
+  ComPtr<IMFMediaType> actual;VLK_DEC_TRY(transform_->GetOutputCurrentType(0,&actual));
+  uint32_t height=0,stride=0;
+  VLK_DEC_TRY(detail::decode_type(actual.Get(),config_.width,config_.height,true,height,stride));
+  coded_height_=height;stride_=stride;
   LONGLONG pts=0;VLK_DEC_TRY(decoded->GetSampleTime(&pts));
   auto pending=pending_.front();
   if(pts!=pending.pts||GetTickCount64()-pending.received>100||MFGetAttributeUINT32(decoded.Get(),MFSampleExtension_Interlaced,FALSE))return E_UNEXPECTED;

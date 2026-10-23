@@ -16,3 +16,7 @@ target_link_libraries(omniplay-video-worker PRIVATE vlikeon-windows-encoder)
 target_compile_options(omniplay-video-worker PRIVATE /W4 /EHsc /guard:cf /sdl)
 target_link_options(omniplay-video-worker PRIVATE /guard:cf /DYNAMICBASE /HIGHENTROPYVA /NXCOMPAT
   "/MANIFESTUAC:level='asInvoker' uiAccess='false'")
+# Explicit later qualification target, never built/run by the worker recipe.
+add_executable(vlikeon-decode-type-fixture EXCLUDE_FROM_ALL tests/decode_type.cpp)
+target_link_libraries(vlikeon-decode-type-fixture PRIVATE vlikeon-windows-encoder)
+target_compile_options(vlikeon-decode-type-fixture PRIVATE /W4 /EHsc /guard:cf /sdl)

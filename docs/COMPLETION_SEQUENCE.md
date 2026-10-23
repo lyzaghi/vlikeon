@@ -141,6 +141,12 @@ Repeated revoke cannot turn unconfirmed cleanup into success. Source-only review
 also rejects impossible future buffered receipt clocks. No build/test or native
 execution occurred; product state/recovery integration remains due.
 
+Item 56 static review now fences all decoder crop metadata, square-pixel/SDR
+colour/stride semantics and actual current output types after sample production.
+An inert media-type fixture target is authored and excluded from normal builds;
+no build/test/API/media operation ran. Full codec/VUI/source/transport/product
+and supported-device qualification remain unfinished.
+
 This fork's current assignment: items 51 and 52 are accepted with evidence in
 `SAVE_ARCHIVE_INTERCHANGE.md` and `STORAGE_FAULT_QUALIFICATION.md`. On 2026-10-23,
 the owner deferred Linux build/runtime work for item 53, then deferred build/test

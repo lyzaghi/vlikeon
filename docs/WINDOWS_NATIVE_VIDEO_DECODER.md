@@ -81,3 +81,29 @@ Remaining: actual native decoder installed/viewer admission and observer wiring,
 negotiated parameter-set/VUI admission and secure receiver connection, display
 surface/UI/audio synchronization, other platform decoders and the complete
 build/runtime/fault/colour/latency/energy/device qualification. Item 56 stays open.
+
+## Actual output-type fences after static review
+
+`vlikeon_decode_type.hpp` now checks all present minimum/geometric/pan-scan
+apertures, even at exact visible height. Each crop must agree with the original
+zero-offset profile; padded height needs a minimum/geometric aperture, not only
+pan-scan. Enabled pan-scan, rotation, stereoscopic video, nonsquare pixels,
+nonprogressive data and odd/invalid stride are rejected. Failure cannot assign
+new output geometry.
+
+Pre-input placeholders may omit colour fields, but conflicting fields fail.
+Actual samples require explicit BT.709 primaries/transfer/matrix, limited range,
+centered chroma and square pixels. The actual CURRENT type is checked after every
+ProcessOutput, not only enumeration/SetOutputType. Missing fields are not inferred
+from bytes. An MFT omitting metadata can therefore be rejected; real supported-
+device compatibility and a valid bitstream-derived metadata path need execution
+qualification. Stamping guessed fields is not a valid workaround.
+
+`tests/decode_type.cpp` authors inert dictionary fixtures for exact/padded and
+conflicting crop, malformed aperture, missing/conflicting colour, aspect,
+pan-scan/rotation/3D, stride and failure-state preservation. Its CMake target is
+EXCLUDE_FROM_ALL, not built/run by the worker recipe. The source is snapshotted
+to keep the copied CMake tree complete. No fixture/compiler/dictionary API or
+decoder ran; these are not actual SPS/VUI/colour or receiver/display evidence.
+Metadata reasoning follows Microsoft's [picture aspect ratio](https://learn.microsoft.com/en-us/windows/win32/medfound/picture-aspect-ratio)
+and [uncompressed video types](https://learn.microsoft.com/en-us/windows/win32/medfound/uncompressed-video-media-types).

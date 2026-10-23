@@ -20,7 +20,7 @@ def digest(path):
 
 
 def source_inventory():
-    files = [SOURCE / 'CMakeLists.txt', *sorted((SOURCE / 'include').glob('*.hpp')),
+    files = [SOURCE / 'CMakeLists.txt', *sorted((SOURCE / 'include').glob('*.hpp')), *sorted((SOURCE / 'tests').glob('*.cpp')),
              *sorted((SOURCE / 'src').glob('*.cpp')),
              ROOT / 'tools/build_stream_video.py', ROOT / 'tools/windows_video_artifact.py']
     result = {}
