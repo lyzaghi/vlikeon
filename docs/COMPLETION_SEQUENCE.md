@@ -1,7 +1,11 @@
 # User-ordered completion sequence
 
-The user requested sequential work on items 1 through 16 and a report when each
-item is finished. Source authoring and the final comprehensive qualification
+The user requested work on items 1 through 17 and a report when each
+item is finished. On 2026-10-23 the owner explicitly deferred the remaining
+item-2 work and directed continuation with items 3 through 17. Item 17 is the
+owner-selected overall review and closure of outstanding work. Deferral does
+not mark item 2 complete or remove it from the final review.
+Source authoring and the final comprehensive qualification
 remain separate; the newer concurrent-test instruction below supersedes the
 earlier deferral for explicitly released batches. Source work, executed verification and release
 approval are tracked separately. A source snapshot alone cannot close an item.
@@ -12,7 +16,12 @@ concurrent work: Antigravity may run exact released test batches on frozen
 copies while Codex writes source; full acceptance remains item 16. See
 `QA_EXECUTION_POLICY.md`.
 
-Current source item: **2 — Windows native runtime lifecycle and containment**.
+Current source item: **3 — Linux native runtime lifecycle and containment**.
+Item 2 is deferred by the owner; preserve `WINDOWS_ITEM2_CLOSURE.md` for return
+and item 17. `LINUX_ITEM3_CLOSURE.md` tracks current source work and evidence.
+
+The following item-2 notes are historical context from before that work-order
+change; their statement that no transition occurred is superseded above.
 The current substep investigates real AppContainer storage and loader behavior
 after adding retained-work reasons, operator guidance and bounded broker workers.
 Selected concurrent Antigravity batches have compiled the broker/worker and
@@ -118,8 +127,8 @@ verified completion has not been claimed.
 | Item | Scope | Source state | Verified completion |
 | --- | --- | --- | --- |
 | 1 | Desktop Chromium, Game Hub, profiles, permissions and build/update integration | Source authored; current desktop overlay and build/upgrade recipes retained | Pending final pass; remains open |
-| 2 | Windows native runtime lifecycle and containment | In progress; current source audit | Pending final pass |
-| 3 | Linux native runtime lifecycle and containment | Pending sequential completion audit | Pending final pass |
+| 2 | Windows native runtime lifecycle and containment | Deferred by owner; remaining source obligations retained | Partial fixture evidence; full acceptance pending |
+| 3 | Linux native runtime lifecycle and containment | In progress; current source audit | Pending target execution |
 | 4 | macOS native runtime lifecycle and containment | Pending sequential completion audit | Pending final pass |
 | 5 | v1 retro systems and core adapters | Pending sequential completion audit | Pending final pass |
 | 6 | Graphics, audio and input | Pending sequential completion audit | Pending final pass |
@@ -133,6 +142,7 @@ verified completion has not been claimed.
 | 14 | Install, repair, uninstall and updates | Pending sequential completion audit | Pending final pass |
 | 15 | Security, licensing and release preparation | Pending sequential completion audit | Pending final pass |
 | 16 | Consolidated build, integration, device and fault verification | Deferred until all source authoring is complete | Not started |
+| 17 | Overall review and closure of outstanding work | Owner-selected final review, including deferred item 2 | Not started |
 
 Existing implementation in every item is preserved. This table records the
 requested work order and does not reset or remove earlier implementation.
@@ -248,6 +258,6 @@ must still be connected to the final desktop build.
   owner/storage and Windows-fiber qualification sources are authored, not run;
   full core/package/OS/restore/device verification and remaining scope stay open.
 
-Item 2 is still in progress. `WINDOWS_NATIVE_COMPLETION.md` lists concrete source
-gaps and later qualification obligations. No Windows runtime operation or test
-has run.
+Item 2 remains unfinished and is now deferred by the owner.
+`WINDOWS_ITEM2_CLOSURE.md` lists source gaps and scoped executed evidence;
+`WINDOWS_NATIVE_COMPLETION.md` retains the historical detailed record.

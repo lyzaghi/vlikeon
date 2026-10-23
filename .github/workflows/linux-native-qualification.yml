@@ -1,0 +1,59 @@
+name: Linux native qualification
+run-name: Linux qualification ${{ inputs.batch_id }} ${{ inputs.expected_sha }}
+on:
+  workflow_dispatch:
+    inputs:
+      expected_sha:
+        description: Exact Codex-reviewed source commit
+        required: true
+        type: string
+      batch_id:
+        description: Unique assigned evidence batch
+        required: true
+        type: string
+permissions:
+  contents: read
+jobs:
+  rust:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      CARGO_HOME: ${{ runner.temp }}/vlikeon-cargo
+      CARGO_TARGET_DIR: ${{ runner.temp }}/vlikeon-target
+      CARGO_TERM_COLOR: never
+      EXPECTED_SHA: ${{ inputs.expected_sha }}
+    steps:
+      - name: Admit exact assigned revision
+        run: test "$GITHUB_SHA" = "$EXPECTED_SHA"
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - name: Provision fixed Rust toolchain in disposable runner
+        run: rustup toolchain install 1.89.0 --profile minimal
+      - name: Compile Linux sandbox
+        run: cargo +1.89.0 check --locked -p omniplay-sandbox
+      - name: Exercise real Unix descriptor and host channel boundaries
+        run: cargo +1.89.0 test --locked -p omniplay-sandbox linux_host_channel::tests -- --test-threads=1
+      - name: Compile Linux runtime and both broker executables
+        run: cargo +1.89.0 check --locked -p omniplay-native-runtime -p omniplay-broker --all-targets
+      - name: Confirm tracked source stayed unchanged
+        if: always()
+        run: git diff --exit-code && git diff --cached --exit-code
+  bootstrap:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      EXPECTED_SHA: ${{ inputs.expected_sha }}
+    steps:
+      - name: Admit exact assigned revision
+        run: test "$GITHUB_SHA" = "$EXPECTED_SHA"
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - name: Configure isolated Linux bootstrap
+        run: cmake -S engines/isolation-linux -B "$RUNNER_TEMP/vlikeon-bootstrap" -DCMAKE_BUILD_TYPE=Release
+      - name: Build isolated Linux bootstrap
+        run: cmake --build "$RUNNER_TEMP/vlikeon-bootstrap" --parallel 2
+      - name: Confirm tracked source stayed unchanged
+        if: always()
+        run: git diff --exit-code && git diff --cached --exit-code

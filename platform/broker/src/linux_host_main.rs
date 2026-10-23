@@ -5,7 +5,9 @@ fn run()->omniplay_contracts::Result<()> {
     use omniplay_sandbox::{linux_delegation::DelegationPolicy,linux_host::{HostPolicy,NativeHostRoot},linux_host_channel};
     use std::{fs::OpenOptions,os::unix::fs::{MetadataExt,OpenOptionsExt},path::PathBuf};
     let runtime=std::env::var_os("XDG_RUNTIME_DIR").map(PathBuf::from).filter(|path|path.is_absolute()).ok_or_else(||omniplay_contracts::PlatformError::new(omniplay_contracts::ErrorCode::RuntimeUnavailable,"The Linux user runtime directory is unavailable"))?;
-    let directory=runtime.join("omniplay"),socket=directory.join("native-host.sock"),lock=directory.join("native-host.lock");
+    let directory=runtime.join("omniplay");
+    let socket=directory.join("native-host.sock");
+    let lock=directory.join("native-host.lock");
     let lease=OpenOptions::new().read(true).write(true).create(true).mode(0o600).custom_flags(libc::O_CLOEXEC|libc::O_NOFOLLOW).open(lock).map_err(|_|omniplay_contracts::PlatformError::new(omniplay_contracts::ErrorCode::RuntimeUnavailable,"The Linux native-host lease is unavailable"))?;
     let shape=lease.metadata().map_err(|_|omniplay_contracts::PlatformError::new(omniplay_contracts::ErrorCode::RuntimeUnavailable,"The Linux native-host lease is unavailable"))?;
     if !shape.is_file()||shape.uid()!=unsafe{libc::geteuid()}||shape.mode()&0o7777!=0o600||shape.nlink()!=1{return Err(omniplay_contracts::PlatformError::new(omniplay_contracts::ErrorCode::RuntimeUnavailable,"The Linux native-host lease is not private"));}
