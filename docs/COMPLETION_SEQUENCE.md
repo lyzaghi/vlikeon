@@ -101,6 +101,12 @@ authored and unexecuted. It has no product/network/decoder caller and requires
 authenticated SRTP/reorder/codec authority before entry. All original missing
 receiver/service/platform/transport and final execution evidence remain due.
 
+The subsequent item-56 checkpoint connects bounded RTP reordering to H.264
+assembly, with original receipt age, duplicate/source/gap fences and finite
+packet/unit budgets. Six inert source fixtures are authored, unexecuted. This
+does not implement SRTP/network, adaptive playout/loss recovery, decoder or a
+product caller. All original remaining scope and real evidence stay open.
+
 This fork's current assignment: items 51 and 52 are accepted with evidence in
 `SAVE_ARCHIVE_INTERCHANGE.md` and `STORAGE_FAULT_QUALIFICATION.md`. On 2026-10-23,
 the owner deferred Linux build/runtime work for item 53, then deferred build/test

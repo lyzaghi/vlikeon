@@ -50,3 +50,8 @@ picture, codec/device/network compatibility or pass is asserted.
 API reasoning follows [RFC 3550 section 5](https://www.rfc-editor.org/rfc/rfc3550.html#section-5)
 and [RFC 6184 sections 5–7](https://www.rfc-editor.org/rfc/rfc6184.html#section-5).
 All item-56 service/platform/receiver/transport/final qualification remains open.
+
+The next source checkpoint adds the separate finite `native_rtp_reorder` stage
+and preserves original packet receipt through ordered assembly. Returned units
+now retain their earliest receipt time for downstream age checks. See
+`NATIVE_RTP_REORDER.md`; no current network/decoder/product caller exists.

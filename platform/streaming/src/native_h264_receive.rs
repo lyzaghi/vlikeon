@@ -5,7 +5,7 @@ use omniplay_contracts::{ErrorCode,PlatformError,Result};
 use std::time::{Duration,Instant};
 
 const MAX_BYTES:usize=2*1024*1024;
-pub struct ReceivedAccessUnit{pub annex_b:Vec<u8>,pub timestamp:u32,pub has_idr:bool}
+pub struct ReceivedAccessUnit{pub annex_b:Vec<u8>,pub timestamp:u32,pub has_idr:bool,pub received_at:Instant}
 struct Header<'a>{sequence:u16,timestamp:u32,marker:bool,payload:&'a[u8]}
 fn header(bytes:&[u8],payload_type:u8,ssrc:u32)->Result<Header<'_>>{
     if !(13..=1400).contains(&bytes.len())||bytes[0]>>6!=2||bytes[1]&127!=payload_type||
@@ -26,6 +26,7 @@ fn header(bytes:&[u8],payload_type:u8,ssrc:u32)->Result<Header<'_>>{
     Ok(Header{sequence:u16::from_be_bytes([bytes[2],bytes[3]]),
         timestamp:u32::from_be_bytes(bytes[4..8].try_into().map_err(|_|invalid())?),marker:bytes[1]&0x80!=0,payload:&bytes[offset..end]})
 }
+pub(crate) fn checked_sequence(bytes:&[u8],payload_type:u8,ssrc:u32)->Result<u16>{Ok(header(bytes,payload_type,ssrc)?.sequence)}
 /// One access unit at a time, finite bytes/NAL/packet/time budget. An error is
 /// terminal for this media generation: caller requests fresh negotiated/keyframe
 /// recovery rather than sending partially reconstructed dependencies to decoder.
@@ -50,7 +51,10 @@ impl Depacketizer{
         }Ok(())
     }
     pub fn push(&mut self,bytes:&[u8])->Result<Option<ReceivedAccessUnit>>{
-        let result=self.receive(bytes,Instant::now());if result.is_err(){self.close();}result
+        self.push_received(bytes,Instant::now())
+    }
+    pub(crate) fn push_received(&mut self,bytes:&[u8],received:Instant)->Result<Option<ReceivedAccessUnit>>{
+        let result=self.receive(bytes,received);if result.is_err(){self.close();}result
     }
     fn append(&mut self,bytes:&[u8])->Result<()>{
         let length=self.buffer.len().checked_add(bytes.len()).filter(|length|*length<=MAX_BYTES).ok_or_else(invalid)?;
@@ -65,10 +69,13 @@ impl Depacketizer{
         self.nals+=1;self.append(&[0,0,0,1,header])
     }
     fn receive(&mut self,bytes:&[u8],now:Instant)->Result<Option<ReceivedAccessUnit>>{
-        self.check(now)?;let packet=header(bytes,self.payload_type,self.ssrc)?;
+        let current=Instant::now();self.check(current)?;
+        if now>current||current.duration_since(now)>Duration::from_millis(100){return Err(invalid());}
+        let packet=header(bytes,self.payload_type,self.ssrc)?;
         if self.sequence.is_some_and(|previous|packet.sequence!=previous.wrapping_add(1)){return Err(invalid());}
         if let Some(timestamp)=self.timestamp{
             if packet.timestamp!=timestamp{return Err(invalid());}
+            self.started=Some(self.started.ok_or_else(invalid)?.min(now));
         }else{
             if self.last_timestamp.is_some_and(|previous|{
                 let delta=packet.timestamp.wrapping_sub(previous);delta==0||delta>=0x8000_0000
@@ -110,9 +117,10 @@ impl Depacketizer{
         let unit=AccessUnit::parse(&self.buffer,Framing::AnnexB)?;
         if self.first&&!unit.has_idr(){return Err(invalid());}let has_idr=unit.has_idr();
         self.check(Instant::now())?;
+        let received_at=self.started.ok_or_else(invalid)?;
         let annex_b=std::mem::take(&mut self.buffer);self.last_timestamp=Some(packet.timestamp);
         self.timestamp=None;self.started=None;self.nals=0;self.packets=0;self.first=false;
-        Ok(Some(ReceivedAccessUnit{annex_b,timestamp:packet.timestamp,has_idr}))
+        Ok(Some(ReceivedAccessUnit{annex_b,timestamp:packet.timestamp,has_idr,received_at}))
     }
 }
 

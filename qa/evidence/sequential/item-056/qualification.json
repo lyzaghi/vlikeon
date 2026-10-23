@@ -23,7 +23,9 @@
     "Bounded explicit H.264 access-unit framing and RTP mode 0/1 packetization with FU-A, marker, clock and sequence handling; no current product/network caller",
     "Eight authored inert NAL/RTP fixture sources, separate from existing colour/authority/PE cases; none executed and not decodable codec evidence",
     "Bounded internal H.264 RTP receive-header/source/sequence/timestamp admission and single-NAL/FU-A/STAP-A reconstruction; no product/network/decoder caller",
-    "Seven additional inert receive-stage fixture sources including packetizer round trip; none executed, no codec/network/device qualification"
+    "Seven additional inert receive-stage fixture sources including packetizer round trip; none executed, no codec/network/device qualification",
+    "Bounded post-authentication RTP reorder lane connected to H.264 assembly, preserving original receipt age across duplicate/gap/window handling; no product/network caller",
+    "Six additional inert reorder/assembly fixture sources, none executed; SRTP/recovery/decoder/platform qualification still missing"
   ],
   "static_review": "Source review and git diff whitespace check only",
   "build_executed": false,

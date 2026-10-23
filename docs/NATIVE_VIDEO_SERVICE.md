@@ -214,3 +214,10 @@ requires IDR layout, without claiming full bitstream/decoder compatibility.
 Seven inert source cases remain unexecuted. `NATIVE_H264_RECEIVER.md` records
 limits and missing SRTP/jitter/codec/decoder/product integration. No receiver,
 network, decoder, build or test executed; original requirements remain open.
+
+The next source checkpoint connects a bounded 64-packet/50-ms RTP reorder lane
+to the depacketizer, preserving earliest local receipt through its original
+100-ms assembly budget. Six inert source fixtures are authored and unexecuted.
+`NATIVE_RTP_REORDER.md` records duplicate/gap/source behavior and missing actual
+SRTP/transport/loss-recovery/decoder/product wiring. No parser, receiver, network,
+build or test execution ran. Original completion scope remains unchanged.
