@@ -46,3 +46,45 @@ Remaining implementation and qualification:
 
 No OS encoder, frame producer, service process, network path or device was run
 for this checkpoint. Item 56 remains unchecked, as does unfinished item 55.
+
+## macOS encoder source candidate
+
+`engines/capture-macos/src/encoder.mm` now supplies a real VideoToolbox API path,
+included by the existing static-library CMake recipe. `VLKMacEncoder` accepts
+complete fixed-profile BGRA samples compatible with `VLKMacCapture` and submits
+them with strictly increasing presentation timestamps. The host must call it
+from one dedicated helper queue; it is not automatically attached to capture.
+
+H.264 Main/AutoLevel or HEVC Main/AutoLevel is requested, with checked realtime,
+bitrate/FPS, GOP and no-reordering settings. The candidate fails if a required
+property is unsupported. Hardware-required creation uses Apple's explicit
+requirement flag and queries the resulting session; hardware availability and
+actual performance remain unknown until run. The actual encoded sample format
+description must be admitted by future receiver negotiation before publication;
+an AutoLevel request does not prove a particular remote profile/level match.
+
+At most two submissions are outstanding. Shared callback state and one-shot
+completion tickets account for callbacks that may execute before submission
+returns, asynchronously or on an error path. Callbacks retain no raw encoder
+object pointer. Output accepts complete single-sample matching-dimension codec
+buffers, requires a sync sample for first/explicit-keyframe submissions, and
+retains at most four buffers/4 MiB with a 2 MiB per-buffer limit. A dropped/error,
+expired, reordered, over-age or over-budget output closes the whole delivery
+generation. Encoded dependencies are not silently evicted.
+
+`copyNextEncodedSample` transfers +1 Core Media sample ownership in output order,
+including its actual format description. It is not Annex-B or RTP packetization.
+The consumer must release it and independently fence late publication after
+authority loss. `deliveryClosed` distinguishes terminal failure from an empty
+queue. `closeDelivery` immediately clears/fences callbacks; `stop` separately
+invalidates/releases the VideoToolbox session. OS calls can block and require the
+future external process supervisor. This adapter does not assert that closing a
+mailbox proves capture/encoder shutdown, and does not encode audio.
+
+API contracts were reviewed against Apple's
+[encode callback documentation](https://developer.apple.com/documentation/videotoolbox/vtcompressionsessionencodeframe(_:imagebuffer:presentationtimestamp:duration:frameproperties:infoflagsout:outputhandler:)),
+[hardware-required selection](https://developer.apple.com/documentation/videotoolbox/kvtvideoencoderspecification_requirehardwareacceleratedvideoencoder),
+and [session invalidation](https://developer.apple.com/documentation/videotoolbox/vtcompressionsessioninvalidate(_:)).
+No macOS SDK compilation, encoder/device execution or callback/timing test ran.
+Windows/Linux backends, actual service/capture/transport integration, native
+authority wiring and all remaining final scope remain due.

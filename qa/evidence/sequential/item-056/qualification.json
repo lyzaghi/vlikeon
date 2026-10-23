@@ -4,13 +4,14 @@
   "owner_steering": "Build and test later; continue source work",
   "source_scope": [
     "Private codec capability intersection and explicit preference/fallback selection",
-    "Owned bounded NV12/BGRA raw-frame mailbox with capture-generation, sequence, timestamp, receipt-age and lifetime fences"
+    "Owned bounded NV12/BGRA raw-frame mailbox with capture-generation, sequence, timestamp, receipt-age and lifetime fences",
+    "Unintegrated macOS VideoToolbox H.264/HEVC encoder source with explicit hardware requirement, bounded submissions/output, shared callback lifetime and terminal output fences"
   ],
   "static_review": "Source review and git diff whitespace check only",
   "build_executed": false,
   "test_executed": false,
   "native_service_integrated": false,
-  "os_encoder_implemented_by_this_checkpoint": false,
+  "os_encoder_source_authored": ["macOS VideoToolbox candidate; not SDK-compiled or run"],
   "passed_test_cases": [],
   "remaining_scope": "docs/NATIVE_VIDEO_SERVICE.md"
 }

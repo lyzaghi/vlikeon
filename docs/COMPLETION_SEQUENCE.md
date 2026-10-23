@@ -9,6 +9,12 @@ OS encoder/capture backend, transport, authority and qualification still due.
 This does not complete item 55 or 56 and does not enable streaming. All build/test
 execution stays deferred; the original 51–109 scope is retained.
 
+Item 56 now also contains an unintegrated macOS VideoToolbox H.264/HEVC encoder
+candidate and its CMake source recipe, with bounded callback ownership/output,
+explicit hardware-required creation and permanent delivery fences. This is not
+a macOS build, service/capture connection, codec compatibility or runtime pass.
+Windows/Linux encoders and every remaining item-56 service obligation stay open.
+
 This fork's current assignment: items 51 and 52 are accepted with evidence in
 `SAVE_ARCHIVE_INTERCHANGE.md` and `STORAGE_FAULT_QUALIFICATION.md`. On 2026-10-23,
 the owner deferred Linux build/runtime work for item 53, then deferred build/test
