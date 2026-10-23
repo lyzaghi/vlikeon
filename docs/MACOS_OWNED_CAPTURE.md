@@ -7,6 +7,10 @@ private component bridge or WebRTC encoder. Native macOS capture is not
 advertised or enabled by this checkpoint. Item 53 Linux builds/runtime work
 was deferred by the owner; it remains open independently.
 
+The owner subsequently requested deferring macOS build/test and moving to item
+55 source work. No additional macOS build, SDK installation, device connection
+or capture test is being run. Retain all integration and qualification gaps.
+
 ## Authored library path
 
 `VLKMacCapture.h` is a private, trusted-host API. It accepts an exact window ID

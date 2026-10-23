@@ -1,5 +1,12 @@
 # Owned-game native keyboard/mouse source
 
+Item 55 now authors a private provider-side gamepad ownership module and Linux
+uinput backend in `platform/stream-input`, plus stable standard browser-pad
+sampling. They are not wired into this helper, native grant UI or host policy;
+gamepad support remains unavailable in the current product. Build/test was
+explicitly deferred. See `VIRTUAL_GAMEPAD_OWNERSHIP.md` for source behavior and
+remaining Windows/macOS, broker, device-permission and qualification work.
+
 The newer `OWNED_NATIVE_CAPTURE.md` source adds Windows capture-process and exact
 captured-window correspondence. Input now requires the broker's capture UUID
 and the component worker's private HWND binding; generic browser capture cannot

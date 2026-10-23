@@ -1520,6 +1520,7 @@ dependencies = [
 name = "omniplay-stream-input"
 version = "0.1.0"
 dependencies = [
+ "libc",
  "omniplay-contracts",
  "serde",
  "serde_json",

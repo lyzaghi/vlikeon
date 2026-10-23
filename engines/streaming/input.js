@@ -7,6 +7,24 @@ export function validateInput(value){
 }
 const emptyMouse=()=>({dx:0,dy:0,wheel:0,buttons:0});
 const bounded=value=>Math.max(-2048,Math.min(2048,value));
+// Standard Web Gamepad indices are stable player slots, never a compacted
+// list of connected devices. This sampling function grants no capability.
+export function sampleStandardGamepads(source){
+  const slots=Array.from({length:4},()=>({axes:[0,0,0,0,0,0],buttons:0}));
+  if(!source||!Number.isSafeInteger(source.length)||source.length<0)return slots;
+  const axis=value=>Number.isFinite(value)?Math.max(-1,Math.min(1,value)):0;
+  const trigger=button=>Number.isFinite(button?.value)?Math.max(0,Math.min(1,button.value)):0;
+  for(let slot=0;slot<Math.min(4,source.length);slot++){
+    const pad=source[slot];
+    if(!pad||pad.connected!==true||pad.index!==slot||pad.mapping!=='standard'||
+       !pad.axes||pad.axes.length<4||!pad.buttons||pad.buttons.length<16)continue;
+    let buttons=0;
+    for(let index=0;index<16;index++)if(pad.buttons[index]?.pressed===true)buttons|=1<<index;
+    slots[slot]={axes:[...Array.from({length:4},(_,index)=>axis(pad.axes[index])),
+      trigger(pad.buttons[6]),trigger(pad.buttons[7])],buttons};
+  }
+  return slots;
+}
 export class RemoteInput extends EventTarget{
   #element;#session;#abort=new AbortController();#timer=0;#keys=new Set();#mouse=emptyMouse();#enabled=false;#closed=false;
   #sources=new Map();#controlRoot=null;
@@ -35,6 +53,9 @@ export class RemoteInput extends EventTarget{
     element.addEventListener('contextmenu',event=>{if(this.#enabled)event.preventDefault();},options);
     element.addEventListener('blur',()=>{this.#keys.clear();this.#mouse=emptyMouse();queueMicrotask(()=>{if(!this.#focused())this.clear();});},options);
     window.addEventListener('blur',()=>this.clear(),options);window.addEventListener('pagehide',()=>this.clear(),options);
+    // Release the old full state before any newly attached/replaced pad can
+    // publish under the existing policy. Never compact other player slots.
+    for(const name of['gamepadconnected','gamepaddisconnected'])window.addEventListener(name,()=>this.clear(),options);
     document.addEventListener('visibilitychange',()=>{if(document.hidden)this.clear();},options);
     document.addEventListener('focusout',()=>queueMicrotask(()=>{if(!this.#focused())this.clear();}),options);
     document.addEventListener('pointerlockchange',()=>{if(document.pointerLockElement!==element)this.clear();},options);
@@ -78,7 +99,7 @@ export class RemoteInput extends EventTarget{
     }
     if(keys.size>32){this.clear();return;}
     let pads=[];
-    if(this.#session.gamepadInputAvailable)try{pads=Array.from(navigator.getGamepads?.()??[]).filter(Boolean).slice(0,4).map(pad=>({axes:Array.from({length:6},(_,index)=>Math.max(-1,Math.min(1,Number.isFinite(pad.axes[index])?pad.axes[index]:0))),buttons:pad.buttons.slice(0,16).reduce((mask,button,index)=>button.pressed?mask|(1<<index):mask,0)}));}catch{}
+    if(this.#session.gamepadInputAvailable)try{pads=sampleStandardGamepads(navigator.getGamepads?.()??[]);}catch{this.clear();return;}
     try{this.#session.sendInput({schema_version:1,keys:[...keys],mouse,pads});}
     catch{this.#enabled=false;this.clear();this.dispatchEvent(new Event('disabled'));}
   }

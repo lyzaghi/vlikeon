@@ -8,6 +8,9 @@ Unchecked items remain open, including items with authored but unqualified sourc
 Owner steering on 2026-10-23: defer Linux build/runtime work in item 53 and
 continue with item 54 (macOS capture). Item 53 remains open; no Linux host,
 VM installation, SSH access or new Linux build/test is authorized by this move.
+The owner subsequently deferred macOS build/test and requested the next step:
+item 55 source work. All new build/test execution stays deferred, including
+Antigravity batches, while source work continues. Items 53 and 54 remain open.
 
 1. [x] Tích hợp các thay đổi mã nguồn đang nằm ngoài commit thành các phiên bản thống nhất, có thể tái tạo. Bằng chứng và giới hạn: `SOURCE_INTEGRATION.md`.
 2. [x] Đồng bộ README, roadmap và tài liệu trạng thái với kết quả phát triển, kiểm thử thực tế. Đối chiếu: `DOCUMENTATION_ALIGNMENT.md`.
@@ -63,7 +66,7 @@ VM installation, SSH access or new Linux build/test is authorized by this move.
 52. [x] Kiểm chứng lưu trữ khi đầy đĩa, crash, giao dịch bị hủy và nâng schema dữ liệu. Bằng chứng và giới hạn: `STORAGE_FAULT_QUALIFICATION.md`.
 53. [ ] Hoàn thiện capture cửa sổ game và âm thanh ứng dụng trên Linux. Hoãn build/runtime theo yêu cầu chủ dự án; thiếu sót giữ tại `LINUX_OWNED_CAPTURE.md`.
 54. [ ] Hoàn thiện capture cửa sổ game và âm thanh ứng dụng trên macOS. Mã đang triển khai và phần chưa kiểm chứng: `MACOS_OWNED_CAPTURE.md`.
-55. [ ] Hoàn thiện tích hợp virtual gamepad và phân quyền thiết bị điều khiển từ xa.
+55. [ ] Hoàn thiện tích hợp virtual gamepad và phân quyền thiết bị điều khiển từ xa. Mã quyền/slot và backend uinput đang triển khai; phần còn thiếu tại `VIRTUAL_GAMEPAD_OWNERSHIP.md`. Build/test hoãn theo yêu cầu.
 56. [ ] Hoàn thiện dịch vụ capture/encode native độc lập và lựa chọn codec.
 57. [ ] Hoàn thiện nhận diện quyền sở hữu tiến trình game con được launcher khởi chạy.
 58. [ ] Hoàn thiện vòng đời credential ghép đôi trên native và mobile.

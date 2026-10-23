@@ -1,5 +1,12 @@
 # Remote touch controls and ordered release fences
 
+Later item 55 source is tracked in `VIRTUAL_GAMEPAD_OWNERSHIP.md`. It adds
+provider-side slot/authority rules and a Linux uinput provider without enabling
+the current host's `gamepad:false` policy. Standard browser sampling now retains
+neutral slot gaps and reads analog trigger button values. Existing touch still
+uses keyboard/mouse permission; none of this claims completed virtual-device
+integration or executed device evidence. The owner deferred new build/test.
+
 This is authored source for the original remote keyboard/mouse/touch requirement.
 No browser, input event, game, native helper, device, compiler or test was run.
 Streaming remains disabled with no configured relay origin. Source assemblies

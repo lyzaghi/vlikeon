@@ -1,5 +1,8 @@
 #![deny(unsafe_op_in_unsafe_fn)]
 pub mod protocol;
+pub mod gamepad;
+#[cfg(all(target_os="linux",any(target_arch="x86_64",target_arch="aarch64")))]
+pub mod gamepad_uinput;
 mod client;
 pub use client::InputWorker;
 #[cfg(windows)]mod windows;
