@@ -5,6 +5,7 @@ pub mod gamepad_host;
 pub mod gamepad_protocol;
 #[cfg(windows)]pub mod gamepad_windows_host;
 #[cfg(windows)]pub mod gamepad_process;
+#[cfg(windows)]pub mod game_process;
 #[cfg(windows)]mod gamepad_child;
 #[cfg(windows)]pub mod gamepad_client;
 #[cfg(windows)]pub mod video_client;

@@ -2,6 +2,13 @@
 
 ## Current sequence — 1–109 outstanding tasks
 
+On the owner's explicit "build and test later; next" steering, source work moves
+to item 57 while all incomplete item-53–56 obligations remain open. Windows
+installed launch now authors creation-time job ownership, group-drain lifetime
+and host-only selected process-handle admission. No descendant capture chooser
+is integrated, native API executed or launcher compatibility claimed. See
+`WINDOWS_LAUNCHER_OWNERSHIP.md`; item 57 and original 51–109 scope remain open.
+
 On the owner's continued source-work/next steering, item 56 now has initial
 private native codec-intersection and bounded raw-frame mailbox source in
 `native_video.rs`. `NATIVE_VIDEO_SERVICE.md` records the independent executable,

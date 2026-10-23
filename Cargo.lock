@@ -1421,6 +1421,7 @@ dependencies = [
  "encoding_rs",
  "libc",
  "omniplay-contracts",
+ "omniplay-stream-input",
  "rusqlite",
  "semver",
  "serde",

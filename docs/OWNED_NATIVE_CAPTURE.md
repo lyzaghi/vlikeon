@@ -67,6 +67,11 @@ descendants, Linux/macOS owned capture and input adapters, signed virtual gamepa
 integration, independent native encoding paths and durable/mobile credential
 lifecycle remain required work in item 8. No policy is enabled to hide those gaps.
 
+Item 57 now authors Windows creation-time launcher job ownership and private
+selected-process-handle admission; see `WINDOWS_LAUNCHER_OWNERSHIP.md`. This
+improves installed-session lifetime source but does not yet replace this
+capture path's root-only preparation or complete descendant window consent.
+
 API reasoning follows Microsoft's documented
 [window process lookup](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-getwindowthreadprocessid)
 and [process creation time](https://learn.microsoft.com/en-us/windows/win32/api/processthreadsapi/nf-processthreadsapi-getprocesstimes).

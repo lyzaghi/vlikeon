@@ -1,0 +1,25 @@
+{
+  "item": 57,
+  "status": "incomplete_source_authored_verification_deferred",
+  "owner_steering": "Build and test later; next source item",
+  "source_scope": [
+    "Windows installed launch uses an unnamed non-killing job assigned at process creation",
+    "Installed session stays active until the original owned process group drains",
+    "Launcher exit status is not treated as descendant game success",
+    "Host-only selected process-handle admission checks original instance liveness and exact retained-job membership",
+    "Existing direct-root capture preparation remains root-only; no renderer or remote process-selection command added"
+  ],
+  "build_executed": false,
+  "tests_executed": false,
+  "native_api_executed": false,
+  "passed_cases": [],
+  "descendant_capture_integrated": false,
+  "remaining": [
+    "Native selected-window/process consent and descendant capture/input binding",
+    "Multiple game windows and persistent launcher lifetime policy",
+    "External existing-client/service handoff support or explicit product refusal",
+    "Windows nested-job, launcher and anti-cheat compatibility qualification",
+    "Broker restart recovery and Linux/macOS adapters",
+    "All build, test and native runtime verification"
+  ]
+}

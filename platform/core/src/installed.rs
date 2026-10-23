@@ -2,7 +2,9 @@ use crate::{Database,now_ms,util::{hash_file,storage_error}};
 use omniplay_contracts::{ContentHash,ErrorCode,GameManifest,GameSystem,PlatformError,Result};
 use rusqlite::{OptionalExtension,Transaction,TransactionBehavior,params};
 use serde::{Deserialize,Serialize};
-use std::{collections::HashMap,fs::{File,OpenOptions},path::{Path,PathBuf},process::{Child,Command,Stdio}};
+use std::{collections::HashMap,fs::{File,OpenOptions},path::{Path,PathBuf}};
+#[cfg(not(windows))]use std::process::{Child,Command,Stdio};
+#[cfg(windows)]use omniplay_stream_input::game_process::OwnedGameProcess as Child;
 use uuid::Uuid;
 
 #[derive(Serialize,Deserialize)]
@@ -55,7 +57,10 @@ impl InstalledGames {
         database.record_audit("installed.launch_requested",Some(game_id))?;
         // Direct process creation: no shell, command interpreter, renderer arguments,
         // DLL injection, anti-cheat hooks or elevated execution.
+        #[cfg(not(windows))]
         let child=Command::new(&launch.executable).current_dir(&launch.working_directory).stdin(Stdio::null()).stdout(Stdio::null()).stderr(Stdio::null()).spawn().map_err(|_|PlatformError::new(ErrorCode::RuntimeUnavailable,"The selected installed game could not start").recover("Try opening it from its normal launcher"))?;
+        #[cfg(windows)]
+        let child=Child::launch(&launch.executable,&launch.working_directory)?;
         let info=InstalledProcess{session_id:Uuid::new_v4(),game_id,started_at_ms:now_ms(),running:true,exited_at_ms:None,exit_success:None};
         self.running.insert(info.session_id,RunningGame{child,info:info.clone()});
         // The process exists and is retained above. A diagnostic write failure
@@ -73,17 +78,30 @@ impl InstalledGames {
 
     #[cfg(windows)]
     pub fn stream_process(&mut self,database:&Database,game_id:Uuid)->Result<std::os::windows::io::OwnedHandle>{
-        use std::os::windows::io::AsHandle;
         self.poll(database)?;
         let game=self.running.values().find(|value|value.info.game_id==game_id).ok_or_else(||PlatformError::new(ErrorCode::InvalidState,"Launch the selected installed game from OmniPlay before authorizing remote input"))?;
-        game.child.as_handle().try_clone_to_owned().map_err(storage_error)
+        game.child.root_handle()
+    }
+
+    /// Native-host selection only; not a renderer/remote process lookup API.
+    /// The eventual chooser must retain this returned exact process instance
+    /// together with its consented HWND and capture owner, then recheck liveness.
+    #[cfg(windows)]
+    pub fn stream_selected_process(&mut self,database:&Database,game_id:Uuid,selected:std::os::windows::io::BorrowedHandle<'_>)->Result<std::os::windows::io::OwnedHandle>{
+        self.poll(database)?;
+        let game=self.running.values().find(|value|value.info.game_id==game_id).ok_or_else(||PlatformError::new(ErrorCode::InvalidState,"The selected installed game session is no longer active"))?;
+        game.child.admit_selected(selected)
     }
 
     fn poll(&mut self,database:&Database)->Result<()> {
         let mut exited=Vec::new();
         for (id,game) in &mut self.running {
-            if let Some(status)=game.child.try_wait().map_err(storage_error)? {
-                if game.info.running{game.info.running=false;game.info.exited_at_ms=Some(now_ms());game.info.exit_success=Some(status.success());}exited.push(*id);
+            #[cfg(not(windows))]
+            let status=game.child.try_wait().map_err(storage_error)?.map(|value|Some(value.success()));
+            #[cfg(windows)]
+            let status=game.child.poll_exit()?;
+            if let Some(success)=status {
+                if game.info.running{game.info.running=false;game.info.exited_at_ms=Some(now_ms());game.info.exit_success=success;}exited.push(*id);
             }
         }
         for id in exited {
