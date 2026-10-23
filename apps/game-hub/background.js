@@ -88,8 +88,15 @@ function connectNative() {
     if(item.method==='stream_input_arm'&&message.status==='ok'&&typeof message.result?.grant_id==='string'&&typeof message.result?.session_id==='string'){
       if(pages.has(item.page)&&!item.expired)pageInputGrants.get(item.page)?.set(message.result.grant_id,message.result.session_id);else void revokeInput(message.result.grant_id,message.result.session_id);
     }
-    if(item.method==='stream_input_revoke'&&message.status==='ok')pageInputGrants.get(item.page)?.delete(message.result?.grant_id);
-    if(item.method.startsWith('stream_input_')&&message.status==='ok'&&message.result?.state==='revoked')pageInputGrants.get(item.page)?.delete(message.result?.grant_id);
+    // A successful RPC may still report retained device cleanup. Keep this
+    // document's capability for status/retry; releasing it early loses the only
+    // UI path to an unresolved native grant. Never retire a foreign reply ID.
+    if(item.method.startsWith('stream_input_')&&message.status==='ok'&&message.result?.state==='revoked'&&message.result.reason!=='release_failed'){
+      const value=message.result,owned=pageInputGrants.get(item.page);
+      const matching=item.method==='stream_input_arm'?item.params?.game_id===value.game_id&&item.params?.pair_id===value.pair_id&&item.params?.session_id===value.session_id:
+        item.params?.grant_id===value.grant_id&&item.params?.session_id===value.session_id;
+      if(matching&&owned?.get(value.grant_id)===value.session_id)owned.delete(value.grant_id);
+    }
     if(item.method==='save_export_upload_start'&&message.status==='ok'&&typeof message.result?.transfer_id==='string'){
       if(pages.has(item.page)&&!item.expired)pageExports.get(item.page)?.add(message.result.transfer_id);else void abortExport(message.result.transfer_id);
     }

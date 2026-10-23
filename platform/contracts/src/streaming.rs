@@ -22,6 +22,6 @@ impl RemoteInputFrame{
     }
 }
 #[derive(Debug,Clone,Copy,Serialize,Deserialize,PartialEq,Eq)]#[serde(rename_all="snake_case")]
-pub enum StreamInputState{WaitingForTarget,Active,Idle,Revoked}
+pub enum StreamInputState{WaitingForTarget,Active,Idle,CleanupRequired,Revoked}
 #[derive(Debug,Clone,Serialize,Deserialize)]#[serde(deny_unknown_fields)]
 pub struct StreamInputStatus{pub grant_id:Uuid,pub game_id:Uuid,pub pair_id:Uuid,pub session_id:Uuid,pub state:StreamInputState,pub reason:Option<String>,pub keyboard_mouse:bool,pub gamepad:bool,pub expires_at_ms:u64}

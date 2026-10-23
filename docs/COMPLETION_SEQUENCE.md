@@ -54,6 +54,12 @@ separates debt-free profile-inventory bootstrap with create-new semantics, and
 retains Windows non-delete-sharing file/directory guards. Fifteen regression
 cases are authored (one Windows-only); none ran. Native bootstrap/repair and
 actual ACL/SQLite/OS validation remain due, with gamepad capability still false.
+The next checkpoint changes product-source revocation to wait for the native
+acknowledgment, retain document authority for pending/unknown cleanup and block
+rearm. The v1 keyboard broker preserves failed/missing Stop observations instead
+of reporting unconditional success. Seven async browser-forwarder cases are
+authored separately from the fifteen journal cases; all execution and generated
+resource assembly remain deferred. Actual gamepad activation is still unwired.
 
 The owner now requests the individually numbered tasks in
 [`OUTSTANDING_WORK.md`](OUTSTANDING_WORK.md), completed in order. Task 1 source

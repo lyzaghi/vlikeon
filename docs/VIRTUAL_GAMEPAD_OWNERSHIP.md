@@ -553,7 +553,48 @@ No coordination file, profile inventory, driver or recovery operation was run
 while authoring this checkpoint. Native bootstrap/repair UX and lost-store
 reconstruction with actual retained devices remain unfinished.
 
-## Receiving browser sampling
+## Revocation acknowledgment in the product source
+
+`NativeInputForwarder` now stops forwarding synchronously but reports local
+`revoking` until the matching native reply arrives. Reply validation binds grant,
+game, pair, session, keyboard/gamepad capability flags and original expiry.
+`cleanup_required`, a release failure, missing reply or changed native identity
+retains a separate retiring capability and blocks another arm. Retry checks the
+native status first; it does not silently create a new grant. A pending revoke
+shares one promise, and stale frame/status/late authorization responses cannot
+restore an already detached forwarding grant. An initial terminal arm result
+cannot enable the remote channel. Document close still attempts teardown, but
+cannot claim a device-removal receipt from page destruction.
+
+The host panel distinguishes waiting for revocation, pending cleanup and unknown
+cleanup, with an accessible status message and Check revocation action. New
+authorization stays disabled until confirmation. The component worker no longer
+forgets a grant just because a revoke RPC succeeded; it removes only matching
+confirmed `revoked` results without `release_failed`, retaining status/retry
+authority for unresolved cleanup. This does not delegate device permission to
+the remote peer or change the advertised `gamepad:false` policy.
+
+The shared status contract adds `cleanup_required`. In the existing keyboard/
+mouse helper, `stop_confirmed` preserves the actual private Stop observation;
+process exit/kill is not substituted for a released-state reply. The v1 broker
+now retains `cleanup_required` after release failure or helper disconnection and
+blocks new capture/input grants while that debt is present. Releasing capture
+stops the input worker through the same acknowledgment path rather than simply
+discarding its record. A capture/document shutdown is not a clean-device claim.
+Legacy keyboard teardown still has unqualified process/I/O behavior and no new
+durable held-key recovery across a complete broker loss; do not infer the v2
+gamepad journal's guarantees for the old v1 keyboard process.
+
+Seven asynchronous forwarder cases are authored in
+`qa/browser/native-input-revocation.test.mjs` for a later frozen Antigravity run:
+acknowledgment/deduplication, lost-reply retry, pending cleanup, foreign identity,
+late frame completion, approval after close and terminal initial approval. They
+use the actual forwarder source with fake native/RTC endpoints; they prove no
+OS/device/browser behavior until executed and reviewed. Existing generated
+component/browser resources must be assembled later from the authoritative
+streaming source; that build and all tests remain deferred.
+
+## Receiving browser sampling behavior
 
 `engines/streaming/input.js::sampleStandardGamepads` now preserves browser
 indices 0–3 as stable slots, including neutral gaps. Disconnecting slot 0 no

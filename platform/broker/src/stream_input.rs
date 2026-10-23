@@ -41,7 +41,7 @@ impl StreamInputs{
         }
     }
     pub fn release_capture(&mut self,id:Uuid,session:Uuid)->Result<serde_json::Value>{
-        if let Some(capture)=&self.capture{if capture.id!=id||capture.session!=session{return Err(PlatformError::new(ErrorCode::PermissionDenied,"Capture belongs to another session"));}self.capture=None;self.active=None;}
+        if let Some(capture)=&self.capture{if capture.id!=id||capture.session!=session{return Err(PlatformError::new(ErrorCode::PermissionDenied,"Capture belongs to another session"));}self.capture=None;if let Some(active)=self.active.as_mut(){stop_active(active);}}
         Ok(serde_json::json!({"released":true,"capture_id":id}))
     }
     pub fn arm(&mut self,database:&Database,installed:&mut InstalledGames,game_id:Uuid,pair_id:Uuid,session_id:Uuid,host_public_key:String,document:StreamGrantDocument,capture_id:Uuid,capture_window:String,deadline_ms:u64)->Result<StreamInputStatus>{
@@ -75,17 +75,25 @@ impl StreamInputs{
         }
     }
     fn active(&mut self,id:Uuid,session:Uuid)->Result<&mut Active>{let active=self.active.as_mut().ok_or_else(||PlatformError::new(ErrorCode::NotFound,"Native input grant is absent"))?;if active.status.grant_id!=id||active.status.session_id!=session{return Err(PlatformError::new(ErrorCode::PermissionDenied,"Native input capability belongs to another session"));}Ok(active)}
-    pub fn frame(&mut self,id:Uuid,session:Uuid,sequence:u64,frame:RemoteInputFrame)->Result<StreamInputStatus>{let active=self.active(id,session)?;frame.validate()?;if active.status.state==StreamInputState::Revoked{return Ok(active.status.clone());}let result=active.worker.as_mut().ok_or_else(unavailable)?.input(sequence,frame);observe(active,result)}
-    pub fn release(&mut self,id:Uuid,session:Uuid)->Result<StreamInputStatus>{let active=self.active(id,session)?;if active.status.state==StreamInputState::Revoked{return Ok(active.status.clone());}let result=active.worker.as_mut().ok_or_else(unavailable)?.release();observe(active,result)}
-    pub fn status(&mut self,id:Uuid,session:Uuid)->Result<StreamInputStatus>{let active=self.active(id,session)?;if active.status.state==StreamInputState::Revoked{return Ok(active.status.clone());}let result=active.worker.as_mut().ok_or_else(unavailable)?.status();observe(active,result)}
-    pub fn revoke(&mut self,id:Uuid,session:Uuid)->Result<StreamInputStatus>{let active=self.active(id,session)?;active.worker.take();active.status.state=StreamInputState::Revoked;active.status.reason=Some("host_stopped".into());Ok(active.status.clone())}
+    pub fn frame(&mut self,id:Uuid,session:Uuid,sequence:u64,frame:RemoteInputFrame)->Result<StreamInputStatus>{let active=self.active(id,session)?;frame.validate()?;if matches!(active.status.state,StreamInputState::Revoked|StreamInputState::CleanupRequired){return Ok(active.status.clone());}let result=active.worker.as_mut().ok_or_else(unavailable)?.input(sequence,frame);observe(active,result)}
+    pub fn release(&mut self,id:Uuid,session:Uuid)->Result<StreamInputStatus>{let active=self.active(id,session)?;if matches!(active.status.state,StreamInputState::Revoked|StreamInputState::CleanupRequired){return Ok(active.status.clone());}let result=active.worker.as_mut().ok_or_else(unavailable)?.release();observe(active,result)}
+    pub fn status(&mut self,id:Uuid,session:Uuid)->Result<StreamInputStatus>{let active=self.active(id,session)?;if matches!(active.status.state,StreamInputState::Revoked|StreamInputState::CleanupRequired){return Ok(active.status.clone());}let result=active.worker.as_mut().ok_or_else(unavailable)?.status();observe(active,result)}
+    pub fn revoke(&mut self,id:Uuid,session:Uuid)->Result<StreamInputStatus>{let active=self.active(id,session)?;stop_active(active);Ok(active.status.clone())}
     pub fn close(&mut self){self.active.take();self.capture.take();}
 }
 impl Drop for StreamInputs{fn drop(&mut self){self.close();}}
+fn stop_active(active:&mut Active){
+    if matches!(active.status.state,StreamInputState::Revoked|StreamInputState::CleanupRequired){return;}
+    let observed=active.worker.take().ok_or_else(unavailable).and_then(|mut worker|worker.stop_confirmed());
+    match observed{
+        Ok(value)=>{active.status.state=StreamInputState::Revoked;active.status.reason=value.reason;},
+        Err(_)=>{active.status.state=StreamInputState::CleanupRequired;active.status.reason=Some("helper_disconnected".into());},
+    }
+}
 fn observe(active:&mut Active,result:Result<Observation>)->Result<StreamInputStatus>{
     match result{
-        Ok(value)=>{active.status.state=match value.state.as_str(){"waiting_for_target"=>StreamInputState::WaitingForTarget,"active"=>StreamInputState::Active,"idle"=>StreamInputState::Idle,_=>StreamInputState::Revoked};active.status.reason=value.reason;if active.status.state==StreamInputState::Revoked{active.worker.take();}Ok(active.status.clone())},
-        Err(error)=>{active.worker.take();active.status.state=StreamInputState::Revoked;active.status.reason=Some("helper_disconnected".into());Err(error)},
+        Ok(value)=>{active.status.state=match value.state.as_str(){"waiting_for_target"=>StreamInputState::WaitingForTarget,"active"=>StreamInputState::Active,"idle"=>StreamInputState::Idle,_=>if value.reason.as_deref()==Some("release_failed"){StreamInputState::CleanupRequired}else{StreamInputState::Revoked}};active.status.reason=value.reason;if matches!(active.status.state,StreamInputState::Revoked|StreamInputState::CleanupRequired){active.worker.take();}Ok(active.status.clone())},
+        Err(error)=>{active.worker.take();active.status.state=StreamInputState::CleanupRequired;active.status.reason=Some("helper_disconnected".into());Err(error)},
     }
 }
 #[cfg(windows)]fn approved_helper()->Result<(PathBuf,File)>{

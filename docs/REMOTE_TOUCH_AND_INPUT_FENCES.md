@@ -118,6 +118,14 @@ arriving after local revoke/close is retired instead of rearming the session.
 
 ## Required final evidence
 
+The product source now waits for matching native revocation acknowledgment.
+Local input forwarding stops immediately; pending/unknown cleanup retains the
+document capability, blocks rearm and offers a status retry. The keyboard helper
+and broker preserve failed/missing Stop observations as `cleanup_required`.
+`VIRTUAL_GAMEPAD_OWNERSHIP.md` records the scope and remaining v1/v2 limitations.
+Seven async forwarder regression cases are authored, not run; component assembly,
+actual page/worker lifecycle and native held-input/device qualification remain due.
+
 The one consolidated final pass must cover actual multi-touch/capture/cancel,
 keyboard focus and assistive access, portrait/landscape/safe-area/fullscreen,
 late profile responses, corrupt/revoked/concurrently updated pair rows, subpixel

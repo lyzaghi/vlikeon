@@ -19,7 +19,10 @@
     "Read-only Windows startup process witness and candidate journal/HID reconciliation after loss of the launch handle",
     "Default-off Windows feature startup recovery lane with cooperative cancellation and existing-database-only connection",
     "Shared per-user singleton SQLite arbitration with revision-bound mirroring and retained profile proof before shared release",
-    "Existing-only coordination open, explicit debt-free profile-inventory initialization and Windows non-delete-sharing file/directory guards"
+    "Existing-only coordination open, explicit debt-free profile-inventory initialization and Windows non-delete-sharing file/directory guards",
+    "Product-source native revocation acknowledgment, retained document capability and rearm blocking on pending/unknown cleanup",
+    "Existing v1 keyboard helper/broker Stop acknowledgment retained as cleanup_required on failure; no durable legacy held-key recovery claim",
+    "Seven authored asynchronous native-input forwarder cases, separate from fifteen Rust journal cases; none executed"
   ],
   "static_review": "Source/API review and git diff whitespace check only; no compiler or runtime validation",
   "passed_test_cases": [],
@@ -35,6 +38,7 @@
     "Shared-root/ACL admission, native bootstrap/repair UX, debt-bearing coordination-store-loss/foreign-profile recovery and actual cross-process arbitration qualification",
     "Recovery-lane compilation/OS/cancellation qualification and real process-snapshot/PID-reuse/restart verification",
     "Combined keyboard/gamepad helper observation and injection attribution",
+    "Browser resource assembly, real revocation UI/document/native lifecycle qualification and legacy v1 owner-loss/held-key recovery",
     "Windows assigned HID identity, exact signed driver/package admission and unresolved-creation recovery",
     "macOS provider and entitlement/package path",
     "Real device readiness, game ordering, analog compatibility and haptics/accessory scope",

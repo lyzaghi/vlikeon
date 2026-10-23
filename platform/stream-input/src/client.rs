@@ -38,10 +38,15 @@ impl InputWorker{
     pub fn input(&mut self,sequence:u64,frame:RemoteInputFrame)->Result<Observation>{frame.validate()?;self.call(Action::Input{sequence,frame},Duration::from_millis(750))}
     pub fn status(&mut self)->Result<Observation>{self.call(Action::Status,Duration::from_millis(750))}
     pub fn release(&mut self)->Result<Observation>{self.call(Action::Release,Duration::from_millis(750))}
-    pub fn close(&mut self){
-        if self.closed{return;}let _=self.call(Action::Stop,Duration::from_millis(750));self.closed=true;self.sender.take();
+    /// A process exit or a successful Stop RPC without a released-state
+    /// observation is not proof that tracked keyboard/mouse input was released.
+    pub fn stop_confirmed(&mut self)->Result<Observation>{
+        if self.closed{return Err(failure());}
+        let observed=self.call(Action::Stop,Duration::from_millis(750));self.closed=true;self.sender.take();
         let start=Instant::now();while start.elapsed()<Duration::from_secs(2){if self.child.try_wait().ok().flatten().is_some(){break;}std::thread::sleep(Duration::from_millis(20));}
         if self.child.try_wait().ok().flatten().is_none(){let _=self.child.kill();}let _=self.child.wait();if let Some(thread)=self.thread.take(){let _=thread.join();}
+        observed.and_then(|value|if value.state=="revoked"&&value.reason.as_deref()!=Some("release_failed"){Ok(value)}else{Err(failure())})
     }
+    pub fn close(&mut self){let _=self.stop_confirmed();}
 }
 impl Drop for InputWorker{fn drop(&mut self){self.close();}}
