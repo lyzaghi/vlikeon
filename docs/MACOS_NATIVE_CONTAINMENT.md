@@ -1,5 +1,13 @@
 # macOS native containment source
 
+Current source work is tracked in `MACOS_ITEM4_CLOSURE.md`. The owner now directs
+source authoring first and practical verification later. New low-level source
+adds suspended pair admission, retained process ownership, schema-2 staged
+receipts, an exclusive storage lease and a durable pre-spawn launch fence.
+The existing XPC launch capability remains false until the remaining broker,
+save-return, descendant/resource and recovery source contracts are complete.
+The historical foundation description below does not constitute target evidence.
+
 OmniPlay keeps native execution unavailable on macOS until the complete signed
 App Sandbox launch and storage boundary is present. It does not call the
 deprecated `sandbox-exec` tool, use private Seatbelt interfaces or treat POSIX

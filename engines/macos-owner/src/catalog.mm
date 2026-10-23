@@ -206,4 +206,39 @@ std::optional<RuntimeSpec> admit_runtime(const char* requested) {
       text(selected[@"presentation_identifier"]), core.fileSystemRepresentation,
       text(selected[@"core_identifier"])};
 }
+
+bool admit_owned_child(const RuntimeSpec& runtime, bool presentation, pid_t pid) {
+  if (pid <= 1) return false;
+  NSString* signing = [NSString stringWithUTF8String:
+      (presentation ? runtime.presentation_identifier : runtime.actor_identifier).c_str()];
+  NSString* team = [NSString stringWithUTF8String:runtime.team_identifier.c_str()];
+  if (!identifier(signing) || !team_identifier(team)) return false;
+  NSDictionary* attributes = @{(__bridge id)kSecGuestAttributePid: @(pid)};
+  SecCodeRef guest = nullptr;
+  // This new child lookup is additional to the existing static bundle admission
+  // and unchanged XPC peer authentication. Strict validity is required below.
+  if (SecCodeCopyGuestWithAttributes(nullptr, (__bridge CFDictionaryRef)attributes,
+      kSecCSDefaultFlags, &guest) != errSecSuccess || !guest) return false;
+  NSString* text = [NSString stringWithFormat:
+      @"anchor apple generic and identifier \"%@\" and certificate leaf[subject.OU] = \"%@\"",
+      signing, team];
+  SecRequirementRef requirement = nullptr;
+  OSStatus status = SecRequirementCreateWithString((__bridge CFStringRef)text,
+      kSecCSDefaultFlags, &requirement);
+  if (status == errSecSuccess && requirement)
+    status = SecCodeCheckValidity(guest,
+        kSecCSStrictValidate | kSecCSCheckAllArchitectures, requirement);
+  if (requirement) CFRelease(requirement);
+  CFDictionaryRef raw = nullptr;
+  if (status == errSecSuccess)
+    status = SecCodeCopySigningInformation(guest, kSecCSSigningInformation, &raw);
+  CFRelease(guest);
+  if (status != errSecSuccess || !raw) { if (raw) CFRelease(raw); return false; }
+  NSDictionary* info = CFBridgingRelease(raw);
+  NSNumber* flags = info[(__bridge id)kSecCodeInfoFlags];
+  return [info[(__bridge id)kSecCodeInfoIdentifier] isEqual:signing] &&
+      [info[(__bridge id)kSecCodeInfoTeamIdentifier] isEqual:team] &&
+      [flags isKindOfClass:NSNumber.class] && (flags.unsignedIntValue & CS_RUNTIME) != 0 &&
+      child_entitlements(info[(__bridge id)kSecCodeInfoEntitlementsDict], signing, team);
+}
 }

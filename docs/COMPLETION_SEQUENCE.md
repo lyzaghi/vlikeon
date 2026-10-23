@@ -16,7 +16,12 @@ concurrent work: Antigravity may run exact released test batches on frozen
 copies while Codex writes source; full acceptance remains item 16. See
 `QA_EXECUTION_POLICY.md`.
 
-Current source item: **3 — Linux native runtime lifecycle and containment**.
+Current source item: **4 — macOS native runtime lifecycle and containment**.
+The owner's latest direction is source authoring first, practical verification
+later. No new build/test/workflow batch is released in this phase. The former
+concurrent-test timing is historical and superseded by `QA_EXECUTION_POLICY.md`.
+Item 3's remaining source obligations are retained for the overall closure;
+moving to item 4 does not mark Linux complete.
 Item 2 is deferred by the owner; preserve `WINDOWS_ITEM2_CLOSURE.md` for return
 and item 17. `LINUX_ITEM3_CLOSURE.md` tracks current source work and evidence.
 
@@ -128,8 +133,8 @@ verified completion has not been claimed.
 | --- | --- | --- | --- |
 | 1 | Desktop Chromium, Game Hub, profiles, permissions and build/update integration | Source authored; current desktop overlay and build/upgrade recipes retained | Pending final pass; remains open |
 | 2 | Windows native runtime lifecycle and containment | Deferred by owner; remaining source obligations retained | Partial fixture evidence; full acceptance pending |
-| 3 | Linux native runtime lifecycle and containment | In progress; current source audit | Eight socket cases, runtime/broker check and bootstrap build passed; full acceptance pending |
-| 4 | macOS native runtime lifecycle and containment | Pending sequential completion audit | Pending final pass |
+| 3 | Linux native runtime lifecycle and containment | Remaining source obligations retained; owner directed next item | Eight socket cases, runtime/broker check and bootstrap build passed; full acceptance pending |
+| 4 | macOS native runtime lifecycle and containment | In progress; source authoring only | Deferred per latest owner direction |
 | 5 | v1 retro systems and core adapters | Pending sequential completion audit | Pending final pass |
 | 6 | Graphics, audio and input | Pending sequential completion audit | Pending final pass |
 | 7 | Saves, library and storage | Pending sequential completion audit | Pending final pass |

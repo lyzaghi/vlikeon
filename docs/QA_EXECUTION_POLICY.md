@@ -5,6 +5,16 @@ execution to Antigravity. The owner additionally specifies that Antigravity
 has test authority only; review and fix decisions belong to the owner and Codex.
 This policy does not mark any product item complete.
 
+## Current owner direction — 2026-10-23
+
+The owner now directs completing source authoring first and deferring practical
+verification. This supersedes the earlier concurrent-test timing below: do not
+dispatch another build, test, workflow or Antigravity execution batch during
+this source-first phase. Historical results remain evidence only for their exact
+revisions and scope. Antigravity retains test-only authority when the owner
+later resumes verification; Codex retains source, diagnosis and fix decisions.
+Source inspection and necessary implementation documentation lookup may continue.
+
 ## Codex and owner
 
 - Own requirements, implementation, test selection, expected behavior and the

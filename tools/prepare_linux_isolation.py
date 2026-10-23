@@ -18,6 +18,7 @@ INPUTS+=['platform/native-runtime/src/linux_staging.rs','platform/core/Cargo.tom
 INPUTS += [path.relative_to(ROOT).as_posix() for path in sorted((ROOT/'platform/core/migrations').glob('*.sql'))]
 INPUTS+=['platform/native-runtime/src/channel.rs','platform/native-runtime/src/linux_session.rs','docs/LINUX_SESSION_COMPOSITION.md']
 INPUTS+=['platform/native-runtime/src/linux_adapter.rs','docs/LINUX_RUNTIME_ADAPTER.md']
+INPUTS+=['docs/MACOS_ITEM4_CLOSURE.md']
 INPUTS+=['docs/LINUX_ABANDONED_RECOVERY.md']
 INPUTS+=['docs/LINUX_RESUMABLE_RETIREMENT.md']
 INPUTS+=['docs/LINUX_CREATOR_RECOVERY.md']

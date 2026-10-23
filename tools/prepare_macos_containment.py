@@ -20,6 +20,7 @@ FILES = [
     "engines/macos-owner/src/catalog.mm", "engines/macos-owner/src/process.hpp",
     "engines/macos-owner/src/process.mm", "tools/author_macos_runtime_catalog.py",
     "docs/MACOS_NATIVE_CONTAINMENT.md", "tools/prepare_macos_containment.py",
+    "docs/MACOS_ITEM4_CLOSURE.md",
 ]
 
 
@@ -71,6 +72,9 @@ def main():
         "bounded_xpc_session_staging_source_authored": True,
         "signed_bundle_runtime_admission_source_authored": True,
         "xpc_session_launch_authored": False, "sandbox_launch_authored": False,
+        "suspended_pair_owner_source_authored": True,
+        "staged_receipt_schema": 2, "staged_owner_lease_source_authored": True,
+        "durable_launch_fence_source_authored": True,
         "product_enabled": False, "configuration": "not_started",
         "compiler": "not_started", "codesign": "not_started",
         "notarization": "not_started", "verification": "not_run",

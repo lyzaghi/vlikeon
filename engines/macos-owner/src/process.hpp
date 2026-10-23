@@ -1,6 +1,7 @@
 #pragma once
 
 #include "catalog.hpp"
+#include "session.hpp"
 #include <cstdint>
 #include <filesystem>
 #include <optional>
@@ -18,14 +19,22 @@ struct LaunchParameters {
 struct LaunchEndpoints {
   int input = -1;
   int output = -1;
+  LaunchEndpoints(int input_descriptor, int output_descriptor) noexcept;
+  ~LaunchEndpoints();
+  LaunchEndpoints(const LaunchEndpoints&) = delete;
+  LaunchEndpoints& operator=(const LaunchEndpoints&) = delete;
+  LaunchEndpoints(LaunchEndpoints&& other) noexcept;
+  LaunchEndpoints& operator=(LaunchEndpoints&& other) noexcept;
+  int take_input() noexcept;
+  int take_output() noexcept;
 };
 
 // This process owner stays disconnected from the XPC protocol until checked
 // save return and recovery are present alongside launch.
 std::optional<LaunchEndpoints> launch_pair(const RuntimeSpec& runtime,
-    const std::filesystem::path& session_directory, const LaunchParameters& parameters,
+    SessionLease session, const LaunchParameters& parameters,
     uint64_t connection_owner);
 bool session_active(const std::string& session_id);
-void stop_session(const std::string& session_id);
+bool stop_session(const std::string& session_id, uint64_t connection_owner);
 void stop_connection(uint64_t connection_owner);
 }

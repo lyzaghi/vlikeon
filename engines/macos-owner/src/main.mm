@@ -3,6 +3,7 @@
 #include <bsm/libbsm.h>
 #include <xpc/xpc.h>
 #include <atomic>
+#include <limits>
 #include "process.hpp"
 #include "session.hpp"
 
@@ -12,13 +13,25 @@ constexpr size_t kMaximumDictionaryBytes = 64 * 1024;
 
 bool uuid(const char* value) {
   if (!value || strnlen(value, 37) != 36) return false;
+  bool nonzero = false;
   for (size_t index = 0; index < 36; ++index) {
     if (index == 8 || index == 13 || index == 18 || index == 23) {
       if (value[index] != '-') return false;
-    } else if (!((value[index] >= '0' && value[index] <= '9') ||
-                 (value[index] >= 'a' && value[index] <= 'f'))) return false;
+    } else {
+      if (!((value[index] >= '0' && value[index] <= '9') ||
+            (value[index] >= 'a' && value[index] <= 'f'))) return false;
+      nonzero |= value[index] != '0';
+    }
   }
-  return true;
+  return nonzero;
+}
+
+uint64_t allocate_owner() {
+  static std::atomic_uint64_t next{1};
+  uint64_t value = next.load();
+  while (value != std::numeric_limits<uint64_t>::max())
+    if (next.compare_exchange_weak(value, value + 1)) return value;
+  return 0; // Exhaustion never wraps into another connection's authority.
 }
 
 bool checked_peer(xpc_connection_t peer) {
@@ -98,12 +111,12 @@ void receive(xpc_connection_t peer, xpc_object_t event, uint64_t owner) {
 int main() {
   @autoreleasepool {
     xpc_main(^(xpc_connection_t peer) {
-      static std::atomic_uint64_t next_owner{1};
       if (!checked_peer(peer)) { xpc_connection_cancel(peer); return; }
-      const uint64_t owner = next_owner.fetch_add(1);
+      const uint64_t owner = allocate_owner();
       if (!owner) { xpc_connection_cancel(peer); return; }
       xpc_connection_set_event_handler(peer, ^(xpc_object_t event) {
-        @autoreleasepool { receive(peer, event, owner); }
+        try { @autoreleasepool { receive(peer, event, owner); } }
+        catch (...) { omniplay::macos::stop_connection(owner); xpc_connection_cancel(peer); }
       });
       xpc_connection_resume(peer);
     });

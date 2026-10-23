@@ -73,6 +73,7 @@ def main():
         if path.suffix not in {'.cpp','.hpp','.h','.in','.txt','.manifest','.entitlements'}:raise ValueError('Unexpected native frontend source input')
         inputs.append((path,PurePosixPath('native')/path.relative_to(native).as_posix(),{}))
     mac_owner=ROOT/'engines/macos-owner'
+    inputs.append((ordinary(ROOT/'docs/MACOS_ITEM4_CLOSURE.md',ROOT,True),PurePosixPath('docs/MACOS_ITEM4_CLOSURE.md'),{}))
     for path in sorted(mac_owner.rglob('*')):
         if path.is_file():inputs.append((ordinary(path,mac_owner,True),PurePosixPath('macos-owner')/path.relative_to(mac_owner).as_posix(),{}))
     for name in ['sandbox','native-runtime']:
