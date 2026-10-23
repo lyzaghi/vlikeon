@@ -7,6 +7,14 @@ This policy does not mark any product item complete.
 
 ## Current owner direction — 2026-10-23
 
+Latest instruction in this chat: retain item-9/10 gaps and move to items 15 then
+16. This explicitly resumes preparation and execution of narrowly assigned,
+frozen build/test batches for consolidated verification in this chat, superseding
+the source-only timing below for those batches. Antigravity remains execution
+only. Other source work remains preserved; no full-product acceptance is implied.
+
+The following source-only timing records the earlier phase:
+
 The owner now directs completing source authoring first and deferring practical
 verification. This supersedes the earlier concurrent-test timing below: do not
 dispatch another build, test, workflow or Antigravity execution batch during

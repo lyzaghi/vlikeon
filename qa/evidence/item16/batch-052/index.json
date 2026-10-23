@@ -1,0 +1,55 @@
+{
+  "batch_id": "vlikeon-052",
+  "scope": "item15 synthetic release checks and item16 initial Windows Rust/JS verification",
+  "executor": "antigravity",
+  "source_manifest_sha256": "600ceaff0aac6bd5e337ed522f9d9c5f665c2273a87895c94e6f7fd1bb615615",
+  "base_commit": "39d4f7b0a642e9775c843af6246e0dd82a901d36",
+  "source_kind": "frozen working tree including uncommitted source, not HEAD qualification",
+  "started_at": "2026-10-23T05:08:46.665Z",
+  "cases": [
+    {
+      "id": "rust-workspace-all-targets",
+      "args": [
+        "test",
+        "--workspace",
+        "--all-targets",
+        "--locked",
+        "--offline",
+        "--",
+        "--test-threads=1"
+      ],
+      "exit_code": 0,
+      "signal": null,
+      "elapsed_ms": 27861,
+      "status": "completed"
+    }
+  ],
+  "source_unchanged": true,
+  "status": "completed",
+  "finished_at": "2026-10-23T05:09:14.582Z",
+  "raw_result_sha256": "2a8cdbdf22b87e92480df6d89baec2578469407135e59457dcc766861a33e410",
+  "tools": [
+    {
+      "name": "cargo.exe",
+      "sha256": "d953858241c1a0aee28e712681dde68e59946375ecabfc3bead2a152e6d7ec2b"
+    }
+  ],
+  "logs": [
+    {
+      "name": "rust-workspace-all-targets.stderr.log",
+      "bytes": 7909,
+      "sha256": "3ff64f9777270d54d1120e7a9bc8b4115632a5450a1b316038f7c0d6dec5840e"
+    },
+    {
+      "name": "rust-workspace-all-targets.stdout.log",
+      "bytes": 7039,
+      "sha256": "8a555ef26772fc590863a31c63923f1073ae8c9d582a4cbd16222a8f7b24e3b0"
+    }
+  ],
+  "publication_scope": "Sanitized index only. Raw logs and frozen source retained locally; source manifest binds working-tree inputs, not HEAD alone.",
+  "rust_counts": {
+    "passed": 42,
+    "failed": 0,
+    "ignored": 4
+  }
+}

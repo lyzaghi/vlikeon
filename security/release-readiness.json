@@ -1,0 +1,29 @@
+{
+  "schema_version": 1,
+  "recorded_on": "2026-10-23",
+  "scope": "production full-product release, distinct from the public technical demo",
+  "production_release_approved": false,
+  "item15_complete": false,
+  "item16_complete": false,
+  "required_reviews": [
+    "exact_compiled_dependency_and_asset_provenance",
+    "license_compatibility_and_notices",
+    "complete_corresponding_source",
+    "artifact_derived_sbom_and_current_advisories",
+    "production_containment_authentication_update_sync_fault_evidence",
+    "platform_signing_notarization_store_privacy_export_review",
+    "controlled_update_hosting_and_offline_threshold_root",
+    "operational_private_security_reporting"
+  ],
+  "restricted_profiles": [
+    {
+      "profile": "Mupen64Plus-Next Angrylion software profile",
+      "distribution": "research_only_not_release_eligible",
+      "review": "security/retro-provenance-review.json"
+    }
+  ],
+  "deferred_mobile_work": "docs/DEFERRED_ITEMS_9_10.md",
+  "release_inventory_gate": "tools/release_inventory.py",
+  "verification_record": "docs/ITEM16_VERIFICATION.md",
+  "note": "A policy record or matching digest cannot establish legal compliance, vulnerability absence, test success or release approval. No approval is inferred from source generation."
+}

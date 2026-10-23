@@ -1,5 +1,17 @@
 # User-ordered completion sequence
 
+## This chat's latest transition — items 15 then 16
+
+On 2026-10-23 the owner requested noting the Android/iOS gaps and moving this
+chat to security/licensing/release preparation (15), then consolidated
+verification (16). `DEFERRED_ITEMS_9_10.md` retains the missing source and
+external/platform gates. Neither mobile item is complete. Exact frozen test
+batches are now released under Antigravity's execution-only policy; Codex owns
+review/fixes/acceptance. `ITEM15_SECURITY_LICENSE_RELEASE.md` and
+`ITEM16_VERIFICATION.md` track this assignment. Other concurrent assignments
+and their outstanding implementation below remain preserved.
+
+
 The user requested work on items 1 through 17 and a report when each
 item is finished. On 2026-10-23 the owner explicitly deferred the remaining
 item-2 work and directed continuation with items 3 through 17. Item 17 is the
@@ -139,14 +151,14 @@ verified completion has not been claimed.
 | 6 | Graphics, audio and input | Pending sequential completion audit | Pending final pass |
 | 7 | Saves, library and storage | Pending sequential completion audit | Pending final pass |
 | 8 | Remote Play and installed PC/AAA bridge | Pending sequential completion audit | Pending final pass |
-| 9 | Android product | Pending sequential completion audit | Pending final pass |
-| 10 | iOS/iPadOS product | Pending sequential completion audit | Pending final pass |
+| 9 | Android product | Deferred by owner; remaining source in DEFERRED_ITEMS_9_10.md | Android SDK/device qualification pending |
+| 10 | iOS/iPadOS product | Deferred by owner; remaining source in DEFERRED_ITEMS_9_10.md | Apple SDK/device qualification pending |
 | 11 | Web/PWA product | Pending sequential completion audit | Pending final pass |
 | 12 | Accounts and encrypted save synchronization | Pending sequential completion audit | Pending final pass |
 | 13 | Performance, routing and optional assistance | Pending sequential completion audit | Pending final pass |
 | 14 | Install, repair, uninstall and updates | Pending sequential completion audit | Pending final pass |
-| 15 | Security, licensing and release preparation | Pending sequential completion audit | Pending final pass |
-| 16 | Consolidated build, integration, device and fault verification | Deferred until all source authoring is complete | Not started |
+| 15 | Security, licensing and release preparation | Release attribution/privacy gate and dependency review inventory authored; production reviews open | Scoped release/updater cases passed; full release approval pending |
+| 16 | Consolidated build, integration, device and fault verification | Active frozen verification batches; original source gaps retained | Initial Windows/shared-source cases passed; platform/device/fault qualification open |
 | 17 | Overall review and closure of outstanding work | Owner-selected final review, including deferred item 2 | Not started |
 
 Existing implementation in every item is preserved. This table records the

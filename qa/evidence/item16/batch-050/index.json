@@ -1,0 +1,100 @@
+{
+  "batch_id": "vlikeon-050",
+  "scope": "item15 synthetic release checks and item16 initial Windows Rust/JS verification",
+  "executor": "antigravity",
+  "source_manifest_sha256": "1998b3bc63cbe2e3c6dd58eb7ba9a03459f99ecad037f3e18febb3d93a833846",
+  "base_commit": "39d4f7b0a642e9775c843af6246e0dd82a901d36",
+  "source_kind": "frozen working tree including uncommitted source, not HEAD qualification",
+  "started_at": "2026-10-23T05:02:46.571Z",
+  "cases": [
+    {
+      "id": "release-inventory",
+      "args": [
+        "-B",
+        "qa/release/test_release_inventory.py"
+      ],
+      "exit_code": 0,
+      "signal": null,
+      "elapsed_ms": 1194,
+      "status": "completed"
+    },
+    {
+      "id": "browser-context-ownership",
+      "args": [
+        "--test",
+        "qa/browser/component-context.test.mjs",
+        "qa/browser/component-ownership.test.mjs"
+      ],
+      "exit_code": 0,
+      "signal": null,
+      "elapsed_ms": 287,
+      "status": "completed"
+    },
+    {
+      "id": "rust-workspace-library-tests",
+      "args": [
+        "test",
+        "--workspace",
+        "--lib",
+        "--locked",
+        "--",
+        "--test-threads=1"
+      ],
+      "exit_code": 101,
+      "signal": null,
+      "elapsed_ms": 122995,
+      "status": "failed"
+    }
+  ],
+  "source_unchanged": true,
+  "status": "failed",
+  "finished_at": "2026-10-23T05:04:51.205Z",
+  "raw_result_sha256": "c4d44d5cb048ab6c73bdeb2729ff1aba378a674ccc13d9181876deea3e450329",
+  "tools": [
+    {
+      "name": "python.exe",
+      "sha256": "7c4ee3011932a75b30db176f35fb91b28f0b299e608eaf643fb1bf36ed5ace99"
+    },
+    {
+      "name": "node.exe",
+      "sha256": "3602f2bb1a10f2cbab4c36886218a33c1ab3db87290e73b033c46c77147d0237"
+    },
+    {
+      "name": "cargo.exe",
+      "sha256": "d953858241c1a0aee28e712681dde68e59946375ecabfc3bead2a152e6d7ec2b"
+    }
+  ],
+  "logs": [
+    {
+      "name": "browser-context-ownership.stderr.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "browser-context-ownership.stdout.log",
+      "bytes": 1252,
+      "sha256": "1c8e1afdd753452d202975cff8ac5f07e8ba2140ff28f2c85201017decff9b4e"
+    },
+    {
+      "name": "release-inventory.stderr.log",
+      "bytes": 1531,
+      "sha256": "108f72c971595e6c014aa7262652302aa823cb8f36de8015540574d6a647e035"
+    },
+    {
+      "name": "release-inventory.stdout.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "rust-workspace-library-tests.stderr.log",
+      "bytes": 8620,
+      "sha256": "bac32d9ab7729ac5d2b6fe946d444d682e2ef8b40cd8de6f77daac385163df3b"
+    },
+    {
+      "name": "rust-workspace-library-tests.stdout.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "publication_scope": "Sanitized index only. Raw logs and frozen source retained locally; source manifest binds working-tree inputs, not HEAD alone."
+}

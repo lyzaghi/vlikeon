@@ -11,6 +11,7 @@ from pathlib import Path
 import re
 import struct
 import tempfile
+from release_inventory import check_release_tree
 
 MAX_BYTES = 2 * 1024**3
 MAX_MANIFEST = 16 * 1024**2
@@ -118,6 +119,9 @@ def main():
             raise ValueError("Shipped component identity is incomplete")
         if component.get("corresponding_source_required") and not component.get("source_archive_sha256"):
             raise ValueError("Copyleft source must identify an exact accompanying source archive")
+    release_findings=check_release_tree(base,entries)
+    if release_findings:
+        raise ValueError("Release inventory rejected: "+json.dumps(release_findings,ensure_ascii=True))
     manifest = {"schema_version": 1, **identity, "files": entries}
     raw = json.dumps(manifest, ensure_ascii=True, separators=(",", ":")).encode("utf-8")
     if len(raw) > MAX_MANIFEST:

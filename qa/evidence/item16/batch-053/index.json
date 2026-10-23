@@ -1,0 +1,57 @@
+{
+  "batch_id": "vlikeon-053",
+  "scope": "item15 synthetic release checks and item16 initial Windows Rust/JS verification",
+  "executor": "antigravity",
+  "source_manifest_sha256": "afe1670ff686b8de0ffd7e8f613f4c79ab8f4df40774fc75e6022baf7da47040",
+  "base_commit": "39d4f7b0a642e9775c843af6246e0dd82a901d36",
+  "source_kind": "frozen working tree including uncommitted source, not HEAD qualification",
+  "started_at": "2026-10-23T05:11:21.343Z",
+  "cases": [
+    {
+      "id": "updater-release-security",
+      "args": [
+        "test",
+        "-p",
+        "omniplay-updater",
+        "--test",
+        "release_security",
+        "--locked",
+        "--offline",
+        "--",
+        "--test-threads=1"
+      ],
+      "exit_code": 0,
+      "signal": null,
+      "elapsed_ms": 51694,
+      "status": "completed"
+    }
+  ],
+  "source_unchanged": true,
+  "status": "completed",
+  "finished_at": "2026-10-23T05:12:13.126Z",
+  "raw_result_sha256": "b7f2a8a6013bb05312a37bea7ef4fd2da39993fb4c401c6c0a4e24ef549888fd",
+  "tools": [
+    {
+      "name": "cargo.exe",
+      "sha256": "d953858241c1a0aee28e712681dde68e59946375ecabfc3bead2a152e6d7ec2b"
+    }
+  ],
+  "logs": [
+    {
+      "name": "updater-release-security.stderr.log",
+      "bytes": 3274,
+      "sha256": "b84ec8adb236bf32bcd72dce54f3e29c65295e7aab21514a5446677fc23331c4"
+    },
+    {
+      "name": "updater-release-security.stdout.log",
+      "bytes": 682,
+      "sha256": "280feaedee54e4f9b09a11d764c0297ad6f36af0341b31087fd5965ef18d8df8"
+    }
+  ],
+  "publication_scope": "Sanitized index only. Raw logs and frozen source retained locally; source manifest binds working-tree inputs, not HEAD alone.",
+  "rust_counts": {
+    "passed": 11,
+    "failed": 0,
+    "ignored": 0
+  }
+}
