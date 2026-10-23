@@ -109,6 +109,27 @@ fn read(connection:&Connection,profile:Uuid,device:Uuid)->Result<Option<Snapshot
 pub fn load(database:&Database,profile:Uuid)->Result<Option<Snapshot>>{
     read(&database.connection,profile,database.device_id)
 }
+/// Dedicated connection for the native recovery lane. Never create a profile,
+/// migrate schema or invoke unrelated save/native-work startup maintenance.
+pub fn open_recovery(root:&std::path::Path,expected_device:Uuid)->Result<Database>{
+    if !root.is_absolute()||expected_device.is_nil(){return Err(invalid());}
+    fn ordinary(path:&std::path::Path,directory:bool)->Result<()>{
+        let shape=std::fs::symlink_metadata(path).map_err(storage_error)?;
+        let mut linked=shape.file_type().is_symlink();
+        #[cfg(windows)]{use std::os::windows::fs::MetadataExt;linked|=shape.file_attributes()&0x400!=0;}
+        if linked||(directory&&!shape.is_dir())||(!directory&&!shape.is_file()){return Err(invalid());}Ok(())
+    }
+    ordinary(root,true)?;let path=root.join("omniplay.sqlite3");ordinary(&path,false)?;
+    let connection=Connection::open_with_flags(&path,rusqlite::OpenFlags::SQLITE_OPEN_READ_WRITE|
+        rusqlite::OpenFlags::SQLITE_OPEN_NO_MUTEX).map_err(storage_error)?;
+    connection.busy_timeout(std::time::Duration::from_millis(100)).map_err(storage_error)?;
+    connection.execute_batch("PRAGMA foreign_keys=ON; PRAGMA synchronous=FULL; PRAGMA trusted_schema=OFF;").map_err(storage_error)?;
+    let version:u32=connection.query_row("PRAGMA user_version",[],|row|row.get(0)).map_err(storage_error)?;
+    let(bytes,raw):(i64,String)=connection.query_row("SELECT length(CAST(value AS BLOB)),substr(value,1,38) FROM preferences WHERE key='device_id'",[],|row|Ok((row.get(0)?,row.get(1)?))).map_err(storage_error)?;
+    if version!=crate::database::CURRENT_SCHEMA_VERSION||bytes!=36||raw!=expected_device.to_string(){return Err(invalid());}
+    let database=Database{connection,root:root.to_owned(),device_id:expected_device};
+    require_durable_connection(&database)?;Ok(database)
+}
 fn require_durable_connection(database:&Database)->Result<()>{
     // Never return an activation ticket from inside an outer uncommitted
     // transaction or a connection whose synchronization was weakened.
@@ -319,5 +340,22 @@ mod tests{
         assert!(record_cleanup(&mut fixture.database,&unknown,fixture.owner,fixture.helper,CleanupState::CleanupRequired,Some(&foreign)).is_err());
         assert_eq!(fixture.load().raw,unknown.raw);
         assert!(record_cleanup(&mut fixture.database,&unknown,fixture.owner,fixture.helper,CleanupState::CleanupRequired,Some(&[])).is_err());
+    }
+    #[test]fn recovery_connection_opens_only_the_existing_matching_device(){
+        let mut fixture=Fixture::new();let reserved=fixture.reserve();
+        assert!(open_recovery(&fixture.path.0,Uuid::new_v4()).is_err());
+        let recovered=open_recovery(&fixture.path.0,fixture.database.device_id).unwrap();
+        assert_eq!(load(&recovered,fixture.profile).unwrap().unwrap().raw,reserved.raw);
+        let timeout:u32=recovered.connection.query_row("PRAGMA busy_timeout",[],|row|row.get(0)).unwrap();
+        assert_eq!(timeout,100);
+        let missing=fixture.path.0.join("not-created-by-recovery");
+        assert!(open_recovery(&missing,fixture.database.device_id).is_err());assert!(!missing.exists());
+    }
+    #[test]fn recovery_connection_refuses_schema_changes_without_migrating(){
+        let fixture=Fixture::new();
+        fixture.database.connection.execute_batch("PRAGMA user_version=999999").unwrap();
+        assert!(open_recovery(&fixture.path.0,fixture.database.device_id).is_err());
+        let version:u32=fixture.database.connection.query_row("PRAGMA user_version",[],|row|row.get(0)).unwrap();
+        assert_eq!(version,999999);
     }
 }

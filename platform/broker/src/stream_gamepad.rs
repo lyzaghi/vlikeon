@@ -276,22 +276,26 @@ impl RecoveryObserver for WindowsRecoveryObserver{
     }
 }
 
-/// Read-only startup reconciliation for a saved helper. Not automatically run
-/// on the current broker/UI thread: process inventory and HID enumeration need
-/// the installed single-owner recovery lane and later OS qualification.
+/// Read-only OS observation plus journal reconciliation for a saved helper.
+/// Explicit-feature startup invokes it only on the dedicated recovery lane;
+/// default builds do not run it. Real OS qualification remains deferred.
 #[cfg(all(feature="windows-gamepad",target_os="windows",target_env="msvc",any(target_arch="x86_64",target_arch="aarch64")))]
-pub fn recover_windows_gamepad(database:&mut Database,profile:Uuid)->Result<bool>{
+pub fn recover_windows_gamepad(database:&mut Database,profile:Uuid,cancel:&std::sync::atomic::AtomicBool)->Result<bool>{
+    use std::sync::atomic::Ordering;
+    if cancel.load(Ordering::Acquire){return Err(stopped());}
     let Some(saved)=journal::load(database,profile)?else{return Ok(true)};
     let identity=saved.record().helper();
     let process=omniplay_stream_input::gamepad_process::RecoveryProcessWitness::from_saved(
         omniplay_stream_input::gamepad_process::ProcessIdentity{process_id:identity.process_id,creation_time:identity.creation_time})?;
-    struct Observer{process:omniplay_stream_input::gamepad_process::RecoveryProcessWitness}
-    impl RecoveryObserver for Observer{
+    struct Observer<'a>{process:omniplay_stream_input::gamepad_process::RecoveryProcessWitness,cancel:&'a std::sync::atomic::AtomicBool}
+    impl RecoveryObserver for Observer<'_>{
         fn helper_exited(&mut self,identity:ProcessIdentity)->Result<bool>{
+            if self.cancel.load(Ordering::Acquire){return Err(stopped());}
             self.process.exited(omniplay_stream_input::gamepad_process::ProcessIdentity{
                 process_id:identity.process_id,creation_time:identity.creation_time})
         }
         fn presence(&mut self,container:Uuid)->journal::Presence{
+            if self.cancel.load(Ordering::Acquire){return journal::Presence::Unknown;}
             use omniplay_stream_input::gamepad_winuhid::{DevicePresence,WinUHidProvider};
             match WinUHidProvider::presence(container){
                 DevicePresence::Present=>journal::Presence::Present,
@@ -300,7 +304,7 @@ pub fn recover_windows_gamepad(database:&mut Database,profile:Uuid)->Result<bool
             }
         }
     }
-    let mut observer=Observer{process};
+    let mut observer=Observer{process,cancel};
     match journal::reconcile(database,&saved,&mut observer)?{
         Reconciliation::Removed=>Ok(true),Reconciliation::Retained(_)=>Ok(false),
     }

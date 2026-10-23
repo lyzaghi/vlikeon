@@ -38,6 +38,11 @@ enumerated process snapshot, saved creation identity and an exact-object handle
 when still live. The candidate broker recovery composes that witness with the
 durable journal/HID query; it does not resume control or terminate PID matches.
 Current service startup still does not invoke it. Build/test remains deferred.
+The subsequent source checkpoint connects optional Windows-feature startup to
+a dedicated, process-bounded recovery lane and an existing-database-only SQLite
+connection. Default builds do not start it; close cooperatively cancels without
+blocking on unfinished OS calls. Eight journal/connection regression cases are
+authored, not executed. Global arbitration and input activation remain open.
 
 The owner now requests the individually numbered tasks in
 [`OUTSTANDING_WORK.md`](OUTSTANDING_WORK.md), completed in order. Task 1 source

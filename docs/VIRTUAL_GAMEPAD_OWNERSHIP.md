@@ -301,20 +301,21 @@ query for live-parent reconciliation. It does not enable any service command,
 change the current keyboard helper, install a driver or launch a process.
 
 The Windows transport and creation-time job/watchdog source is described below.
-The actual native authority source, cross-profile/OS reservation and startup
-recovery service integration remain unfinished. No current
-service constructs this supervisor or invokes its journal; current app capability stays
+The actual native authority source and cross-profile/OS reservation remain
+unfinished. The default service does not construct this supervisor or invoke
+its journal; the explicit-feature recovery lane below is separate. App capability stays
 false. One profile journal is not a machine-global lease, an OS attestation or
 permission to clear another profile's device. Startup recovery must obtain a
 positive process retirement witness; access refusal or PID lookup failure
 alone must not satisfy the observer trait. Signed helper/driver admission and
 native consent remain mandatory before wiring any runtime path.
 
-Six journal regression cases are authored behind `cfg(test)` for the later
+Eight journal regression cases are authored behind `cfg(test)` for the later
 Antigravity batch: stale reservation/replacement, reopen after lost activation
 reply, never-observed absence and later presence/absence, cleanup receipt before
 child exit, synthetic SQL write failure, outer-transaction refusal and unknown/
-foreign pending sets (some share one case). They have not been executed. Fake
+foreign pending sets, existing-device-only recovery connection and refusing a
+future schema without migration (some checks share one case). They have not been executed. Fake
 process/container observations test journal decisions only; they cannot qualify
 Windows PnP removal, driver cleanup, disk-full or real process crash behavior.
 
@@ -423,13 +424,47 @@ and the required absence. Never-observed attempted devices remain unresolved.
 Compare-and-swap still refuses a row changed during the OS queries. No input is
 resumed, no driver/devnode/process is removed, and no privilege is requested.
 
-This function is not invoked from current service startup or the browser/UI
-thread. The installed single-owner recovery lane, cross-profile arbitration,
-blocked-query handling and real restart/PID-reuse/device testing remain due.
+Default builds do not invoke this function. Startup in an explicitly built
+`windows-gamepad` Windows x64/ARM64 MSVC broker now schedules it on the dedicated
+lane below, never the browser/UI thread. Cross-profile arbitration, OS query
+qualification and real restart/PID-reuse/device testing remain due.
 API source review follows Microsoft's [process snapshot contract](https://learn.microsoft.com/en-us/windows/win32/api/tlhelp32/nf-tlhelp32-createtoolhelp32snapshot),
 [enumeration completion contract](https://learn.microsoft.com/en-us/windows/win32/api/tlhelp32/nf-tlhelp32-process32nextw)
 and [process identifier lifetime](https://learn.microsoft.com/en-us/windows/win32/procthread/process-handles-and-identifiers).
 No new build/test or OS recovery execution has occurred.
+
+## Recovery lane and existing-database admission
+
+`stream_gamepad_recovery.rs` starts one background recovery worker at broker
+startup only for the default-off Windows feature/target combination. It accepts
+the active broker's known profile directory, profile UUID and device UUID, with
+no renderer-supplied path. A process-local permit bounds simultaneous recovery
+to one thread. A still-running or blocked thread retains that permit; startup
+does not manufacture a replacement on timeout or close. Internal state separates
+running, complete, retained, failed and acknowledged cancellation. No renderer
+recovery/force-clear API or controller permission is introduced.
+
+The worker calls `open_recovery`, which opens an **existing** SQLite file read/
+write without `SQLITE_OPEN_CREATE`, schema migration, directory creation or the
+normal `Database::open` save/native-work maintenance. It rejects linked/reparse
+root/database entries, mismatching device UUID bytes, wrong schema version and
+non-WAL mode. The connection uses FULL synchronization, foreign-key/trusted-schema
+settings and a 100 ms SQLite busy timeout. These path checks operate under the
+existing trusted profile-root boundary; they are not a new race-proof OS file
+admission service. Failure leaves the durable ownership row in place.
+
+Broker close raises a cooperative cancellation flag and joins only a thread
+already observed finished. The recovery observer checks cancellation before
+process-retirement and container queries; unknown/cancelled queries cannot
+establish device absence. A completed atomic journal transition is not rolled
+back by a later cancellation. Windows API calls can still block, so neither
+cancel nor drop is proof that the worker stopped; the single-thread permit stays
+owned until its actual return. Error/status does not authorize slot reassignment.
+
+This connects only the optional startup recovery path. Actual input activation,
+native permission observation, machine/user-wide slot arbitration, driver/helper
+admission and supported recovery UX remain unfinished. The ordinary product
+still advertises `gamepad:false`; all new build/test execution remains deferred.
 
 ## Receiving browser sampling
 

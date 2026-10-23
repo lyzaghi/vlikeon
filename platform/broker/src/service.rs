@@ -24,6 +24,7 @@ pub struct Broker {
     import_jobs:crate::import_jobs::ImportJobs,
     preparations:crate::preparation_jobs::Preparations,
     stream_inputs:crate::stream_input::StreamInputs,
+    gamepad_recovery:crate::stream_gamepad_recovery::RecoveryLane,
     device_probe:omniplay_device_info::DeviceProbe,
     native_work_jobs:crate::native_work_jobs::NativeWorkJobs,
     asset_ranges:std::sync::Arc<omniplay_local_service::asset_ranges::AssetRanges>,
@@ -46,12 +47,14 @@ impl Broker {
             import_jobs:crate::import_jobs::ImportJobs::default(),
             preparations:crate::preparation_jobs::Preparations::default(),
             stream_inputs:crate::stream_input::StreamInputs::default(),
+            gamepad_recovery:crate::stream_gamepad_recovery::RecoveryLane::default(),
             device_probe:omniplay_device_info::DeviceProbe::default(),
             native_work_jobs:crate::native_work_jobs::NativeWorkJobs::default(),
         };
         // The system-owned first pass has no renderer capability. It shares the
         // same single worker/collector lease with later explicit user passes.
         if crate::native_work_jobs::enabled(){let _=broker.native_work_jobs.start(&broker.database.root,profile_id);}
+        if crate::stream_gamepad_recovery::enabled(){let _=broker.gamepad_recovery.start(&broker.database.root,profile_id,broker.database.device_id);}
         Ok(broker)
     }
     pub fn prepare_range_read(&self,request:&Request,raw:&[u8])->Result<omniplay_local_service::asset_ranges::ReadOperation>{
@@ -433,7 +436,7 @@ impl Broker {
         Ok(preview)
     }
 
-    pub fn close(&mut self) { self.native_work_jobs.cancel_all();self.asset_ranges.close_owner(self.client_id);self.stream_inputs.close();self.jobs.cancel_all();self.update_jobs.cancel_all();self.import_jobs.cancel_all();self.preparations.cancel_all();let ids=self.sessions.list().into_iter().filter(|s|!s.state.is_terminal()).map(|s|s.id).collect::<Vec<_>>();for id in ids{let _=self.detach_session(id);}self.sessions.stop_all(&self.database);self.web_sessions.close(&self.database);self.transfers.clear();self.permissions.revoke_owner(self.client_id);self.directory_grants.revoke_owner(self.client_id); }
+    pub fn close(&mut self) { self.gamepad_recovery.cancel();self.native_work_jobs.cancel_all();self.asset_ranges.close_owner(self.client_id);self.stream_inputs.close();self.jobs.cancel_all();self.update_jobs.cancel_all();self.import_jobs.cancel_all();self.preparations.cancel_all();let ids=self.sessions.list().into_iter().filter(|s|!s.state.is_terminal()).map(|s|s.id).collect::<Vec<_>>();for id in ids{let _=self.detach_session(id);}self.sessions.stop_all(&self.database);self.web_sessions.close(&self.database);self.transfers.clear();self.permissions.revoke_owner(self.client_id);self.directory_grants.revoke_owner(self.client_id); }
 }
 
 fn encode(value: impl serde::Serialize) -> Result<Value> { serde_json::to_value(value).map_err(|_|PlatformError::new(ErrorCode::Internal,"Response could not be encoded")) }
