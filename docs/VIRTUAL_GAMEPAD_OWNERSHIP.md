@@ -302,11 +302,11 @@ change the current keyboard helper, install a driver or launch a process.
 
 The Windows transport and creation-time job/watchdog source is described below.
 The actual native authority source, cross-profile/OS reservation and startup
-recovery after the original process handle is lost remain unfinished. No current
+recovery service integration remain unfinished. No current
 service constructs this supervisor or invokes its journal; current app capability stays
 false. One profile journal is not a machine-global lease, an OS attestation or
 permission to clear another profile's device. Startup recovery must obtain a
-positive boot/process retirement witness; access refusal or PID lookup failure
+positive process retirement witness; access refusal or PID lookup failure
 alone must not satisfy the observer trait. Signed helper/driver admission and
 native consent remain mandatory before wiring any runtime path.
 
@@ -392,6 +392,44 @@ heartbeat timing, I/O faults, stalled driver calls and crash/PnP cleanup all
 remain unexecuted and unaccepted. Local implementation follows the Microsoft
 [process attribute contract](https://learn.microsoft.com/en-us/windows/win32/api/processthreadsapi/nf-processthreadsapi-updateprocthreadattribute)
 and [synchronous I/O cancellation contract](https://learn.microsoft.com/en-us/windows/win32/api/ioapiset/nf-ioapiset-cancelsynchronousio).
+
+## Read-only Windows startup recovery source
+
+`RecoveryProcessWitness` adds a separate path when the original launch handle
+was lost with the broker. It accepts only PID/creation identity from the validated
+native journal, not a renderer or peer request. It creates a fresh read-only
+process snapshot using `TH32CS_SNAPPROCESS`, walks it to successful
+`ERROR_NO_MORE_FILES`, requires the current broker itself to appear and bounds
+the walk to 65,536 entries. An empty, truncated, failed or excessive inventory
+is unknown and cannot establish retirement. No process names, paths, modules,
+threads or command lines are retained.
+
+A complete snapshot without the saved PID is positive disappearance evidence.
+When that PID exists, recovery opens only query/synchronize rights and compares
+its actual creation time. A positively observed different creation identity
+means the saved instance has retired; it never uses the replacement's exit code
+or terminates it. A matching identity retains the queried kernel handle and
+waits for that exact object to signal. Open/query errors remain unknown, even
+if a concurrent exit is likely; the next explicit recovery can retry from a
+fresh snapshot. Nothing is inferred from wall-clock boot estimates, grant age,
+`GetTickCount` subtraction or an assumed reboot. A possible timestamp collision
+therefore retains ownership instead of clearing it.
+
+The optional broker `recover_windows_gamepad` source loads the current bounded
+journal, obtains this process witness and invokes the existing exact-container
+reconciliation. It can clear only an unattempted reservation after proven helper
+retirement, or attempted devices that have actual prior presence/removal evidence
+and the required absence. Never-observed attempted devices remain unresolved.
+Compare-and-swap still refuses a row changed during the OS queries. No input is
+resumed, no driver/devnode/process is removed, and no privilege is requested.
+
+This function is not invoked from current service startup or the browser/UI
+thread. The installed single-owner recovery lane, cross-profile arbitration,
+blocked-query handling and real restart/PID-reuse/device testing remain due.
+API source review follows Microsoft's [process snapshot contract](https://learn.microsoft.com/en-us/windows/win32/api/tlhelp32/nf-tlhelp32-createtoolhelp32snapshot),
+[enumeration completion contract](https://learn.microsoft.com/en-us/windows/win32/api/tlhelp32/nf-tlhelp32-process32nextw)
+and [process identifier lifetime](https://learn.microsoft.com/en-us/windows/win32/procthread/process-handles-and-identifiers).
+No new build/test or OS recovery execution has occurred.
 
 ## Receiving browser sampling
 

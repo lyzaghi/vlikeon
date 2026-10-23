@@ -33,6 +33,11 @@ reader/watchdog termination path, plus its concrete broker channel adapter.
 These sources are not launched by current service commands. Native authority
 observation/service wiring, global arbitration, startup recovery, provider/native
 admission and all build/runtime qualification remain open.
+On 2026-10-24, source work adds read-only Windows startup recovery using a fully
+enumerated process snapshot, saved creation identity and an exact-object handle
+when still live. The candidate broker recovery composes that witness with the
+durable journal/HID query; it does not resume control or terminate PID matches.
+Current service startup still does not invoke it. Build/test remains deferred.
 
 The owner now requests the individually numbered tasks in
 [`OUTSTANDING_WORK.md`](OUTSTANDING_WORK.md), completed in order. Task 1 source

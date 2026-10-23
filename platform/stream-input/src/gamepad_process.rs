@@ -1,10 +1,11 @@
-//! Read-only Windows helper-instance witness. Construct from the actual child
-//! process handle at launch, never by opening a renderer-supplied PID. This is
-//! not process supervision/termination, a boot identity, or a removal receipt.
+//! Read-only Windows helper-instance and startup-recovery witnesses. A launch
+//! witness uses the actual child handle; recovery uses only a validated native
+//! journal identity. Neither path accepts renderer PID authority, terminates a
+//! process, establishes a boot identity or acknowledges device removal.
 use crate::failure;
 use omniplay_contracts::Result;
-use std::os::windows::io::{AsRawHandle,BorrowedHandle,FromRawHandle,OwnedHandle};
-use windows_sys::Win32::{Foundation::*,System::Threading::*};
+use std::{mem::size_of,os::windows::io::{AsHandle,AsRawHandle,BorrowedHandle,FromRawHandle,OwnedHandle}};
+use windows_sys::Win32::{Foundation::*,System::{Diagnostics::ToolHelp::*,Threading::*}};
 
 #[derive(Clone,Copy,Debug,PartialEq,Eq)]
 pub struct ProcessIdentity{pub process_id:u32,pub creation_time:u64}
@@ -37,6 +38,57 @@ impl ProcessWitness{
         // even when Windows recycles its numeric PID for a different process.
         match unsafe{WaitForSingleObject(self.handle.as_raw_handle(),0)}{
             WAIT_OBJECT_0=>Ok(true),WAIT_TIMEOUT=>Ok(false),_=>Err(failure()),
+        }
+    }
+}
+
+/// Read-only recovery after losing the original launch handle. This is only
+/// retirement evidence for a validated durable helper record, never authority
+/// to control/terminate a process found by numeric PID or to resume old input.
+pub struct RecoveryProcessWitness{expected:ProcessIdentity,observed:Option<ProcessWitness>}
+impl RecoveryProcessWitness{
+    pub fn from_saved(expected:ProcessIdentity)->Result<Self>{
+        if expected.process_id==0||expected.creation_time==0{return Err(failure());}
+        if !snapshot_contains(expected.process_id)?{
+            return Ok(Self{expected,observed:None});
+        }
+        // No escalation, debug privilege, image lookup or process mutation.
+        // Open refusal or a race with exit is unknown, not proof of retirement.
+        let raw=unsafe{OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION|PROCESS_SYNCHRONIZE,0,expected.process_id)};
+        if raw.is_null()||raw==INVALID_HANDLE_VALUE{return Err(failure());}
+        // SAFETY: newly returned, privately owned process handle.
+        let handle=unsafe{OwnedHandle::from_raw_handle(raw)};
+        let observed=ProcessWitness::from_child(handle.as_handle())?;
+        if observed.identity.process_id!=expected.process_id{return Err(failure());}
+        if observed.identity.creation_time!=expected.creation_time{
+            // A positive observation of another creation identity at this PID
+            // proves the saved instance is no longer live. Never inspect its
+            // exit status as the old helper's, or terminate the replacement.
+            return Ok(Self{expected,observed:None});
+        }
+        // A matching timestamp is conservative, even across a restart/clock
+        // change: retain the real handle and wait for this object to signal.
+        Ok(Self{expected,observed:Some(observed)})
+    }
+    pub fn exited(&self,expected:ProcessIdentity)->Result<bool>{
+        if expected!=self.expected{return Err(failure());}
+        match &self.observed{None=>Ok(true),Some(process)=>process.exited(expected)}
+    }
+}
+fn snapshot_contains(pid:u32)->Result<bool>{
+    let raw=unsafe{CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS,0)};
+    if raw.is_null()||raw==INVALID_HANDLE_VALUE{return Err(failure());}
+    // SAFETY: newly created read-only, non-inheritable snapshot handle.
+    let snapshot=unsafe{OwnedHandle::from_raw_handle(raw)};
+    let mut entry=PROCESSENTRY32W::default();entry.dwSize=size_of::<PROCESSENTRY32W>()as u32;
+    if unsafe{Process32FirstW(snapshot.as_raw_handle(),&mut entry)}==0{return Err(failure());}
+    let current=unsafe{GetCurrentProcessId()};let mut own=false;let mut found=false;let mut count=0;
+    loop{
+        count+=1;if count>65536{return Err(failure());}
+        own|=entry.th32ProcessID==current;found|=entry.th32ProcessID==pid;
+        if unsafe{Process32NextW(snapshot.as_raw_handle(),&mut entry)}==0{
+            if unsafe{GetLastError()}!=ERROR_NO_MORE_FILES||!own{return Err(failure());}
+            return Ok(found);
         }
     }
 }

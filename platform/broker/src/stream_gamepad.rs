@@ -249,8 +249,8 @@ impl ParentChannel for WindowsParentChannel{
 }
 
 /// Live-parent recovery from the actual launch handle plus native provider
-/// inventory. Startup after broker loss needs a separate boot/process recovery
-/// witness; reopening a PID here would weaken the exact-instance requirement.
+/// inventory. Startup after broker loss uses the separate read-only recovery
+/// witness below; this live observer never substitutes a newly opened PID.
 #[cfg(all(feature="windows-gamepad",target_os="windows",target_env="msvc",any(target_arch="x86_64",target_arch="aarch64")))]
 pub struct WindowsRecoveryObserver{process:omniplay_stream_input::gamepad_process::ProcessWitness}
 #[cfg(all(feature="windows-gamepad",target_os="windows",target_env="msvc",any(target_arch="x86_64",target_arch="aarch64")))]
@@ -273,5 +273,35 @@ impl RecoveryObserver for WindowsRecoveryObserver{
             DevicePresence::Absent=>journal::Presence::Absent,
             DevicePresence::Unknown=>journal::Presence::Unknown,
         }
+    }
+}
+
+/// Read-only startup reconciliation for a saved helper. Not automatically run
+/// on the current broker/UI thread: process inventory and HID enumeration need
+/// the installed single-owner recovery lane and later OS qualification.
+#[cfg(all(feature="windows-gamepad",target_os="windows",target_env="msvc",any(target_arch="x86_64",target_arch="aarch64")))]
+pub fn recover_windows_gamepad(database:&mut Database,profile:Uuid)->Result<bool>{
+    let Some(saved)=journal::load(database,profile)?else{return Ok(true)};
+    let identity=saved.record().helper();
+    let process=omniplay_stream_input::gamepad_process::RecoveryProcessWitness::from_saved(
+        omniplay_stream_input::gamepad_process::ProcessIdentity{process_id:identity.process_id,creation_time:identity.creation_time})?;
+    struct Observer{process:omniplay_stream_input::gamepad_process::RecoveryProcessWitness}
+    impl RecoveryObserver for Observer{
+        fn helper_exited(&mut self,identity:ProcessIdentity)->Result<bool>{
+            self.process.exited(omniplay_stream_input::gamepad_process::ProcessIdentity{
+                process_id:identity.process_id,creation_time:identity.creation_time})
+        }
+        fn presence(&mut self,container:Uuid)->journal::Presence{
+            use omniplay_stream_input::gamepad_winuhid::{DevicePresence,WinUHidProvider};
+            match WinUHidProvider::presence(container){
+                DevicePresence::Present=>journal::Presence::Present,
+                DevicePresence::Absent=>journal::Presence::Absent,
+                DevicePresence::Unknown=>journal::Presence::Unknown,
+            }
+        }
+    }
+    let mut observer=Observer{process};
+    match journal::reconcile(database,&saved,&mut observer)?{
+        Reconciliation::Removed=>Ok(true),Reconciliation::Retained(_)=>Ok(false),
     }
 }
