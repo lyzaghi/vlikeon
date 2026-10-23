@@ -1,0 +1,52 @@
+{
+  "batch_id": "vlikeon-036",
+  "source_commit": "9da9982b47783033225b8516ef320ab80ab600b7",
+  "executor": "antigravity",
+  "started_at": "2026-10-23T00:15:19.978Z",
+  "commands": [
+    {
+      "id": "prior-runs",
+      "args": [
+        "run",
+        "list",
+        "--repo",
+        "lyzaghi/vlikeon",
+        "--workflow",
+        "linux-native-qualification.yml",
+        "--event",
+        "workflow_dispatch",
+        "--branch",
+        "main",
+        "--limit",
+        "30",
+        "--json",
+        "databaseId,headSha,displayTitle,status,conclusion,url"
+      ],
+      "exit_code": 0,
+      "elapsed_ms": 1071,
+      "error": null
+    },
+    {
+      "id": "dispatch",
+      "args": [
+        "workflow",
+        "run",
+        "linux-native-qualification.yml",
+        "--repo",
+        "lyzaghi/vlikeon",
+        "--ref",
+        "main",
+        "-f",
+        "expected_sha=9da9982b47783033225b8516ef320ab80ab600b7",
+        "-f",
+        "batch_id=vlikeon-036"
+      ],
+      "exit_code": 1,
+      "elapsed_ms": 2419,
+      "error": null
+    }
+  ],
+  "status": "blocked",
+  "error": "Assigned command failed; inspect retained raw logs",
+  "finished_at": "2026-10-23T00:15:23.469Z"
+}

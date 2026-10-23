@@ -1,0 +1,434 @@
+rust	Set up job	﻿2026-10-23T00:17:09.5816437Z Current runner version: '2.338.0'
+rust	Set up job	2026-10-23T00:17:09.5837223Z ##[group]Runner Image Provisioner
+rust	Set up job	2026-10-23T00:17:09.5838031Z Hosted Compute Agent
+rust	Set up job	2026-10-23T00:17:09.5838617Z Version: 20261012.601
+rust	Set up job	2026-10-23T00:17:09.5839128Z Commit: f3dc54e1fb89da6852db922499a0233137369e1d
+rust	Set up job	2026-10-23T00:17:09.5839695Z Build Date: 2026-10-12T17:48:21Z
+rust	Set up job	2026-10-23T00:17:09.5840341Z Worker ID: {9eb7abea-b605-4f28-bf22-cdf7551ee85c}
+rust	Set up job	2026-10-23T00:17:09.5840958Z Region: westus3
+rust	Set up job	2026-10-23T00:17:09.5841485Z Cloud: Azure
+rust	Set up job	2026-10-23T00:17:09.5841944Z ##[endgroup]
+rust	Set up job	2026-10-23T00:17:09.5843204Z ##[group]Operating System
+rust	Set up job	2026-10-23T00:17:09.5843938Z Ubuntu
+rust	Set up job	2026-10-23T00:17:09.5844407Z 24.04.5
+rust	Set up job	2026-10-23T00:17:09.5844859Z LTS
+rust	Set up job	2026-10-23T00:17:09.5845324Z ##[endgroup]
+rust	Set up job	2026-10-23T00:17:09.5845805Z ##[group]Runner Image
+rust	Set up job	2026-10-23T00:17:09.5846327Z Image: ubuntu-24.04
+rust	Set up job	2026-10-23T00:17:09.5846792Z Version: 20261012.334.1
+rust	Set up job	2026-10-23T00:17:09.5847650Z Included Software: https://github.com/actions/runner-images/blob/ubuntu24/20261012.334/images/ubuntu/Ubuntu2404-Readme.md
+rust	Set up job	2026-10-23T00:17:09.5849556Z Image Release: https://github.com/actions/runner-images/releases/tag/ubuntu24%2F20261012.334
+rust	Set up job	2026-10-23T00:17:09.5850770Z ##[endgroup]
+rust	Set up job	2026-10-23T00:17:09.5852014Z ##[group]GITHUB_TOKEN Permissions
+rust	Set up job	2026-10-23T00:17:09.5854111Z Contents: read
+rust	Set up job	2026-10-23T00:17:09.5854649Z Metadata: read
+rust	Set up job	2026-10-23T00:17:09.5855452Z ##[endgroup]
+rust	Set up job	2026-10-23T00:17:09.5857329Z Secret source: Actions
+rust	Set up job	2026-10-23T00:17:09.5858102Z Cache mode: write
+rust	Set up job	2026-10-23T00:17:09.5858876Z Prepare workflow directory
+rust	Set up job	2026-10-23T00:17:09.6808331Z Prepare all required actions
+rust	Set up job	2026-10-23T00:17:09.6860550Z Getting action download info
+rust	Set up job	2026-10-23T00:17:09.9943468Z Download action repository 'actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683' (SHA:11bd71901bbe5b1630ceea73d27597364c9af683)
+rust	Set up job	2026-10-23T00:17:10.1887167Z Complete job name: rust
+rust	Admit exact assigned revision	﻿2026-10-23T00:17:10.2488044Z ##[group]Run test "$GITHUB_SHA" = "$EXPECTED_SHA"
+rust	Admit exact assigned revision	2026-10-23T00:17:10.2488666Z ^[[36;1mtest "$GITHUB_SHA" = "$EXPECTED_SHA"^[[0m
+rust	Admit exact assigned revision	2026-10-23T00:17:10.2703584Z shell: /usr/bin/bash -e {0}
+rust	Admit exact assigned revision	2026-10-23T00:17:10.2704419Z env:
+rust	Admit exact assigned revision	2026-10-23T00:17:10.2704770Z   CARGO_TERM_COLOR: never
+rust	Admit exact assigned revision	2026-10-23T00:17:10.2705264Z   EXPECTED_SHA: b1f7439ba1cabd9d025e701c9fbf99cade3b3d5b
+rust	Admit exact assigned revision	2026-10-23T00:17:10.2705764Z ##[endgroup]
+rust	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	﻿2026-10-23T00:17:10.2988416Z ##[group]Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+rust	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:17:10.2989050Z with:
+rust	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:17:10.2989398Z   persist-credentials: false
+rust	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:17:10.2989818Z   repository: lyzaghi/vlikeon
+rust	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:17:10.2992746Z   token: ***
+rust	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:17:10.2993089Z   ssh-strict: true
+rust	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:17:10.2993437Z   ssh-user: git
+rust	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:17:10.2994155Z   clean: true
+rust	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:17:10.2994515Z   sparse-checkout-cone-mode: true
+rust	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:17:10.2994932Z   fetch-depth: 1
+rust	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:17:10.2995275Z   fetch-tags: false
+rust	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:17:10.2995624Z   show-progress: true
+rust	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:17:10.2995975Z   lfs: false
+rust	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:17:10.2996308Z   submodules: false
+rust	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:17:10.2996681Z   set-safe-directory: true
+rust	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:17:10.2997053Z env:
+rust	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:17:10.2997374Z   CARGO_TERM_COLOR: never
+rust	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:17:10.2997816Z   EXPECTED_SHA: b1f7439ba1cabd9d025e701c9fbf99cade3b3d5b
+rust	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:17:10.2998300Z ##[endgroup]
+rust	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:17:10.3803710Z Syncing repository: lyzaghi/vlikeon
+rust	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:17:10.3805514Z ##[group]Getting Git version info
+rust	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:17:10.3806066Z Working directory is '/home/runner/work/vlikeon/vlikeon'
+rust	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:17:10.3806862Z [command]/usr/bin/git version
+rust	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:17:10.3856202Z git version 2.55.0
+rust	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:17:10.3873377Z ##[endgroup]
+rust	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:17:10.3885911Z Temporarily overriding HOME='/home/runner/work/_temp/65610384-c3ee-4b97-8bac-ea9308620be7' before making global git config changes
+rust	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:17:10.3887670Z Adding repository directory to the temporary git global config as a safe directory
+rust	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:17:10.3891138Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/vlikeon/vlikeon
+rust	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:17:10.3935493Z Deleting the contents of '/home/runner/work/vlikeon/vlikeon'
+rust	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:17:10.3938445Z ##[group]Initializing the repository
+rust	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:17:10.3942561Z [command]/usr/bin/git init /home/runner/work/vlikeon/vlikeon
+rust	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:17:10.4053657Z hint: Using 'master' as the name for the initial branch. This default branch name
+rust	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:17:10.4055556Z hint: will change to "main" in Git 3.0. To configure the initial branch name
+rust	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:17:10.4057256Z hint: to use in all of your new repositories, which will suppress this warning,
+rust	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:17:10.4058553Z hint: call:
+rust	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:17:10.4059249Z hint:
+rust	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:17:10.4060068Z hint: 	git config --global init.defaultBranch <name>
+rust	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:17:10.4060989Z hint:
+rust	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:17:10.4061926Z hint: Names commonly chosen instead of 'master' are 'main', 'trunk' and
+rust	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:17:10.4063384Z hint: 'development'. The just-created branch can be renamed via this command:
+rust	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:17:10.4065742Z hint:
+rust	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:17:10.4067128Z hint: 	git branch -m <name>
+rust	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:17:10.4068513Z hint:
+rust	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:17:10.4070131Z hint: Disable this message with "git config set advice.defaultBranchName false"
+rust	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:17:10.4072663Z Initialized empty Git repository in /home/runner/work/vlikeon/vlikeon/.git/
+rust	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:17:10.4075230Z [command]/usr/bin/git remote add origin https://github.com/lyzaghi/vlikeon
+rust	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:17:10.4110027Z ##[endgroup]
+rust	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:17:10.4110963Z ##[group]Disabling automatic garbage collection
+rust	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:17:10.4115457Z [command]/usr/bin/git config --local gc.auto 0
+rust	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:17:10.4140890Z ##[endgroup]
+rust	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:17:10.4141739Z ##[group]Setting up auth
+rust	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:17:10.4146918Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+rust	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:17:10.4174521Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+rust	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:17:10.4457114Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+rust	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:17:10.4489709Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+rust	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:17:10.4682288Z [command]/usr/bin/git config --local http.https://github.com/.extraheader AUTHORIZATION: basic ***
+rust	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:17:10.4855147Z ##[endgroup]
+rust	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:17:10.4856179Z ##[group]Fetching the repository
+rust	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:17:10.4863099Z [command]/usr/bin/git -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=1 origin +b1f7439ba1cabd9d025e701c9fbf99cade3b3d5b:refs/remotes/origin/main
+rust	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:17:11.6472203Z From https://github.com/lyzaghi/vlikeon
+rust	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:17:11.6474120Z  * [new ref]         b1f7439ba1cabd9d025e701c9fbf99cade3b3d5b -> origin/main
+rust	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:17:11.6482759Z ##[endgroup]
+rust	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:17:11.6484334Z ##[group]Determining the checkout info
+rust	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:17:11.6485797Z ##[endgroup]
+rust	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:17:11.6486638Z [command]/usr/bin/git sparse-checkout disable
+rust	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:17:11.6532207Z [command]/usr/bin/git config --local --unset-all extensions.worktreeConfig
+rust	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:17:11.6559572Z ##[group]Checking out the ref
+rust	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:17:11.6562799Z [command]/usr/bin/git checkout --progress --force -B main refs/remotes/origin/main
+rust	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:17:11.7330280Z Switched to a new branch 'main'
+rust	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:17:11.7333170Z branch 'main' set up to track 'origin/main'.
+rust	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:17:11.7341124Z ##[endgroup]
+rust	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:17:11.7380295Z [command]/usr/bin/git log -1 --format=%H
+rust	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:17:11.7405411Z b1f7439ba1cabd9d025e701c9fbf99cade3b3d5b
+rust	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:17:11.7414691Z ##[group]Removing auth
+rust	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:17:11.7417765Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+rust	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:17:11.7448014Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+rust	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:17:11.7635470Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+rust	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:17:11.7658762Z http.https://github.com/.extraheader
+rust	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:17:11.7665227Z [command]/usr/bin/git config --local --unset-all http.https://github.com/.extraheader
+rust	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:17:11.7698317Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+rust	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:17:11.7881120Z ##[endgroup]
+rust	Provision fixed Rust toolchain in disposable runner	﻿2026-10-23T00:17:11.8027002Z ##[group]Run printf 'CARGO_HOME=%s\n' "$RUNNER_TEMP/vlikeon-cargo" >> "$GITHUB_ENV"
+rust	Provision fixed Rust toolchain in disposable runner	2026-10-23T00:17:11.8028874Z ^[[36;1mprintf 'CARGO_HOME=%s\n' "$RUNNER_TEMP/vlikeon-cargo" >> "$GITHUB_ENV"^[[0m
+rust	Provision fixed Rust toolchain in disposable runner	2026-10-23T00:17:11.8030668Z ^[[36;1mprintf 'CARGO_TARGET_DIR=%s\n' "$RUNNER_TEMP/vlikeon-target" >> "$GITHUB_ENV"^[[0m
+rust	Provision fixed Rust toolchain in disposable runner	2026-10-23T00:17:11.8032343Z ^[[36;1mrustup toolchain install 1.89.0 --profile minimal^[[0m
+rust	Provision fixed Rust toolchain in disposable runner	2026-10-23T00:17:11.8090205Z shell: /usr/bin/bash -e {0}
+rust	Provision fixed Rust toolchain in disposable runner	2026-10-23T00:17:11.8091105Z env:
+rust	Provision fixed Rust toolchain in disposable runner	2026-10-23T00:17:11.8091839Z   CARGO_TERM_COLOR: never
+rust	Provision fixed Rust toolchain in disposable runner	2026-10-23T00:17:11.8092914Z   EXPECTED_SHA: b1f7439ba1cabd9d025e701c9fbf99cade3b3d5b
+rust	Provision fixed Rust toolchain in disposable runner	2026-10-23T00:17:11.8094262Z ##[endgroup]
+rust	Provision fixed Rust toolchain in disposable runner	2026-10-23T00:17:11.8440727Z info: syncing channel updates for 1.89.0-x86_64-unknown-linux-gnu
+rust	Provision fixed Rust toolchain in disposable runner	2026-10-23T00:17:12.0577557Z info: latest update on 2025-08-07 for version 1.89.0 (29483883e 2025-08-04)
+rust	Provision fixed Rust toolchain in disposable runner	2026-10-23T00:17:12.0578291Z info: downloading 3 components
+rust	Provision fixed Rust toolchain in disposable runner	2026-10-23T00:17:18.5456500Z 
+rust	Provision fixed Rust toolchain in disposable runner	2026-10-23T00:17:18.5524791Z   1.89.0-x86_64-unknown-linux-gnu installed - rustc 1.89.0 (29483883e 2025-08-04)
+rust	Provision fixed Rust toolchain in disposable runner	2026-10-23T00:17:18.5525351Z 
+rust	Compile Linux sandbox	﻿2026-10-23T00:17:18.5611135Z ##[group]Run cargo +1.89.0 check --locked -p omniplay-sandbox
+rust	Compile Linux sandbox	2026-10-23T00:17:18.5611550Z ^[[36;1mcargo +1.89.0 check --locked -p omniplay-sandbox^[[0m
+rust	Compile Linux sandbox	2026-10-23T00:17:18.5670423Z shell: /usr/bin/bash -e {0}
+rust	Compile Linux sandbox	2026-10-23T00:17:18.5670683Z env:
+rust	Compile Linux sandbox	2026-10-23T00:17:18.5670894Z   CARGO_TERM_COLOR: never
+rust	Compile Linux sandbox	2026-10-23T00:17:18.5671173Z   EXPECTED_SHA: b1f7439ba1cabd9d025e701c9fbf99cade3b3d5b
+rust	Compile Linux sandbox	2026-10-23T00:17:18.5671494Z   CARGO_HOME: /home/runner/work/_temp/vlikeon-cargo
+rust	Compile Linux sandbox	2026-10-23T00:17:18.5671816Z   CARGO_TARGET_DIR: /home/runner/work/_temp/vlikeon-target
+rust	Compile Linux sandbox	2026-10-23T00:17:18.5672122Z ##[endgroup]
+rust	Compile Linux sandbox	2026-10-23T00:17:18.6094579Z     Updating crates.io index
+rust	Compile Linux sandbox	2026-10-23T00:17:19.2721163Z  Downloading crates ...
+rust	Compile Linux sandbox	2026-10-23T00:17:19.3247950Z   Downloaded block-buffer v0.10.4
+rust	Compile Linux sandbox	2026-10-23T00:17:19.3269870Z   Downloaded generic-array v0.14.7
+rust	Compile Linux sandbox	2026-10-23T00:17:19.3284316Z   Downloaded cfg-if v1.0.5
+rust	Compile Linux sandbox	2026-10-23T00:17:19.3318145Z   Downloaded crypto-common v0.1.7
+rust	Compile Linux sandbox	2026-10-23T00:17:19.3377727Z   Downloaded itoa v1.0.18
+rust	Compile Linux sandbox	2026-10-23T00:17:19.3414130Z   Downloaded cpufeatures v0.2.17
+rust	Compile Linux sandbox	2026-10-23T00:17:19.3436894Z   Downloaded digest v0.10.7
+rust	Compile Linux sandbox	2026-10-23T00:17:19.3461057Z   Downloaded semver v1.0.28
+rust	Compile Linux sandbox	2026-10-23T00:17:19.3483229Z   Downloaded proc-macro2 v1.0.107
+rust	Compile Linux sandbox	2026-10-23T00:17:19.3511592Z   Downloaded version_check v0.9.5
+rust	Compile Linux sandbox	2026-10-23T00:17:19.3604001Z   Downloaded quote v1.0.47
+rust	Compile Linux sandbox	2026-10-23T00:17:19.3630187Z   Downloaded thiserror v2.0.20
+rust	Compile Linux sandbox	2026-10-23T00:17:19.3694593Z   Downloaded zmij v1.0.23
+rust	Compile Linux sandbox	2026-10-23T00:17:19.3711984Z   Downloaded unicode-ident v1.0.27
+rust	Compile Linux sandbox	2026-10-23T00:17:19.3737813Z   Downloaded serde_core v1.0.229
+rust	Compile Linux sandbox	2026-10-23T00:17:19.3762095Z   Downloaded thiserror-impl v2.0.20
+rust	Compile Linux sandbox	2026-10-23T00:17:19.3775535Z   Downloaded sha2 v0.10.9
+rust	Compile Linux sandbox	2026-10-23T00:17:19.3801176Z   Downloaded uuid v1.25.0
+rust	Compile Linux sandbox	2026-10-23T00:17:19.3828974Z   Downloaded serde_derive v1.0.229
+rust	Compile Linux sandbox	2026-10-23T00:17:19.3856908Z   Downloaded serde v1.0.229
+rust	Compile Linux sandbox	2026-10-23T00:17:19.3890909Z   Downloaded typenum v1.20.1
+rust	Compile Linux sandbox	2026-10-23T00:17:19.3922375Z   Downloaded memchr v2.8.3
+rust	Compile Linux sandbox	2026-10-23T00:17:19.3974876Z   Downloaded getrandom v0.4.3
+rust	Compile Linux sandbox	2026-10-23T00:17:19.4011588Z   Downloaded serde_json v1.0.151
+rust	Compile Linux sandbox	2026-10-23T00:17:19.4081767Z   Downloaded syn v3.0.9
+rust	Compile Linux sandbox	2026-10-23T00:17:19.4181694Z   Downloaded libc v0.2.191
+rust	Compile Linux sandbox	2026-10-23T00:17:19.4847581Z    Compiling proc-macro2 v1.0.107
+rust	Compile Linux sandbox	2026-10-23T00:17:19.4848083Z    Compiling unicode-ident v1.0.27
+rust	Compile Linux sandbox	2026-10-23T00:17:19.4848552Z    Compiling quote v1.0.47
+rust	Compile Linux sandbox	2026-10-23T00:17:19.4862801Z    Compiling version_check v0.9.5
+rust	Compile Linux sandbox	2026-10-23T00:17:19.5313284Z    Compiling serde_core v1.0.229
+rust	Compile Linux sandbox	2026-10-23T00:17:19.6615347Z    Compiling generic-array v0.14.7
+rust	Compile Linux sandbox	2026-10-23T00:17:19.7465239Z     Checking typenum v1.20.1
+rust	Compile Linux sandbox	2026-10-23T00:17:19.8134977Z    Compiling libc v0.2.191
+rust	Compile Linux sandbox	2026-10-23T00:17:20.2726671Z    Compiling syn v3.0.9
+rust	Compile Linux sandbox	2026-10-23T00:17:20.3045205Z    Compiling zmij v1.0.23
+rust	Compile Linux sandbox	2026-10-23T00:17:20.4885136Z     Checking cfg-if v1.0.5
+rust	Compile Linux sandbox	2026-10-23T00:17:20.5115425Z    Compiling getrandom v0.4.3
+rust	Compile Linux sandbox	2026-10-23T00:17:20.6194609Z     Checking block-buffer v0.10.4
+rust	Compile Linux sandbox	2026-10-23T00:17:20.6675300Z     Checking crypto-common v0.1.7
+rust	Compile Linux sandbox	2026-10-23T00:17:20.7108149Z    Compiling serde v1.0.229
+rust	Compile Linux sandbox	2026-10-23T00:17:20.9016754Z    Compiling thiserror v2.0.20
+rust	Compile Linux sandbox	2026-10-23T00:17:21.1345246Z    Compiling serde_json v1.0.151
+rust	Compile Linux sandbox	2026-10-23T00:17:21.2274762Z     Checking digest v0.10.7
+rust	Compile Linux sandbox	2026-10-23T00:17:21.3164912Z     Checking cpufeatures v0.2.17
+rust	Compile Linux sandbox	2026-10-23T00:17:21.3364745Z     Checking itoa v1.0.18
+rust	Compile Linux sandbox	2026-10-23T00:17:21.4043283Z     Checking memchr v2.8.3
+rust	Compile Linux sandbox	2026-10-23T00:17:21.4534610Z     Checking sha2 v0.10.9
+rust	Compile Linux sandbox	2026-10-23T00:17:21.5954742Z     Checking uuid v1.25.0
+rust	Compile Linux sandbox	2026-10-23T00:17:21.6154691Z     Checking semver v1.0.28
+rust	Compile Linux sandbox	2026-10-23T00:17:21.9792129Z    Compiling thiserror-impl v2.0.20
+rust	Compile Linux sandbox	2026-10-23T00:17:21.9792672Z    Compiling serde_derive v1.0.229
+rust	Compile Linux sandbox	2026-10-23T00:17:23.6469038Z     Checking omniplay-contracts v0.1.0 (/home/runner/work/vlikeon/vlikeon/platform/contracts)
+rust	Compile Linux sandbox	2026-10-23T00:17:25.7281569Z     Checking omniplay-sandbox v0.1.0 (/home/runner/work/vlikeon/vlikeon/platform/sandbox)
+rust	Compile Linux sandbox	2026-10-23T00:17:25.9809997Z warning: variable does not need to be mutable
+rust	Compile Linux sandbox	2026-10-23T00:17:25.9811278Z   --> platform/sandbox/src/linux_host.rs:42:59
+rust	Compile Linux sandbox	2026-10-23T00:17:25.9811868Z    |
+rust	Compile Linux sandbox	2026-10-23T00:17:25.9812527Z 42 | ...   let service=current;metadata(&service,false)?;let(mut manager,fresh)=created(&service,c"manager")?;if !fresh{empty_new(&manager)?;}...
+rust	Compile Linux sandbox	2026-10-23T00:17:25.9813291Z    |                                                         ----^^^^^^^
+rust	Compile Linux sandbox	2026-10-23T00:17:25.9813668Z    |                                                         |
+rust	Compile Linux sandbox	2026-10-23T00:17:25.9814442Z    |                                                         help: remove this `mut`
+rust	Compile Linux sandbox	2026-10-23T00:17:25.9814960Z    |
+rust	Compile Linux sandbox	2026-10-23T00:17:25.9815207Z    = note: `#[warn(unused_mut)]` on by default
+rust	Compile Linux sandbox	2026-10-23T00:17:25.9815459Z 
+rust	Compile Linux sandbox	2026-10-23T00:17:25.9815619Z error[E0716]: temporary value dropped while borrowed
+rust	Compile Linux sandbox	2026-10-23T00:17:25.9816026Z   --> platform/sandbox/src/linux_host.rs:43:25
+rust	Compile Linux sandbox	2026-10-23T00:17:25.9816366Z    |
+rust	Compile Linux sandbox	2026-10-23T00:17:25.9816961Z 43 | ...   let mut members=text(&manager,c"cgroup.procs")?.lines();if members.next()!=Some(process.as_str())||members.next().is_some()||!text(...
+rust	Compile Linux sandbox	2026-10-23T00:17:25.9817760Z    |                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^        -   ------- borrow later used here
+rust	Compile Linux sandbox	2026-10-23T00:17:25.9818215Z    |                       |                                      |
+rust	Compile Linux sandbox	2026-10-23T00:17:25.9818629Z    |                       |                                      temporary value is freed at the end of this statement
+rust	Compile Linux sandbox	2026-10-23T00:17:25.9819006Z    |                       creates a temporary value which is freed while still in use
+rust	Compile Linux sandbox	2026-10-23T00:17:25.9819278Z    |
+rust	Compile Linux sandbox	2026-10-23T00:17:25.9819506Z    = note: consider using a `let` binding to create a longer lived value
+rust	Compile Linux sandbox	2026-10-23T00:17:25.9819739Z 
+rust	Compile Linux sandbox	2026-10-23T00:17:26.0726178Z For more information about this error, try `rustc --explain E0716`.
+rust	Compile Linux sandbox	2026-10-23T00:17:26.0755521Z warning: `omniplay-sandbox` (lib) generated 1 warning
+rust	Compile Linux sandbox	2026-10-23T00:17:26.0756225Z error: could not compile `omniplay-sandbox` (lib) due to 1 previous error; 1 warning emitted
+rust	Compile Linux sandbox	2026-10-23T00:17:26.1346426Z ##[error]Process completed with exit code 101.
+rust	Confirm tracked source stayed unchanged	﻿2026-10-23T00:17:26.2327179Z ##[group]Run git diff --exit-code && git diff --cached --exit-code
+rust	Confirm tracked source stayed unchanged	2026-10-23T00:17:26.2327749Z ^[[36;1mgit diff --exit-code && git diff --cached --exit-code^[[0m
+rust	Confirm tracked source stayed unchanged	2026-10-23T00:17:26.2382219Z shell: /usr/bin/bash -e {0}
+rust	Confirm tracked source stayed unchanged	2026-10-23T00:17:26.2382429Z env:
+rust	Confirm tracked source stayed unchanged	2026-10-23T00:17:26.2382592Z   CARGO_TERM_COLOR: never
+rust	Confirm tracked source stayed unchanged	2026-10-23T00:17:26.2382839Z   EXPECTED_SHA: b1f7439ba1cabd9d025e701c9fbf99cade3b3d5b
+rust	Confirm tracked source stayed unchanged	2026-10-23T00:17:26.2383143Z   CARGO_HOME: /home/runner/work/_temp/vlikeon-cargo
+rust	Confirm tracked source stayed unchanged	2026-10-23T00:17:26.2383448Z   CARGO_TARGET_DIR: /home/runner/work/_temp/vlikeon-target
+rust	Confirm tracked source stayed unchanged	2026-10-23T00:17:26.2383702Z ##[endgroup]
+rust	Post Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	﻿2026-10-23T00:17:26.3077820Z Post job cleanup.
+rust	Post Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:17:26.3746170Z [command]/usr/bin/git version
+rust	Post Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:17:26.3782679Z git version 2.55.0
+rust	Post Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:17:26.3816613Z Temporarily overriding HOME='/home/runner/work/_temp/de842c62-e7f3-4f3e-b04d-83d777c02efd' before making global git config changes
+rust	Post Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:17:26.3817369Z Adding repository directory to the temporary git global config as a safe directory
+rust	Post Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:17:26.3821106Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/vlikeon/vlikeon
+rust	Post Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:17:26.3853558Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+rust	Post Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:17:26.3881654Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+rust	Post Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:17:26.4088210Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+rust	Post Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:17:26.4119459Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+rust	Complete job	﻿2026-10-23T00:17:26.4501956Z Cleaning up orphan processes
+rust	Complete job	2026-10-23T00:17:26.4752740Z ##[warning]Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+bootstrap	Set up job	﻿2026-10-23T00:17:09.4745771Z Current runner version: '2.338.0'
+bootstrap	Set up job	2026-10-23T00:17:09.4772340Z ##[group]Runner Image Provisioner
+bootstrap	Set up job	2026-10-23T00:17:09.4773411Z Hosted Compute Agent
+bootstrap	Set up job	2026-10-23T00:17:09.4774092Z Version: 20261012.601
+bootstrap	Set up job	2026-10-23T00:17:09.4775175Z Commit: f3dc54e1fb89da6852db922499a0233137369e1d
+bootstrap	Set up job	2026-10-23T00:17:09.4776060Z Build Date: 2026-10-12T17:48:21Z
+bootstrap	Set up job	2026-10-23T00:17:09.4776767Z Worker ID: {6bb733ac-d283-4271-8e44-183b817f9d4b}
+bootstrap	Set up job	2026-10-23T00:17:09.4777486Z Region: westus2
+bootstrap	Set up job	2026-10-23T00:17:09.4778156Z Cloud: Azure
+bootstrap	Set up job	2026-10-23T00:17:09.4778718Z ##[endgroup]
+bootstrap	Set up job	2026-10-23T00:17:09.4780585Z ##[group]Operating System
+bootstrap	Set up job	2026-10-23T00:17:09.4781336Z Ubuntu
+bootstrap	Set up job	2026-10-23T00:17:09.4781867Z 24.04.5
+bootstrap	Set up job	2026-10-23T00:17:09.4782493Z LTS
+bootstrap	Set up job	2026-10-23T00:17:09.4783030Z ##[endgroup]
+bootstrap	Set up job	2026-10-23T00:17:09.4783642Z ##[group]Runner Image
+bootstrap	Set up job	2026-10-23T00:17:09.4784272Z Image: ubuntu-24.04
+bootstrap	Set up job	2026-10-23T00:17:09.4785220Z Version: 20261012.334.1
+bootstrap	Set up job	2026-10-23T00:17:09.4786415Z Included Software: https://github.com/actions/runner-images/blob/ubuntu24/20261012.334/images/ubuntu/Ubuntu2404-Readme.md
+bootstrap	Set up job	2026-10-23T00:17:09.4788209Z Image Release: https://github.com/actions/runner-images/releases/tag/ubuntu24%2F20261012.334
+bootstrap	Set up job	2026-10-23T00:17:09.4789211Z ##[endgroup]
+bootstrap	Set up job	2026-10-23T00:17:09.4790791Z ##[group]GITHUB_TOKEN Permissions
+bootstrap	Set up job	2026-10-23T00:17:09.4792969Z Contents: read
+bootstrap	Set up job	2026-10-23T00:17:09.4793593Z Metadata: read
+bootstrap	Set up job	2026-10-23T00:17:09.4794287Z ##[endgroup]
+bootstrap	Set up job	2026-10-23T00:17:09.4796712Z Secret source: Actions
+bootstrap	Set up job	2026-10-23T00:17:09.4797806Z Cache mode: write
+bootstrap	Set up job	2026-10-23T00:17:09.4798755Z Prepare workflow directory
+bootstrap	Set up job	2026-10-23T00:17:09.5344252Z Prepare all required actions
+bootstrap	Set up job	2026-10-23T00:17:09.5393696Z Getting action download info
+bootstrap	Set up job	2026-10-23T00:17:09.8731497Z Download action repository 'actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683' (SHA:11bd71901bbe5b1630ceea73d27597364c9af683)
+bootstrap	Set up job	2026-10-23T00:17:10.0821682Z Complete job name: bootstrap
+bootstrap	Admit exact assigned revision	﻿2026-10-23T00:17:10.1580732Z ##[group]Run test "$GITHUB_SHA" = "$EXPECTED_SHA"
+bootstrap	Admit exact assigned revision	2026-10-23T00:17:10.1581530Z ^[[36;1mtest "$GITHUB_SHA" = "$EXPECTED_SHA"^[[0m
+bootstrap	Admit exact assigned revision	2026-10-23T00:17:10.1846252Z shell: /usr/bin/bash -e {0}
+bootstrap	Admit exact assigned revision	2026-10-23T00:17:10.1847254Z env:
+bootstrap	Admit exact assigned revision	2026-10-23T00:17:10.1847859Z   EXPECTED_SHA: b1f7439ba1cabd9d025e701c9fbf99cade3b3d5b
+bootstrap	Admit exact assigned revision	2026-10-23T00:17:10.1848593Z ##[endgroup]
+bootstrap	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	﻿2026-10-23T00:17:10.2236611Z ##[group]Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+bootstrap	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:17:10.2237421Z with:
+bootstrap	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:17:10.2237864Z   persist-credentials: false
+bootstrap	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:17:10.2238401Z   repository: lyzaghi/vlikeon
+bootstrap	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:17:10.2242292Z   token: ***
+bootstrap	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:17:10.2242739Z   ssh-strict: true
+bootstrap	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:17:10.2243189Z   ssh-user: git
+bootstrap	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:17:10.2243614Z   clean: true
+bootstrap	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:17:10.2244069Z   sparse-checkout-cone-mode: true
+bootstrap	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:17:10.2244918Z   fetch-depth: 1
+bootstrap	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:17:10.2245371Z   fetch-tags: false
+bootstrap	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:17:10.2245828Z   show-progress: true
+bootstrap	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:17:10.2246281Z   lfs: false
+bootstrap	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:17:10.2246705Z   submodules: false
+bootstrap	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:17:10.2247161Z   set-safe-directory: true
+bootstrap	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:17:10.2247661Z env:
+bootstrap	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:17:10.2248165Z   EXPECTED_SHA: b1f7439ba1cabd9d025e701c9fbf99cade3b3d5b
+bootstrap	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:17:10.2248799Z ##[endgroup]
+bootstrap	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:17:10.3285668Z Syncing repository: lyzaghi/vlikeon
+bootstrap	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:17:10.3288184Z ##[group]Getting Git version info
+bootstrap	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:17:10.3289080Z Working directory is '/home/runner/work/vlikeon/vlikeon'
+bootstrap	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:17:10.3290849Z [command]/usr/bin/git version
+bootstrap	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:17:10.3361634Z git version 2.55.0
+bootstrap	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:17:10.3392832Z ##[endgroup]
+bootstrap	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:17:10.3409864Z Temporarily overriding HOME='/home/runner/work/_temp/196f87e9-ea7e-4307-8321-648ae1be8ac4' before making global git config changes
+bootstrap	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:17:10.3412189Z Adding repository directory to the temporary git global config as a safe directory
+bootstrap	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:17:10.3416118Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/vlikeon/vlikeon
+bootstrap	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:17:10.3473492Z Deleting the contents of '/home/runner/work/vlikeon/vlikeon'
+bootstrap	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:17:10.3479011Z ##[group]Initializing the repository
+bootstrap	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:17:10.3484452Z [command]/usr/bin/git init /home/runner/work/vlikeon/vlikeon
+bootstrap	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:17:10.3608171Z hint: Using 'master' as the name for the initial branch. This default branch name
+bootstrap	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:17:10.3610666Z hint: will change to "main" in Git 3.0. To configure the initial branch name
+bootstrap	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:17:10.3613060Z hint: to use in all of your new repositories, which will suppress this warning,
+bootstrap	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:17:10.3615193Z hint: call:
+bootstrap	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:17:10.3616346Z hint:
+bootstrap	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:17:10.3617560Z hint: 	git config --global init.defaultBranch <name>
+bootstrap	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:17:10.3618984Z hint:
+bootstrap	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:17:10.3620224Z hint: Names commonly chosen instead of 'master' are 'main', 'trunk' and
+bootstrap	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:17:10.3622031Z hint: 'development'. The just-created branch can be renamed via this command:
+bootstrap	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:17:10.3623588Z hint:
+bootstrap	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:17:10.3624942Z hint: 	git branch -m <name>
+bootstrap	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:17:10.3626474Z hint:
+bootstrap	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:17:10.3627924Z hint: Disable this message with "git config set advice.defaultBranchName false"
+bootstrap	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:17:10.3630164Z Initialized empty Git repository in /home/runner/work/vlikeon/vlikeon/.git/
+bootstrap	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:17:10.3633556Z [command]/usr/bin/git remote add origin https://github.com/lyzaghi/vlikeon
+bootstrap	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:17:10.3690729Z ##[endgroup]
+bootstrap	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:17:10.3692005Z ##[group]Disabling automatic garbage collection
+bootstrap	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:17:10.3695534Z [command]/usr/bin/git config --local gc.auto 0
+bootstrap	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:17:10.3737551Z ##[endgroup]
+bootstrap	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:17:10.3738941Z ##[group]Setting up auth
+bootstrap	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:17:10.3746992Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+bootstrap	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:17:10.3796237Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+bootstrap	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:17:10.4236292Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+bootstrap	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:17:10.4288503Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+bootstrap	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:17:10.4545070Z [command]/usr/bin/git config --local http.https://github.com/.extraheader AUTHORIZATION: basic ***
+bootstrap	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:17:10.4590384Z ##[endgroup]
+bootstrap	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:17:10.4591275Z ##[group]Fetching the repository
+bootstrap	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:17:10.4601310Z [command]/usr/bin/git -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=1 origin +b1f7439ba1cabd9d025e701c9fbf99cade3b3d5b:refs/remotes/origin/main
+bootstrap	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:17:11.0085328Z From https://github.com/lyzaghi/vlikeon
+bootstrap	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:17:11.0086695Z  * [new ref]         b1f7439ba1cabd9d025e701c9fbf99cade3b3d5b -> origin/main
+bootstrap	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:17:11.0092001Z ##[endgroup]
+bootstrap	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:17:11.0093400Z ##[group]Determining the checkout info
+bootstrap	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:17:11.0095858Z ##[endgroup]
+bootstrap	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:17:11.0102634Z [command]/usr/bin/git sparse-checkout disable
+bootstrap	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:17:11.0160277Z [command]/usr/bin/git config --local --unset-all extensions.worktreeConfig
+bootstrap	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:17:11.0194185Z ##[group]Checking out the ref
+bootstrap	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:17:11.0200586Z [command]/usr/bin/git checkout --progress --force -B main refs/remotes/origin/main
+bootstrap	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:17:11.1178261Z Switched to a new branch 'main'
+bootstrap	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:17:11.1182501Z branch 'main' set up to track 'origin/main'.
+bootstrap	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:17:11.1191310Z ##[endgroup]
+bootstrap	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:17:11.1246468Z [command]/usr/bin/git log -1 --format=%H
+bootstrap	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:17:11.1283290Z b1f7439ba1cabd9d025e701c9fbf99cade3b3d5b
+bootstrap	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:17:11.1295347Z ##[group]Removing auth
+bootstrap	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:17:11.1299970Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+bootstrap	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:17:11.1340321Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+bootstrap	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:17:11.1585026Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+bootstrap	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:17:11.1631049Z http.https://github.com/.extraheader
+bootstrap	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:17:11.1640160Z [command]/usr/bin/git config --local --unset-all http.https://github.com/.extraheader
+bootstrap	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:17:11.1684866Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+bootstrap	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:17:11.1930906Z ##[endgroup]
+bootstrap	Configure isolated Linux bootstrap	﻿2026-10-23T00:17:11.2079808Z ##[group]Run cmake -S engines/isolation-linux -B "$RUNNER_TEMP/vlikeon-bootstrap" -DCMAKE_BUILD_TYPE=Release
+bootstrap	Configure isolated Linux bootstrap	2026-10-23T00:17:11.2081231Z ^[[36;1mcmake -S engines/isolation-linux -B "$RUNNER_TEMP/vlikeon-bootstrap" -DCMAKE_BUILD_TYPE=Release^[[0m
+bootstrap	Configure isolated Linux bootstrap	2026-10-23T00:17:11.2148868Z shell: /usr/bin/bash -e {0}
+bootstrap	Configure isolated Linux bootstrap	2026-10-23T00:17:11.2149470Z env:
+bootstrap	Configure isolated Linux bootstrap	2026-10-23T00:17:11.2150024Z   EXPECTED_SHA: b1f7439ba1cabd9d025e701c9fbf99cade3b3d5b
+bootstrap	Configure isolated Linux bootstrap	2026-10-23T00:17:11.2150684Z ##[endgroup]
+bootstrap	Configure isolated Linux bootstrap	2026-10-23T00:17:12.6134373Z -- The C compiler identification is GNU 13.3.0
+bootstrap	Configure isolated Linux bootstrap	2026-10-23T00:17:12.7300098Z -- Detecting C compiler ABI info
+bootstrap	Configure isolated Linux bootstrap	2026-10-23T00:17:12.9453830Z -- Detecting C compiler ABI info - done
+bootstrap	Configure isolated Linux bootstrap	2026-10-23T00:17:12.9639139Z -- Check for working C compiler: /usr/bin/cc - skipped
+bootstrap	Configure isolated Linux bootstrap	2026-10-23T00:17:12.9687443Z -- Detecting C compile features
+bootstrap	Configure isolated Linux bootstrap	2026-10-23T00:17:12.9731185Z -- Detecting C compile features - done
+bootstrap	Configure isolated Linux bootstrap	2026-10-23T00:17:12.9929145Z -- Configuring done (1.4s)
+bootstrap	Configure isolated Linux bootstrap	2026-10-23T00:17:13.0038453Z -- Generating done (0.0s)
+bootstrap	Configure isolated Linux bootstrap	2026-10-23T00:17:13.0043078Z -- Build files have been written to: /home/runner/work/_temp/vlikeon-bootstrap
+bootstrap	Build isolated Linux bootstrap	﻿2026-10-23T00:17:13.0168606Z ##[group]Run cmake --build "$RUNNER_TEMP/vlikeon-bootstrap" --parallel 2
+bootstrap	Build isolated Linux bootstrap	2026-10-23T00:17:13.0169296Z ^[[36;1mcmake --build "$RUNNER_TEMP/vlikeon-bootstrap" --parallel 2^[[0m
+bootstrap	Build isolated Linux bootstrap	2026-10-23T00:17:13.0236862Z shell: /usr/bin/bash -e {0}
+bootstrap	Build isolated Linux bootstrap	2026-10-23T00:17:13.0237289Z env:
+bootstrap	Build isolated Linux bootstrap	2026-10-23T00:17:13.0237692Z   EXPECTED_SHA: b1f7439ba1cabd9d025e701c9fbf99cade3b3d5b
+bootstrap	Build isolated Linux bootstrap	2026-10-23T00:17:13.0238081Z ##[endgroup]
+bootstrap	Build isolated Linux bootstrap	2026-10-23T00:17:13.0484220Z [ 12%] Building C object CMakeFiles/omniplay-linux-policy.dir/policy.c.o
+bootstrap	Build isolated Linux bootstrap	2026-10-23T00:17:13.2637658Z /home/runner/work/vlikeon/vlikeon/engines/isolation-linux/policy.c:29:2: error: #error A qualified Landlock ABI-6-or-newer UAPI SDK is required
+bootstrap	Build isolated Linux bootstrap	2026-10-23T00:17:13.2639492Z    29 | #error A qualified Landlock ABI-6-or-newer UAPI SDK is required
+bootstrap	Build isolated Linux bootstrap	2026-10-23T00:17:13.2639943Z       |  ^~~~~
+bootstrap	Build isolated Linux bootstrap	2026-10-23T00:17:13.2704247Z /home/runner/work/vlikeon/vlikeon/engines/isolation-linux/policy.c: In function ‘paths’:
+bootstrap	Build isolated Linux bootstrap	2026-10-23T00:17:13.2706436Z /home/runner/work/vlikeon/vlikeon/engines/isolation-linux/policy.c:56:455: error: ‘LANDLOCK_ACCESS_FS_IOCTL_DEV’ undeclared (first use in this function); did you mean ‘LANDLOCK_ACCESS_FS_MAKE_DIR’?
+bootstrap	Build isolated Linux bootstrap	2026-10-23T00:17:13.2708949Z    56 |   attr.handled_access_fs=LANDLOCK_ACCESS_FS_EXECUTE|LANDLOCK_ACCESS_FS_WRITE_FILE|LANDLOCK_ACCESS_FS_READ_FILE|LANDLOCK_ACCESS_FS_READ_DIR|LANDLOCK_ACCESS_FS_REMOVE_DIR|LANDLOCK_ACCESS_FS_REMOVE_FILE|LANDLOCK_ACCESS_FS_MAKE_CHAR|LANDLOCK_ACCESS_FS_MAKE_DIR|LANDLOCK_ACCESS_FS_MAKE_REG|LANDLOCK_ACCESS_FS_MAKE_SOCK|LANDLOCK_ACCESS_FS_MAKE_FIFO|LANDLOCK_ACCESS_FS_MAKE_BLOCK|LANDLOCK_ACCESS_FS_MAKE_SYM|LANDLOCK_ACCESS_FS_REFER|LANDLOCK_ACCESS_FS_TRUNCATE|LANDLOCK_ACCESS_FS_IOCTL_DEV;
+bootstrap	Build isolated Linux bootstrap	2026-10-23T00:17:13.2711349Z       |                                                                                                                                                                                                                                                                                                                                                                                                                                                                       ^~~~~~~~~~~~~~~~~~~~~~~~~~~~
+bootstrap	Build isolated Linux bootstrap	2026-10-23T00:17:13.2712771Z       |                                                                                                                                                                                                                                                                                                                                                                                                                                                                       LANDLOCK_ACCESS_FS_MAKE_DIR
+bootstrap	Build isolated Linux bootstrap	2026-10-23T00:17:13.2714440Z /home/runner/work/vlikeon/vlikeon/engines/isolation-linux/policy.c:56:455: note: each undeclared identifier is reported only once for each function it appears in
+bootstrap	Build isolated Linux bootstrap	2026-10-23T00:17:13.2743893Z /home/runner/work/vlikeon/vlikeon/engines/isolation-linux/policy.c:58:7: error: ‘struct landlock_ruleset_attr’ has no member named ‘scoped’
+bootstrap	Build isolated Linux bootstrap	2026-10-23T00:17:13.2745224Z    58 |   attr.scoped=LANDLOCK_SCOPE_ABSTRACT_UNIX_SOCKET|LANDLOCK_SCOPE_SIGNAL;
+bootstrap	Build isolated Linux bootstrap	2026-10-23T00:17:13.2745691Z       |       ^
+bootstrap	Build isolated Linux bootstrap	2026-10-23T00:17:13.2768152Z /home/runner/work/vlikeon/vlikeon/engines/isolation-linux/policy.c:58:15: error: ‘LANDLOCK_SCOPE_ABSTRACT_UNIX_SOCKET’ undeclared (first use in this function)
+bootstrap	Build isolated Linux bootstrap	2026-10-23T00:17:13.2769196Z    58 |   attr.scoped=LANDLOCK_SCOPE_ABSTRACT_UNIX_SOCKET|LANDLOCK_SCOPE_SIGNAL;
+bootstrap	Build isolated Linux bootstrap	2026-10-23T00:17:13.2769693Z       |               ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+bootstrap	Build isolated Linux bootstrap	2026-10-23T00:17:13.2788940Z /home/runner/work/vlikeon/vlikeon/engines/isolation-linux/policy.c:58:51: error: ‘LANDLOCK_SCOPE_SIGNAL’ undeclared (first use in this function)
+bootstrap	Build isolated Linux bootstrap	2026-10-23T00:17:13.2789976Z    58 |   attr.scoped=LANDLOCK_SCOPE_ABSTRACT_UNIX_SOCKET|LANDLOCK_SCOPE_SIGNAL;
+bootstrap	Build isolated Linux bootstrap	2026-10-23T00:17:13.2790468Z       |                                                   ^~~~~~~~~~~~~~~~~~~~~
+bootstrap	Build isolated Linux bootstrap	2026-10-23T00:17:13.2790967Z In file included from /usr/include/x86_64-linux-gnu/sys/mman.h:25,
+bootstrap	Build isolated Linux bootstrap	2026-10-23T00:17:13.2796178Z                  from /home/runner/work/vlikeon/vlikeon/engines/isolation-linux/policy.c:20:
+bootstrap	Build isolated Linux bootstrap	2026-10-23T00:17:13.2797497Z /home/runner/work/vlikeon/vlikeon/engines/isolation-linux/policy.c:59:22: error: ‘struct landlock_ruleset_attr’ has no member named ‘scoped’
+bootstrap	Build isolated Linux bootstrap	2026-10-23T00:17:13.2798404Z    59 |   const size_t bytes=offsetof(struct landlock_ruleset_attr,scoped)+sizeof(attr.scoped);
+bootstrap	Build isolated Linux bootstrap	2026-10-23T00:17:13.2798937Z       |                      ^~~~~~~~
+bootstrap	Build isolated Linux bootstrap	2026-10-23T00:17:13.2799690Z /home/runner/work/vlikeon/vlikeon/engines/isolation-linux/policy.c:59:79: error: ‘struct landlock_ruleset_attr’ has no member named ‘scoped’
+bootstrap	Build isolated Linux bootstrap	2026-10-23T00:17:13.2800521Z    59 |   const size_t bytes=offsetof(struct landlock_ruleset_attr,scoped)+sizeof(attr.scoped);
+bootstrap	Build isolated Linux bootstrap	2026-10-23T00:17:13.2801053Z       |                                                                               ^
+bootstrap	Build isolated Linux bootstrap	2026-10-23T00:17:13.3075384Z gmake[2]: *** [CMakeFiles/omniplay-linux-policy.dir/build.make:79: CMakeFiles/omniplay-linux-policy.dir/policy.c.o] Error 1
+bootstrap	Build isolated Linux bootstrap	2026-10-23T00:17:13.3156909Z gmake[1]: *** [CMakeFiles/Makefile2:93: CMakeFiles/omniplay-linux-policy.dir/all] Error 2
+bootstrap	Build isolated Linux bootstrap	2026-10-23T00:17:13.3158001Z gmake: *** [Makefile:91: all] Error 2
+bootstrap	Build isolated Linux bootstrap	2026-10-23T00:17:13.3173362Z ##[error]Process completed with exit code 2.
+bootstrap	Confirm tracked source stayed unchanged	﻿2026-10-23T00:17:13.3237463Z ##[group]Run git diff --exit-code && git diff --cached --exit-code
+bootstrap	Confirm tracked source stayed unchanged	2026-10-23T00:17:13.3238055Z ^[[36;1mgit diff --exit-code && git diff --cached --exit-code^[[0m
+bootstrap	Confirm tracked source stayed unchanged	2026-10-23T00:17:13.3305191Z shell: /usr/bin/bash -e {0}
+bootstrap	Confirm tracked source stayed unchanged	2026-10-23T00:17:13.3305523Z env:
+bootstrap	Confirm tracked source stayed unchanged	2026-10-23T00:17:13.3305838Z   EXPECTED_SHA: b1f7439ba1cabd9d025e701c9fbf99cade3b3d5b
+bootstrap	Confirm tracked source stayed unchanged	2026-10-23T00:17:13.3306219Z ##[endgroup]
+bootstrap	Post Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	﻿2026-10-23T00:17:13.3987555Z Post job cleanup.
+bootstrap	Post Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:17:13.4909474Z [command]/usr/bin/git version
+bootstrap	Post Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:17:13.4960362Z git version 2.55.0
+bootstrap	Post Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:17:13.5005385Z Temporarily overriding HOME='/home/runner/work/_temp/bf23c6ee-49ce-4863-9bcd-da8022c58059' before making global git config changes
+bootstrap	Post Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:17:13.5007064Z Adding repository directory to the temporary git global config as a safe directory
+bootstrap	Post Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:17:13.5012377Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/vlikeon/vlikeon
+bootstrap	Post Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:17:13.5062249Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+bootstrap	Post Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:17:13.5113938Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+bootstrap	Post Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:17:13.5383990Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+bootstrap	Post Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:17:13.5419408Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+bootstrap	Complete job	﻿2026-10-23T00:17:13.5887622Z Cleaning up orphan processes
+bootstrap	Complete job	2026-10-23T00:17:13.6230022Z ##[warning]Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/

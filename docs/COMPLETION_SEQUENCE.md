@@ -128,7 +128,7 @@ verified completion has not been claimed.
 | --- | --- | --- | --- |
 | 1 | Desktop Chromium, Game Hub, profiles, permissions and build/update integration | Source authored; current desktop overlay and build/upgrade recipes retained | Pending final pass; remains open |
 | 2 | Windows native runtime lifecycle and containment | Deferred by owner; remaining source obligations retained | Partial fixture evidence; full acceptance pending |
-| 3 | Linux native runtime lifecycle and containment | In progress; current source audit | Eight socket cases and bootstrap build passed; full acceptance pending |
+| 3 | Linux native runtime lifecycle and containment | In progress; current source audit | Eight socket cases, runtime/broker check and bootstrap build passed; full acceptance pending |
 | 4 | macOS native runtime lifecycle and containment | Pending sequential completion audit | Pending final pass |
 | 5 | v1 retro systems and core adapters | Pending sequential completion audit | Pending final pass |
 | 6 | Graphics, audio and input | Pending sequential completion audit | Pending final pass |

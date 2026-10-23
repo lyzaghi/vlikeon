@@ -1,0 +1,1240 @@
+rust	Set up job	﻿2026-10-23T00:27:13.0657773Z Current runner version: '2.338.0'
+rust	Set up job	2026-10-23T00:27:13.0687138Z ##[group]Runner Image Provisioner
+rust	Set up job	2026-10-23T00:27:13.0688023Z Hosted Compute Agent
+rust	Set up job	2026-10-23T00:27:13.0688704Z Version: 20261012.601
+rust	Set up job	2026-10-23T00:27:13.0689355Z Commit: f3dc54e1fb89da6852db922499a0233137369e1d
+rust	Set up job	2026-10-23T00:27:13.0690109Z Build Date: 2026-10-12T17:48:21Z
+rust	Set up job	2026-10-23T00:27:13.0690898Z Worker ID: {4115e03d-7b31-4661-b322-d91264535a1c}
+rust	Set up job	2026-10-23T00:27:13.0691986Z Region: eastus
+rust	Set up job	2026-10-23T00:27:13.0692794Z Cloud: Azure
+rust	Set up job	2026-10-23T00:27:13.0693348Z ##[endgroup]
+rust	Set up job	2026-10-23T00:27:13.0694982Z ##[group]Operating System
+rust	Set up job	2026-10-23T00:27:13.0695678Z Ubuntu
+rust	Set up job	2026-10-23T00:27:13.0696209Z 24.04.5
+rust	Set up job	2026-10-23T00:27:13.0696805Z LTS
+rust	Set up job	2026-10-23T00:27:13.0697326Z ##[endgroup]
+rust	Set up job	2026-10-23T00:27:13.0697905Z ##[group]Runner Image
+rust	Set up job	2026-10-23T00:27:13.0698649Z Image: ubuntu-24.04
+rust	Set up job	2026-10-23T00:27:13.0699217Z Version: 20261012.334.1
+rust	Set up job	2026-10-23T00:27:13.0700328Z Included Software: https://github.com/actions/runner-images/blob/ubuntu24/20261012.334/images/ubuntu/Ubuntu2404-Readme.md
+rust	Set up job	2026-10-23T00:27:13.0702531Z Image Release: https://github.com/actions/runner-images/releases/tag/ubuntu24%2F20261012.334
+rust	Set up job	2026-10-23T00:27:13.0703573Z ##[endgroup]
+rust	Set up job	2026-10-23T00:27:13.0705149Z ##[group]GITHUB_TOKEN Permissions
+rust	Set up job	2026-10-23T00:27:13.0707292Z Contents: read
+rust	Set up job	2026-10-23T00:27:13.0708029Z Metadata: read
+rust	Set up job	2026-10-23T00:27:13.0708620Z ##[endgroup]
+rust	Set up job	2026-10-23T00:27:13.0710762Z Secret source: Actions
+rust	Set up job	2026-10-23T00:27:13.0712040Z Cache mode: write
+rust	Set up job	2026-10-23T00:27:13.0713013Z Prepare workflow directory
+rust	Set up job	2026-10-23T00:27:13.1248210Z Prepare all required actions
+rust	Set up job	2026-10-23T00:27:13.1299957Z Getting action download info
+rust	Set up job	2026-10-23T00:27:13.3252961Z Download action repository 'actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683' (SHA:11bd71901bbe5b1630ceea73d27597364c9af683)
+rust	Set up job	2026-10-23T00:27:13.5053034Z Complete job name: rust
+rust	Admit exact assigned revision	﻿2026-10-23T00:27:13.5918406Z ##[group]Run test "$GITHUB_SHA" = "$EXPECTED_SHA"
+rust	Admit exact assigned revision	2026-10-23T00:27:13.5919214Z ^[[36;1mtest "$GITHUB_SHA" = "$EXPECTED_SHA"^[[0m
+rust	Admit exact assigned revision	2026-10-23T00:27:13.6224367Z shell: /usr/bin/bash -e {0}
+rust	Admit exact assigned revision	2026-10-23T00:27:13.6225377Z env:
+rust	Admit exact assigned revision	2026-10-23T00:27:13.6225871Z   CARGO_TERM_COLOR: never
+rust	Admit exact assigned revision	2026-10-23T00:27:13.6226502Z   EXPECTED_SHA: 1d1af96f42adc80fc0bef9e427e24fac6efad1a9
+rust	Admit exact assigned revision	2026-10-23T00:27:13.6227236Z ##[endgroup]
+rust	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	﻿2026-10-23T00:27:13.6602871Z ##[group]Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+rust	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:27:13.6603669Z with:
+rust	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:27:13.6604120Z   persist-credentials: false
+rust	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:27:13.6604669Z   repository: lyzaghi/vlikeon
+rust	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:27:13.6608631Z   token: ***
+rust	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:27:13.6609062Z   ssh-strict: true
+rust	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:27:13.6609498Z   ssh-user: git
+rust	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:27:13.6609912Z   clean: true
+rust	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:27:13.6610361Z   sparse-checkout-cone-mode: true
+rust	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:27:13.6610886Z   fetch-depth: 1
+rust	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:27:13.6611321Z   fetch-tags: false
+rust	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:27:13.6611935Z   show-progress: true
+rust	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:27:13.6612376Z   lfs: false
+rust	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:27:13.6612787Z   submodules: false
+rust	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:27:13.6613245Z   set-safe-directory: true
+rust	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:27:13.6613705Z env:
+rust	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:27:13.6614100Z   CARGO_TERM_COLOR: never
+rust	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:27:13.6614653Z   EXPECTED_SHA: 1d1af96f42adc80fc0bef9e427e24fac6efad1a9
+rust	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:27:13.6615292Z ##[endgroup]
+rust	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:27:13.7630170Z Syncing repository: lyzaghi/vlikeon
+rust	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:27:13.7632638Z ##[group]Getting Git version info
+rust	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:27:13.7633423Z Working directory is '/home/runner/work/vlikeon/vlikeon'
+rust	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:27:13.7634429Z [command]/usr/bin/git version
+rust	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:27:13.7750866Z git version 2.55.0
+rust	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:27:13.7775010Z ##[endgroup]
+rust	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:27:13.7800384Z Temporarily overriding HOME='/home/runner/work/_temp/a0425dab-c577-4e5c-81a2-0abe3daed82b' before making global git config changes
+rust	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:27:13.7802942Z Adding repository directory to the temporary git global config as a safe directory
+rust	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:27:13.7807320Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/vlikeon/vlikeon
+rust	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:27:13.7866626Z Deleting the contents of '/home/runner/work/vlikeon/vlikeon'
+rust	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:27:13.7872139Z ##[group]Initializing the repository
+rust	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:27:13.7878438Z [command]/usr/bin/git init /home/runner/work/vlikeon/vlikeon
+rust	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:27:13.8010314Z hint: Using 'master' as the name for the initial branch. This default branch name
+rust	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:27:13.8012520Z hint: will change to "main" in Git 3.0. To configure the initial branch name
+rust	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:27:13.8014446Z hint: to use in all of your new repositories, which will suppress this warning,
+rust	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:27:13.8015363Z hint: call:
+rust	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:27:13.8015787Z hint:
+rust	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:27:13.8016326Z hint: 	git config --global init.defaultBranch <name>
+rust	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:27:13.8016947Z hint:
+rust	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:27:13.8017534Z hint: Names commonly chosen instead of 'master' are 'main', 'trunk' and
+rust	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:27:13.8018463Z hint: 'development'. The just-created branch can be renamed via this command:
+rust	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:27:13.8019195Z hint:
+rust	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:27:13.8019647Z hint: 	git branch -m <name>
+rust	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:27:13.8020132Z hint:
+rust	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:27:13.8020761Z hint: Disable this message with "git config set advice.defaultBranchName false"
+rust	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:27:13.8022269Z Initialized empty Git repository in /home/runner/work/vlikeon/vlikeon/.git/
+rust	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:27:13.8035459Z [command]/usr/bin/git remote add origin https://github.com/lyzaghi/vlikeon
+rust	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:27:13.8093143Z ##[endgroup]
+rust	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:27:13.8094437Z ##[group]Disabling automatic garbage collection
+rust	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:27:13.8097497Z [command]/usr/bin/git config --local gc.auto 0
+rust	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:27:13.8161084Z ##[endgroup]
+rust	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:27:13.8162882Z ##[group]Setting up auth
+rust	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:27:13.8169420Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+rust	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:27:13.8210569Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+rust	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:27:13.8623149Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+rust	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:27:13.8663745Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+rust	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:27:13.8904366Z [command]/usr/bin/git config --local http.https://github.com/.extraheader AUTHORIZATION: basic ***
+rust	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:27:13.8953084Z ##[endgroup]
+rust	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:27:13.8954693Z ##[group]Fetching the repository
+rust	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:27:13.8965614Z [command]/usr/bin/git -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=1 origin +1d1af96f42adc80fc0bef9e427e24fac6efad1a9:refs/remotes/origin/main
+rust	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:27:14.3210261Z From https://github.com/lyzaghi/vlikeon
+rust	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:27:14.3211692Z  * [new ref]         1d1af96f42adc80fc0bef9e427e24fac6efad1a9 -> origin/main
+rust	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:27:14.3214634Z ##[endgroup]
+rust	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:27:14.3215580Z ##[group]Determining the checkout info
+rust	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:27:14.3217045Z ##[endgroup]
+rust	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:27:14.3223784Z [command]/usr/bin/git sparse-checkout disable
+rust	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:27:14.3280014Z [command]/usr/bin/git config --local --unset-all extensions.worktreeConfig
+rust	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:27:14.3315470Z ##[group]Checking out the ref
+rust	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:27:14.3319632Z [command]/usr/bin/git checkout --progress --force -B main refs/remotes/origin/main
+rust	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:27:14.4312853Z Switched to a new branch 'main'
+rust	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:27:14.4317345Z branch 'main' set up to track 'origin/main'.
+rust	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:27:14.4328507Z ##[endgroup]
+rust	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:27:14.4384769Z [command]/usr/bin/git log -1 --format=%H
+rust	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:27:14.4418629Z 1d1af96f42adc80fc0bef9e427e24fac6efad1a9
+rust	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:27:14.4430331Z ##[group]Removing auth
+rust	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:27:14.4433410Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+rust	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:27:14.4471888Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+rust	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:27:14.4727977Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+rust	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:27:14.4757344Z http.https://github.com/.extraheader
+rust	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:27:14.4766389Z [command]/usr/bin/git config --local --unset-all http.https://github.com/.extraheader
+rust	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:27:14.4803269Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+rust	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:27:14.5029755Z ##[endgroup]
+rust	Provision fixed Rust toolchain in disposable runner	﻿2026-10-23T00:27:14.5212088Z ##[group]Run printf 'CARGO_HOME=%s\n' "$RUNNER_TEMP/vlikeon-cargo" >> "$GITHUB_ENV"
+rust	Provision fixed Rust toolchain in disposable runner	2026-10-23T00:27:14.5214740Z ^[[36;1mprintf 'CARGO_HOME=%s\n' "$RUNNER_TEMP/vlikeon-cargo" >> "$GITHUB_ENV"^[[0m
+rust	Provision fixed Rust toolchain in disposable runner	2026-10-23T00:27:14.5217230Z ^[[36;1mprintf 'CARGO_TARGET_DIR=%s\n' "$RUNNER_TEMP/vlikeon-target" >> "$GITHUB_ENV"^[[0m
+rust	Provision fixed Rust toolchain in disposable runner	2026-10-23T00:27:14.5219456Z ^[[36;1mrustup toolchain install 1.89.0 --profile minimal^[[0m
+rust	Provision fixed Rust toolchain in disposable runner	2026-10-23T00:27:14.5285619Z shell: /usr/bin/bash -e {0}
+rust	Provision fixed Rust toolchain in disposable runner	2026-10-23T00:27:14.5286714Z env:
+rust	Provision fixed Rust toolchain in disposable runner	2026-10-23T00:27:14.5287542Z   CARGO_TERM_COLOR: never
+rust	Provision fixed Rust toolchain in disposable runner	2026-10-23T00:27:14.5288850Z   EXPECTED_SHA: 1d1af96f42adc80fc0bef9e427e24fac6efad1a9
+rust	Provision fixed Rust toolchain in disposable runner	2026-10-23T00:27:14.5290336Z ##[endgroup]
+rust	Provision fixed Rust toolchain in disposable runner	2026-10-23T00:27:14.5885027Z info: syncing channel updates for 1.89.0-x86_64-unknown-linux-gnu
+rust	Provision fixed Rust toolchain in disposable runner	2026-10-23T00:27:14.9083252Z info: latest update on 2025-08-07 for version 1.89.0 (29483883e 2025-08-04)
+rust	Provision fixed Rust toolchain in disposable runner	2026-10-23T00:27:14.9086399Z info: downloading 3 components
+rust	Provision fixed Rust toolchain in disposable runner	2026-10-23T00:27:22.3223670Z 
+rust	Provision fixed Rust toolchain in disposable runner	2026-10-23T00:27:22.3301916Z   1.89.0-x86_64-unknown-linux-gnu installed - rustc 1.89.0 (29483883e 2025-08-04)
+rust	Provision fixed Rust toolchain in disposable runner	2026-10-23T00:27:22.3302878Z 
+rust	Compile Linux sandbox	﻿2026-10-23T00:27:22.3395617Z ##[group]Run cargo +1.89.0 check --locked -p omniplay-sandbox
+rust	Compile Linux sandbox	2026-10-23T00:27:22.3396174Z ^[[36;1mcargo +1.89.0 check --locked -p omniplay-sandbox^[[0m
+rust	Compile Linux sandbox	2026-10-23T00:27:22.3462604Z shell: /usr/bin/bash -e {0}
+rust	Compile Linux sandbox	2026-10-23T00:27:22.3462933Z env:
+rust	Compile Linux sandbox	2026-10-23T00:27:22.3463179Z   CARGO_TERM_COLOR: never
+rust	Compile Linux sandbox	2026-10-23T00:27:22.3463531Z   EXPECTED_SHA: 1d1af96f42adc80fc0bef9e427e24fac6efad1a9
+rust	Compile Linux sandbox	2026-10-23T00:27:22.3463957Z   CARGO_HOME: /home/runner/work/_temp/vlikeon-cargo
+rust	Compile Linux sandbox	2026-10-23T00:27:22.3464386Z   CARGO_TARGET_DIR: /home/runner/work/_temp/vlikeon-target
+rust	Compile Linux sandbox	2026-10-23T00:27:22.3464760Z ##[endgroup]
+rust	Compile Linux sandbox	2026-10-23T00:27:22.4048298Z     Updating crates.io index
+rust	Compile Linux sandbox	2026-10-23T00:27:23.2104670Z  Downloading crates ...
+rust	Compile Linux sandbox	2026-10-23T00:27:23.2940065Z   Downloaded cfg-if v1.0.5
+rust	Compile Linux sandbox	2026-10-23T00:27:23.3038927Z   Downloaded block-buffer v0.10.4
+rust	Compile Linux sandbox	2026-10-23T00:27:23.3080795Z   Downloaded getrandom v0.4.3
+rust	Compile Linux sandbox	2026-10-23T00:27:23.3186216Z   Downloaded digest v0.10.7
+rust	Compile Linux sandbox	2026-10-23T00:27:23.3210428Z   Downloaded generic-array v0.14.7
+rust	Compile Linux sandbox	2026-10-23T00:27:23.3232471Z   Downloaded itoa v1.0.18
+rust	Compile Linux sandbox	2026-10-23T00:27:23.3250622Z   Downloaded cpufeatures v0.2.17
+rust	Compile Linux sandbox	2026-10-23T00:27:23.3273823Z   Downloaded crypto-common v0.1.7
+rust	Compile Linux sandbox	2026-10-23T00:27:23.3394033Z   Downloaded version_check v0.9.5
+rust	Compile Linux sandbox	2026-10-23T00:27:23.3696128Z   Downloaded zmij v1.0.23
+rust	Compile Linux sandbox	2026-10-23T00:27:23.3721763Z   Downloaded sha2 v0.10.9
+rust	Compile Linux sandbox	2026-10-23T00:27:23.3754849Z   Downloaded unicode-ident v1.0.27
+rust	Compile Linux sandbox	2026-10-23T00:27:23.3789420Z   Downloaded thiserror-impl v2.0.20
+rust	Compile Linux sandbox	2026-10-23T00:27:23.3816094Z   Downloaded semver v1.0.28
+rust	Compile Linux sandbox	2026-10-23T00:27:23.3845660Z   Downloaded quote v1.0.47
+rust	Compile Linux sandbox	2026-10-23T00:27:23.3883276Z   Downloaded serde_derive v1.0.229
+rust	Compile Linux sandbox	2026-10-23T00:27:23.3923098Z   Downloaded uuid v1.25.0
+rust	Compile Linux sandbox	2026-10-23T00:27:23.3957690Z   Downloaded serde_core v1.0.229
+rust	Compile Linux sandbox	2026-10-23T00:27:23.3990337Z   Downloaded proc-macro2 v1.0.107
+rust	Compile Linux sandbox	2026-10-23T00:27:23.4027286Z   Downloaded memchr v2.8.3
+rust	Compile Linux sandbox	2026-10-23T00:27:23.4095918Z   Downloaded typenum v1.20.1
+rust	Compile Linux sandbox	2026-10-23T00:27:23.4135312Z   Downloaded serde v1.0.229
+rust	Compile Linux sandbox	2026-10-23T00:27:23.4178180Z   Downloaded thiserror v2.0.20
+rust	Compile Linux sandbox	2026-10-23T00:27:23.4303888Z   Downloaded serde_json v1.0.151
+rust	Compile Linux sandbox	2026-10-23T00:27:23.4439190Z   Downloaded syn v3.0.9
+rust	Compile Linux sandbox	2026-10-23T00:27:23.4600310Z   Downloaded libc v0.2.191
+rust	Compile Linux sandbox	2026-10-23T00:27:23.5336628Z    Compiling proc-macro2 v1.0.107
+rust	Compile Linux sandbox	2026-10-23T00:27:23.5337260Z    Compiling version_check v0.9.5
+rust	Compile Linux sandbox	2026-10-23T00:27:23.5337901Z    Compiling unicode-ident v1.0.27
+rust	Compile Linux sandbox	2026-10-23T00:27:23.5339189Z    Compiling quote v1.0.47
+rust	Compile Linux sandbox	2026-10-23T00:27:23.6010715Z    Compiling serde_core v1.0.229
+rust	Compile Linux sandbox	2026-10-23T00:27:23.7822518Z    Compiling generic-array v0.14.7
+rust	Compile Linux sandbox	2026-10-23T00:27:23.8434347Z     Checking typenum v1.20.1
+rust	Compile Linux sandbox	2026-10-23T00:27:23.9652383Z    Compiling libc v0.2.191
+rust	Compile Linux sandbox	2026-10-23T00:27:24.5412738Z    Compiling syn v3.0.9
+rust	Compile Linux sandbox	2026-10-23T00:27:24.5762531Z    Compiling zmij v1.0.23
+rust	Compile Linux sandbox	2026-10-23T00:27:24.8062509Z    Compiling getrandom v0.4.3
+rust	Compile Linux sandbox	2026-10-23T00:27:25.0013108Z     Checking cfg-if v1.0.5
+rust	Compile Linux sandbox	2026-10-23T00:27:25.1052690Z     Checking block-buffer v0.10.4
+rust	Compile Linux sandbox	2026-10-23T00:27:25.1793062Z     Checking crypto-common v0.1.7
+rust	Compile Linux sandbox	2026-10-23T00:27:25.2413063Z    Compiling serde v1.0.229
+rust	Compile Linux sandbox	2026-10-23T00:27:25.5012986Z    Compiling thiserror v2.0.20
+rust	Compile Linux sandbox	2026-10-23T00:27:25.8022652Z    Compiling serde_json v1.0.151
+rust	Compile Linux sandbox	2026-10-23T00:27:25.9823078Z     Checking digest v0.10.7
+rust	Compile Linux sandbox	2026-10-23T00:27:26.1106858Z     Checking cpufeatures v0.2.17
+rust	Compile Linux sandbox	2026-10-23T00:27:26.1422573Z     Checking memchr v2.8.3
+rust	Compile Linux sandbox	2026-10-23T00:27:26.2042333Z     Checking itoa v1.0.18
+rust	Compile Linux sandbox	2026-10-23T00:27:26.3052619Z     Checking sha2 v0.10.9
+rust	Compile Linux sandbox	2026-10-23T00:27:26.3263728Z     Checking uuid v1.25.0
+rust	Compile Linux sandbox	2026-10-23T00:27:26.5553262Z     Checking semver v1.0.28
+rust	Compile Linux sandbox	2026-10-23T00:27:26.8974308Z    Compiling serde_derive v1.0.229
+rust	Compile Linux sandbox	2026-10-23T00:27:26.8974963Z    Compiling thiserror-impl v2.0.20
+rust	Compile Linux sandbox	2026-10-23T00:27:29.0826455Z     Checking omniplay-contracts v0.1.0 (/home/runner/work/vlikeon/vlikeon/platform/contracts)
+rust	Compile Linux sandbox	2026-10-23T00:27:31.8172803Z     Checking omniplay-sandbox v0.1.0 (/home/runner/work/vlikeon/vlikeon/platform/sandbox)
+rust	Compile Linux sandbox	2026-10-23T00:27:32.3222350Z     Finished `dev` profile [unoptimized + debuginfo] target(s) in 9.95s
+rust	Exercise real Unix descriptor and host channel boundaries	﻿2026-10-23T00:27:32.3864954Z ##[group]Run cargo +1.89.0 test --locked -p omniplay-sandbox linux_host_channel::tests -- --test-threads=1
+rust	Exercise real Unix descriptor and host channel boundaries	2026-10-23T00:27:32.3865764Z ^[[36;1mcargo +1.89.0 test --locked -p omniplay-sandbox linux_host_channel::tests -- --test-threads=1^[[0m
+rust	Exercise real Unix descriptor and host channel boundaries	2026-10-23T00:27:32.3932217Z shell: /usr/bin/bash -e {0}
+rust	Exercise real Unix descriptor and host channel boundaries	2026-10-23T00:27:32.3932504Z env:
+rust	Exercise real Unix descriptor and host channel boundaries	2026-10-23T00:27:32.3932715Z   CARGO_TERM_COLOR: never
+rust	Exercise real Unix descriptor and host channel boundaries	2026-10-23T00:27:32.3933016Z   EXPECTED_SHA: 1d1af96f42adc80fc0bef9e427e24fac6efad1a9
+rust	Exercise real Unix descriptor and host channel boundaries	2026-10-23T00:27:32.3933419Z   CARGO_HOME: /home/runner/work/_temp/vlikeon-cargo
+rust	Exercise real Unix descriptor and host channel boundaries	2026-10-23T00:27:32.3933798Z   CARGO_TARGET_DIR: /home/runner/work/_temp/vlikeon-target
+rust	Exercise real Unix descriptor and host channel boundaries	2026-10-23T00:27:32.3934118Z ##[endgroup]
+rust	Exercise real Unix descriptor and host channel boundaries	2026-10-23T00:27:32.4995958Z    Compiling typenum v1.20.1
+rust	Exercise real Unix descriptor and host channel boundaries	2026-10-23T00:27:32.4996811Z    Compiling serde_core v1.0.229
+rust	Exercise real Unix descriptor and host channel boundaries	2026-10-23T00:27:32.5002258Z    Compiling cfg-if v1.0.5
+rust	Exercise real Unix descriptor and host channel boundaries	2026-10-23T00:27:32.5002895Z    Compiling libc v0.2.191
+rust	Exercise real Unix descriptor and host channel boundaries	2026-10-23T00:27:32.5352581Z    Compiling zmij v1.0.23
+rust	Exercise real Unix descriptor and host channel boundaries	2026-10-23T00:27:32.8602311Z    Compiling itoa v1.0.18
+rust	Exercise real Unix descriptor and host channel boundaries	2026-10-23T00:27:33.0453146Z    Compiling memchr v2.8.3
+rust	Exercise real Unix descriptor and host channel boundaries	2026-10-23T00:27:33.3342596Z    Compiling generic-array v0.14.7
+rust	Exercise real Unix descriptor and host channel boundaries	2026-10-23T00:27:33.8003007Z    Compiling getrandom v0.4.3
+rust	Exercise real Unix descriptor and host channel boundaries	2026-10-23T00:27:33.8123248Z    Compiling cpufeatures v0.2.17
+rust	Exercise real Unix descriptor and host channel boundaries	2026-10-23T00:27:33.8442759Z    Compiling thiserror v2.0.20
+rust	Exercise real Unix descriptor and host channel boundaries	2026-10-23T00:27:33.8945156Z    Compiling block-buffer v0.10.4
+rust	Exercise real Unix descriptor and host channel boundaries	2026-10-23T00:27:33.9092565Z    Compiling crypto-common v0.1.7
+rust	Exercise real Unix descriptor and host channel boundaries	2026-10-23T00:27:33.9650157Z    Compiling digest v0.10.7
+rust	Exercise real Unix descriptor and host channel boundaries	2026-10-23T00:27:34.0446472Z    Compiling sha2 v0.10.9
+rust	Exercise real Unix descriptor and host channel boundaries	2026-10-23T00:27:34.5773017Z    Compiling serde_json v1.0.151
+rust	Exercise real Unix descriptor and host channel boundaries	2026-10-23T00:27:34.5792314Z    Compiling uuid v1.25.0
+rust	Exercise real Unix descriptor and host channel boundaries	2026-10-23T00:27:34.5802274Z    Compiling semver v1.0.28
+rust	Exercise real Unix descriptor and host channel boundaries	2026-10-23T00:27:34.6743066Z    Compiling serde v1.0.229
+rust	Exercise real Unix descriptor and host channel boundaries	2026-10-23T00:27:35.2743079Z    Compiling omniplay-contracts v0.1.0 (/home/runner/work/vlikeon/vlikeon/platform/contracts)
+rust	Exercise real Unix descriptor and host channel boundaries	2026-10-23T00:27:39.0753732Z    Compiling omniplay-sandbox v0.1.0 (/home/runner/work/vlikeon/vlikeon/platform/sandbox)
+rust	Exercise real Unix descriptor and host channel boundaries	2026-10-23T00:27:40.1872266Z     Finished `test` profile [unoptimized + debuginfo] target(s) in 7.77s
+rust	Exercise real Unix descriptor and host channel boundaries	2026-10-23T00:27:40.1923276Z      Running unittests src/lib.rs (/home/runner/work/_temp/vlikeon-target/debug/deps/omniplay_sandbox-b7b1280242e36274)
+rust	Exercise real Unix descriptor and host channel boundaries	2026-10-23T00:27:40.1934611Z 
+rust	Exercise real Unix descriptor and host channel boundaries	2026-10-23T00:27:40.1936921Z running 8 tests
+rust	Exercise real Unix descriptor and host channel boundaries	2026-10-23T00:27:40.1949922Z test linux_host_channel::tests::bad_client_does_not_end_listener_or_invoke_provisioning ... ok
+rust	Exercise real Unix descriptor and host channel boundaries	2026-10-23T00:27:40.1950731Z test linux_host_channel::tests::connect_preserves_cloexec_and_restores_blocking_io ... ok
+rust	Exercise real Unix descriptor and host channel boundaries	2026-10-23T00:27:40.1951311Z test linux_host_channel::tests::early_eof_closes_descriptor_already_received ... ok
+rust	Exercise real Unix descriptor and host channel boundaries	2026-10-23T00:27:40.1952145Z test linux_host_channel::tests::extra_descriptors_are_all_closed ... ok
+rust	Exercise real Unix descriptor and host channel boundaries	2026-10-23T00:27:40.2148917Z test linux_host_channel::tests::fragmented_response_preserves_one_cloexec_descriptor ... ok
+rust	Exercise real Unix descriptor and host channel boundaries	2026-10-23T00:27:40.2150297Z test linux_host_channel::tests::ordinary_fd_does_not_gain_cgroup_authority ... ok
+rust	Exercise real Unix descriptor and host channel boundaries	2026-10-23T00:27:40.2153750Z test linux_host_channel::tests::refused_or_malformed_response_closes_transferred_descriptor ... ok
+rust	Exercise real Unix descriptor and host channel boundaries	2026-10-23T00:27:40.2155564Z test linux_host_channel::tests::second_fragment_descriptor_is_rejected_and_both_close ... ok
+rust	Exercise real Unix descriptor and host channel boundaries	2026-10-23T00:27:40.2156332Z 
+rust	Exercise real Unix descriptor and host channel boundaries	2026-10-23T00:27:40.2156637Z test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+rust	Exercise real Unix descriptor and host channel boundaries	2026-10-23T00:27:40.2157228Z 
+rust	Provision broker development headers in disposable runner	﻿2026-10-23T00:27:40.2230232Z ##[group]Run sudo apt-get update
+rust	Provision broker development headers in disposable runner	2026-10-23T00:27:40.2230568Z ^[[36;1msudo apt-get update^[[0m
+rust	Provision broker development headers in disposable runner	2026-10-23T00:27:40.2231034Z ^[[36;1msudo apt-get install --yes --no-install-recommends libdbus-1-dev libwayland-dev pkg-config^[[0m
+rust	Provision broker development headers in disposable runner	2026-10-23T00:27:40.2231952Z ^[[36;1mdpkg-query -W libdbus-1-dev libwayland-dev pkg-config^[[0m
+rust	Provision broker development headers in disposable runner	2026-10-23T00:27:40.2295511Z shell: /usr/bin/bash -e {0}
+rust	Provision broker development headers in disposable runner	2026-10-23T00:27:40.2295779Z env:
+rust	Provision broker development headers in disposable runner	2026-10-23T00:27:40.2295977Z   CARGO_TERM_COLOR: never
+rust	Provision broker development headers in disposable runner	2026-10-23T00:27:40.2296276Z   EXPECTED_SHA: 1d1af96f42adc80fc0bef9e427e24fac6efad1a9
+rust	Provision broker development headers in disposable runner	2026-10-23T00:27:40.2296651Z   CARGO_HOME: /home/runner/work/_temp/vlikeon-cargo
+rust	Provision broker development headers in disposable runner	2026-10-23T00:27:40.2297030Z   CARGO_TARGET_DIR: /home/runner/work/_temp/vlikeon-target
+rust	Provision broker development headers in disposable runner	2026-10-23T00:27:40.2297382Z ##[endgroup]
+rust	Provision broker development headers in disposable runner	2026-10-23T00:27:40.3876696Z Get:1 https://packages.microsoft.com/ubuntu/24.04/prod noble InRelease [3600 B]
+rust	Provision broker development headers in disposable runner	2026-10-23T00:27:40.4362555Z Get:2 file:/etc/apt/apt-mirrors.txt Mirrorlist [144 B]
+rust	Provision broker development headers in disposable runner	2026-10-23T00:27:40.4642786Z Hit:3 http://azure.archive.ubuntu.com/ubuntu noble InRelease
+rust	Provision broker development headers in disposable runner	2026-10-23T00:27:40.4672529Z Get:4 http://azure.archive.ubuntu.com/ubuntu noble-updates InRelease [126 kB]
+rust	Provision broker development headers in disposable runner	2026-10-23T00:27:40.4732398Z Get:5 http://azure.archive.ubuntu.com/ubuntu noble-backports InRelease [126 kB]
+rust	Provision broker development headers in disposable runner	2026-10-23T00:27:40.4802739Z Get:6 http://azure.archive.ubuntu.com/ubuntu noble-security InRelease [126 kB]
+rust	Provision broker development headers in disposable runner	2026-10-23T00:27:40.6107510Z Get:7 https://packages.microsoft.com/ubuntu/24.04/prod noble/main armhf Packages [12.4 kB]
+rust	Provision broker development headers in disposable runner	2026-10-23T00:27:40.6278497Z Get:8 https://packages.microsoft.com/ubuntu/24.04/prod noble/main amd64 Packages [635 kB]
+rust	Provision broker development headers in disposable runner	2026-10-23T00:27:40.6354774Z Get:9 https://packages.microsoft.com/ubuntu/24.04/prod noble/main arm64 Packages [572 kB]
+rust	Provision broker development headers in disposable runner	2026-10-23T00:27:40.7474257Z Get:10 http://azure.archive.ubuntu.com/ubuntu noble-updates/main amd64 Packages [1400 kB]
+rust	Provision broker development headers in disposable runner	2026-10-23T00:27:40.7550828Z Get:11 http://azure.archive.ubuntu.com/ubuntu noble-updates/main Translation-en [310 kB]
+rust	Provision broker development headers in disposable runner	2026-10-23T00:27:40.7562362Z Get:12 http://azure.archive.ubuntu.com/ubuntu noble-updates/universe amd64 Packages [1706 kB]
+rust	Provision broker development headers in disposable runner	2026-10-23T00:27:40.7683384Z Get:13 http://azure.archive.ubuntu.com/ubuntu noble-updates/universe Translation-en [342 kB]
+rust	Provision broker development headers in disposable runner	2026-10-23T00:27:40.7687309Z Get:14 http://azure.archive.ubuntu.com/ubuntu noble-updates/restricted amd64 Packages [1805 kB]
+rust	Provision broker development headers in disposable runner	2026-10-23T00:27:40.7806907Z Get:15 http://azure.archive.ubuntu.com/ubuntu noble-updates/restricted Translation-en [411 kB]
+rust	Provision broker development headers in disposable runner	2026-10-23T00:27:40.8768123Z Get:16 http://azure.archive.ubuntu.com/ubuntu noble-security/main amd64 Packages [1146 kB]
+rust	Provision broker development headers in disposable runner	2026-10-23T00:27:40.8832142Z Get:17 http://azure.archive.ubuntu.com/ubuntu noble-security/main Translation-en [231 kB]
+rust	Provision broker development headers in disposable runner	2026-10-23T00:27:40.8848304Z Get:18 http://azure.archive.ubuntu.com/ubuntu noble-security/universe amd64 Packages [1222 kB]
+rust	Provision broker development headers in disposable runner	2026-10-23T00:27:40.8907068Z Get:19 http://azure.archive.ubuntu.com/ubuntu noble-security/universe Translation-en [246 kB]
+rust	Provision broker development headers in disposable runner	2026-10-23T00:27:40.9352794Z Get:20 http://azure.archive.ubuntu.com/ubuntu noble-security/restricted amd64 Packages [1713 kB]
+rust	Provision broker development headers in disposable runner	2026-10-23T00:27:40.9434337Z Get:21 http://azure.archive.ubuntu.com/ubuntu noble-security/restricted Translation-en [392 kB]
+rust	Provision broker development headers in disposable runner	2026-10-23T00:27:48.7993256Z Fetched 12.5 MB in 1s (8791 kB/s)
+rust	Provision broker development headers in disposable runner	2026-10-23T00:27:49.8322136Z Reading package lists...
+rust	Provision broker development headers in disposable runner	2026-10-23T00:27:49.8629322Z Reading package lists...
+rust	Provision broker development headers in disposable runner	2026-10-23T00:27:50.0920113Z Building dependency tree...
+rust	Provision broker development headers in disposable runner	2026-10-23T00:27:50.0927512Z Reading state information...
+rust	Provision broker development headers in disposable runner	2026-10-23T00:27:50.2802804Z pkg-config is already the newest version (1.8.1-2build1).
+rust	Provision broker development headers in disposable runner	2026-10-23T00:27:50.2803483Z The following additional packages will be installed:
+rust	Provision broker development headers in disposable runner	2026-10-23T00:27:50.2805388Z   libwayland-bin libwayland-server0
+rust	Provision broker development headers in disposable runner	2026-10-23T00:27:50.2814614Z Suggested packages:
+rust	Provision broker development headers in disposable runner	2026-10-23T00:27:50.2814992Z   libwayland-doc
+rust	Provision broker development headers in disposable runner	2026-10-23T00:27:50.3344316Z The following NEW packages will be installed:
+rust	Provision broker development headers in disposable runner	2026-10-23T00:27:50.3350927Z   libdbus-1-dev libwayland-bin libwayland-dev libwayland-server0
+rust	Provision broker development headers in disposable runner	2026-10-23T00:27:50.3542485Z 0 upgraded, 4 newly installed, 0 to remove and 99 not upgraded.
+rust	Provision broker development headers in disposable runner	2026-10-23T00:27:50.3543304Z Need to get 316 kB of archives.
+rust	Provision broker development headers in disposable runner	2026-10-23T00:27:50.3543657Z After this operation, 1780 kB of additional disk space will be used.
+rust	Provision broker development headers in disposable runner	2026-10-23T00:27:50.3544087Z Get:1 file:/etc/apt/apt-mirrors.txt Mirrorlist [144 B]
+rust	Provision broker development headers in disposable runner	2026-10-23T00:27:50.4668373Z Get:2 http://azure.archive.ubuntu.com/ubuntu noble-updates/main amd64 libdbus-1-dev amd64 1.14.10-4ubuntu4.1 [190 kB]
+rust	Provision broker development headers in disposable runner	2026-10-23T00:27:50.4829289Z Get:3 http://azure.archive.ubuntu.com/ubuntu noble/main amd64 libwayland-server0 amd64 1.22.0-2.1build1 [33.9 kB]
+rust	Provision broker development headers in disposable runner	2026-10-23T00:27:50.4975324Z Get:4 http://azure.archive.ubuntu.com/ubuntu noble/main amd64 libwayland-bin amd64 1.22.0-2.1build1 [20.6 kB]
+rust	Provision broker development headers in disposable runner	2026-10-23T00:27:50.5118346Z Get:5 http://azure.archive.ubuntu.com/ubuntu noble/main amd64 libwayland-dev amd64 1.22.0-2.1build1 [71.3 kB]
+rust	Provision broker development headers in disposable runner	2026-10-23T00:27:50.8701666Z Fetched 316 kB in 0s (1867 kB/s)
+rust	Provision broker development headers in disposable runner	2026-10-23T00:27:50.9618631Z Selecting previously unselected package libdbus-1-dev:amd64.
+rust	Provision broker development headers in disposable runner	2026-10-23T00:27:51.0272078Z (Reading database ... 
+rust	Provision broker development headers in disposable runner	2026-10-23T00:27:51.0272604Z (Reading database ... 5%
+rust	Provision broker development headers in disposable runner	2026-10-23T00:27:51.0273047Z (Reading database ... 10%
+rust	Provision broker development headers in disposable runner	2026-10-23T00:27:51.0273437Z (Reading database ... 15%
+rust	Provision broker development headers in disposable runner	2026-10-23T00:27:51.0273827Z (Reading database ... 20%
+rust	Provision broker development headers in disposable runner	2026-10-23T00:27:51.0274257Z (Reading database ... 25%
+rust	Provision broker development headers in disposable runner	2026-10-23T00:27:51.0274826Z (Reading database ... 30%
+rust	Provision broker development headers in disposable runner	2026-10-23T00:27:51.0275195Z (Reading database ... 35%
+rust	Provision broker development headers in disposable runner	2026-10-23T00:27:51.0275992Z (Reading database ... 40%
+rust	Provision broker development headers in disposable runner	2026-10-23T00:27:51.0276370Z (Reading database ... 45%
+rust	Provision broker development headers in disposable runner	2026-10-23T00:27:51.0276701Z (Reading database ... 50%
+rust	Provision broker development headers in disposable runner	2026-10-23T00:27:51.1429837Z (Reading database ... 55%
+rust	Provision broker development headers in disposable runner	2026-10-23T00:27:51.6608516Z (Reading database ... 60%
+rust	Provision broker development headers in disposable runner	2026-10-23T00:27:51.9946655Z (Reading database ... 65%
+rust	Provision broker development headers in disposable runner	2026-10-23T00:27:52.3324156Z (Reading database ... 70%
+rust	Provision broker development headers in disposable runner	2026-10-23T00:27:53.0086984Z (Reading database ... 75%
+rust	Provision broker development headers in disposable runner	2026-10-23T00:27:54.4441518Z (Reading database ... 80%
+rust	Provision broker development headers in disposable runner	2026-10-23T00:27:55.8576166Z (Reading database ... 85%
+rust	Provision broker development headers in disposable runner	2026-10-23T00:27:57.7867311Z (Reading database ... 90%
+rust	Provision broker development headers in disposable runner	2026-10-23T00:27:59.4083335Z (Reading database ... 95%
+rust	Provision broker development headers in disposable runner	2026-10-23T00:27:59.4083842Z (Reading database ... 100%
+rust	Provision broker development headers in disposable runner	2026-10-23T00:27:59.4084354Z (Reading database ... 203540 files and directories currently installed.)
+rust	Provision broker development headers in disposable runner	2026-10-23T00:27:59.4127215Z Preparing to unpack .../libdbus-1-dev_1.14.10-4ubuntu4.1_amd64.deb ...
+rust	Provision broker development headers in disposable runner	2026-10-23T00:27:59.4161620Z Unpacking libdbus-1-dev:amd64 (1.14.10-4ubuntu4.1) ...
+rust	Provision broker development headers in disposable runner	2026-10-23T00:27:59.4499612Z Selecting previously unselected package libwayland-server0:amd64.
+rust	Provision broker development headers in disposable runner	2026-10-23T00:27:59.4630683Z Preparing to unpack .../libwayland-server0_1.22.0-2.1build1_amd64.deb ...
+rust	Provision broker development headers in disposable runner	2026-10-23T00:27:59.4649809Z Unpacking libwayland-server0:amd64 (1.22.0-2.1build1) ...
+rust	Provision broker development headers in disposable runner	2026-10-23T00:27:59.4871215Z Selecting previously unselected package libwayland-bin.
+rust	Provision broker development headers in disposable runner	2026-10-23T00:27:59.5000357Z Preparing to unpack .../libwayland-bin_1.22.0-2.1build1_amd64.deb ...
+rust	Provision broker development headers in disposable runner	2026-10-23T00:27:59.5009310Z Unpacking libwayland-bin (1.22.0-2.1build1) ...
+rust	Provision broker development headers in disposable runner	2026-10-23T00:27:59.5238597Z Selecting previously unselected package libwayland-dev:amd64.
+rust	Provision broker development headers in disposable runner	2026-10-23T00:27:59.5367167Z Preparing to unpack .../libwayland-dev_1.22.0-2.1build1_amd64.deb ...
+rust	Provision broker development headers in disposable runner	2026-10-23T00:27:59.5376237Z Unpacking libwayland-dev:amd64 (1.22.0-2.1build1) ...
+rust	Provision broker development headers in disposable runner	2026-10-23T00:27:59.5818395Z Setting up libwayland-server0:amd64 (1.22.0-2.1build1) ...
+rust	Provision broker development headers in disposable runner	2026-10-23T00:27:59.5843356Z Setting up libwayland-bin (1.22.0-2.1build1) ...
+rust	Provision broker development headers in disposable runner	2026-10-23T00:27:59.5864093Z Setting up libdbus-1-dev:amd64 (1.14.10-4ubuntu4.1) ...
+rust	Provision broker development headers in disposable runner	2026-10-23T00:27:59.7829969Z Setting up libwayland-dev:amd64 (1.22.0-2.1build1) ...
+rust	Provision broker development headers in disposable runner	2026-10-23T00:27:59.7855288Z Processing triggers for libc-bin (2.39-0ubuntu8.9) ...
+rust	Provision broker development headers in disposable runner	2026-10-23T00:27:59.9372250Z Processing triggers for sgml-base (1.31) ...
+rust	Provision broker development headers in disposable runner	2026-10-23T00:28:01.8004832Z 
+rust	Provision broker development headers in disposable runner	2026-10-23T00:28:01.8005504Z Running kernel seems to be up-to-date.
+rust	Provision broker development headers in disposable runner	2026-10-23T00:28:01.8006030Z 
+rust	Provision broker development headers in disposable runner	2026-10-23T00:28:01.8006193Z No services need to be restarted.
+rust	Provision broker development headers in disposable runner	2026-10-23T00:28:01.8006431Z 
+rust	Provision broker development headers in disposable runner	2026-10-23T00:28:01.8006575Z No containers need to be restarted.
+rust	Provision broker development headers in disposable runner	2026-10-23T00:28:01.8006808Z 
+rust	Provision broker development headers in disposable runner	2026-10-23T00:28:01.8006956Z No user sessions are running outdated binaries.
+rust	Provision broker development headers in disposable runner	2026-10-23T00:28:01.8007570Z 
+rust	Provision broker development headers in disposable runner	2026-10-23T00:28:01.8007818Z No VM guests are running outdated hypervisor (qemu) binaries on this host.
+rust	Provision broker development headers in disposable runner	2026-10-23T00:28:02.9205024Z libdbus-1-dev:amd64	1.14.10-4ubuntu4.1
+rust	Provision broker development headers in disposable runner	2026-10-23T00:28:02.9205637Z libwayland-dev:amd64	1.22.0-2.1build1
+rust	Provision broker development headers in disposable runner	2026-10-23T00:28:02.9206113Z pkg-config:amd64	1.8.1-2build1
+rust	Compile Linux runtime and both broker executables	﻿2026-10-23T00:28:02.9243075Z ##[group]Run cargo +1.89.0 check --locked -p omniplay-native-runtime -p omniplay-broker --all-targets
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:02.9243860Z ^[[36;1mcargo +1.89.0 check --locked -p omniplay-native-runtime -p omniplay-broker --all-targets^[[0m
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:02.9305897Z shell: /usr/bin/bash -e {0}
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:02.9306163Z env:
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:02.9306481Z   CARGO_TERM_COLOR: never
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:02.9306785Z   EXPECTED_SHA: 1d1af96f42adc80fc0bef9e427e24fac6efad1a9
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:02.9307162Z   CARGO_HOME: /home/runner/work/_temp/vlikeon-cargo
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:02.9307544Z   CARGO_TARGET_DIR: /home/runner/work/_temp/vlikeon-target
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:02.9307864Z ##[endgroup]
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:03.0334477Z  Downloading crates ...
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:03.0746141Z   Downloaded aead v0.5.2
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:03.0870167Z   Downloaded idna_adapter v1.2.2
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:03.0889019Z   Downloaded cpufeatures v0.3.1
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:03.0910387Z   Downloaded fallible-streaming-iterator v0.1.9
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:03.0924675Z   Downloaded atomic-waker v1.1.2
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:03.0967482Z   Downloaded cfg_aliases v0.2.2
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:03.1009299Z   Downloaded async-broadcast v0.7.2
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:03.1089310Z   Downloaded linux-keyutils v0.2.5
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:03.1119617Z   Downloaded endi v1.1.1
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:03.1138452Z   Downloaded block-padding v0.3.3
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:03.1154301Z   Downloaded async-trait v0.1.92
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:03.1215205Z   Downloaded inout v0.1.4
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:03.1277523Z   Downloaded enumflags2_derive v0.7.12
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:03.1307462Z   Downloaded parking v2.2.1
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:03.1327466Z   Downloaded percent-encoding v2.3.2
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:03.1349091Z   Downloaded scoped-tls v1.0.1
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:03.1370428Z   Downloaded pollster v0.4.0
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:03.1395393Z   Downloaded signature v2.2.0
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:03.1422857Z   Downloaded potential_utf v0.1.6
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:03.1444930Z   Downloaded lru-slab v0.1.3
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:03.1463883Z   Downloaded rustc-hash v2.1.3
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:03.1489935Z   Downloaded serde_urlencoded v0.7.1
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:03.1523262Z   Downloaded slab v0.4.12
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:03.1550701Z   Downloaded poly1305 v0.8.0
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:03.1593653Z   Downloaded num-complex v0.4.6
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:03.1622836Z   Downloaded libloading v0.8.9
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:03.1661835Z   Downloaded once_cell v1.21.4
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:03.1704403Z   Downloaded serde_repr v0.1.21
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:03.1740133Z   Downloaded icu_provider v2.3.1
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:03.1781053Z   Downloaded hmac v0.12.1
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:03.1815133Z   Downloaded const-oid v0.9.6
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:03.1854477Z   Downloaded mio v1.2.4
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:03.1937144Z   Downloaded sha1 v0.10.7
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:03.1967222Z   Downloaded untrusted v0.9.0
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:03.2004009Z   Downloaded static_assertions v1.1.0
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:03.2031230Z   Downloaded http v1.5.0
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:03.2082169Z   Downloaded hyper-util v0.1.21
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:03.2168797Z   Downloaded proc-macro-crate v3.5.0
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:03.2193213Z   Downloaded reqwest v0.12.28
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:03.2261146Z   Downloaded idna v1.1.0
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:03.2306159Z   Downloaded futures-macro v0.3.31
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:03.2325299Z   Downloaded hyper v1.12.0
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:03.2417982Z   Downloaded rand_chacha v0.3.1
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:03.2436769Z   Downloaded zbus_names v3.0.0
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:03.2454486Z   Downloaded xdg-home v1.3.0
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:03.2468556Z   Downloaded tower-service v0.3.3
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:03.2479773Z   Downloaded hashbrown v0.17.1
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:03.2552160Z   Downloaded rand_pcg v0.10.2
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:03.2576507Z   Downloaded nix v0.29.0
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:03.2708200Z   Downloaded pin-utils v0.1.1
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:03.2731891Z   Downloaded zvariant_derive v4.2.0
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:03.2753496Z   Downloaded zvariant_utils v2.1.0
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:03.2768050Z   Downloaded zerofrom-derive v0.1.8
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:03.2784167Z   Downloaded curve25519-dalek v4.1.3
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:03.2884674Z   Downloaded zeroize_derive v1.5.0
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:03.2902621Z   Downloaded wayland-sys v0.31.11
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:03.2922385Z   Downloaded yoke-derive v0.8.4
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:03.2940945Z   Downloaded want v0.3.2
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:03.2960696Z   Downloaded spki v0.7.3
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:03.2988579Z   Downloaded raw-window-handle v0.6.2
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:03.3014444Z   Downloaded pkg-config v0.3.34
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:03.3036142Z   Downloaded sync_wrapper v1.0.2
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:03.3053582Z   Downloaded rand_core v0.6.4
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:03.3074289Z   Downloaded zerovec-derive v0.11.6
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:03.3098847Z   Downloaded ppv-lite86 v0.2.21
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:03.3117116Z   Downloaded utf8_iter v1.0.4
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:03.3133097Z   Downloaded pkcs8 v0.10.2
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:03.3169875Z   Downloaded zeroize v1.8.2
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:03.3187639Z   Downloaded universal-hash v0.5.1
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:03.3207613Z   Downloaded tinystr v0.8.4
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:03.3242703Z   Downloaded rand_core v0.10.1
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:03.3265349Z   Downloaded secret-service v4.0.0
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:03.3297567Z   Downloaded yoke v0.8.3
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:03.3321594Z   Downloaded zbus_macros v4.4.0
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:03.3341107Z   Downloaded writeable v0.6.4
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:03.3371412Z   Downloaded quinn-udp v0.5.16
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:03.3395213Z   Downloaded socket2 v0.6.5
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:03.3423043Z   Downloaded wayland-scanner v0.31.11
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:03.3451839Z   Downloaded tokio-rustls v0.26.6
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:03.3475566Z   Downloaded toml_parser v1.1.5+spec-1.1.0
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:03.3506270Z   Downloaded toml_datetime v1.1.2+spec-1.1.0
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:03.3523537Z   Downloaded synstructure v0.14.0
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:03.3538991Z   Downloaded ryu v1.0.23
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:03.3582045Z   Downloaded rfd v0.17.2
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:03.3651637Z   Downloaded tracing-core v0.1.36
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:03.3685384Z   Downloaded tracing-attributes v0.1.31
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:03.3717608Z   Downloaded smallvec v1.16.3
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:03.3735674Z   Downloaded rustls-pki-types v1.15.1
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:03.3768563Z   Downloaded icu_normalizer v2.3.0
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:03.3886583Z   Downloaded shlex v2.0.1
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:03.3904621Z   Downloaded wayland-backend v0.3.17
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:03.3957086Z   Downloaded toml_edit v0.25.17+spec-1.1.0
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:03.4004134Z   Downloaded tinyvec v1.13.3
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:03.4057389Z   Downloaded quinn v0.11.12
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:03.4095779Z   Downloaded rustls-webpki v0.103.15
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:03.4136407Z   Downloaded zvariant v4.2.0
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:03.4184129Z   Downloaded zerotrie v0.2.5
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:03.4243803Z   Downloaded wayland-client v0.31.15
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:03.4270305Z   Downloaded rand v0.10.3
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:03.4318552Z   Downloaded zerovec v0.11.8
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:03.4390741Z   Downloaded tower v0.5.2
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:03.4528368Z   Downloaded url v2.5.8
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:03.4564118Z   Downloaded zbus v4.4.0
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:03.4642793Z   Downloaded wayland-protocols v0.32.13
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:03.4751198Z   Downloaded tower-http v0.6.11
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:03.4866868Z   Downloaded rusqlite v0.40.2
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:03.4950934Z   Downloaded webpki-roots v1.0.9
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:03.4986528Z   Downloaded winnow v1.0.4
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:03.5106646Z   Downloaded quick-xml v0.41.0
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:03.5176041Z   Downloaded quinn-proto v0.11.19
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:03.5253870Z   Downloaded vcpkg v0.2.15
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:03.5890160Z   Downloaded syn v2.0.119
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:03.6011097Z   Downloaded encoding_rs v0.8.35
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:03.6225480Z   Downloaded libdbus-sys v0.2.7
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:03.6574008Z   Downloaded zerocopy v0.8.63
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:03.6889538Z   Downloaded zerofrom v0.1.8
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:03.6905261Z   Downloaded rustls v0.23.46
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:03.7042410Z   Downloaded try-lock v0.2.5
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:03.7054355Z   Downloaded tower-layer v0.3.3
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:03.7068179Z   Downloaded rustix v1.1.5
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:03.7384527Z   Downloaded subtle v2.6.1
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:03.7400602Z   Downloaded icu_properties_data v2.3.0
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:03.7525685Z   Downloaded tracing v0.1.44
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:03.7698245Z   Downloaded hkdf v0.12.4
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:03.7728134Z   Downloaded futures-util v0.3.31
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:03.7880849Z   Downloaded cc v1.9.0
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:03.7928982Z   Downloaded base64 v0.22.1
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:03.7974101Z   Downloaded stable_deref_trait v1.2.1
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:03.7985439Z   Downloaded indexmap v2.14.2
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:03.8037011Z   Downloaded icu_properties v2.3.0
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:03.8074475Z   Downloaded aes v0.8.4
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:03.8116685Z   Downloaded rand v0.8.8
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:03.8155928Z   Downloaded icu_normalizer_data v2.3.0
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:03.8182659Z   Downloaded ed25519-dalek v2.2.0
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:03.8221564Z   Downloaded der v0.7.10
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:03.8284493Z   Downloaded chacha20poly1305 v0.10.1
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:03.8304542Z   Downloaded rustc_version v0.4.1
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:03.8321352Z   Downloaded num-bigint v0.4.8
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:03.8378522Z   Downloaded icu_collections v2.3.0
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:03.8453263Z   Downloaded dbus v0.9.12
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:03.8503577Z   Downloaded keyring v3.6.3
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:03.8535291Z   Downloaded icu_locale_core v2.3.0
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:03.8618432Z   Downloaded base64 v0.23.1
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:03.8667914Z   Downloaded tokio v1.53.1
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:03.9182704Z   Downloaded bytes v1.12.1
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:03.9224359Z   Downloaded bitflags v2.13.2
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:03.9277829Z   Downloaded getrandom v0.2.17
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:03.9313332Z   Downloaded futures-channel v0.3.34
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:03.9335842Z   Downloaded enumflags2 v0.7.12
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:03.9352214Z   Downloaded num-traits v0.2.19
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:03.9382689Z   Downloaded log v0.4.34
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:03.9412947Z   Downloaded litemap v0.8.3
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:03.9440456Z   Downloaded ipnet v2.12.2
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:03.9460652Z   Downloaded event-listener v5.4.2
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:03.9480879Z   Downloaded chacha20 v0.10.2
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:03.9508695Z   Downloaded hyper-rustls v0.27.10
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:03.9526081Z   Downloaded fastrand v2.5.0
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:03.9542331Z   Downloaded cipher v0.4.4
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:03.9558861Z   Downloaded num-rational v0.4.2
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:03.9573359Z   Downloaded fallible-iterator v0.3.0
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:03.9590797Z   Downloaded ed25519 v2.2.3
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:03.9613064Z   Downloaded ordered-stream v0.2.0
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:03.9627147Z   Downloaded num-integer v0.1.47
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:03.9647695Z   Downloaded http-body-util v0.1.5
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:03.9670990Z   Downloaded displaydoc v0.2.7
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:03.9695685Z   Downloaded base64ct v1.8.3
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:03.9727377Z   Downloaded pin-project-lite v0.2.17
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:03.9796712Z   Downloaded find-msvc-tools v0.1.15
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:03.9816834Z   Downloaded dbus-secret-service v4.1.0
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:03.9839462Z   Downloaded chacha20 v0.9.1
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:03.9862906Z   Downloaded hashlink v0.12.2
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:03.9885587Z   Downloaded downcast-rs v1.2.1
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:03.9902082Z   Downloaded futures-core v0.3.34
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:03.9919356Z   Downloaded form_urlencoded v1.2.2
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:03.9929632Z   Downloaded num v0.4.3
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:03.9942426Z   Downloaded memoffset v0.9.1
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:03.9958076Z   Downloaded futures-sink v0.3.34
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:03.9968699Z   Downloaded dlib v0.5.3
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:03.9981524Z   Downloaded opaque-debug v0.3.1
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:03.9994155Z   Downloaded num-iter v0.1.46
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:04.0006644Z   Downloaded ring v0.17.14
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:04.0468539Z   Downloaded http-body v1.1.0
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:04.0480895Z   Downloaded futures-task v0.3.34
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:04.0496649Z   Downloaded equivalent v1.0.3
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:04.0509206Z   Downloaded curve25519-dalek-derive v0.1.1
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:04.0522100Z   Downloaded hex v0.4.3
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:04.0542160Z   Downloaded futures-io v0.3.34
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:04.0552986Z   Downloaded cbc v0.1.2
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:04.0571469Z   Downloaded autocfg v1.5.1
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:04.0594748Z   Downloaded httparse v1.10.1
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:04.0624713Z   Downloaded foldhash v0.2.0
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:04.0639399Z   Downloaded event-listener-strategy v0.5.4
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:04.0653107Z   Downloaded errno v0.3.14
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:04.0675597Z   Downloaded linux-raw-sys v0.12.1
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:04.1464008Z   Downloaded libsqlite3-sys v0.38.2
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:04.2486583Z    Compiling syn v3.0.9
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:04.2488845Z     Checking getrandom v0.2.17
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:04.2489470Z    Compiling syn v2.0.119
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:04.2490024Z     Checking subtle v2.6.1
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:04.3302691Z     Checking rand_core v0.6.4
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:04.3312351Z    Compiling shlex v2.0.1
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:04.4192942Z     Checking crypto-common v0.1.7
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:04.4522553Z    Compiling find-msvc-tools v0.1.15
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:04.4753008Z    Compiling pkg-config v0.3.34
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:04.6144277Z    Compiling cc v1.9.0
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:04.9692516Z     Checking smallvec v1.16.3
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:05.1082668Z     Checking stable_deref_trait v1.2.1
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:05.1370737Z     Checking digest v0.10.7
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:05.2881215Z     Checking memchr v2.8.3
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:05.6872655Z     Checking bitflags v2.13.2
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:05.8003078Z     Checking bytes v1.12.1
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:06.2457934Z     Checking pin-project-lite v0.2.17
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:06.2842664Z     Checking sha2 v0.10.9
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:06.4032535Z     Checking writeable v0.6.4
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:06.5202844Z     Checking futures-core v0.3.34
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:06.5502660Z     Checking litemap v0.8.3
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:06.5774414Z     Checking utf8_iter v1.0.4
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:06.6425702Z    Compiling icu_normalizer_data v2.3.0
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:06.6833189Z    Compiling synstructure v0.14.0
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:06.8052582Z     Checking percent-encoding v2.3.2
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:06.8822694Z    Compiling icu_properties_data v2.3.0
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:07.0143047Z     Checking once_cell v1.21.4
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:07.1343164Z     Checking serde_json v1.0.151
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:07.1662809Z    Compiling ring v0.17.14
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:07.6922614Z     Checking socket2 v0.6.5
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:07.7957538Z    Compiling zerofrom-derive v0.1.8
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:07.8502180Z    Compiling yoke-derive v0.8.4
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:07.9202768Z    Compiling zerovec-derive v0.11.6
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:08.7512430Z     Checking zerofrom v0.1.8
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:08.8172712Z    Compiling displaydoc v0.2.7
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:08.8191971Z     Checking yoke v0.8.3
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:08.9292384Z    Compiling serde_derive v1.0.229
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:09.1942477Z     Checking zerovec v0.11.8
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:09.4902520Z    Compiling zeroize_derive v1.5.0
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:09.6332647Z     Checking zerotrie v0.2.5
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:09.7086744Z     Checking tinystr v0.8.4
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:09.8362747Z     Checking icu_locale_core v2.3.0
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:09.8620354Z     Checking potential_utf v0.1.6
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:09.9242746Z     Checking icu_collections v2.3.0
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:10.2082702Z    Compiling thiserror-impl v2.0.20
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:10.2492532Z     Checking zeroize v1.8.2
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:10.3292389Z     Checking mio v1.2.4
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:10.5683031Z     Checking icu_provider v2.3.1
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:10.5876991Z    Compiling semver v1.0.28
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:10.7512962Z    Compiling autocfg v1.5.1
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:10.8342539Z    Compiling rustc_version v0.4.1
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:11.0792878Z     Checking tokio v1.53.1
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:11.1008742Z    Compiling num-traits v0.2.19
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:11.6447462Z     Checking thiserror v2.0.20
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:11.7629773Z     Checking http v1.5.0
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:12.3142478Z     Checking serde v1.0.229
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:12.3922622Z     Checking log v0.4.34
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:12.4822978Z     Checking futures-sink v0.3.34
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:12.5153010Z     Checking http-body v1.1.0
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:12.5863447Z     Checking icu_properties v2.3.0
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:12.7766980Z     Checking omniplay-contracts v0.1.0 (/home/runner/work/vlikeon/vlikeon/platform/contracts)
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:13.5702551Z     Checking icu_normalizer v2.3.0
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:13.9082064Z    Compiling curve25519-dalek v4.1.3
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:13.9555549Z     Checking rustls-pki-types v1.15.1
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:14.1113122Z     Checking block-padding v0.3.3
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:14.1665219Z     Checking slab v0.4.12
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:14.1754882Z    Compiling httparse v1.10.1
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:14.2699476Z     Checking futures-task v0.3.34
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:14.3323886Z     Checking futures-io v0.3.34
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:14.3768341Z     Checking untrusted v0.9.0
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:14.4119975Z     Checking pin-utils v0.1.1
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:14.4304289Z     Checking futures-util v0.3.31
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:14.4382814Z     Checking inout v0.1.4
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:14.8993058Z     Checking idna_adapter v1.2.2
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:14.9348683Z    Compiling curve25519-dalek-derive v0.1.1
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:15.4433474Z     Checking form_urlencoded v1.2.2
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:15.4856092Z     Checking try-lock v0.2.5
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:15.5111153Z     Checking tower-service v0.3.3
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:15.5332146Z    Compiling vcpkg v0.2.15
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:15.9642820Z     Checking signature v2.2.0
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:15.9975641Z    Compiling rustls v0.23.46
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:16.1444665Z     Checking ed25519 v2.2.3
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:16.2073103Z    Compiling libsqlite3-sys v0.38.2
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:16.4972560Z     Checking want v0.3.2
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:16.8862951Z     Checking idna v1.1.0
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:17.0898725Z     Checking cipher v0.4.4
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:17.1660103Z     Checking tracing-core v0.1.36
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:17.2482354Z     Checking foldhash v0.2.0
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:17.2669551Z     Checking base64 v0.22.1
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:17.3155715Z     Checking atomic-waker v1.1.2
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:17.3499144Z     Checking hyper v1.12.0
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:17.4103263Z     Checking tracing v0.1.44
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:17.4430728Z     Checking hashbrown v0.17.1
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:17.5324474Z     Checking ed25519-dalek v2.2.0
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:17.6440949Z     Checking url v2.5.8
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:17.8662718Z     Checking num-integer v0.1.47
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:18.0046405Z     Checking futures-channel v0.3.34
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:18.0321944Z     Checking sync_wrapper v1.0.2
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:18.0599948Z     Checking tower-layer v0.3.3
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:18.1012759Z     Checking ipnet v2.12.2
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:18.1312594Z     Checking base64 v0.23.1
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:18.2346317Z     Checking tower v0.5.2
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:18.3981698Z     Checking hyper-util v0.1.21
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:18.4987360Z     Checking hashlink v0.12.2
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:18.6546256Z     Checking webpki-roots v1.0.9
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:18.6946297Z    Compiling libdbus-sys v0.2.7
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:18.8727362Z     Checking fallible-streaming-iterator v0.1.9
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:18.9522717Z     Checking ryu v1.0.23
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:19.0324525Z     Checking fallible-iterator v0.3.0
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:19.1387161Z     Checking serde_urlencoded v0.7.1
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:19.2680548Z     Checking tower-http v0.6.11
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:19.2881990Z     Checking num-bigint v0.4.8
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:19.4369235Z     Checking http-body-util v0.1.5
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:19.5632735Z     Checking hmac v0.12.1
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:19.6080094Z    Compiling wayland-sys v0.31.11
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:19.7360139Z     Checking libloading v0.8.9
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:19.7926698Z     Checking encoding_rs v0.8.35
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:20.2892994Z    Compiling rustix v1.1.5
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:20.5863431Z     Checking num-rational v0.4.2
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:20.6532621Z     Checking dlib v0.5.3
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:20.7022815Z     Checking hkdf v0.12.4
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:20.8222970Z     Checking num-iter v0.1.46
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:20.8485106Z     Checking num-complex v0.4.6
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:20.8807478Z    Compiling wayland-backend v0.3.17
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:21.1162554Z     Checking universal-hash v0.5.1
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:21.2190294Z     Checking linux-raw-sys v0.12.1
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:21.7327994Z     Checking opaque-debug v0.3.1
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:21.7496547Z     Checking poly1305 v0.8.0
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:21.8719424Z    Compiling quick-xml v0.41.0
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:22.5316952Z     Checking num v0.4.3
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:22.5554899Z     Checking dbus v0.9.12
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:23.6169379Z     Checking aes v0.8.4
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:23.8601236Z     Checking cbc v0.1.2
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:23.9080708Z     Checking chacha20 v0.9.1
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:23.9966623Z     Checking aead v0.5.2
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:24.0437806Z     Checking scoped-tls v1.0.1
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:24.0664928Z     Checking fastrand v2.5.0
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:24.1425946Z     Checking downcast-rs v1.2.1
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:24.1668816Z    Compiling wayland-client v0.31.15
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:24.2698075Z     Checking dbus-secret-service v4.1.0
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:24.4224588Z     Checking chacha20poly1305 v0.10.1
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:24.4624023Z    Compiling wayland-scanner v0.31.11
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:25.6087133Z     Checking linux-keyutils v0.2.5
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:25.7297953Z     Checking keyring v3.6.3
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:25.9158209Z     Checking omniplay-sync v0.1.0 (/home/runner/work/vlikeon/vlikeon/platform/sync)
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:26.0243582Z warning: unused import: `Signer`
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:26.0244257Z  --> platform/sync/src/account.rs:3:32
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:26.0244780Z   |
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:26.0245201Z 3 | use ed25519_dalek::{SigningKey,Signer};
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:26.0245719Z   |                                ^^^^^^
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:26.0246177Z   |
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:26.0246551Z   = note: `#[warn(unused_imports)]` on by default
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:26.0246946Z 
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:26.7303322Z warning: `omniplay-sync` (lib) generated 1 warning (run `cargo fix --lib -p omniplay-sync` to apply 1 suggestion)
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:26.7392606Z     Checking omniplay-sandbox v0.1.0 (/home/runner/work/vlikeon/vlikeon/platform/sandbox)
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:27.1812223Z     Checking rusqlite v0.40.2
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:27.5042976Z    Compiling rfd v0.17.2
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:27.6824914Z     Checking omniplay-device-info v0.1.0 (/home/runner/work/vlikeon/vlikeon/platform/device-info)
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:27.7012805Z     Checking wayland-protocols v0.32.13
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:27.8032537Z     Checking rustls-webpki v0.103.15
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:27.9313283Z     Checking omniplay-core v0.1.0 (/home/runner/work/vlikeon/vlikeon/platform/core)
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:27.9572567Z     Checking pollster v0.4.0
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:27.9978678Z     Checking raw-window-handle v0.6.2
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:28.1302735Z     Checking omniplay-streaming v0.1.0 (/home/runner/work/vlikeon/vlikeon/platform/streaming)
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:28.6332870Z     Checking omniplay-stream-input v0.1.0 (/home/runner/work/vlikeon/vlikeon/platform/stream-input)
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:28.6812830Z warning: unused imports: `Action`, `Observation`, `Reply`, `Request`, and `self`
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:28.6833253Z  --> platform/stream-input/src/worker.rs:1:23
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:28.6862046Z   |
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:28.6872455Z 1 | use crate::protocol::{self,Request,Reply,Action,Observation};
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:28.6905263Z   |                       ^^^^ ^^^^^^^ ^^^^^ ^^^^^^ ^^^^^^^^^^^
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:28.6931890Z   |
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:28.6952011Z   = note: `#[warn(unused_imports)]` on by default
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:28.6961871Z 
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:28.6992278Z warning: unused imports: `Arc`, `AtomicBool`, `Ordering`, and `mpsc`
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:28.7022083Z  --> platform/stream-input/src/worker.rs:2:17
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:28.7022799Z   |
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:28.7052209Z 2 | use std::sync::{Arc,atomic::{AtomicBool,Ordering},mpsc};
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:28.7082070Z   |                 ^^^          ^^^^^^^^^^ ^^^^^^^^  ^^^^
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:28.7111889Z 
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:28.7112382Z warning: unused imports: `Duration` and `Instant`
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:28.7142105Z  --> platform/stream-input/src/worker.rs:3:17
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:28.7171970Z   |
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:28.7192011Z 3 | use std::time::{Duration,Instant};
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:28.7202334Z   |                 ^^^^^^^^ ^^^^^^^
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:28.7231831Z 
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:28.7852421Z warning: unused import: `io::Write`
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:28.7862241Z  --> platform/core/src/firmware.rs:5:34
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:28.7862804Z   |
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:28.7863245Z 5 | use std::{fs::{File,OpenOptions},io::Write};
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:28.7863785Z   |                                  ^^^^^^^^^
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:28.7864654Z   |
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:28.7865149Z   = note: `#[warn(unused_imports)]` on by default
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:28.7865589Z 
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:28.8823142Z warning: `omniplay-stream-input` (lib) generated 3 warnings (run `cargo fix --lib -p omniplay-stream-input` to apply 3 suggestions)
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:29.0265364Z warning: variable does not need to be mutable
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:29.0266675Z   --> platform/core/src/save_maintenance.rs:63:9
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:29.0267429Z    |
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:29.0268057Z 63 |     let mut linked=metadata.file_type().is_symlink();
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:29.0268839Z    |         ----^^^^^^
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:29.0269435Z    |         |
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:29.0269995Z    |         help: remove this `mut`
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:29.0270632Z    |
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:29.0271183Z    = note: `#[warn(unused_mut)]` on by default
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:29.0272509Z 
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:29.4487431Z warning: `omniplay-core` (lib) generated 2 warnings (run `cargo fix --lib -p omniplay-core` to apply 1 suggestion)
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:30.2098986Z     Checking tokio-rustls v0.26.6
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:30.3207372Z     Checking hyper-rustls v0.27.10
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:30.3983763Z     Checking reqwest v0.12.28
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:30.8987276Z     Checking omniplay-updater v0.1.0 (/home/runner/work/vlikeon/vlikeon/platform/updater)
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:30.8988633Z     Checking omniplay-sync-client v0.1.0 (/home/runner/work/vlikeon/vlikeon/platform/sync-client)
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:31.2521050Z     Checking omniplay-native-runtime v0.1.0 (/home/runner/work/vlikeon/vlikeon/platform/native-runtime)
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:31.3455179Z     Checking omniplay-local-service v0.1.0 (/home/runner/work/vlikeon/vlikeon/platform/local-service)
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:31.4556803Z warning: unused import: `runtime::NativeAdapter`
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:31.4557972Z  --> platform/native-runtime/src/registry.rs:1:13
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:31.4558728Z   |
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:31.4559560Z 1 | use crate::{runtime::NativeAdapter,unavailable};
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:31.4560349Z   |             ^^^^^^^^^^^^^^^^^^^^^^
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:31.4574286Z   |
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:31.4575425Z   = note: `#[warn(unused_imports)]` on by default
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:31.4576021Z 
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:31.4576426Z warning: unused import: `OpenOptions`
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:31.4577149Z  --> platform/native-runtime/src/work.rs:4:26
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:31.4577782Z   |
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:31.4578759Z 4 | use std::{fs::{self,File,OpenOptions},path::{Path,PathBuf}};
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:31.4579469Z   |                          ^^^^^^^^^^^
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:31.4579933Z 
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:32.3680397Z warning: variable does not need to be mutable
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:32.3681695Z   --> platform/native-runtime/src/work.rs:28:9
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:32.3682627Z    |
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:32.3683686Z 28 |     let mut linked=value.file_type().is_symlink();#[cfg(windows)]{use std::os::windows::fs::MetadataExt;linked|=value.file_attributes()&0...
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:32.3684747Z    |         ----^^^^^^
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:32.3685150Z    |         |
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:32.3685520Z    |         help: remove this `mut`
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:32.3685986Z    |
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:32.3686333Z    = note: `#[warn(unused_mut)]` on by default
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:32.3686703Z 
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:32.3728223Z warning: unused variable: `id`
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:32.3728779Z    --> platform/native-runtime/src/work.rs:122:14
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:32.3729307Z     |
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:32.3729724Z 122 |     let(root,id)=confined(profile,work)?;
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:32.3730448Z     |              ^^ help: if this is intentional, prefix it with an underscore: `_id`
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:32.3731108Z     |
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:32.3731759Z     = note: `#[warn(unused_variables)]` on by default
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:32.3732182Z 
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:32.3732373Z warning: unused variable: `profile_id`
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:32.3732917Z   --> platform/native-runtime/src/work.rs:99:35
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:32.3733437Z    |
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:32.3734193Z 99 | fn reclaim_reported(profile:&Path,profile_id:Uuid,work:&Path,retained:&mut RetainedReason)->Result<()>{
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:32.3735432Z    |                                   ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_profile_id`
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:32.3736682Z 
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:32.6197889Z warning: method `call` is never used
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:32.6205130Z   --> platform/native-runtime/src/channel.rs:70:12
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:32.6206043Z    |
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:32.6206630Z 57 | impl WorkerChannel {
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:32.6207409Z    | ------------------ method in this implementation
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:32.6208145Z ...
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:32.6209225Z 70 |     pub fn call(&mut self,process:&impl WorkerProcess,method:&str,params:Value,payload:Vec<u8>,timeout:Duration)->Result<Reply> {
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:32.6210550Z    |            ^^^^
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:32.6211036Z    |
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:32.6211864Z    = note: `#[warn(dead_code)]` on by default
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:32.6212381Z 
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:32.6212727Z warning: method `as_str` is never used
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:32.6213439Z   --> platform/native-runtime/src/registry.rs:19:26
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:32.6214187Z    |
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:32.6215247Z 19 | impl VideoBackend{pub fn as_str(self)->&'static str{match self{Self::Software=>"software",Self::OpenGlCore=>"opengl_core"}}}
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:32.6216410Z    | -----------------        ^^^^^^
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:32.6216992Z    | |
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:32.6217515Z    | method in this implementation
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:32.6218018Z 
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:32.6218389Z warning: method `legacy_os_writes` is never used
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:32.6219188Z   --> platform/native-runtime/src/registry.rs:55:19
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:32.6219866Z    |
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:32.6220360Z 54 | impl RuntimePackage{
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:32.6220999Z    | ------------------- method in this implementation
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:32.6222014Z 55 |     pub(crate) fn legacy_os_writes(&self)->bool{
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:32.6222786Z    |                   ^^^^^^^^^^^^^^^^
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:32.6223407Z 
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:32.6223877Z warning: struct `NativeAdapter` is never constructed
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:32.6224682Z   --> platform/native-runtime/src/runtime.rs:13:12
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:32.6225373Z    |
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:32.6226505Z 13 | pub struct NativeAdapter {root:PathBuf,package:RuntimePackage,profile_root:PathBuf,profile_id:Uuid,inventory:Option<PackageManifest>,work...
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:32.6227816Z    |            ^^^^^^^^^^^^^
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:32.6228281Z 
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:32.6229269Z warning: associated items `new`, `call`, `cleanup`, and `parse_measurement_status` are never used
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:32.6230303Z   --> platform/native-runtime/src/runtime.rs:15:12
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:32.6231011Z    |
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:32.6231818Z 14 | impl NativeAdapter {
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:32.6232570Z    | ------------------ associated items in this implementation
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:32.6233960Z 15 |     pub fn new(root:PathBuf,package:RuntimePackage,profile_root:PathBuf,profile_id:Uuid,inventory:Option<PackageManifest>)->Self{Self{roo...
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:32.6235208Z    |            ^^^
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:32.6236511Z 16 |     fn call(&mut self,method:&str,params:serde_json::Value,payload:Vec<u8>,seconds:u64)->Result<Reply>{let process=self.process.as_ref()....
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:32.6237725Z    |        ^^^^
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:32.6238235Z 17 |     fn cleanup(&mut self){
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:32.6238818Z    |        ^^^^^^^
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:32.6239339Z ...
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:32.6240189Z 29 |     fn parse_measurement_status(&self,reply:Reply,expected:Uuid)->Result<NativeMeasurementStatus>{
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:32.6241201Z    |        ^^^^^^^^^^^^^^^^^^^^^^^^
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:32.6241930Z 
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:32.6242294Z warning: multiple fields are never read
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:32.6243024Z    --> platform/native-runtime/src/runtime.rs:177:46
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:32.6243690Z     |
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:32.6244842Z 177 | ...ct Metric {window_duration_ms:u32,frames_presented:u32,dropped_frames:u32,audio_underruns:u32,frame_time_p50_ms:f64,frame_time_p95_ms:f64,frame_time_p99_ms:f64}
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:32.6246493Z     |       ------  ^^^^^^^^^^^^^^^^^^     ^^^^^^^^^^^^^^^^     ^^^^^^^^^^^^^^     ^^^^^^^^^^^^^^^     ^^^^^^^^^^^^^^^^^     ^^^^^^^^^^^^^^^^^     ^^^^^^^^^^^^^^^^^
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:32.6247626Z     |       |
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:32.6248139Z     |       fields in this struct
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:32.6248606Z 
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:32.6248940Z warning: multiple fields are never read
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:32.6249586Z    --> platform/native-runtime/src/runtime.rs:190:75
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:32.6250260Z     |
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:32.6251947Z 190 | ...ct Header {id:Uuid,nominal_refresh_hz:f64,observed_duration_ms:u32,warmup_ms:u32,frames_presented:u32,frames_emulated:u32,dropped_frames:u32,audio_underruns:u32,interval_count:u32,interval_encoding:St...
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:32.6253938Z     |       ------  ^^      ^^^^^^^^^^^^^^^^^^     ^^^^^^^^^^^^^^^^^^^^     ^^^^^^^^^     ^^^^^^^^^^^^^^^^     ^^^^^^^^^^^^^^^     ^^^^^^^^^^^^^^     ^^^^^^^^^^^^^^^     ^^^^^^^^^^^^^^     ^^^^^^^^^^^^^^^^^
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:32.6254923Z     |       |
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:32.6255469Z     |       fields in this struct
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:32.6255939Z 
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:32.6256329Z warning: static `NEVER_CANCELLED` is never used
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:32.6257124Z    --> platform/native-runtime/src/runtime.rs:214:8
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:32.6258050Z     |
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:32.6258850Z 214 | static NEVER_CANCELLED:AtomicBool=AtomicBool::new(false);
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:32.6259531Z     |        ^^^^^^^^^^^^^^^
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:32.6259816Z 
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:32.6260036Z warning: function `check_cancel` is never used
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:32.6260650Z    --> platform/native-runtime/src/runtime.rs:215:4
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:32.6261139Z     |
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:32.6262343Z 215 | fn check_cancel(cancel:&AtomicBool)->Result<()>{if cancel.load(Ordering::Acquire){return Err(PlatformError::new(ErrorCode::Cancelled,"Run...
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:32.6263452Z     |    ^^^^^^^^^^^^
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:32.6263713Z 
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:32.6263917Z warning: function `materialize` is never used
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:32.6264516Z    --> platform/native-runtime/src/runtime.rs:216:4
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:32.6265060Z     |
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:32.6266096Z 216 | fn materialize(directory:&std::path::Path,name:&str,expected_hash:&ContentHash,expected_bytes:u64,mut source:File,cancel:&AtomicBool)->Re...
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:32.6267324Z     |    ^^^^^^^^^^^
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:32.6267561Z 
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:32.6267777Z warning: function `container_name` is never used
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:32.6268336Z   --> platform/native-runtime/src/work.rs:16:8
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:32.6269170Z    |
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:32.6269860Z 16 | pub fn container_name(work_id:Uuid)->String{format!("OmniPlay.Session.{}",work_id.simple())}
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:32.6270627Z    |        ^^^^^^^^^^^^^^
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:32.6270877Z 
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:32.6271078Z warning: function `record_bytes` is never used
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:32.6271958Z   --> platform/native-runtime/src/work.rs:17:4
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:32.6272457Z    |
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:32.6273334Z 17 | fn record_bytes(work:&Path,name:&str,bytes:&[u8])->Result<()>{if bytes.len()>4096{return Err(storage_error("work record exceeds its bound...
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:32.6274339Z    |    ^^^^^^^^^^^^
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:32.6274582Z 
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:32.6274759Z warning: function `record` is never used
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:32.6275275Z   --> platform/native-runtime/src/work.rs:18:4
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:32.6275758Z    |
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:32.6276677Z 18 | fn record(work:&Path,name:&str,value:&impl Serialize)->Result<()>{record_bytes(work,name,&serde_json::to_vec(value).map_err(storage_error...
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:32.6277688Z    |    ^^^^^^
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:32.6277885Z 
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:32.6278089Z warning: function `staging_ready` is never used
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:32.6278653Z   --> platform/native-runtime/src/work.rs:19:8
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:32.6279141Z    |
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:32.6280276Z 19 | pub fn staging_ready(work:&Path,value:&impl Serialize)->Result<omniplay_contracts::ContentHash>{let bytes=serde_json::to_vec(value).map_e...
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:32.6281371Z    |        ^^^^^^^^^^^^^
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:32.6281861Z 
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:32.6282074Z warning: function `creation_intent` is never used
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:32.6282661Z   --> platform/native-runtime/src/work.rs:20:8
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:32.6283437Z    |
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:32.6284382Z 20 | pub fn creation_intent(work:&Path,profile:Uuid,id:Uuid)->Result<()>{record(work,"container-intent.json",&Ownership{schema_version:1,profi...
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:32.6285479Z    |        ^^^^^^^^^^^^^^^
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:32.6285741Z 
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:32.6285927Z warning: function `created` is never used
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:32.6286462Z   --> platform/native-runtime/src/work.rs:21:8
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:32.6286950Z    |
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:32.6287864Z 21 | pub fn created(work:&Path,profile:Uuid,id:Uuid)->Result<()>{record(work,"container-owned.json",&Ownership{schema_version:1,profile_id:pro...
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:32.6288907Z    |        ^^^^^^^
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:32.6289145Z 
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:32.6289362Z warning: function `launch_intent` is never used
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:32.6289945Z   --> platform/native-runtime/src/work.rs:22:8
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:32.6290435Z    |
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:32.6291338Z 22 | pub fn launch_intent(work:&Path,id:Uuid)->Result<()>{record(work,"launch-intent.json",&serde_json::json!({"schema_version":1,"work_id":id...
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:32.6292571Z    |        ^^^^^^^^^^^^^
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:32.6292806Z 
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:32.6292982Z warning: function `process` is never used
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:32.6293503Z   --> platform/native-runtime/src/work.rs:23:8
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:32.6293976Z    |
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:32.6294922Z 23 | pub fn process(work:&Path,id:Uuid,observed:omniplay_sandbox::ProcessIdentity)->Result<()>{record(work,"container-process.json",&Worker{sc...
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:32.6296008Z    |        ^^^^^^^
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:32.6296248Z 
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:32.6296527Z warning: function `presentation_launch_intent` is never used
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:32.6297172Z   --> platform/native-runtime/src/work.rs:24:8
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:32.6297664Z    |
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:32.6298624Z 24 | pub fn presentation_launch_intent(work:&Path,id:Uuid)->Result<()>{record(work,"presentation-launch-intent.json",&serde_json::json!({"sche...
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:32.6299733Z    |        ^^^^^^^^^^^^^^^^^^^^^^^^^^
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:32.6300036Z 
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:32.6300274Z warning: function `presentation_process` is never used
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:32.6300886Z   --> platform/native-runtime/src/work.rs:25:8
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:32.6301371Z    |
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:32.6302604Z 25 | pub fn presentation_process(work:&Path,id:Uuid,observed:omniplay_sandbox::ProcessIdentity)->Result<()>{record(work,"presentation-process....
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:32.6303987Z    |        ^^^^^^^^^^^^^^^^^^^^
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:32.6304273Z 
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:32.6304443Z warning: function `read` is never used
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:32.6304964Z   --> platform/native-runtime/src/work.rs:31:4
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:32.6305433Z    |
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:32.6306307Z 31 | fn read<T:for<'a>Deserialize<'a>>(path:&Path)->Result<T>{if !ordinary(path,false)?{return Err(storage_error("work record is absent"));}le...
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:32.6307322Z    |    ^^^^
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:32.6307504Z 
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:32.6307688Z warning: function `reclaim` is never used
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:32.6308234Z   --> platform/native-runtime/src/work.rs:93:4
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:32.6308723Z    |
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:32.6309203Z 93 | fn reclaim(profile:&Path,profile_id:Uuid,work:&Path)->Result<()>{
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:32.6309834Z    |    ^^^^^^^
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:32.6310040Z 
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:32.6310242Z warning: enum `RetainedReason` is never used
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:32.6310814Z   --> platform/native-runtime/src/work.rs:98:6
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:32.6311290Z    |
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:32.6312407Z 98 | enum RetainedReason{Locked,LegacyOwnership,IncompleteOwnership,OtherPlatform,Unconfirmed}
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:32.6313288Z    |      ^^^^^^^^^^^^^^
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:32.6313519Z 
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:32.6313726Z warning: function `reclaim_reported` is never used
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:32.6314294Z   --> platform/native-runtime/src/work.rs:99:4
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:32.6314778Z    |
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:32.6315510Z 99 | fn reclaim_reported(profile:&Path,profile_id:Uuid,work:&Path,retained:&mut RetainedReason)->Result<()>{
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:32.6316611Z    |    ^^^^^^^^^^^^^^^^
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:32.6316855Z 
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:32.6317065Z warning: function `collect_one` is never used
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:32.6317626Z    --> platform/native-runtime/src/work.rs:229:8
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:32.6318141Z     |
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:32.6318675Z 229 | pub fn collect_one(profile:&Path,profile_id:Uuid,work:&Path)->Result<()>{
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:32.6319340Z     |        ^^^^^^^^^^^
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:32.6319557Z 
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:32.6319757Z warning: methods `has_exited` and `work` are never used
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:32.6320374Z   --> platform/native-runtime/src/linux_session.rs:69:12
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:32.6320909Z    |
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:32.6321219Z 12 | impl LinuxSession{
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:32.6321916Z    | ----------------- methods in this implementation
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:32.6322410Z ...
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:32.6323277Z 69 |     pub fn has_exited(&self)->bool{self.process.as_ref().is_none_or(|process|process.has_exited())||self.presentation.as_ref().is_none_or...
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:32.6324324Z    |            ^^^^^^^^^^
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:32.6324759Z 70 |     pub fn work(&self)->&LinuxWork{&self.work}
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:32.6325240Z    |            ^^^^
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:32.6325459Z 
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:32.6730921Z warning: method `as_str` is never used
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:32.6732122Z   --> platform/native-runtime/src/registry.rs:19:26
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:32.6733228Z    |
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:32.6734270Z 19 | impl VideoBackend{pub fn as_str(self)->&'static str{match self{Self::Software=>"software",Self::OpenGlCore=>"opengl_core"}}}
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:32.6735222Z    | -----------------        ^^^^^^
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:32.6735593Z    | |
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:32.6735918Z    | method in this implementation
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:32.6736333Z    |
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:32.6736636Z    = note: `#[warn(dead_code)]` on by default
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:32.6736943Z 
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:32.6942110Z warning: `omniplay-native-runtime` (lib) generated 31 warnings (run `cargo fix --lib -p omniplay-native-runtime` to apply 3 suggestions)
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:32.6943363Z     Checking omniplay-broker v0.1.0 (/home/runner/work/vlikeon/vlikeon/platform/broker)
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:32.7542157Z warning: `omniplay-native-runtime` (lib test) generated 30 warnings (29 duplicates)
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:32.7684594Z warning: unused import: `key_id`
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:32.7686328Z  --> platform/broker/src/stream_input.rs:4:72
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:32.7687530Z   |
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:32.7688384Z 4 | use omniplay_streaming::{SignedDocument,PairGrant,inspect,verify_grant,key_id};
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:32.7689258Z   |                                                                        ^^^^^^
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:32.7689771Z   |
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:32.7690135Z   = note: `#[warn(unused_imports)]` on by default
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:32.7690487Z 
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:32.7690681Z warning: unused import: `path::PathBuf`
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:32.7691191Z  --> platform/broker/src/stream_input.rs:6:20
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:32.7691922Z   |
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:32.7692263Z 6 | use std::{fs::File,path::PathBuf};
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:32.7692733Z   |                    ^^^^^^^^^^^^^
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:32.7693019Z 
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:33.0350266Z warning: unused variable: `deadline_ms`
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:33.0351300Z   --> platform/broker/src/stream_input.rs:24:169
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:33.0352364Z    |
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:33.0353168Z 24 | ...ent:StreamGrantDocument,deadline_ms:u64)->Result<StreamInputStatus>{
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:33.0354180Z    |                            ^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_deadline_ms`
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:33.0354871Z    |
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:33.0355209Z    = note: `#[warn(unused_variables)]` on by default
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:33.0355554Z 
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:33.0773134Z warning: `omniplay-broker` (bin "omniplay-broker") generated 3 warnings (run `cargo fix --bin "omniplay-broker"` to apply 2 suggestions)
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:33.1198284Z warning: `omniplay-broker` (bin "omniplay-broker" test) generated 3 warnings (3 duplicates)
+rust	Compile Linux runtime and both broker executables	2026-10-23T00:28:33.1199071Z     Finished `dev` profile [unoptimized + debuginfo] target(s) in 30.17s
+rust	Confirm tracked source stayed unchanged	﻿2026-10-23T00:28:33.1517813Z ##[group]Run git diff --exit-code && git diff --cached --exit-code
+rust	Confirm tracked source stayed unchanged	2026-10-23T00:28:33.1518333Z ^[[36;1mgit diff --exit-code && git diff --cached --exit-code^[[0m
+rust	Confirm tracked source stayed unchanged	2026-10-23T00:28:33.1580796Z shell: /usr/bin/bash -e {0}
+rust	Confirm tracked source stayed unchanged	2026-10-23T00:28:33.1581071Z env:
+rust	Confirm tracked source stayed unchanged	2026-10-23T00:28:33.1581269Z   CARGO_TERM_COLOR: never
+rust	Confirm tracked source stayed unchanged	2026-10-23T00:28:33.1581859Z   EXPECTED_SHA: 1d1af96f42adc80fc0bef9e427e24fac6efad1a9
+rust	Confirm tracked source stayed unchanged	2026-10-23T00:28:33.1582239Z   CARGO_HOME: /home/runner/work/_temp/vlikeon-cargo
+rust	Confirm tracked source stayed unchanged	2026-10-23T00:28:33.1582606Z   CARGO_TARGET_DIR: /home/runner/work/_temp/vlikeon-target
+rust	Confirm tracked source stayed unchanged	2026-10-23T00:28:33.1582927Z ##[endgroup]
+rust	Post Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	﻿2026-10-23T00:28:33.2317615Z Post job cleanup.
+rust	Post Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:28:33.3206899Z [command]/usr/bin/git version
+rust	Post Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:28:33.3256115Z git version 2.55.0
+rust	Post Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:28:33.3299594Z Temporarily overriding HOME='/home/runner/work/_temp/3e75e9a8-28b6-48bc-aec3-70c29c6f0b08' before making global git config changes
+rust	Post Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:28:33.3301258Z Adding repository directory to the temporary git global config as a safe directory
+rust	Post Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:28:33.3306475Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/vlikeon/vlikeon
+rust	Post Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:28:33.3353750Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+rust	Post Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:28:33.3398544Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+rust	Post Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:28:33.3683443Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+rust	Post Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:28:33.3726800Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+rust	Complete job	﻿2026-10-23T00:28:33.4211063Z Cleaning up orphan processes
+rust	Complete job	2026-10-23T00:28:33.4517331Z ##[warning]Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+bootstrap	Set up job	﻿2026-10-23T00:27:13.7107648Z Current runner version: '2.338.0'
+bootstrap	Set up job	2026-10-23T00:27:13.7133405Z ##[group]Runner Image Provisioner
+bootstrap	Set up job	2026-10-23T00:27:13.7134544Z Hosted Compute Agent
+bootstrap	Set up job	2026-10-23T00:27:13.7135170Z Version: 20261012.601
+bootstrap	Set up job	2026-10-23T00:27:13.7135772Z Commit: f3dc54e1fb89da6852db922499a0233137369e1d
+bootstrap	Set up job	2026-10-23T00:27:13.7136497Z Build Date: 2026-10-12T17:48:21Z
+bootstrap	Set up job	2026-10-23T00:27:13.7137154Z Worker ID: {684cd588-6b2b-419f-83fc-0c09db8348d9}
+bootstrap	Set up job	2026-10-23T00:27:13.7137817Z Region: westcentralus
+bootstrap	Set up job	2026-10-23T00:27:13.7138424Z Cloud: Azure
+bootstrap	Set up job	2026-10-23T00:27:13.7138950Z ##[endgroup]
+bootstrap	Set up job	2026-10-23T00:27:13.7140555Z ##[group]Operating System
+bootstrap	Set up job	2026-10-23T00:27:13.7141167Z Ubuntu
+bootstrap	Set up job	2026-10-23T00:27:13.7141681Z 24.04.5
+bootstrap	Set up job	2026-10-23T00:27:13.7142220Z LTS
+bootstrap	Set up job	2026-10-23T00:27:13.7142721Z ##[endgroup]
+bootstrap	Set up job	2026-10-23T00:27:13.7143251Z ##[group]Runner Image
+bootstrap	Set up job	2026-10-23T00:27:13.7143828Z Image: ubuntu-24.04
+bootstrap	Set up job	2026-10-23T00:27:13.7144528Z Version: 20261012.334.1
+bootstrap	Set up job	2026-10-23T00:27:13.7145560Z Included Software: https://github.com/actions/runner-images/blob/ubuntu24/20261012.334/images/ubuntu/Ubuntu2404-Readme.md
+bootstrap	Set up job	2026-10-23T00:27:13.7147187Z Image Release: https://github.com/actions/runner-images/releases/tag/ubuntu24%2F20261012.334
+bootstrap	Set up job	2026-10-23T00:27:13.7148099Z ##[endgroup]
+bootstrap	Set up job	2026-10-23T00:27:13.7149508Z ##[group]GITHUB_TOKEN Permissions
+bootstrap	Set up job	2026-10-23T00:27:13.7151806Z Contents: read
+bootstrap	Set up job	2026-10-23T00:27:13.7152359Z Metadata: read
+bootstrap	Set up job	2026-10-23T00:27:13.7152962Z ##[endgroup]
+bootstrap	Set up job	2026-10-23T00:27:13.7155112Z Secret source: Actions
+bootstrap	Set up job	2026-10-23T00:27:13.7156063Z Cache mode: write
+bootstrap	Set up job	2026-10-23T00:27:13.7156950Z Prepare workflow directory
+bootstrap	Set up job	2026-10-23T00:27:13.7686841Z Prepare all required actions
+bootstrap	Set up job	2026-10-23T00:27:13.7735194Z Getting action download info
+bootstrap	Set up job	2026-10-23T00:27:14.0532746Z Download action repository 'actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683' (SHA:11bd71901bbe5b1630ceea73d27597364c9af683)
+bootstrap	Set up job	2026-10-23T00:27:14.3041172Z Complete job name: bootstrap
+bootstrap	Admit exact assigned revision	﻿2026-10-23T00:27:14.3562068Z ##[group]Run test "$GITHUB_SHA" = "$EXPECTED_SHA"
+bootstrap	Admit exact assigned revision	2026-10-23T00:27:14.3562962Z ^[[36;1mtest "$GITHUB_SHA" = "$EXPECTED_SHA"^[[0m
+bootstrap	Admit exact assigned revision	2026-10-23T00:27:14.3782947Z shell: /usr/bin/bash -e {0}
+bootstrap	Admit exact assigned revision	2026-10-23T00:27:14.3784109Z env:
+bootstrap	Admit exact assigned revision	2026-10-23T00:27:14.3784823Z   EXPECTED_SHA: 1d1af96f42adc80fc0bef9e427e24fac6efad1a9
+bootstrap	Admit exact assigned revision	2026-10-23T00:27:14.3785557Z ##[endgroup]
+bootstrap	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	﻿2026-10-23T00:27:14.4135912Z ##[group]Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+bootstrap	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:27:14.4136805Z with:
+bootstrap	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:27:14.4137320Z   persist-credentials: false
+bootstrap	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:27:14.4137893Z   repository: lyzaghi/vlikeon
+bootstrap	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:27:14.4142086Z   token: ***
+bootstrap	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:27:14.4142659Z   ssh-strict: true
+bootstrap	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:27:14.4143166Z   ssh-user: git
+bootstrap	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:27:14.4143663Z   clean: true
+bootstrap	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:27:14.4144467Z   sparse-checkout-cone-mode: true
+bootstrap	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:27:14.4145106Z   fetch-depth: 1
+bootstrap	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:27:14.4145594Z   fetch-tags: false
+bootstrap	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:27:14.4146081Z   show-progress: true
+bootstrap	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:27:14.4146620Z   lfs: false
+bootstrap	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:27:14.4147100Z   submodules: false
+bootstrap	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:27:14.4147704Z   set-safe-directory: true
+bootstrap	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:27:14.4148274Z env:
+bootstrap	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:27:14.4148824Z   EXPECTED_SHA: 1d1af96f42adc80fc0bef9e427e24fac6efad1a9
+bootstrap	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:27:14.4149539Z ##[endgroup]
+bootstrap	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:27:14.5076490Z Syncing repository: lyzaghi/vlikeon
+bootstrap	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:27:14.5078451Z ##[group]Getting Git version info
+bootstrap	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:27:14.5079360Z Working directory is '/home/runner/work/vlikeon/vlikeon'
+bootstrap	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:27:14.5080457Z [command]/usr/bin/git version
+bootstrap	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:27:14.5167398Z git version 2.55.0
+bootstrap	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:27:14.5185306Z ##[endgroup]
+bootstrap	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:27:14.5197838Z Temporarily overriding HOME='/home/runner/work/_temp/073d0c74-b25e-4144-83c7-4116bf42b411' before making global git config changes
+bootstrap	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:27:14.5200154Z Adding repository directory to the temporary git global config as a safe directory
+bootstrap	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:27:14.5202731Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/vlikeon/vlikeon
+bootstrap	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:27:14.5256555Z Deleting the contents of '/home/runner/work/vlikeon/vlikeon'
+bootstrap	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:27:14.5260957Z ##[group]Initializing the repository
+bootstrap	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:27:14.5265710Z [command]/usr/bin/git init /home/runner/work/vlikeon/vlikeon
+bootstrap	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:27:14.5372305Z hint: Using 'master' as the name for the initial branch. This default branch name
+bootstrap	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:27:14.5374275Z hint: will change to "main" in Git 3.0. To configure the initial branch name
+bootstrap	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:27:14.5376753Z hint: to use in all of your new repositories, which will suppress this warning,
+bootstrap	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:27:14.5378082Z hint: call:
+bootstrap	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:27:14.5378821Z hint:
+bootstrap	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:27:14.5379589Z hint: 	git config --global init.defaultBranch <name>
+bootstrap	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:27:14.5380495Z hint:
+bootstrap	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:27:14.5381432Z hint: Names commonly chosen instead of 'master' are 'main', 'trunk' and
+bootstrap	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:27:14.5382810Z hint: 'development'. The just-created branch can be renamed via this command:
+bootstrap	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:27:14.5384169Z hint:
+bootstrap	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:27:14.5384855Z hint: 	git branch -m <name>
+bootstrap	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:27:14.5385639Z hint:
+bootstrap	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:27:14.5386632Z hint: Disable this message with "git config set advice.defaultBranchName false"
+bootstrap	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:27:14.5388111Z Initialized empty Git repository in /home/runner/work/vlikeon/vlikeon/.git/
+bootstrap	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:27:14.5390403Z [command]/usr/bin/git remote add origin https://github.com/lyzaghi/vlikeon
+bootstrap	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:27:14.5441013Z ##[endgroup]
+bootstrap	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:27:14.5442371Z ##[group]Disabling automatic garbage collection
+bootstrap	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:27:14.5445838Z [command]/usr/bin/git config --local gc.auto 0
+bootstrap	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:27:14.5478531Z ##[endgroup]
+bootstrap	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:27:14.5480058Z ##[group]Setting up auth
+bootstrap	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:27:14.5485147Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+bootstrap	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:27:14.5513518Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+bootstrap	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:27:14.5865505Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+bootstrap	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:27:14.5896681Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+bootstrap	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:27:14.6099076Z [command]/usr/bin/git config --local http.https://github.com/.extraheader AUTHORIZATION: basic ***
+bootstrap	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:27:14.6138848Z ##[endgroup]
+bootstrap	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:27:14.6140370Z ##[group]Fetching the repository
+bootstrap	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:27:14.6148787Z [command]/usr/bin/git -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=1 origin +1d1af96f42adc80fc0bef9e427e24fac6efad1a9:refs/remotes/origin/main
+bootstrap	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:27:15.6766347Z From https://github.com/lyzaghi/vlikeon
+bootstrap	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:27:15.6769174Z  * [new ref]         1d1af96f42adc80fc0bef9e427e24fac6efad1a9 -> origin/main
+bootstrap	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:27:15.6775945Z ##[endgroup]
+bootstrap	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:27:15.6778853Z ##[group]Determining the checkout info
+bootstrap	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:27:15.6782264Z ##[endgroup]
+bootstrap	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:27:15.6784619Z [command]/usr/bin/git sparse-checkout disable
+bootstrap	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:27:15.6838063Z [command]/usr/bin/git config --local --unset-all extensions.worktreeConfig
+bootstrap	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:27:15.6870643Z ##[group]Checking out the ref
+bootstrap	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:27:15.6873785Z [command]/usr/bin/git checkout --progress --force -B main refs/remotes/origin/main
+bootstrap	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:27:15.7708352Z Switched to a new branch 'main'
+bootstrap	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:27:15.7713451Z branch 'main' set up to track 'origin/main'.
+bootstrap	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:27:15.7722003Z ##[endgroup]
+bootstrap	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:27:15.7764524Z [command]/usr/bin/git log -1 --format=%H
+bootstrap	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:27:15.7790346Z 1d1af96f42adc80fc0bef9e427e24fac6efad1a9
+bootstrap	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:27:15.7800567Z ##[group]Removing auth
+bootstrap	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:27:15.7805257Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+bootstrap	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:27:15.7832627Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+bootstrap	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:27:15.8018297Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+bootstrap	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:27:15.8041942Z http.https://github.com/.extraheader
+bootstrap	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:27:15.8049722Z [command]/usr/bin/git config --local --unset-all http.https://github.com/.extraheader
+bootstrap	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:27:15.8085318Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+bootstrap	Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:27:15.8261958Z ##[endgroup]
+bootstrap	Configure isolated Linux bootstrap	﻿2026-10-23T00:27:15.8447961Z ##[group]Run cmake -S engines/isolation-linux -B "$RUNNER_TEMP/vlikeon-bootstrap" -DCMAKE_BUILD_TYPE=Release
+bootstrap	Configure isolated Linux bootstrap	2026-10-23T00:27:15.8451367Z ^[[36;1mcmake -S engines/isolation-linux -B "$RUNNER_TEMP/vlikeon-bootstrap" -DCMAKE_BUILD_TYPE=Release^[[0m
+bootstrap	Configure isolated Linux bootstrap	2026-10-23T00:27:15.8494647Z shell: /usr/bin/bash -e {0}
+bootstrap	Configure isolated Linux bootstrap	2026-10-23T00:27:15.8496134Z env:
+bootstrap	Configure isolated Linux bootstrap	2026-10-23T00:27:15.8497599Z   EXPECTED_SHA: 1d1af96f42adc80fc0bef9e427e24fac6efad1a9
+bootstrap	Configure isolated Linux bootstrap	2026-10-23T00:27:15.8499327Z ##[endgroup]
+bootstrap	Configure isolated Linux bootstrap	2026-10-23T00:27:17.2708195Z -- The C compiler identification is GNU 13.3.0
+bootstrap	Configure isolated Linux bootstrap	2026-10-23T00:27:17.3969379Z -- Detecting C compiler ABI info
+bootstrap	Configure isolated Linux bootstrap	2026-10-23T00:27:17.6575465Z -- Detecting C compiler ABI info - done
+bootstrap	Configure isolated Linux bootstrap	2026-10-23T00:27:17.6723290Z -- Check for working C compiler: /usr/bin/cc - skipped
+bootstrap	Configure isolated Linux bootstrap	2026-10-23T00:27:17.6774240Z -- Detecting C compile features
+bootstrap	Configure isolated Linux bootstrap	2026-10-23T00:27:17.6826186Z -- Detecting C compile features - done
+bootstrap	Configure isolated Linux bootstrap	2026-10-23T00:27:17.6991449Z -- Configuring done (1.3s)
+bootstrap	Configure isolated Linux bootstrap	2026-10-23T00:27:17.7105000Z -- Generating done (0.0s)
+bootstrap	Configure isolated Linux bootstrap	2026-10-23T00:27:17.7108915Z -- Build files have been written to: /home/runner/work/_temp/vlikeon-bootstrap
+bootstrap	Build isolated Linux bootstrap	﻿2026-10-23T00:27:17.7221253Z ##[group]Run cmake --build "$RUNNER_TEMP/vlikeon-bootstrap" --parallel 2
+bootstrap	Build isolated Linux bootstrap	2026-10-23T00:27:17.7221953Z ^[[36;1mcmake --build "$RUNNER_TEMP/vlikeon-bootstrap" --parallel 2^[[0m
+bootstrap	Build isolated Linux bootstrap	2026-10-23T00:27:17.7267903Z shell: /usr/bin/bash -e {0}
+bootstrap	Build isolated Linux bootstrap	2026-10-23T00:27:17.7268392Z env:
+bootstrap	Build isolated Linux bootstrap	2026-10-23T00:27:17.7268841Z   EXPECTED_SHA: 1d1af96f42adc80fc0bef9e427e24fac6efad1a9
+bootstrap	Build isolated Linux bootstrap	2026-10-23T00:27:17.7269345Z ##[endgroup]
+bootstrap	Build isolated Linux bootstrap	2026-10-23T00:27:17.7474226Z [ 12%] Building C object CMakeFiles/omniplay-linux-policy.dir/policy.c.o
+bootstrap	Build isolated Linux bootstrap	2026-10-23T00:27:18.8830302Z [ 25%] Linking C static library libomniplay-linux-policy.a
+bootstrap	Build isolated Linux bootstrap	2026-10-23T00:27:27.1245892Z [ 25%] Built target omniplay-linux-policy
+bootstrap	Build isolated Linux bootstrap	2026-10-23T00:27:27.1311331Z [ 37%] Building C object CMakeFiles/omniplay-linux-namespaces.dir/namespaces.c.o
+bootstrap	Build isolated Linux bootstrap	2026-10-23T00:27:27.1313542Z [ 50%] Building C object CMakeFiles/omniplay-linux-namespaces.dir/root.c.o
+bootstrap	Build isolated Linux bootstrap	2026-10-23T00:27:27.1898903Z /home/runner/work/vlikeon/vlikeon/engines/isolation-linux/root.c: In function ‘game_path’:
+bootstrap	Build isolated Linux bootstrap	2026-10-23T00:27:27.1901199Z /home/runner/work/vlikeon/vlikeon/engines/isolation-linux/root.c:67:3: warning: this ‘if’ clause does not guard... [-Wmisleading-indentation]
+bootstrap	Build isolated Linux bootstrap	2026-10-23T00:27:27.1902783Z    67 |   if(strncmp(file->path,"work/",5)!=0||file->executable)return false;const char* name=file->path+5;
+bootstrap	Build isolated Linux bootstrap	2026-10-23T00:27:27.1903513Z       |   ^~
+bootstrap	Build isolated Linux bootstrap	2026-10-23T00:27:27.1904993Z /home/runner/work/vlikeon/vlikeon/engines/isolation-linux/root.c:67:70: note: ...this statement, but the latter is misleadingly indented as if it were guarded by the ‘if’
+bootstrap	Build isolated Linux bootstrap	2026-10-23T00:27:27.1906020Z    67 |   if(strncmp(file->path,"work/",5)!=0||file->executable)return false;const char* name=file->path+5;
+bootstrap	Build isolated Linux bootstrap	2026-10-23T00:27:27.1906671Z       |                                                                      ^~~~~
+bootstrap	Build isolated Linux bootstrap	2026-10-23T00:27:27.1907354Z /home/runner/work/vlikeon/vlikeon/engines/isolation-linux/root.c: In function ‘directory’:
+bootstrap	Build isolated Linux bootstrap	2026-10-23T00:27:27.1908358Z /home/runner/work/vlikeon/vlikeon/engines/isolation-linux/root.c:89:3: warning: this ‘if’ clause does not guard... [-Wmisleading-indentation]
+bootstrap	Build isolated Linux bootstrap	2026-10-23T00:27:27.1909527Z    89 |   if(mkdirat(root,name,0700)<0)require(errno==EEXIST);struct stat value;require(fstatat(root,name,&value,AT_SYMLINK_NOFOLLOW)==0&&S_ISDIR(value.st_mode)&&value.st_uid==0);
+bootstrap	Build isolated Linux bootstrap	2026-10-23T00:27:27.1910635Z       |   ^~
+bootstrap	Build isolated Linux bootstrap	2026-10-23T00:27:27.1911572Z /home/runner/work/vlikeon/vlikeon/engines/isolation-linux/root.c:89:55: note: ...this statement, but the latter is misleadingly indented as if it were guarded by the ‘if’
+bootstrap	Build isolated Linux bootstrap	2026-10-23T00:27:27.1912751Z    89 |   if(mkdirat(root,name,0700)<0)require(errno==EEXIST);struct stat value;require(fstatat(root,name,&value,AT_SYMLINK_NOFOLLOW)==0&&S_ISDIR(value.st_mode)&&value.st_uid==0);
+bootstrap	Build isolated Linux bootstrap	2026-10-23T00:27:27.1914334Z       |                                                       ^~~~~~
+bootstrap	Build isolated Linux bootstrap	2026-10-23T00:27:27.2377003Z /home/runner/work/vlikeon/vlikeon/engines/isolation-linux/namespaces.c: In function ‘session’:
+bootstrap	Build isolated Linux bootstrap	2026-10-23T00:27:27.2378922Z /home/runner/work/vlikeon/vlikeon/engines/isolation-linux/namespaces.c:39:3: warning: this ‘if’ clause does not guard... [-Wmisleading-indentation]
+bootstrap	Build isolated Linux bootstrap	2026-10-23T00:27:27.2380538Z    39 |   if(value[36]!=0)return false;bool nonzero=false;
+bootstrap	Build isolated Linux bootstrap	2026-10-23T00:27:27.2381130Z       |   ^~
+bootstrap	Build isolated Linux bootstrap	2026-10-23T00:27:27.2381900Z In file included from /home/runner/work/vlikeon/vlikeon/engines/isolation-linux/namespaces.h:3,
+bootstrap	Build isolated Linux bootstrap	2026-10-23T00:27:27.2383069Z                  from /home/runner/work/vlikeon/vlikeon/engines/isolation-linux/namespaces.c:1:
+bootstrap	Build isolated Linux bootstrap	2026-10-23T00:27:27.2385026Z /home/runner/work/vlikeon/vlikeon/engines/isolation-linux/namespaces.c:39:32: note: ...this statement, but the latter is misleadingly indented as if it were guarded by the ‘if’
+bootstrap	Build isolated Linux bootstrap	2026-10-23T00:27:27.2386471Z    39 |   if(value[36]!=0)return false;bool nonzero=false;
+bootstrap	Build isolated Linux bootstrap	2026-10-23T00:27:27.2387095Z       |                                ^~~~
+bootstrap	Build isolated Linux bootstrap	2026-10-23T00:27:27.3218003Z [ 62%] Building C object CMakeFiles/omniplay-linux-namespaces.dir/cgroup.c.o
+bootstrap	Build isolated Linux bootstrap	2026-10-23T00:27:27.4009602Z [ 75%] Linking C static library libomniplay-linux-namespaces.a
+bootstrap	Build isolated Linux bootstrap	2026-10-23T00:27:27.4748279Z [ 75%] Built target omniplay-linux-namespaces
+bootstrap	Build isolated Linux bootstrap	2026-10-23T00:27:27.4812593Z [ 87%] Building C object CMakeFiles/omniplay-linux-bootstrap.dir/bootstrap.c.o
+bootstrap	Build isolated Linux bootstrap	2026-10-23T00:27:27.5869044Z [100%] Linking C executable omniplay-linux-bootstrap
+bootstrap	Build isolated Linux bootstrap	2026-10-23T00:27:28.1618948Z [100%] Built target omniplay-linux-bootstrap
+bootstrap	Confirm tracked source stayed unchanged	﻿2026-10-23T00:27:28.1752939Z ##[group]Run git diff --exit-code && git diff --cached --exit-code
+bootstrap	Confirm tracked source stayed unchanged	2026-10-23T00:27:28.1753561Z ^[[36;1mgit diff --exit-code && git diff --cached --exit-code^[[0m
+bootstrap	Confirm tracked source stayed unchanged	2026-10-23T00:27:28.1795373Z shell: /usr/bin/bash -e {0}
+bootstrap	Confirm tracked source stayed unchanged	2026-10-23T00:27:28.1795885Z env:
+bootstrap	Confirm tracked source stayed unchanged	2026-10-23T00:27:28.1796254Z   EXPECTED_SHA: 1d1af96f42adc80fc0bef9e427e24fac6efad1a9
+bootstrap	Confirm tracked source stayed unchanged	2026-10-23T00:27:28.1796698Z ##[endgroup]
+bootstrap	Post Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	﻿2026-10-23T00:27:28.2390684Z Post job cleanup.
+bootstrap	Post Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:27:28.3207983Z [command]/usr/bin/git version
+bootstrap	Post Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:27:28.3265296Z git version 2.55.0
+bootstrap	Post Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:27:28.3298434Z Temporarily overriding HOME='/home/runner/work/_temp/11b98a24-0097-4d7e-bb20-7076d3a373b9' before making global git config changes
+bootstrap	Post Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:27:28.3299981Z Adding repository directory to the temporary git global config as a safe directory
+bootstrap	Post Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:27:28.3303154Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/vlikeon/vlikeon
+bootstrap	Post Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:27:28.3341904Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+bootstrap	Post Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:27:28.3375070Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+bootstrap	Post Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:27:28.3583065Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+bootstrap	Post Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683	2026-10-23T00:27:28.3610073Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+bootstrap	Complete job	﻿2026-10-23T00:27:28.4038958Z Cleaning up orphan processes
+bootstrap	Complete job	2026-10-23T00:27:28.4281236Z ##[warning]Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/

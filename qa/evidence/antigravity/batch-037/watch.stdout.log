@@ -1,0 +1,65 @@
+Refreshing run status every 30 seconds. Press Ctrl+C to quit.
+
+* main Linux native qualification · 39877185332
+Triggered via workflow_dispatch less than a minute ago
+
+JOBS
+* rust (ID 120165530878)
+  ✓ Set up job
+  ✓ Admit exact assigned revision
+  ✓ Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+  * Provision fixed Rust toolchain in disposable runner
+  * Compile Linux sandbox
+  * Exercise real Unix descriptor and host channel boundaries
+  * Compile Linux runtime and both broker executables
+  * Confirm tracked source stayed unchanged
+  * Post Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+X bootstrap in 8s (ID 120165530894)
+  ✓ Set up job
+  ✓ Admit exact assigned revision
+  ✓ Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+  ✓ Configure isolated Linux bootstrap
+  X Build isolated Linux bootstrap
+  ✓ Confirm tracked source stayed unchanged
+  ✓ Post Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+  ✓ Complete job
+
+ANNOTATIONS
+! Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+bootstrap: .github#2
+
+X Process completed with exit code 2.
+bootstrap: .github#37
+
+X main Linux native qualification · 39877185332
+Triggered via workflow_dispatch less than a minute ago
+
+JOBS
+X rust in 20s (ID 120165530878)
+  ✓ Set up job
+  ✓ Admit exact assigned revision
+  ✓ Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+  ✓ Provision fixed Rust toolchain in disposable runner
+  X Compile Linux sandbox
+  - Exercise real Unix descriptor and host channel boundaries
+  - Compile Linux runtime and both broker executables
+  ✓ Confirm tracked source stayed unchanged
+  ✓ Post Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+  ✓ Complete job
+X bootstrap in 8s (ID 120165530894)
+  ✓ Set up job
+  ✓ Admit exact assigned revision
+  ✓ Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+  ✓ Configure isolated Linux bootstrap
+  X Build isolated Linux bootstrap
+  ✓ Confirm tracked source stayed unchanged
+  ✓ Post Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+  ✓ Complete job
+
+ANNOTATIONS
+! Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+bootstrap: .github#2
+
+X Process completed with exit code 2.
+bootstrap: .github#37
+

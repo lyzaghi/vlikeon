@@ -1,0 +1,322 @@
+{
+  "batch_id": "vlikeon-037",
+  "source_commit": "b1f7439ba1cabd9d025e701c9fbf99cade3b3d5b",
+  "executor": "antigravity",
+  "started_at": "2026-10-23T00:16:59.990Z",
+  "commands": [
+    {
+      "id": "prior-runs",
+      "args": [
+        "run",
+        "list",
+        "--repo",
+        "lyzaghi/vlikeon",
+        "--workflow",
+        "linux-native-qualification.yml",
+        "--event",
+        "workflow_dispatch",
+        "--branch",
+        "main",
+        "--limit",
+        "30",
+        "--json",
+        "databaseId,headSha,displayTitle,status,conclusion,url"
+      ],
+      "exit_code": 0,
+      "elapsed_ms": 1072,
+      "error": null
+    },
+    {
+      "id": "dispatch",
+      "args": [
+        "workflow",
+        "run",
+        "linux-native-qualification.yml",
+        "--repo",
+        "lyzaghi/vlikeon",
+        "--ref",
+        "main",
+        "-f",
+        "expected_sha=b1f7439ba1cabd9d025e701c9fbf99cade3b3d5b",
+        "-f",
+        "batch_id=vlikeon-037"
+      ],
+      "exit_code": 0,
+      "elapsed_ms": 2238,
+      "error": null
+    },
+    {
+      "id": "locate-0",
+      "args": [
+        "run",
+        "list",
+        "--repo",
+        "lyzaghi/vlikeon",
+        "--workflow",
+        "linux-native-qualification.yml",
+        "--event",
+        "workflow_dispatch",
+        "--branch",
+        "main",
+        "--limit",
+        "30",
+        "--json",
+        "databaseId,headSha,displayTitle,status,conclusion,url"
+      ],
+      "exit_code": 0,
+      "elapsed_ms": 1172,
+      "error": null
+    },
+    {
+      "id": "locate-1",
+      "args": [
+        "run",
+        "list",
+        "--repo",
+        "lyzaghi/vlikeon",
+        "--workflow",
+        "linux-native-qualification.yml",
+        "--event",
+        "workflow_dispatch",
+        "--branch",
+        "main",
+        "--limit",
+        "30",
+        "--json",
+        "databaseId,headSha,displayTitle,status,conclusion,url"
+      ],
+      "exit_code": 0,
+      "elapsed_ms": 1530,
+      "error": null
+    },
+    {
+      "id": "watch",
+      "args": [
+        "run",
+        "watch",
+        "39877185332",
+        "--repo",
+        "lyzaghi/vlikeon",
+        "--exit-status",
+        "--interval",
+        "30"
+      ],
+      "exit_code": 1,
+      "elapsed_ms": 35265,
+      "error": null
+    },
+    {
+      "id": "remote-result",
+      "args": [
+        "run",
+        "view",
+        "39877185332",
+        "--repo",
+        "lyzaghi/vlikeon",
+        "--json",
+        "headSha,status,conclusion,jobs,url"
+      ],
+      "exit_code": 0,
+      "elapsed_ms": 1420,
+      "error": null
+    },
+    {
+      "id": "remote-logs",
+      "args": [
+        "run",
+        "view",
+        "39877185332",
+        "--repo",
+        "lyzaghi/vlikeon",
+        "--log"
+      ],
+      "exit_code": 0,
+      "elapsed_ms": 3217,
+      "error": null
+    }
+  ],
+  "run": {
+    "conclusion": "",
+    "databaseId": 39877185332,
+    "displayTitle": "Linux qualification vlikeon-037 b1f7439ba1cabd9d025e701c9fbf99cade3b3d5b",
+    "headSha": "b1f7439ba1cabd9d025e701c9fbf99cade3b3d5b",
+    "status": "in_progress",
+    "url": "https://github.com/lyzaghi/vlikeon/actions/runs/39877185332"
+  },
+  "observed": {
+    "conclusion": "failure",
+    "headSha": "b1f7439ba1cabd9d025e701c9fbf99cade3b3d5b",
+    "jobs": [
+      {
+        "completedAt": "2026-10-23T00:17:28Z",
+        "conclusion": "failure",
+        "databaseId": 120165530878,
+        "name": "rust",
+        "startedAt": "2026-10-23T00:17:08Z",
+        "status": "completed",
+        "steps": [
+          {
+            "completedAt": "2026-10-23T00:17:10Z",
+            "conclusion": "success",
+            "name": "Set up job",
+            "number": 1,
+            "startedAt": "2026-10-23T00:17:09Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-23T00:17:10Z",
+            "conclusion": "success",
+            "name": "Admit exact assigned revision",
+            "number": 2,
+            "startedAt": "2026-10-23T00:17:10Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-23T00:17:11Z",
+            "conclusion": "success",
+            "name": "Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683",
+            "number": 3,
+            "startedAt": "2026-10-23T00:17:10Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-23T00:17:18Z",
+            "conclusion": "success",
+            "name": "Provision fixed Rust toolchain in disposable runner",
+            "number": 4,
+            "startedAt": "2026-10-23T00:17:11Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-23T00:17:26Z",
+            "conclusion": "failure",
+            "name": "Compile Linux sandbox",
+            "number": 5,
+            "startedAt": "2026-10-23T00:17:18Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-23T00:17:26Z",
+            "conclusion": "skipped",
+            "name": "Exercise real Unix descriptor and host channel boundaries",
+            "number": 6,
+            "startedAt": "2026-10-23T00:17:26Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-23T00:17:26Z",
+            "conclusion": "skipped",
+            "name": "Compile Linux runtime and both broker executables",
+            "number": 7,
+            "startedAt": "2026-10-23T00:17:26Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-23T00:17:26Z",
+            "conclusion": "success",
+            "name": "Confirm tracked source stayed unchanged",
+            "number": 8,
+            "startedAt": "2026-10-23T00:17:26Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-23T00:17:26Z",
+            "conclusion": "success",
+            "name": "Post Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683",
+            "number": 16,
+            "startedAt": "2026-10-23T00:17:26Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-23T00:17:26Z",
+            "conclusion": "success",
+            "name": "Complete job",
+            "number": 17,
+            "startedAt": "2026-10-23T00:17:26Z",
+            "status": "completed"
+          }
+        ],
+        "url": "https://github.com/lyzaghi/vlikeon/actions/runs/39877185332/job/120165530878"
+      },
+      {
+        "completedAt": "2026-10-23T00:17:16Z",
+        "conclusion": "failure",
+        "databaseId": 120165530894,
+        "name": "bootstrap",
+        "startedAt": "2026-10-23T00:17:08Z",
+        "status": "completed",
+        "steps": [
+          {
+            "completedAt": "2026-10-23T00:17:10Z",
+            "conclusion": "success",
+            "name": "Set up job",
+            "number": 1,
+            "startedAt": "2026-10-23T00:17:09Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-23T00:17:10Z",
+            "conclusion": "success",
+            "name": "Admit exact assigned revision",
+            "number": 2,
+            "startedAt": "2026-10-23T00:17:10Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-23T00:17:11Z",
+            "conclusion": "success",
+            "name": "Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683",
+            "number": 3,
+            "startedAt": "2026-10-23T00:17:10Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-23T00:17:13Z",
+            "conclusion": "success",
+            "name": "Configure isolated Linux bootstrap",
+            "number": 4,
+            "startedAt": "2026-10-23T00:17:11Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-23T00:17:13Z",
+            "conclusion": "failure",
+            "name": "Build isolated Linux bootstrap",
+            "number": 5,
+            "startedAt": "2026-10-23T00:17:13Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-23T00:17:13Z",
+            "conclusion": "success",
+            "name": "Confirm tracked source stayed unchanged",
+            "number": 6,
+            "startedAt": "2026-10-23T00:17:13Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-23T00:17:13Z",
+            "conclusion": "success",
+            "name": "Post Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683",
+            "number": 12,
+            "startedAt": "2026-10-23T00:17:13Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-23T00:17:13Z",
+            "conclusion": "success",
+            "name": "Complete job",
+            "number": 13,
+            "startedAt": "2026-10-23T00:17:13Z",
+            "status": "completed"
+          }
+        ],
+        "url": "https://github.com/lyzaghi/vlikeon/actions/runs/39877185332/job/120165530894"
+      }
+    ],
+    "status": "completed",
+    "url": "https://github.com/lyzaghi/vlikeon/actions/runs/39877185332"
+  },
+  "status": "failed",
+  "finished_at": "2026-10-23T00:17:55.914Z"
+}

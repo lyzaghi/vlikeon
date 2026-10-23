@@ -31,9 +31,10 @@ work. This document tracks Linux implementation separately from execution.
 
 ## Remaining closure and acceptance
 
-1. Build/check the exact Linux broker, sandbox, runtime, bootstrap and SDL
-   presentation artifacts. Syntax-only parsing on Windows is explicitly
-   insufficient for target types, libc ABI, linking or runtime behavior.
+1. Finish linked production broker/worker/SDL presentation packages and exact
+   artifact admission. Batch040 covers target checks and bootstrap linking,
+   not that whole package. Syntax-only parsing on Windows would be insufficient
+   for target types, libc ABI, linking or runtime behavior.
 2. Complete migration/repair policy around active delegated trees without
    changing live resource ceilings or using an unowned path/PID as authority.
 3. Complete interrupted creation/recovery paths and retained legacy outcomes;
@@ -47,9 +48,10 @@ work. This document tracks Linux implementation separately from execution.
    process-tree/resource retirement, filesystem crash recovery and all original
    core/device/SDK/license/package acceptance on supported Linux targets.
 
-The current Windows machine reports WSL is not installed. No Linux environment
-has been installed or claimed available. Source changes and authored tests
-remain unverified on Linux until exact target evidence is recorded.
+The current Windows machine reports WSL is not installed. No local Linux
+environment was installed. Target evidence below comes from the explicitly
+assigned disposable GitHub Ubuntu runners; it does not establish a supported
+production desktop, service delegation or device configuration.
 
 The manual GitHub Ubuntu workflow now provides actual target compiler evidence.
 Batch036 was rejected before execution due to workflow expression context.
@@ -72,6 +74,13 @@ missing Wayland development headers, required by rfd's existing default feature.
 The next workflow supplies that SDK package too; no Cargo feature or isolation
 policy is removed to bypass the missing prerequisite. This is compilation and
 userland socket evidence, not an actual sandboxed launch on the runner.
+
+Batch040 source1d1af96 passes both Ubuntu jobs: sandbox compilation, eight socket
+cases, runtime/broker `cargo check --all-targets` and the static-pie C bootstrap
+build. Tracked source remained unchanged. The runtime/broker check does not
+link production executables, and the bootstrap build does not execute policy.
+Source closure and all remaining target/systemd/core/device obligations above
+remain open. Public raw logs and review are in `qa/evidence/antigravity/`.
 
 Antigravity executes only Codex-released batches on frozen inputs. Codex owns
 review, diagnosis, source/test edits and acceptance decisions. No source-copy,
