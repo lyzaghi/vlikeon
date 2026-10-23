@@ -28,8 +28,10 @@ No reboot, browser installation or browser launch is part of this build run.
 
 ## Execution and retained failures
 
-Antigravity executes exact fixed commands only; Codex authors source and reviews
-raw results. Bootstrap attempts `003-bootstrap` and `003-bootstrap-b` failed
+Antigravity executes assigned tests only; Codex authors source and reviews raw
+results. Initial build preparation also ran through Antigravity; compilation
+is now supervised directly by a persistent Codex exec session, as described
+below. Bootstrap attempts `003-bootstrap` and `003-bootstrap-b` failed
 before tool startup because of CMD invocation. Corrected `003-bootstrap-c`
 completed the official bootstrap/gclient invocation with exit zero. It does
 not establish Chromium configuration or compilation.
@@ -40,8 +42,51 @@ comment preamble as product JSON. The checker now excludes generated output
 and Git metadata; product JSON remains strict. This is a harness scope fix,
 not a product security or schema relaxation.
 
-Fresh batch `003-build-b` passed authored-source language checks and entered
-the recipe's `dependency_sync` phase. No build receipt has been accepted.
+Batch `003-build-b` passed authored-source language checks and entered the
+recipe's `dependency_sync` phase. Its CLI returned an active-background report,
+but subsequent OS inspection found the runner, recipe, gclient and scoped Git
+processes absent, with no terminal result/receipt. The interruption record and
+original logs are retained. A live-status message or journal alone is not proof
+of a surviving process and is not accepted as completion.
+
+Codex resumed the unchanged recipe in batch `003-build-c`, supervised by an
+actual persistent exec handle. It failed dependency sync on an orphaned Git
+config lock. After confirming no scoped processes remained, the 14 stale locks
+in the owned workspace were inventoried, copied into failure evidence and
+removed individually with path/time checks. No authoring checkout, source,
+dependency pin or user-global Git setting changed. Batch `003-build-d` resumes
+the same workspace; its actual terminal build result is still required.
+
+Batch `003-build-d` completed sync/hooks but failed GN because the interrupted
+NASM checkout lacked `nasm_assemble.gni`; the Dawn hook also reported an invalid
+HEAD. Antigravity's read-only `003-dependencies-a` audit checked 155 Git entries
+and found 12 incomplete checkouts. The pinned depot_tools update logic can skip
+checkout when a parent's gitlink already matches the pin, despite absent HEAD.
+Codex used the ordinary `gclient sync --reset --nohooks --no-history` recovery
+inside this owned build workspace. It completed with zero exit; upstream tooling
+preserved the 12 broken directories under `_bad_scm` and re-created them.
+
+Antigravity's independent inventory and new production admission check then
+passed all 155 dependencies with unchanged check inputs (`003-dependencies-b`).
+The authored recipe now admits actual dependency HEAD and tracked source before
+hooks, freezes that checker and binds its inventory digest into the final build
+receipt. This new recipe is for subsequent preparations; the active build still
+uses its original frozen recipe with the separately executed inventory evidence.
+
+Exact upstream hooks reran successfully in `003-hooks-b`. Recovery also reset
+Chromium's tracked overlay, causing `003-build-e` to refuse changed integration
+bytes before GN. Codex preserved its result/journal and rewound only overlay
+admission to the completed-hooks phase. Batch `003-build-f` rechecks each target
+against frozen original/new bytes, reapplies the original overlay and continues
+GN/compilation. No check was waived, and no product source or pin was substituted.
+
+Batch `003-build-f` completed GN configuration and entered the actual full
+`chrome` compilation phase. The active journal is `configured`, running
+`chromium_compilation`. This is progress, not a successful build result.
+Dependency check reports and raw-log digests are published separately under
+`../qa/evidence/sequential/item-003/`; all earlier failed attempts stay retained.
+
+No build receipt has been accepted.
 Original failed snapshots/logs remain retained in the assigned local QA area;
 do not reinterpret them as successful build attempts or count prechecks as
 compiled Chromium. Update this record after inspecting terminal build evidence.

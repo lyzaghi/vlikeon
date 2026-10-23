@@ -16,6 +16,7 @@ import subprocess
 import sys
 import tempfile
 from prepare_desktop_browser import digest, encoded, ordinary, relative
+from chromium_dependencies import verify_dependency_inventory
 
 HOSTS = {'windows-x86_64': 'Windows', 'linux-x86_64': 'Linux', 'macos-aarch64': 'Darwin'}
 REPOSITORY = 'https://chromium.googlesource.com/chromium/src.git'
@@ -104,6 +105,8 @@ def main():
     source = check_inventory(project, receipt)
     if digest(Path(__file__).resolve()) != digest(source / 'recipe/tools/build_desktop_browser.py') or digest(Path(__file__).resolve().with_name('prepare_desktop_browser.py')) != digest(source / 'recipe/tools/prepare_desktop_browser.py'):
         raise ValueError('Run the build recipe frozen with this desktop source project')
+    if digest(Path(__file__).resolve().with_name('chromium_dependencies.py')) != digest(source / 'recipe/tools/chromium_dependencies.py'):
+        raise ValueError('Run the dependency admission code frozen with this project')
     git = args.git.resolve(strict=True)
     python = args.python.resolve(strict=True)
     depot = args.depot_tools.resolve(strict=True)
@@ -168,6 +171,11 @@ def build(project, source, receipt, args, git, python, depot):
         persist(journal_path, journal)
     if git_text(git, checkout, 'rev-parse', 'HEAD') != revision:
         raise ValueError('The hydrated Chromium checkout differs from its frozen revision')
+    # A resumed gclient sync may skip an incomplete checkout because its parent
+    # gitlink already carries the requested pin. Admit actual HEAD and bytes
+    # before hooks can silently substitute an unknown dependency version.
+    dependency_inventory = verify_dependency_inventory(workspace, git)
+    persist(project / 'dependency-git-inventory.json', dependency_inventory)
     if journal['phase'] == 'synced':
         command([python, depot / 'gclient.py', 'runhooks'], workspace, environment,
                 journal, journal_path, 'upstream_hooks')
@@ -247,6 +255,7 @@ def build(project, source, receipt, args, git, python, depot):
         'binary_relative_path': binary.relative_to(project).as_posix(),
         'binary_bytes': binary.stat().st_size, 'binary_sha256': digest(binary),
         'dependency_revisions_sha256': hashlib.sha256(dependencies).hexdigest(),
+        'dependency_git_inventory_sha256': digest(project / 'dependency-git-inventory.json'),
         'gn_sha256': digest(gn), 'browser': 'not_started', 'verification': 'not_run',
         'reproducibility_verified': False, 'distribution_approved': False,
     })

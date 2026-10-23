@@ -78,6 +78,7 @@ def main():
     for name in ['browser/upstream.lock.json', 'browser/patches/series.json',
                  'security/component_identity.json', 'security/game_hub_origin.txt',
                  'tools/prepare_desktop_browser.py', 'tools/build_desktop_browser.py',
+                 'tools/chromium_dependencies.py',
                  'tools/prepare_chromium_upgrade.py',
                  'tools/generate_browser_patch.py', 'tools/stage_browser_integration.py',
                  'tools/game_hub_assets.py', 'tools/desktop_capture_audio_patch.py',

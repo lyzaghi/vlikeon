@@ -1,0 +1,1247 @@
+{
+  "schema_version": 1,
+  "scope": "Actual pinned Git HEAD and tracked source only; not CIPD/GS or browser behavior",
+  "entries_sha256": "94a6f61be46aa55fc26ab57023987e2783c31fe13b9e52fc38c4cd814c397f6e",
+  "cases": [
+    {
+      "path": "src/agents/shared",
+      "expected": "b61aca5681312269c2a2bb46ceb6b6f65fdd94dd",
+      "expected_object_present": true,
+      "head": "b61aca5681312269c2a2bb46ceb6b6f65fdd94dd",
+      "tracked_tree_matches": true,
+      "passed": true
+    },
+    {
+      "path": "src/chrome/test/data/perf/canvas_bench",
+      "expected": "a7b40ea5ae0239517d78845a5fc9b12976bfc732",
+      "expected_object_present": true,
+      "head": "a7b40ea5ae0239517d78845a5fc9b12976bfc732",
+      "tracked_tree_matches": true,
+      "passed": true
+    },
+    {
+      "path": "src/chrome/test/data/perf/frame_rate/content",
+      "expected": "c10272c88463efeef6bb19c9ec07c42bc8fe22b9",
+      "expected_object_present": true,
+      "head": "c10272c88463efeef6bb19c9ec07c42bc8fe22b9",
+      "tracked_tree_matches": true,
+      "passed": true
+    },
+    {
+      "path": "src/chrome/test/data/xr/webvr_info",
+      "expected": "c58ae99b9ff9e2aa4c524633519570bf33536248",
+      "expected_object_present": true,
+      "head": "c58ae99b9ff9e2aa4c524633519570bf33536248",
+      "tracked_tree_matches": true,
+      "passed": true
+    },
+    {
+      "path": "src/docs/website",
+      "expected": "a88b32e46218523463a769f0ecfcb4da46649ce5",
+      "expected_object_present": true,
+      "head": "a88b32e46218523463a769f0ecfcb4da46649ce5",
+      "tracked_tree_matches": true,
+      "passed": true
+    },
+    {
+      "path": "src/media/cdm/api",
+      "expected": "d6c4e1ea4c8fc3dcd98ac3ab5a981f63067223a4",
+      "expected_object_present": true,
+      "head": "d6c4e1ea4c8fc3dcd98ac3ab5a981f63067223a4",
+      "tracked_tree_matches": true,
+      "passed": true
+    },
+    {
+      "path": "src/net/third_party/quiche/src",
+      "expected": "0b2bc13f4fdad122a0ffc163b182a9b0f9cfdfbd",
+      "expected_object_present": true,
+      "head": "0b2bc13f4fdad122a0ffc163b182a9b0f9cfdfbd",
+      "tracked_tree_matches": true,
+      "passed": true
+    },
+    {
+      "path": "src/testing/libfuzzer/fuzzers/wasm_corpus",
+      "expected": "1df5e50a45db9518a56ebb42cb020a94a090258b",
+      "expected_object_present": true,
+      "head": "1df5e50a45db9518a56ebb42cb020a94a090258b",
+      "tracked_tree_matches": true,
+      "passed": true
+    },
+    {
+      "path": "src/third_party/angle",
+      "expected": "cccf60cde32c911b017a315b82235df61da5057b",
+      "expected_object_present": true,
+      "head": "cccf60cde32c911b017a315b82235df61da5057b",
+      "tracked_tree_matches": true,
+      "passed": true
+    },
+    {
+      "path": "src/third_party/angle/third_party/VK-GL-CTS/src",
+      "expected": "1942832354c96f0de379f491519734256fbd4f9d",
+      "expected_object_present": true,
+      "head": "1942832354c96f0de379f491519734256fbd4f9d",
+      "tracked_tree_matches": true,
+      "passed": true
+    },
+    {
+      "path": "src/third_party/angle/third_party/glmark2/src",
+      "expected": "6edcf02205fd1e8979dc3f3964257a81959b80c8",
+      "expected_object_present": true,
+      "head": "6edcf02205fd1e8979dc3f3964257a81959b80c8",
+      "tracked_tree_matches": true,
+      "passed": true
+    },
+    {
+      "path": "src/third_party/angle/third_party/rapidjson/src",
+      "expected": "24b5e7a8b27f42fa16b96fc70aade9106cf7102f",
+      "expected_object_present": true,
+      "head": "24b5e7a8b27f42fa16b96fc70aade9106cf7102f",
+      "tracked_tree_matches": true,
+      "passed": true
+    },
+    {
+      "path": "src/third_party/anonymous_tokens/src",
+      "expected": "1ae8df5e40bab28959cc182c2c0d88923059e278",
+      "expected_object_present": true,
+      "head": "1ae8df5e40bab28959cc182c2c0d88923059e278",
+      "tracked_tree_matches": true,
+      "passed": true
+    },
+    {
+      "path": "src/third_party/boringssl/src",
+      "expected": "b780f192ce515ed8ed358f6c0947bd7acce438b9",
+      "expected_object_present": true,
+      "head": "b780f192ce515ed8ed358f6c0947bd7acce438b9",
+      "tracked_tree_matches": true,
+      "passed": true
+    },
+    {
+      "path": "src/third_party/breakpad/breakpad",
+      "expected": "a9df3bd99cf8b863a92502ef906b5ddc399c2c9a",
+      "expected_object_present": true,
+      "head": "a9df3bd99cf8b863a92502ef906b5ddc399c2c9a",
+      "tracked_tree_matches": true,
+      "passed": true
+    },
+    {
+      "path": "src/third_party/cast_core/public/src",
+      "expected": "f5ee589bdaea60418f670fa176be15ccb9a34942",
+      "expected_object_present": true,
+      "head": "f5ee589bdaea60418f670fa176be15ccb9a34942",
+      "tracked_tree_matches": true,
+      "passed": true
+    },
+    {
+      "path": "src/third_party/catapult",
+      "expected": "471aa8aec31a4de79a96b72815180bc9dc71c420",
+      "expected_object_present": true,
+      "head": "471aa8aec31a4de79a96b72815180bc9dc71c420",
+      "tracked_tree_matches": true,
+      "passed": true
+    },
+    {
+      "path": "src/third_party/ced/src",
+      "expected": "d127078cedef9c6642cbe592dacdd2292b50bb19",
+      "expected_object_present": true,
+      "head": "d127078cedef9c6642cbe592dacdd2292b50bb19",
+      "tracked_tree_matches": true,
+      "passed": true
+    },
+    {
+      "path": "src/third_party/clang-format/script",
+      "expected": "70510081984cfcdb14a15b3e08dfe9776dc7ed37",
+      "expected_object_present": true,
+      "head": "70510081984cfcdb14a15b3e08dfe9776dc7ed37",
+      "tracked_tree_matches": true,
+      "passed": true
+    },
+    {
+      "path": "src/third_party/cld_3/src",
+      "expected": "b48dc46512566f5a2d41118c8c1116c4f96dc661",
+      "expected_object_present": true,
+      "head": "b48dc46512566f5a2d41118c8c1116c4f96dc661",
+      "tracked_tree_matches": true,
+      "passed": true
+    },
+    {
+      "path": "src/third_party/colorama/src",
+      "expected": "3de9f013df4b470069d03d250224062e8cf15c49",
+      "expected_object_present": true,
+      "head": "3de9f013df4b470069d03d250224062e8cf15c49",
+      "tracked_tree_matches": true,
+      "passed": true
+    },
+    {
+      "path": "src/third_party/compiler-rt/src",
+      "expected": "ccf6305a0bdd648ec1c873de316ca483a7136498",
+      "expected_object_present": true,
+      "head": "ccf6305a0bdd648ec1c873de316ca483a7136498",
+      "tracked_tree_matches": true,
+      "passed": true
+    },
+    {
+      "path": "src/third_party/content_analysis_sdk/src",
+      "expected": "0a0e7ea516249e786d5a8884552bbd6e163d89cb",
+      "expected_object_present": true,
+      "head": "0a0e7ea516249e786d5a8884552bbd6e163d89cb",
+      "tracked_tree_matches": true,
+      "passed": true
+    },
+    {
+      "path": "src/third_party/cpu_features/src",
+      "expected": "81d13c49649f0714dd41fb56bb246398b6584085",
+      "expected_object_present": true,
+      "head": "81d13c49649f0714dd41fb56bb246398b6584085",
+      "tracked_tree_matches": true,
+      "passed": true
+    },
+    {
+      "path": "src/third_party/cpuinfo/src",
+      "expected": "66ee79c038d70dad9f08705b2c9b3e58f6d8f512",
+      "expected_object_present": true,
+      "head": "66ee79c038d70dad9f08705b2c9b3e58f6d8f512",
+      "tracked_tree_matches": true,
+      "passed": true
+    },
+    {
+      "path": "src/third_party/crabbyavif/src",
+      "expected": "3da6b895e3ed2084ad9d16c45cb6b4485d680ecb",
+      "expected_object_present": true,
+      "head": "3da6b895e3ed2084ad9d16c45cb6b4485d680ecb",
+      "tracked_tree_matches": true,
+      "passed": true
+    },
+    {
+      "path": "src/third_party/crc32c/src",
+      "expected": "2bbb3be42e20a0e6c0f7b39dc07dc863d9ffbc07",
+      "expected_object_present": true,
+      "head": "2bbb3be42e20a0e6c0f7b39dc07dc863d9ffbc07",
+      "tracked_tree_matches": true,
+      "passed": true
+    },
+    {
+      "path": "src/third_party/cros-components/src",
+      "expected": "0abb2efaa3d16db861c9710b193c39e657ac3bdf",
+      "expected_object_present": true,
+      "head": "0abb2efaa3d16db861c9710b193c39e657ac3bdf",
+      "tracked_tree_matches": true,
+      "passed": true
+    },
+    {
+      "path": "src/third_party/crossbench",
+      "expected": "385559563561c434453a599e5f14a46f411405e2",
+      "expected_object_present": true,
+      "head": "385559563561c434453a599e5f14a46f411405e2",
+      "tracked_tree_matches": true,
+      "passed": true
+    },
+    {
+      "path": "src/third_party/crossbench-web-tests",
+      "expected": "33397fe15820ff895d88b4cd9a37e214968ef68d",
+      "expected_object_present": true,
+      "head": "33397fe15820ff895d88b4cd9a37e214968ef68d",
+      "tracked_tree_matches": true,
+      "passed": true
+    },
+    {
+      "path": "src/third_party/dav1d/libdav1d",
+      "expected": "a34e0685b9111b9eb1d7835ea7bea5b425dced73",
+      "expected_object_present": true,
+      "head": "a34e0685b9111b9eb1d7835ea7bea5b425dced73",
+      "tracked_tree_matches": true,
+      "passed": true
+    },
+    {
+      "path": "src/third_party/dawn",
+      "expected": "42d0e90fe3552a2a8e95ca8e506bc19bbda12729",
+      "expected_object_present": true,
+      "head": "42d0e90fe3552a2a8e95ca8e506bc19bbda12729",
+      "tracked_tree_matches": true,
+      "passed": true
+    },
+    {
+      "path": "src/third_party/dawn/third_party/EGL-Registry/src",
+      "expected": "5961a7fe64cf8a126890ced6f13d69e0a1e1b83e",
+      "expected_object_present": true,
+      "head": "5961a7fe64cf8a126890ced6f13d69e0a1e1b83e",
+      "tracked_tree_matches": true,
+      "passed": true
+    },
+    {
+      "path": "src/third_party/dawn/third_party/OpenGL-Registry/src",
+      "expected": "1cdd228e34966dd6b95bd203e9f84faba0f371a1",
+      "expected_object_present": true,
+      "head": "1cdd228e34966dd6b95bd203e9f84faba0f371a1",
+      "tracked_tree_matches": true,
+      "passed": true
+    },
+    {
+      "path": "src/third_party/dawn/third_party/directx-shader-compiler/src",
+      "expected": "b9e9f840b3ed530a7f67010ee899a02a613d3586",
+      "expected_object_present": true,
+      "head": "b9e9f840b3ed530a7f67010ee899a02a613d3586",
+      "tracked_tree_matches": true,
+      "passed": true
+    },
+    {
+      "path": "src/third_party/dawn/third_party/glfw3/src",
+      "expected": "92dcf4ce74f2e2554a98fea09be7c705c17daa5a",
+      "expected_object_present": true,
+      "head": "92dcf4ce74f2e2554a98fea09be7c705c17daa5a",
+      "tracked_tree_matches": true,
+      "passed": true
+    },
+    {
+      "path": "src/third_party/dawn/third_party/webgpu-cts",
+      "expected": "32cc9f03ad14135b5f6f833dba83e7e80edc256f",
+      "expected_object_present": true,
+      "head": "32cc9f03ad14135b5f6f833dba83e7e80edc256f",
+      "tracked_tree_matches": true,
+      "passed": true
+    },
+    {
+      "path": "src/third_party/dawn/third_party/webgpu-headers/src",
+      "expected": "b5ff182caa90e53293f47939716281342c0812ba",
+      "expected_object_present": true,
+      "head": "b5ff182caa90e53293f47939716281342c0812ba",
+      "tracked_tree_matches": true,
+      "passed": true
+    },
+    {
+      "path": "src/third_party/depot_tools",
+      "expected": "dca727ba1f8fa8f1e3b12a815d065818bb61d395",
+      "expected_object_present": true,
+      "head": "dca727ba1f8fa8f1e3b12a815d065818bb61d395",
+      "tracked_tree_matches": true,
+      "passed": true
+    },
+    {
+      "path": "src/third_party/devtools-frontend/src",
+      "expected": "a7b389bcb341f6e5e1bfa107992d3c327db75736",
+      "expected_object_present": true,
+      "head": "a7b389bcb341f6e5e1bfa107992d3c327db75736",
+      "tracked_tree_matches": true,
+      "passed": true
+    },
+    {
+      "path": "src/third_party/disarm/src",
+      "expected": "2d960dae4b4fb29dba05cfc48210fbed423f3d2c",
+      "expected_object_present": true,
+      "head": "2d960dae4b4fb29dba05cfc48210fbed423f3d2c",
+      "tracked_tree_matches": true,
+      "passed": true
+    },
+    {
+      "path": "src/third_party/dom_distiller_js/dist",
+      "expected": "015cda307cf81e293889c0887cffff4f0aa090ce",
+      "expected_object_present": true,
+      "head": "015cda307cf81e293889c0887cffff4f0aa090ce",
+      "tracked_tree_matches": true,
+      "passed": true
+    },
+    {
+      "path": "src/third_party/domato/src",
+      "expected": "fadff396cc45d521cc594d3e2396e27e887b1963",
+      "expected_object_present": true,
+      "head": "fadff396cc45d521cc594d3e2396e27e887b1963",
+      "tracked_tree_matches": true,
+      "passed": true
+    },
+    {
+      "path": "src/third_party/dragonbox/src",
+      "expected": "beeeef91cf6fef89a4d4ba5e95d47ca64ccb3a44",
+      "expected_object_present": true,
+      "head": "beeeef91cf6fef89a4d4ba5e95d47ca64ccb3a44",
+      "tracked_tree_matches": true,
+      "passed": true
+    },
+    {
+      "path": "src/third_party/ds_store/src",
+      "expected": "6f971c764a511f609615c6c4f5ae2a9403ff32cb",
+      "expected_object_present": true,
+      "head": "6f971c764a511f609615c6c4f5ae2a9403ff32cb",
+      "tracked_tree_matches": true,
+      "passed": true
+    },
+    {
+      "path": "src/third_party/eigen3/src",
+      "expected": "9b196f65756803ab6b9ef60c9e75b6a197b8df8c",
+      "expected_object_present": true,
+      "head": "9b196f65756803ab6b9ef60c9e75b6a197b8df8c",
+      "tracked_tree_matches": true,
+      "passed": true
+    },
+    {
+      "path": "src/third_party/emoji-segmenter/src",
+      "expected": "955936be8b391e00835257059607d7c5b72ce744",
+      "expected_object_present": true,
+      "head": "955936be8b391e00835257059607d7c5b72ce744",
+      "tracked_tree_matches": true,
+      "passed": true
+    },
+    {
+      "path": "src/third_party/expat/src",
+      "expected": "a851869e111c06fbcdc89edf639abf5fc2b6deba",
+      "expected_object_present": true,
+      "head": "a851869e111c06fbcdc89edf639abf5fc2b6deba",
+      "tracked_tree_matches": true,
+      "passed": true
+    },
+    {
+      "path": "src/third_party/fadec/src",
+      "expected": "c9f78f532b9004de278489019ab2c6c28ae9746e",
+      "expected_object_present": true,
+      "head": "c9f78f532b9004de278489019ab2c6c28ae9746e",
+      "tracked_tree_matches": true,
+      "passed": true
+    },
+    {
+      "path": "src/third_party/farmhash/src",
+      "expected": "816a4ae622e964763ca0862d9dbd19324a1eaf45",
+      "expected_object_present": true,
+      "head": "816a4ae622e964763ca0862d9dbd19324a1eaf45",
+      "tracked_tree_matches": true,
+      "passed": true
+    },
+    {
+      "path": "src/third_party/fast_float/src",
+      "expected": "34164f547b7df3f5d794ff67e9f885c36819ebfc",
+      "expected_object_present": true,
+      "head": "34164f547b7df3f5d794ff67e9f885c36819ebfc",
+      "tracked_tree_matches": true,
+      "passed": true
+    },
+    {
+      "path": "src/third_party/federated_compute/src",
+      "expected": "f5241fb459426f88af484a909927044a71306209",
+      "expected_object_present": true,
+      "head": "f5241fb459426f88af484a909927044a71306209",
+      "tracked_tree_matches": true,
+      "passed": true
+    },
+    {
+      "path": "src/third_party/ffmpeg",
+      "expected": "ba5e7eaea38b6a54157870e0085b2e8c75aa6bcb",
+      "expected_object_present": true,
+      "head": "ba5e7eaea38b6a54157870e0085b2e8c75aa6bcb",
+      "tracked_tree_matches": true,
+      "passed": true
+    },
+    {
+      "path": "src/third_party/flac",
+      "expected": "e7108e2ed031547c3759217819a032065c820d73",
+      "expected_object_present": true,
+      "head": "e7108e2ed031547c3759217819a032065c820d73",
+      "tracked_tree_matches": true,
+      "passed": true
+    },
+    {
+      "path": "src/third_party/flatbuffers/src",
+      "expected": "a86afae9399bbe631d1ea0783f8816e780e236cc",
+      "expected_object_present": true,
+      "head": "a86afae9399bbe631d1ea0783f8816e780e236cc",
+      "tracked_tree_matches": true,
+      "passed": true
+    },
+    {
+      "path": "src/third_party/fp16/src",
+      "expected": "782eea126dc5c755827be751a099eb01826175cf",
+      "expected_object_present": true,
+      "head": "782eea126dc5c755827be751a099eb01826175cf",
+      "tracked_tree_matches": true,
+      "passed": true
+    },
+    {
+      "path": "src/third_party/freetype/src",
+      "expected": "5c79d6cd1ac73d70a55f3d963fb568aa32f6d794",
+      "expected_object_present": true,
+      "head": "5c79d6cd1ac73d70a55f3d963fb568aa32f6d794",
+      "tracked_tree_matches": true,
+      "passed": true
+    },
+    {
+      "path": "src/third_party/fuzztest/src",
+      "expected": "846bda6f291e26b7f8fb33c8de23796129bffd12",
+      "expected_object_present": true,
+      "head": "846bda6f291e26b7f8fb33c8de23796129bffd12",
+      "tracked_tree_matches": true,
+      "passed": true
+    },
+    {
+      "path": "src/third_party/fxdiv/src",
+      "expected": "63058eff77e11aa15bf531df5dd34395ec3017c8",
+      "expected_object_present": true,
+      "head": "63058eff77e11aa15bf531df5dd34395ec3017c8",
+      "tracked_tree_matches": true,
+      "passed": true
+    },
+    {
+      "path": "src/third_party/gemmlowp/src",
+      "expected": "16e8662c34917be0065110bfcd9cc27d30f52fdf",
+      "expected_object_present": true,
+      "head": "16e8662c34917be0065110bfcd9cc27d30f52fdf",
+      "tracked_tree_matches": true,
+      "passed": true
+    },
+    {
+      "path": "src/third_party/glslang/src",
+      "expected": "0f99286a3542c19097ea807f751342a89ab11e04",
+      "expected_object_present": true,
+      "head": "0f99286a3542c19097ea807f751342a89ab11e04",
+      "tracked_tree_matches": true,
+      "passed": true
+    },
+    {
+      "path": "src/third_party/google_benchmark/src",
+      "expected": "8abf1e701fbd88c8170f48fe0558247e2e5f8e7d",
+      "expected_object_present": true,
+      "head": "8abf1e701fbd88c8170f48fe0558247e2e5f8e7d",
+      "tracked_tree_matches": true,
+      "passed": true
+    },
+    {
+      "path": "src/third_party/googletest/src",
+      "expected": "4fe3307fb2d9f86d19777c7eb0e4809e9694dde7",
+      "expected_object_present": true,
+      "head": "4fe3307fb2d9f86d19777c7eb0e4809e9694dde7",
+      "tracked_tree_matches": true,
+      "passed": true
+    },
+    {
+      "path": "src/third_party/gperf",
+      "expected": "e9eeea862a18e77b945d98eff7e1bf065d3daf8e",
+      "expected_object_present": true,
+      "head": "e9eeea862a18e77b945d98eff7e1bf065d3daf8e",
+      "tracked_tree_matches": true,
+      "passed": true
+    },
+    {
+      "path": "src/third_party/harfbuzz/src",
+      "expected": "f5efbbef3841bdcdc6427bde7c2971f62ac8c8f1",
+      "expected_object_present": true,
+      "head": "f5efbbef3841bdcdc6427bde7c2971f62ac8c8f1",
+      "tracked_tree_matches": true,
+      "passed": true
+    },
+    {
+      "path": "src/third_party/highway/src",
+      "expected": "2607d3b5b0113992fe84d3848859eae13b3b52c1",
+      "expected_object_present": true,
+      "head": "2607d3b5b0113992fe84d3848859eae13b3b52c1",
+      "tracked_tree_matches": true,
+      "passed": true
+    },
+    {
+      "path": "src/third_party/hunspell_dictionaries",
+      "expected": "cee14e319bb7603a1157bb4d1e216be64ee82b77",
+      "expected_object_present": true,
+      "head": "cee14e319bb7603a1157bb4d1e216be64ee82b77",
+      "tracked_tree_matches": true,
+      "passed": true
+    },
+    {
+      "path": "src/third_party/icu",
+      "expected": "6ebb40c594776cc2c21ea14df85a2a89a328b364",
+      "expected_object_present": true,
+      "head": "6ebb40c594776cc2c21ea14df85a2a89a328b364",
+      "tracked_tree_matches": true,
+      "passed": true
+    },
+    {
+      "path": "src/third_party/ink/src",
+      "expected": "4aa45f40c047ee173dcbf1095ba9353e3308709d",
+      "expected_object_present": true,
+      "head": "4aa45f40c047ee173dcbf1095ba9353e3308709d",
+      "tracked_tree_matches": true,
+      "passed": true
+    },
+    {
+      "path": "src/third_party/jetstream/main",
+      "expected": "c603c04db8505477867974a69789309ded2cc948",
+      "expected_object_present": true,
+      "head": "c603c04db8505477867974a69789309ded2cc948",
+      "tracked_tree_matches": true,
+      "passed": true
+    },
+    {
+      "path": "src/third_party/jetstream/v2.2",
+      "expected": "2145cedef4ca2777b792cb0059d3400ee2a6153c",
+      "expected_object_present": true,
+      "head": "2145cedef4ca2777b792cb0059d3400ee2a6153c",
+      "tracked_tree_matches": true,
+      "passed": true
+    },
+    {
+      "path": "src/third_party/jetstream/v3.0",
+      "expected": "06785cf861ac44855f168cbbe829278c2802e6de",
+      "expected_object_present": true,
+      "head": "06785cf861ac44855f168cbbe829278c2802e6de",
+      "tracked_tree_matches": true,
+      "passed": true
+    },
+    {
+      "path": "src/third_party/jsoncpp/source",
+      "expected": "3347a4b86bb914cb565f0cbda19c06e109513300",
+      "expected_object_present": true,
+      "head": "3347a4b86bb914cb565f0cbda19c06e109513300",
+      "tracked_tree_matches": true,
+      "passed": true
+    },
+    {
+      "path": "src/third_party/leveldatabase/src",
+      "expected": "7ee830d02b623e8ffe0b95d59a74db1e58da04c5",
+      "expected_object_present": true,
+      "head": "7ee830d02b623e8ffe0b95d59a74db1e58da04c5",
+      "tracked_tree_matches": true,
+      "passed": true
+    },
+    {
+      "path": "src/third_party/libFuzzer/src",
+      "expected": "adc3407201e641a73a551d2f1181c684c33eea56",
+      "expected_object_present": true,
+      "head": "adc3407201e641a73a551d2f1181c684c33eea56",
+      "tracked_tree_matches": true,
+      "passed": true
+    },
+    {
+      "path": "src/third_party/libaddressinput/src",
+      "expected": "81eb9628382b07d371d8ea0b11badf7de3857fd5",
+      "expected_object_present": true,
+      "head": "81eb9628382b07d371d8ea0b11badf7de3857fd5",
+      "tracked_tree_matches": true,
+      "passed": true
+    },
+    {
+      "path": "src/third_party/libaom/source/libaom",
+      "expected": "023743a7d78d9c7d33390c5c45b35495ea013a21",
+      "expected_object_present": true,
+      "head": "023743a7d78d9c7d33390c5c45b35495ea013a21",
+      "tracked_tree_matches": true,
+      "passed": true
+    },
+    {
+      "path": "src/third_party/libc++/src",
+      "expected": "97b436da4c33663581d394f4ee0a5977fc38c2f4",
+      "expected_object_present": true,
+      "head": "97b436da4c33663581d394f4ee0a5977fc38c2f4",
+      "tracked_tree_matches": true,
+      "passed": true
+    },
+    {
+      "path": "src/third_party/libc++abi/src",
+      "expected": "14024f8f89421ba73a3d28c9b8f9fbd745d92dff",
+      "expected_object_present": true,
+      "head": "14024f8f89421ba73a3d28c9b8f9fbd745d92dff",
+      "tracked_tree_matches": true,
+      "passed": true
+    },
+    {
+      "path": "src/third_party/libgav1/src",
+      "expected": "c1deec657b32b911920c78e078cfd089faa77200",
+      "expected_object_present": true,
+      "head": "c1deec657b32b911920c78e078cfd089faa77200",
+      "tracked_tree_matches": true,
+      "passed": true
+    },
+    {
+      "path": "src/third_party/libjpeg_turbo",
+      "expected": "640f254ad0fa03f6b1f29f89b7dd9366f2f6e533",
+      "expected_object_present": true,
+      "head": "640f254ad0fa03f6b1f29f89b7dd9366f2f6e533",
+      "tracked_tree_matches": true,
+      "passed": true
+    },
+    {
+      "path": "src/third_party/libpfm4/src",
+      "expected": "6870a9f00412830ceaa7e4384bb92ee323e2a28f",
+      "expected_object_present": true,
+      "head": "6870a9f00412830ceaa7e4384bb92ee323e2a28f",
+      "tracked_tree_matches": true,
+      "passed": true
+    },
+    {
+      "path": "src/third_party/libphonenumber/src",
+      "expected": "806ee32e8c8c74ca339d8c91a6d86ef58687c9f4",
+      "expected_object_present": true,
+      "head": "806ee32e8c8c74ca339d8c91a6d86ef58687c9f4",
+      "tracked_tree_matches": true,
+      "passed": true
+    },
+    {
+      "path": "src/third_party/libprotobuf-mutator/src",
+      "expected": "c1c950eae0440c3808f2b8bd7c57d0c6a42c1a90",
+      "expected_object_present": true,
+      "head": "c1c950eae0440c3808f2b8bd7c57d0c6a42c1a90",
+      "tracked_tree_matches": true,
+      "passed": true
+    },
+    {
+      "path": "src/third_party/libsrtp",
+      "expected": "cd5d177bf1fde755ddb4c7f0d9ff7693f8b49e5e",
+      "expected_object_present": true,
+      "head": "cd5d177bf1fde755ddb4c7f0d9ff7693f8b49e5e",
+      "tracked_tree_matches": true,
+      "passed": true
+    },
+    {
+      "path": "src/third_party/libunwind/src",
+      "expected": "24a407d5353ad38f948f107c7d6bc2bcbb4bca24",
+      "expected_object_present": true,
+      "head": "24a407d5353ad38f948f107c7d6bc2bcbb4bca24",
+      "tracked_tree_matches": true,
+      "passed": true
+    },
+    {
+      "path": "src/third_party/libva-fake-driver/src",
+      "expected": "a9bcab9cd6b15d4e3634ca44d5e5f7652c612194",
+      "expected_object_present": true,
+      "head": "a9bcab9cd6b15d4e3634ca44d5e5f7652c612194",
+      "tracked_tree_matches": true,
+      "passed": true
+    },
+    {
+      "path": "src/third_party/libvpx/source/libvpx",
+      "expected": "d2413e2ca11039724ca33bb4d661ca2c94cb501e",
+      "expected_object_present": true,
+      "head": "d2413e2ca11039724ca33bb4d661ca2c94cb501e",
+      "tracked_tree_matches": true,
+      "passed": true
+    },
+    {
+      "path": "src/third_party/libwebm/source",
+      "expected": "6184f4484a826724b5293837134ab9492261b941",
+      "expected_object_present": true,
+      "head": "6184f4484a826724b5293837134ab9492261b941",
+      "tracked_tree_matches": true,
+      "passed": true
+    },
+    {
+      "path": "src/third_party/libwebp/src",
+      "expected": "b43b2caa710c0c997c066cb32c7fea1391fad70a",
+      "expected_object_present": true,
+      "head": "b43b2caa710c0c997c066cb32c7fea1391fad70a",
+      "tracked_tree_matches": true,
+      "passed": true
+    },
+    {
+      "path": "src/third_party/libyuv",
+      "expected": "2dd4257364d39c38d79465c4ddc4b93137fe729b",
+      "expected_object_present": true,
+      "head": "2dd4257364d39c38d79465c4ddc4b93137fe729b",
+      "tracked_tree_matches": true,
+      "passed": true
+    },
+    {
+      "path": "src/third_party/litert/src",
+      "expected": "e0dbf4d47f2e50652496479bd3bca678231b2062",
+      "expected_object_present": true,
+      "head": "e0dbf4d47f2e50652496479bd3bca678231b2062",
+      "tracked_tree_matches": true,
+      "passed": true
+    },
+    {
+      "path": "src/third_party/llvm-libc/src",
+      "expected": "91b3328166da1db7db15cb49c714d59198e56cab",
+      "expected_object_present": true,
+      "head": "91b3328166da1db7db15cb49c714d59198e56cab",
+      "tracked_tree_matches": true,
+      "passed": true
+    },
+    {
+      "path": "src/third_party/mac_alias/src",
+      "expected": "d0c076b4562541c1509d9874f42880378245d268",
+      "expected_object_present": true,
+      "head": "d0c076b4562541c1509d9874f42880378245d268",
+      "tracked_tree_matches": true,
+      "passed": true
+    },
+    {
+      "path": "src/third_party/material_color_utilities/src",
+      "expected": "5b3618b16fdc3825e21d5679bafd144662088ea1",
+      "expected_object_present": true,
+      "head": "5b3618b16fdc3825e21d5679bafd144662088ea1",
+      "tracked_tree_matches": true,
+      "passed": true
+    },
+    {
+      "path": "src/third_party/microsoft_dxheaders/src",
+      "expected": "07b94cba474be6cdfd934febdbd0b21ca0524187",
+      "expected_object_present": true,
+      "head": "07b94cba474be6cdfd934febdbd0b21ca0524187",
+      "tracked_tree_matches": true,
+      "passed": true
+    },
+    {
+      "path": "src/third_party/microsoft_multimedia_redirection/src",
+      "expected": "8b1d8893d126547309f1bab8d8232418aa7c7109",
+      "expected_object_present": true,
+      "head": "8b1d8893d126547309f1bab8d8232418aa7c7109",
+      "tracked_tree_matches": true,
+      "passed": true
+    },
+    {
+      "path": "src/third_party/microsoft_webauthn/src",
+      "expected": "ef82c157125a0490e05f6ea82a7adb1b8e1bad08",
+      "expected_object_present": true,
+      "head": "ef82c157125a0490e05f6ea82a7adb1b8e1bad08",
+      "tracked_tree_matches": true,
+      "passed": true
+    },
+    {
+      "path": "src/third_party/nasm",
+      "expected": "525a09a813be0f75b646ee93fc2a31c27b87d722",
+      "expected_object_present": true,
+      "head": "525a09a813be0f75b646ee93fc2a31c27b87d722",
+      "tracked_tree_matches": true,
+      "passed": true
+    },
+    {
+      "path": "src/third_party/nearby/src",
+      "expected": "0bad8b0c9877f92eeeb550654f1ea51a71a085e4",
+      "expected_object_present": true,
+      "head": "0bad8b0c9877f92eeeb550654f1ea51a71a085e4",
+      "tracked_tree_matches": true,
+      "passed": true
+    },
+    {
+      "path": "src/third_party/neon_2_sse/src",
+      "expected": "183fc88bcb90dbfaefba33a292eae8a5ce94bd67",
+      "expected_object_present": true,
+      "head": "183fc88bcb90dbfaefba33a292eae8a5ce94bd67",
+      "tracked_tree_matches": true,
+      "passed": true
+    },
+    {
+      "path": "src/third_party/nlohmann_json/src",
+      "expected": "55f93686c01528224f448c19128836e7df245f72",
+      "expected_object_present": true,
+      "head": "55f93686c01528224f448c19128836e7df245f72",
+      "tracked_tree_matches": true,
+      "passed": true
+    },
+    {
+      "path": "src/third_party/oak/src",
+      "expected": "d3e0f13998b13628fa8b55be52c9ddf31244668d",
+      "expected_object_present": true,
+      "head": "d3e0f13998b13628fa8b55be52c9ddf31244668d",
+      "tracked_tree_matches": true,
+      "passed": true
+    },
+    {
+      "path": "src/third_party/openh264/src",
+      "expected": "9547f96ea5c47f4d465d97b07264b997ecc4b4b6",
+      "expected_object_present": true,
+      "head": "9547f96ea5c47f4d465d97b07264b997ecc4b4b6",
+      "tracked_tree_matches": true,
+      "passed": true
+    },
+    {
+      "path": "src/third_party/openscreen/src",
+      "expected": "d11342d20e542b48cc63e2d932a273c20cc99820",
+      "expected_object_present": true,
+      "head": "d11342d20e542b48cc63e2d932a273c20cc99820",
+      "tracked_tree_matches": true,
+      "passed": true
+    },
+    {
+      "path": "src/third_party/openscreen/src/buildtools",
+      "expected": "4277578aa9c45906e51ad33cac1a5a7ad5288010",
+      "expected_object_present": true,
+      "head": "4277578aa9c45906e51ad33cac1a5a7ad5288010",
+      "tracked_tree_matches": true,
+      "passed": true
+    },
+    {
+      "path": "src/third_party/openscreen/src/third_party/tinycbor/src",
+      "expected": "bac6648fed8c0ff3d34616e4fff7cdcca634a18e",
+      "expected_object_present": true,
+      "head": "bac6648fed8c0ff3d34616e4fff7cdcca634a18e",
+      "tracked_tree_matches": true,
+      "passed": true
+    },
+    {
+      "path": "src/third_party/openxr/src",
+      "expected": "75c53b6e853dc12c7b3c771edc9c9c841b15faaa",
+      "expected_object_present": true,
+      "head": "75c53b6e853dc12c7b3c771edc9c9c841b15faaa",
+      "tracked_tree_matches": true,
+      "passed": true
+    },
+    {
+      "path": "src/third_party/ots/src",
+      "expected": "46bea9879127d0ff1c6601b078e2ce98e83fcd33",
+      "expected_object_present": true,
+      "head": "46bea9879127d0ff1c6601b078e2ce98e83fcd33",
+      "tracked_tree_matches": true,
+      "passed": true
+    },
+    {
+      "path": "src/third_party/pdfium",
+      "expected": "39f0ed4a657e53ed743a16d10d77dec086a08e03",
+      "expected_object_present": true,
+      "head": "39f0ed4a657e53ed743a16d10d77dec086a08e03",
+      "tracked_tree_matches": true,
+      "passed": true
+    },
+    {
+      "path": "src/third_party/perfetto",
+      "expected": "d10115a34cfa887efd75606c460f541d1b854e23",
+      "expected_object_present": true,
+      "head": "d10115a34cfa887efd75606c460f541d1b854e23",
+      "tracked_tree_matches": true,
+      "passed": true
+    },
+    {
+      "path": "src/third_party/perl",
+      "expected": "a2bd4470d3485e6eda532eee416a71d16db2d7ba",
+      "expected_object_present": true,
+      "head": "a2bd4470d3485e6eda532eee416a71d16db2d7ba",
+      "tracked_tree_matches": true,
+      "passed": true
+    },
+    {
+      "path": "src/third_party/protobuf-javascript/src",
+      "expected": "e6d763860001ba1a76a63adcff5efb12b1c96024",
+      "expected_object_present": true,
+      "head": "e6d763860001ba1a76a63adcff5efb12b1c96024",
+      "tracked_tree_matches": true,
+      "passed": true
+    },
+    {
+      "path": "src/third_party/pthreadpool/src",
+      "expected": "15a6644ba1c45f1acc16ac1e883efc3e56c6bed2",
+      "expected_object_present": true,
+      "head": "15a6644ba1c45f1acc16ac1e883efc3e56c6bed2",
+      "tracked_tree_matches": true,
+      "passed": true
+    },
+    {
+      "path": "src/third_party/pywebsocket3/src",
+      "expected": "284690c2a68ca1d4fc766807e00b354afd695897",
+      "expected_object_present": true,
+      "head": "284690c2a68ca1d4fc766807e00b354afd695897",
+      "tracked_tree_matches": true,
+      "passed": true
+    },
+    {
+      "path": "src/third_party/quic_trace/src",
+      "expected": "6ecf6aa8e604655f1dfa72c4a1ae733c4c7fc883",
+      "expected_object_present": true,
+      "head": "6ecf6aa8e604655f1dfa72c4a1ae733c4c7fc883",
+      "tracked_tree_matches": true,
+      "passed": true
+    },
+    {
+      "path": "src/third_party/re2/src",
+      "expected": "972a15cedd008d846f1a39b2e88ce48d7f166cbd",
+      "expected_object_present": true,
+      "head": "972a15cedd008d846f1a39b2e88ce48d7f166cbd",
+      "tracked_tree_matches": true,
+      "passed": true
+    },
+    {
+      "path": "src/third_party/readability/src",
+      "expected": "d7949dc47dd9ed9ee1d3b34ffdcf3bce28cde435",
+      "expected_object_present": true,
+      "head": "d7949dc47dd9ed9ee1d3b34ffdcf3bce28cde435",
+      "tracked_tree_matches": true,
+      "passed": true
+    },
+    {
+      "path": "src/third_party/ruy/src",
+      "expected": "2264753777198e4393fb83c44c693462d57a2be1",
+      "expected_object_present": true,
+      "head": "2264753777198e4393fb83c44c693462d57a2be1",
+      "tracked_tree_matches": true,
+      "passed": true
+    },
+    {
+      "path": "src/third_party/search_engines_data/resources",
+      "expected": "1d39fffec1e14bf6f430a65b8de65669cb1479e6",
+      "expected_object_present": true,
+      "head": "1d39fffec1e14bf6f430a65b8de65669cb1479e6",
+      "tracked_tree_matches": true,
+      "passed": true
+    },
+    {
+      "path": "src/third_party/securemessage/src",
+      "expected": "fa07beb12babc3b25e0c5b1f38c16aa8cb6b8f84",
+      "expected_object_present": true,
+      "head": "fa07beb12babc3b25e0c5b1f38c16aa8cb6b8f84",
+      "tracked_tree_matches": true,
+      "passed": true
+    },
+    {
+      "path": "src/third_party/sframe/src",
+      "expected": "b14090904433bed0d4ec3f875b9b39f3e0555930",
+      "expected_object_present": true,
+      "head": "b14090904433bed0d4ec3f875b9b39f3e0555930",
+      "tracked_tree_matches": true,
+      "passed": true
+    },
+    {
+      "path": "src/third_party/skia",
+      "expected": "29ed1e87a0a50f3d8347e988842d9d59e7573efa",
+      "expected_object_present": true,
+      "head": "29ed1e87a0a50f3d8347e988842d9d59e7573efa",
+      "tracked_tree_matches": true,
+      "passed": true
+    },
+    {
+      "path": "src/third_party/smhasher/src",
+      "expected": "0ff96f7835817a27d0487325b6c16033e2992eb5",
+      "expected_object_present": true,
+      "head": "0ff96f7835817a27d0487325b6c16033e2992eb5",
+      "tracked_tree_matches": true,
+      "passed": true
+    },
+    {
+      "path": "src/third_party/snappy/src",
+      "expected": "32ded457c0b1fe78ceb8397632c416568d6714a0",
+      "expected_object_present": true,
+      "head": "32ded457c0b1fe78ceb8397632c416568d6714a0",
+      "tracked_tree_matches": true,
+      "passed": true
+    },
+    {
+      "path": "src/third_party/speedometer/main",
+      "expected": "f866d2b077038bc85bea5edb7bff8e05cadef0b2",
+      "expected_object_present": true,
+      "head": "f866d2b077038bc85bea5edb7bff8e05cadef0b2",
+      "tracked_tree_matches": true,
+      "passed": true
+    },
+    {
+      "path": "src/third_party/speedometer/v2.0",
+      "expected": "732af0dfe867f8815e662ac637357e55f285dbbb",
+      "expected_object_present": true,
+      "head": "732af0dfe867f8815e662ac637357e55f285dbbb",
+      "tracked_tree_matches": true,
+      "passed": true
+    },
+    {
+      "path": "src/third_party/speedometer/v2.1",
+      "expected": "8bf7946e39e47c875c00767177197aea5727e84a",
+      "expected_object_present": true,
+      "head": "8bf7946e39e47c875c00767177197aea5727e84a",
+      "tracked_tree_matches": true,
+      "passed": true
+    },
+    {
+      "path": "src/third_party/speedometer/v3.0",
+      "expected": "8d67f28d0281ac4330f283495b7f48286654ad7d",
+      "expected_object_present": true,
+      "head": "8d67f28d0281ac4330f283495b7f48286654ad7d",
+      "tracked_tree_matches": true,
+      "passed": true
+    },
+    {
+      "path": "src/third_party/speedometer/v3.1",
+      "expected": "1386415be8fef2f6b6bbdbe1828872471c5d802a",
+      "expected_object_present": true,
+      "head": "1386415be8fef2f6b6bbdbe1828872471c5d802a",
+      "tracked_tree_matches": true,
+      "passed": true
+    },
+    {
+      "path": "src/third_party/spirv-cross/src",
+      "expected": "b8fcf307f1f347089e3c46eb4451d27f32ebc8d3",
+      "expected_object_present": true,
+      "head": "b8fcf307f1f347089e3c46eb4451d27f32ebc8d3",
+      "tracked_tree_matches": true,
+      "passed": true
+    },
+    {
+      "path": "src/third_party/spirv-headers/src",
+      "expected": "04fd3caa1e8267e4d95c806cad901181728e1006",
+      "expected_object_present": true,
+      "head": "04fd3caa1e8267e4d95c806cad901181728e1006",
+      "tracked_tree_matches": true,
+      "passed": true
+    },
+    {
+      "path": "src/third_party/spirv-tools/src",
+      "expected": "d6f63db7031c181c146963206da772445704d5a0",
+      "expected_object_present": true,
+      "head": "d6f63db7031c181c146963206da772445704d5a0",
+      "tracked_tree_matches": true,
+      "passed": true
+    },
+    {
+      "path": "src/third_party/sqlite/src",
+      "expected": "ba8c54c83337618a9f15dd368a267e46b672fc84",
+      "expected_object_present": true,
+      "head": "ba8c54c83337618a9f15dd368a267e46b672fc84",
+      "tracked_tree_matches": true,
+      "passed": true
+    },
+    {
+      "path": "src/third_party/swiftshader",
+      "expected": "5b0479bd2d15058aaa9eb490e364f920ff824a8c",
+      "expected_object_present": true,
+      "head": "5b0479bd2d15058aaa9eb490e364f920ff824a8c",
+      "tracked_tree_matches": true,
+      "passed": true
+    },
+    {
+      "path": "src/third_party/text-fragments-polyfill/src",
+      "expected": "abc6ed408b3f20e91d9cbda9977748459f5e3877",
+      "expected_object_present": true,
+      "head": "abc6ed408b3f20e91d9cbda9977748459f5e3877",
+      "tracked_tree_matches": true,
+      "passed": true
+    },
+    {
+      "path": "src/third_party/tflite/src",
+      "expected": "bf3e7d28d4e95c73044c538381235758004ed18c",
+      "expected_object_present": true,
+      "head": "bf3e7d28d4e95c73044c538381235758004ed18c",
+      "tracked_tree_matches": true,
+      "passed": true
+    },
+    {
+      "path": "src/third_party/ukey2/src",
+      "expected": "0275885d8e6038c39b8a8ca55e75d1d4d1727f47",
+      "expected_object_present": true,
+      "head": "0275885d8e6038c39b8a8ca55e75d1d4d1727f47",
+      "tracked_tree_matches": true,
+      "passed": true
+    },
+    {
+      "path": "src/third_party/vulkan-deps",
+      "expected": "634fe15e4d1e699cf3b0516a33d4148a45607870",
+      "expected_object_present": true,
+      "head": "634fe15e4d1e699cf3b0516a33d4148a45607870",
+      "tracked_tree_matches": true,
+      "passed": true
+    },
+    {
+      "path": "src/third_party/vulkan-headers/src",
+      "expected": "ee2ec5fd83dafce291024683b50dc89219333076",
+      "expected_object_present": true,
+      "head": "ee2ec5fd83dafce291024683b50dc89219333076",
+      "tracked_tree_matches": true,
+      "passed": true
+    },
+    {
+      "path": "src/third_party/vulkan-loader/src",
+      "expected": "bde79ad2dd832db9180c4a6eca2e84ceb12b1bb0",
+      "expected_object_present": true,
+      "head": "bde79ad2dd832db9180c4a6eca2e84ceb12b1bb0",
+      "tracked_tree_matches": true,
+      "passed": true
+    },
+    {
+      "path": "src/third_party/vulkan-tools/src",
+      "expected": "462d9819e5953e064e1dcdc04d3edc5fc6bc9431",
+      "expected_object_present": true,
+      "head": "462d9819e5953e064e1dcdc04d3edc5fc6bc9431",
+      "tracked_tree_matches": true,
+      "passed": true
+    },
+    {
+      "path": "src/third_party/vulkan-utility-libraries/src",
+      "expected": "930a38bce146cf85c5bd7cb00fa33a66c640c0c6",
+      "expected_object_present": true,
+      "head": "930a38bce146cf85c5bd7cb00fa33a66c640c0c6",
+      "tracked_tree_matches": true,
+      "passed": true
+    },
+    {
+      "path": "src/third_party/vulkan-validation-layers/src",
+      "expected": "e59427bc03981779b8a153e6cd84ea2b1d6bf087",
+      "expected_object_present": true,
+      "head": "e59427bc03981779b8a153e6cd84ea2b1d6bf087",
+      "tracked_tree_matches": true,
+      "passed": true
+    },
+    {
+      "path": "src/third_party/vulkan_memory_allocator",
+      "expected": "82a9d47e4f9d91f0e32d2b6acd9714fcee1933a0",
+      "expected_object_present": true,
+      "head": "82a9d47e4f9d91f0e32d2b6acd9714fcee1933a0",
+      "tracked_tree_matches": true,
+      "passed": true
+    },
+    {
+      "path": "src/third_party/webdriver/pylib",
+      "expected": "1e954903022e9386b9acf452c24f4458dd4c4fc1",
+      "expected_object_present": true,
+      "head": "1e954903022e9386b9acf452c24f4458dd4c4fc1",
+      "tracked_tree_matches": true,
+      "passed": true
+    },
+    {
+      "path": "src/third_party/webgl/src",
+      "expected": "064aaf18207438d4f6dd10c98b02b25778257b7f",
+      "expected_object_present": true,
+      "head": "064aaf18207438d4f6dd10c98b02b25778257b7f",
+      "tracked_tree_matches": true,
+      "passed": true
+    },
+    {
+      "path": "src/third_party/webgpu-cts/src",
+      "expected": "32cc9f03ad14135b5f6f833dba83e7e80edc256f",
+      "expected_object_present": true,
+      "head": "32cc9f03ad14135b5f6f833dba83e7e80edc256f",
+      "tracked_tree_matches": true,
+      "passed": true
+    },
+    {
+      "path": "src/third_party/webpagereplay",
+      "expected": "b2b856131e36c99e9de9c419fe8ca02f857082ba",
+      "expected_object_present": true,
+      "head": "b2b856131e36c99e9de9c419fe8ca02f857082ba",
+      "tracked_tree_matches": true,
+      "passed": true
+    },
+    {
+      "path": "src/third_party/webpagereplay/third_party/clang-format/script",
+      "expected": "70510081984cfcdb14a15b3e08dfe9776dc7ed37",
+      "expected_object_present": true,
+      "head": "70510081984cfcdb14a15b3e08dfe9776dc7ed37",
+      "tracked_tree_matches": true,
+      "passed": true
+    },
+    {
+      "path": "src/third_party/webrtc",
+      "expected": "5bd86a2f17a35dfc986b87d058f511e45805bd1d",
+      "expected_object_present": true,
+      "head": "5bd86a2f17a35dfc986b87d058f511e45805bd1d",
+      "tracked_tree_matches": true,
+      "passed": true
+    },
+    {
+      "path": "src/third_party/wuffs/src",
+      "expected": "7411f488fe2e2c205c3d3b3d28638b7356522930",
+      "expected_object_present": true,
+      "head": "7411f488fe2e2c205c3d3b3d28638b7356522930",
+      "tracked_tree_matches": true,
+      "passed": true
+    },
+    {
+      "path": "src/third_party/xnnpack/src",
+      "expected": "3c4596adb505f51c042ee14e76731b9004524b1a",
+      "expected_object_present": true,
+      "head": "3c4596adb505f51c042ee14e76731b9004524b1a",
+      "tracked_tree_matches": true,
+      "passed": true
+    },
+    {
+      "path": "src/third_party/zstd/src",
+      "expected": "10da6ba6de05e29169261fa4b68eb99239f770dd",
+      "expected_object_present": true,
+      "head": "10da6ba6de05e29169261fa4b68eb99239f770dd",
+      "tracked_tree_matches": true,
+      "passed": true
+    },
+    {
+      "path": "src/v8",
+      "expected": "712e1808de2d7416f1276d0deb1ee4ac978132b8",
+      "expected_object_present": true,
+      "head": "712e1808de2d7416f1276d0deb1ee4ac978132b8",
+      "tracked_tree_matches": true,
+      "passed": true
+    }
+  ]
+}

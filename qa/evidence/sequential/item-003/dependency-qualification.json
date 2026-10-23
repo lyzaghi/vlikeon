@@ -1,0 +1,76 @@
+{
+  "schema_version": 1,
+  "item": 3,
+  "full_browser_build_complete": false,
+  "antigravity_dependency_audit_before": {
+    "git_dependencies": 155,
+    "passed": false,
+    "incomplete_paths": [
+      "src/third_party/dawn",
+      "src/third_party/devtools-frontend/src",
+      "src/third_party/icu",
+      "src/third_party/jetstream/main",
+      "src/third_party/libc++/src",
+      "src/third_party/litert/src",
+      "src/third_party/llvm-libc/src",
+      "src/third_party/material_color_utilities/src",
+      "src/third_party/microsoft_dxheaders/src",
+      "src/third_party/microsoft_multimedia_redirection/src",
+      "src/third_party/microsoft_webauthn/src",
+      "src/third_party/nasm"
+    ],
+    "entries_sha256": "94a6f61be46aa55fc26ab57023987e2783c31fe13b9e52fc38c4cd814c397f6e"
+  },
+  "antigravity_dependency_audit_after": {
+    "git_dependencies": 155,
+    "passed": true,
+    "entries_unchanged": true,
+    "entries_sha256": "94a6f61be46aa55fc26ab57023987e2783c31fe13b9e52fc38c4cd814c397f6e",
+    "check_execution": {
+      "item": 3,
+      "executor": "antigravity",
+      "cases": [
+        {
+          "id": "independent-inventory",
+          "exit_code": 0
+        },
+        {
+          "id": "production-admission",
+          "exit_code": 0
+        },
+        {
+          "id": "recipe-language",
+          "exit_code": 0
+        }
+      ],
+      "inputs": {
+        "build_desktop_browser.py": "f5a51e2e5818f61a263b1e3fe65208565fe6fcb4e2311e1d329e90a62d784b9e",
+        "chromium_dependencies.py": "389c0b55cddca5e8d3bcad4e4f40c80802d617853fbcf9cad1a887050688cfaf",
+        "prepare_desktop_browser.py": "59e0953afaab9a9dacde4e04580e4fb91c292d75ff110cbaeb7f64d6ccd787de"
+      },
+      "inputs_unchanged": true,
+      "passed": true
+    }
+  },
+  "upstream_hooks_after_repair": {
+    "exit_code": 0,
+    "config_unchanged": true
+  },
+  "raw_evidence_sha256": {
+    "runs/003-dependencies-a.json": "75e901545b9dcbeaad4f85fb3b65c0661dcde152f46e95a319cc5656d7ccfa94",
+    "runs/003-dependency-repair-a/result.json": "a75242abc8c11e13e66ef08ae5e6b8fd6ac88e40acbdc09008c7d902c5ed4051",
+    "runs/003-dependency-repair-a/stdout.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "runs/003-dependency-repair-a/stderr.log": "2c20f270c46a5e58e36fc769e2d6b65dd65ef0b8183bb007c8deef45a3f62f05",
+    "runs/003-hooks-b/result.json": "daa9d6fa035320a7fb0f63bcd37f6870123874dac962a5ea80b89c78991bb8a0",
+    "runs/003-hooks-b/stdout.log": "e4331306e13cb28b6af393a821c82bf782631a708ae77554f9879fe9c29a5c4c",
+    "runs/003-hooks-b/stderr.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "runs/003-dependencies-b/independent-inventory.stderr.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "runs/003-dependencies-b/independent-inventory.stdout.log": "82f6e90f2a20d8c55b68de773d89bf6d3cebbd196e95ff899020c636360d07dd",
+    "runs/003-dependencies-b/inventory.json": "ecbfacbb5ac1344e78ee633a1a615edd01629521afce83c3f1c83c89edc2255b",
+    "runs/003-dependencies-b/production-admission.stderr.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "runs/003-dependencies-b/production-admission.stdout.log": "4c4320b724cd655a994e34a4758d6d67bc72bccc22479283efc1927d862157a9",
+    "runs/003-dependencies-b/recipe-language.stderr.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "runs/003-dependencies-b/recipe-language.stdout.log": "d1d682e2bb19a4b30a23413b0bc5b54f033484bb31026aa31ca5961226a4b27c",
+    "runs/003-dependencies-b/result.json": "8c211f7e717a55256b0f32ad82ca148f9f3519cbaa62dd5176355310aafb86ac"
+  }
+}

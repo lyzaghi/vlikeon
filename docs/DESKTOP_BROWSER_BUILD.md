@@ -97,6 +97,14 @@ reset by this procedure. A per-project exclusive lock prevents concurrent runs;
 after a crash, an operator must establish that no prior build is still active
 before removing its stale lock.
 
+Before hooks or a resumed build, `chromium_dependencies.py` compares the actual
+HEAD and tracked source of every pinned HTTPS Git dependency against
+`.gclient_entries`. A cached parent gitlink is insufficient after interruption.
+The checker reads the inventory with bounded literal parsing, disables lazy
+fetch/optional Git locks, refuses links and fails on missing or changed source.
+Its frozen code and inventory hash become build inputs/evidence. CIPD/GS package
+admission remains upstream's responsibility; this check does not certify them.
+
 Git child processes use LF source and long-path support through process-local
 configuration, leaving user-global Git settings intact. On Windows, bootstrap
 the explicitly pinned depot_tools using its official `bootstrap/win_tools.bat`
