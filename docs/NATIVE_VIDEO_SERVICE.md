@@ -192,3 +192,10 @@ ownership/original process identity, consumes one attempt and recomputes lifetim
 after hash admission. No service command calls it. `WINDOWS_VIDEO_INSTALLATION.md`
 records exact behavior and missing package/native observation/UI/receiver work.
 No install, admission, helper launch, capture, build or test ran.
+
+The next source checkpoint adds an explicit Windows video helper snapshot/build/
+staging recipe and fixed-entry structural PE admission in the existing release
+packager. Static runtime/asInvoker/mitigation settings are authored; seven inert
+PE fixture cases remain unexecuted. `WINDOWS_VIDEO_PACKAGING.md` records scope,
+toolchain/provenance/signature limitations and remaining requirements. No build,
+staging, parser/test, package, release or helper execution ran.

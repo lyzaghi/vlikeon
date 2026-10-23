@@ -1,5 +1,6 @@
 cmake_minimum_required(VERSION 3.25)
 project(VlikeonWindowsEncoder LANGUAGES CXX)
+set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
 if(NOT WIN32 OR NOT MSVC OR NOT CMAKE_SIZEOF_VOID_P EQUAL 8)
   message(FATAL_ERROR "The native encoder requires 64-bit Windows and MSVC")
 endif()
@@ -13,4 +14,5 @@ target_link_libraries(vlikeon-windows-encoder PUBLIC mfplat mf mfuuid ole32 olea
 add_executable(omniplay-video-worker src/worker.cpp)
 target_link_libraries(omniplay-video-worker PRIVATE vlikeon-windows-encoder)
 target_compile_options(omniplay-video-worker PRIVATE /W4 /EHsc /guard:cf /sdl)
-target_link_options(omniplay-video-worker PRIVATE /guard:cf /DYNAMICBASE /NXCOMPAT)
+target_link_options(omniplay-video-worker PRIVATE /guard:cf /DYNAMICBASE /HIGHENTROPYVA /NXCOMPAT
+  "/MANIFESTUAC:level='asInvoker' uiAccess='false'")

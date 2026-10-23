@@ -13,6 +13,7 @@ import re
 import struct
 import tempfile
 from release_inventory import check_release_tree
+from windows_video_artifact import ENTRY as VIDEO_ENTRY, admit_video_artifact
 
 MAX_BYTES = 2 * 1024**3
 MAX_MANIFEST = 16 * 1024**2
@@ -90,6 +91,13 @@ def main():
     for name in (identity["browser_entry"], identity["broker_entry"]):
         if name not in executables:
             raise ValueError("Both entry points must be approved executable files")
+    if VIDEO_ENTRY in {entry['path'] for entry in entries}:
+        if VIDEO_ENTRY not in executables:
+            raise ValueError('Explicitly approve the native video worker in the executable inventory')
+        admitted_video = admit_video_artifact(base / VIDEO_ENTRY, identity['platform'])
+        video_entry = next(entry for entry in entries if entry['path'] == VIDEO_ENTRY)
+        if any(video_entry[key] != admitted_video[key] for key in ('bytes', 'sha256', 'executable')):
+            raise ValueError('The native video worker changed during release inventory admission')
     if identity["platform"] == "macos-aarch64":
         broker_entry = "VlikeonBroker.app/Contents/MacOS/omniplay-broker"
         inventory = {entry["path"]: entry for entry in entries}
