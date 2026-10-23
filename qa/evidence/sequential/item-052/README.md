@@ -10,8 +10,8 @@ The requirement matrix and limitations are in
 `052b` exposed a cancellation-classification defect. `052c` confirmed the
 product fix and exposed a quota-fixture timing issue. Both failed results are
 retained. `052d` passed the earlier Web matrix; `052e` additionally crashes an
-actual save-publication transaction, before or after commit. Only `052a` and
-`052e` are used for current accepted coverage, without double-counting runs.
+actual save-publication transaction, before or after commit. Only `052a`,
+`052e` and `052g` are used for accepted coverage, without double-counting runs.
 Native request/result logs and phase markers are synthetic fixture evidence.
 
 Physical NTFS disk-full execution **passed** in `052g`: real `write` `ENOSPC`,

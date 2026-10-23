@@ -1,0 +1,23 @@
+{
+  "item": 53,
+  "batch": "053a",
+  "scope": "Host probe syntax and Windows refusal only; no Linux runtime/capture acceptance",
+  "executor": "Antigravity",
+  "cases": [
+    {
+      "id": "parse-probe",
+      "status": "passed",
+      "exit_code": 0
+    },
+    {
+      "id": "reject-non-linux-without-report",
+      "status": "passed",
+      "exit_code": 2
+    }
+  ],
+  "source_manifest_sha256": "b39bb97d6a18d466e841878a0f74045e56117014e5ad5cd821a28a2fbc3d1a2e",
+  "started_at": "2026-10-23T12:22:02.923Z",
+  "status": "passed",
+  "source_unchanged": true,
+  "finished_at": "2026-10-23T12:22:03.223Z"
+}

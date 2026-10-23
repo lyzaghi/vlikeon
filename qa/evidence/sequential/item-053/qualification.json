@@ -1,0 +1,18 @@
+{
+  "item": 53,
+  "status": "incomplete",
+  "executor": "Antigravity",
+  "reviewed_by": "Codex",
+  "checks": [
+    "Python syntax",
+    "Windows refusal without Linux report"
+  ],
+  "probe_sha256": "7752caf9687de7890f24836bbbb25eab7e4c71f5670af507cda336e16761006e",
+  "linux_runtime_executed": false,
+  "capture_implemented": false,
+  "pending": [
+    "Linux desktop environment selection",
+    "Owned-window and application-only audio adapters",
+    "Real Linux media and lifecycle qualification"
+  ]
+}
