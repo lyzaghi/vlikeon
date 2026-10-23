@@ -236,3 +236,11 @@ contract and required typed viewer-side admission/watchdog. Current Rust/game
 video client does not invoke v3 and cannot stand in for viewer authority. Native
 receiver/codec/clock admission, secure transport and presentation/UI remain due.
 No build, protocol/decoder/media execution or test ran.
+
+The next source checkpoint adds Rust decoder-v3 job launch/pipe admission,
+opaque original ingress boot/Instant receipts and exact accepted-input/NV12
+output matching. Viewer decode requires native receive/document/pair authority
+without a local game handle. A private broker wrapper returns only unpresented
+frames. `WINDOWS_DECODER_SUPERVISION.md` records required ingress/reorder/codec/
+native service and display gaps. No current product path calls v3, and no
+compiler, helper/decoder/media/clock operation or test ran.

@@ -65,7 +65,7 @@ pub(crate) struct SuspendedChild{
     pub(crate) input:File,pub(crate) output:File,
 }
 #[derive(Clone,Copy)]
-pub(crate) enum HelperKind{KeyboardMouse,Gamepad,Video}
+pub(crate) enum HelperKind{KeyboardMouse,Gamepad,Video,VideoDecode}
 impl SuspendedChild{
     pub(crate) fn launch(executable:&Path,kind:HelperKind)->Result<Self>{
         Self::launch_with_target(executable,kind,None)
@@ -95,7 +95,7 @@ impl SuspendedChild{
         limits.BasicLimitInformation.LimitFlags=JOB_OBJECT_LIMIT_ACTIVE_PROCESS|
             JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE|JOB_OBJECT_LIMIT_PROCESS_MEMORY|JOB_OBJECT_LIMIT_DIE_ON_UNHANDLED_EXCEPTION;
         limits.BasicLimitInformation.ActiveProcessLimit=1;
-        limits.ProcessMemoryLimit=match kind{HelperKind::Video=>512*1024*1024,_=>128*1024*1024};
+        limits.ProcessMemoryLimit=match kind{HelperKind::Video|HelperKind::VideoDecode=>512*1024*1024,_=>128*1024*1024};
         if unsafe{SetInformationJobObject(job.as_raw_handle(),JobObjectExtendedLimitInformation,
             (&limits as*const JOBOBJECT_EXTENDED_LIMIT_INFORMATION).cast(),size_of_val(&limits)as u32)}==0{return Err(failure());}
         let jobs=[job.as_raw_handle()];let mut attributes=Attributes::new()?;
@@ -103,7 +103,7 @@ impl SuspendedChild{
         attributes.set(PROC_THREAD_ATTRIBUTE_JOB_LIST,&jobs)?;
         let application=wide(executable.as_os_str())?;let directory=wide(directory.as_os_str())?;
         let argument=if let Some(game)=&game{format!("--stdio-owned-video-v2 {}",game.as_raw_handle()as usize)}else{
-            match kind{HelperKind::KeyboardMouse=>"--stdio-input-v1",HelperKind::Gamepad=>"--stdio-gamepad-v2",HelperKind::Video=>"--stdio-video-v1"}.into()
+            match kind{HelperKind::KeyboardMouse=>"--stdio-input-v1",HelperKind::Gamepad=>"--stdio-gamepad-v2",HelperKind::Video=>"--stdio-video-v1",HelperKind::VideoDecode=>"--stdio-decode-v3"}.into()
         };
         let mut command=wide(OsStr::new(&format!("\"{text}\" {argument}")))?;
         let system=system_directory()?;let system=system.to_str().ok_or_else(failure)?;

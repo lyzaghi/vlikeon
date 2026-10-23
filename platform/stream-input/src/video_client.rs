@@ -22,14 +22,32 @@ impl VideoOwner{fn valid(self)->bool{[self.capture,self.game,self.pair,self.sess
 pub struct VideoProfile{pub width:u32,pub height:u32,pub fps:u32,pub bitrate:u32,pub require_hardware:bool}
 impl VideoProfile{fn valid(self)->bool{matches!((self.width,self.height),(1280,720)|(1920,1080))&&matches!(self.fps,30|60)&&(500_000..=30_000_000).contains(&self.bitrate)}}
 pub struct VideoPacket{pub timestamp_100ns:i64,pub keyframe:bool,pub source_sequence:Option<u64>,pub bytes:Vec<u8>,pub sequence_header:Vec<u8>}
+/// Capture at original authenticated RTP ingress and carry through all queues.
+/// Creating this AFTER reorder/assembly would erase age and violate the contract.
+#[derive(Clone,Copy)]
+pub struct DecoderReceipt{tick:u64,local:Instant}
+impl DecoderReceipt{
+    pub fn at_native_ingress()->Self{
+        // Take the boot-clock reading first: both readings stay conservative
+        // deadlines, and an interrupted capture cannot make the tick newer.
+        let tick=unsafe{windows_sys::Win32::System::SystemInformation::GetTickCount64()};
+        Self{tick,local:Instant::now()}
+    }
+    fn live(self)->bool{
+        let tick=unsafe{windows_sys::Win32::System::SystemInformation::GetTickCount64()};
+        self.tick<=tick&&tick-self.tick<=100&&self.local.elapsed()<=Duration::from_millis(100)
+    }
+}
+pub struct DecodedVideoFrame{pub width:u32,pub height:u32,pub stride:u32,pub timestamp_100ns:i64,pub nv12:Vec<u8>,receipt:DecoderReceipt}
+impl DecodedVideoFrame{pub fn within_receive_age(&self)->bool{self.receipt.live()}}
 struct Queued{packet:VideoPacket,deadline:Instant}
 struct Packets{queue:VecDeque<Queued>,bytes:usize}
 struct Lease{sequence:u64,deadline:Instant}
 struct Shared{
-    process:Arc<ChildProcess>,target:ProcessWitness,owner:VideoOwner,deadline:Instant,window:Option<u64>,
+    process:Arc<ChildProcess>,target:Option<ProcessWitness>,owner:VideoOwner,deadline:Instant,window:Option<u64>,decode:bool,
     _permit:Permit,artifact:Option<File>,installation_guards:Vec<File>,closed:AtomicBool,revoking:AtomicBool,
     lease:Mutex<Lease>,stop_deadline:Mutex<Option<Instant>>,pending:Mutex<Option<Instant>>,
-    packets:Mutex<Packets>,io:OnceLock<OwnedHandle>,
+    packets:Mutex<Packets>,frames:Mutex<VecDeque<DecodedVideoFrame>>,io:OnceLock<OwnedHandle>,
 }
 impl Drop for Shared{fn drop(&mut self){
     if !self.process.exited().unwrap_or(false){
@@ -41,7 +59,7 @@ impl Shared{
     fn authority_live(&self)->bool{
         !self.closed.load(Ordering::Acquire)&&!self.revoking.load(Ordering::Acquire)&&Instant::now()<self.deadline&&
         self.lease.lock().is_ok_and(|lease|Instant::now()<lease.deadline)&&
-        self.target.exited(self.target.identity()).is_ok_and(|exited|!exited)
+        self.target.as_ref().map(|target|target.exited(target.identity()).is_ok_and(|exited|!exited)).unwrap_or(self.decode)
     }
     fn transport_live(&self)->bool{
         if self.closed.load(Ordering::Acquire){return false;}
@@ -51,6 +69,7 @@ impl Shared{
     fn close(&self){
         self.closed.store(true,Ordering::Release);
         if let Ok(mut packets)=self.packets.lock(){packets.queue.clear();packets.bytes=0;}
+        if let Ok(mut frames)=self.frames.lock(){frames.clear();}
         if let Some(io)=self.io.get(){unsafe{CancelSynchronousIo(io.as_raw_handle());}}
     }
 }
@@ -107,7 +126,7 @@ mod authority_tests{
         assert!(!observation(now+Duration::from_millis(1)).permits(owner(),now));
     }
 }
-struct Call{kind:u16,payload:Vec<u8>,reply:SyncSender<Result<Vec<u8>>>,timeout:Duration}
+struct Call{kind:u16,payload:Vec<u8>,reply:SyncSender<Result<Vec<u8>>>,timeout:Duration,receipt:Option<DecoderReceipt>}
 pub struct VideoWorker{shared:Arc<Shared>,sender:Option<SyncSender<Call>>,threads:Vec<JoinHandle<()>>,profile:Option<VideoProfile>,sha256:ContentHash}
 fn thread_handle(thread:&JoinHandle<()>)->Result<OwnedHandle>{
     let current=unsafe{GetCurrentProcess()};let mut handle=std::ptr::null_mut();
@@ -116,7 +135,7 @@ fn thread_handle(thread:&JoinHandle<()>)->Result<OwnedHandle>{
 }
 impl VideoWorker{
     pub fn spawn(executable:&Path,artifact:File,sha256:ContentHash,owner:VideoOwner,target:ProcessWitness,remaining:Duration)->Result<(Self,VideoAuthorityLease)>{
-        Self::spawn_mode(executable,artifact,sha256,owner,target,remaining,None,Vec::new())
+        Self::spawn_mode(executable,artifact,sha256,owner,Some(target),remaining,None,Vec::new(),false)
     }
     /// The HWND is private native capture context, not renderer authority.
     /// Native WGC confirmation remains mandatory inside the v2 worker.
@@ -128,16 +147,23 @@ impl VideoWorker{
     pub fn spawn_owned_guarded(executable:&Path,artifact:File,guards:Vec<File>,sha256:ContentHash,owner:VideoOwner,target:ProcessWitness,window:u64,remaining:Duration)->Result<(Self,VideoAuthorityLease)>{
         let mut pid=0;
         if window==0||unsafe{windows_sys::Win32::UI::WindowsAndMessaging::GetWindowThreadProcessId(window as usize as HWND,&mut pid)}==0||pid!=target.identity().process_id{return Err(failure());}
-        Self::spawn_mode(executable,artifact,sha256,owner,target,remaining,Some(window),guards)
+        Self::spawn_mode(executable,artifact,sha256,owner,Some(target),remaining,Some(window),guards,false)
     }
-    fn spawn_mode(executable:&Path,artifact:File,sha256:ContentHash,owner:VideoOwner,target:ProcessWitness,remaining:Duration,window:Option<u64>,installation_guards:Vec<File>)->Result<(Self,VideoAuthorityLease)>{
-        if !owner.valid()||remaining.is_zero()||remaining>Duration::from_secs(1800)||target.exited(target.identity())?||ContentHash::parse(sha256.0.clone()).is_err(){return Err(failure());}
+    /// Viewer decoder has no local game process. Its mandatory independent
+    /// native authority lease binds the authorized receive/document/pair context.
+    pub fn spawn_decoder_guarded(executable:&Path,artifact:File,guards:Vec<File>,sha256:ContentHash,owner:VideoOwner,remaining:Duration)->Result<(Self,VideoAuthorityLease)>{
+        Self::spawn_mode(executable,artifact,sha256,owner,None,remaining,None,guards,true)
+    }
+    fn spawn_mode(executable:&Path,artifact:File,sha256:ContentHash,owner:VideoOwner,target:Option<ProcessWitness>,remaining:Duration,window:Option<u64>,installation_guards:Vec<File>,decode:bool)->Result<(Self,VideoAuthorityLease)>{
+        if !owner.valid()||remaining.is_zero()||remaining>Duration::from_secs(1800)||
+            (decode&&(target.is_some()||window.is_some()))||(!decode&&target.is_none())||
+            target.as_ref().is_some_and(|target|!target.exited(target.identity()).is_ok_and(|exited|!exited))||ContentHash::parse(sha256.0.clone()).is_err(){return Err(failure());}
         let permit=Permit::acquire()?;let now=Instant::now();
-        let child=if window.is_some(){SuspendedChild::launch_owned_video(executable,target.native_handle())?}else{SuspendedChild::launch(executable,HelperKind::Video)?};
+        let child=if window.is_some(){SuspendedChild::launch_owned_video(executable,target.as_ref().ok_or_else(failure)?.native_handle())?}else{SuspendedChild::launch(executable,if decode{HelperKind::VideoDecode}else{HelperKind::Video})?};
         let(process,primary,input,output)=child.into_parts();
-        let shared=Arc::new(Shared{process,target,owner,deadline:now+remaining,window,_permit:permit,artifact:Some(artifact),installation_guards,
+        let shared=Arc::new(Shared{process,target,owner,deadline:now+remaining,window,decode,_permit:permit,artifact:Some(artifact),installation_guards,
             closed:AtomicBool::new(false),revoking:AtomicBool::new(false),lease:Mutex::new(Lease{sequence:0,deadline:now+Duration::from_millis(300)}),
-            stop_deadline:Mutex::new(None),pending:Mutex::new(None),packets:Mutex::new(Packets{queue:VecDeque::new(),bytes:0}),io:OnceLock::new()});
+            stop_deadline:Mutex::new(None),pending:Mutex::new(None),packets:Mutex::new(Packets{queue:VecDeque::new(),bytes:0}),frames:Mutex::new(VecDeque::new()),io:OnceLock::new()});
         let(sender,receiver)=mpsc::sync_channel(1);
         let mut client=Self{shared:shared.clone(),sender:Some(sender),threads:Vec::new(),profile:None,sha256};
         let io_shared=shared.clone();
@@ -147,6 +173,7 @@ impl VideoWorker{
         client.threads.push(std::thread::Builder::new().name("vlikeon-video-watch".into()).spawn(move||{
             while watch.transport_live()&&watch.pending.lock().is_ok_and(|deadline|deadline.is_none_or(|value|Instant::now()<value))&&
                 watch.packets.lock().is_ok_and(|packets|packets.queue.front().is_none_or(|packet|Instant::now()<packet.deadline))&&
+                watch.frames.lock().is_ok_and(|frames|frames.front().is_none_or(|frame|frame.within_receive_age()))&&
                 watch.io.get().is_some_and(|io|unsafe{WaitForSingleObject(io.as_raw_handle(),0)}==WAIT_TIMEOUT)&&watch.process.exited().is_ok_and(|value|!value){
                 std::thread::sleep(Duration::from_millis(8));
             }
@@ -157,6 +184,7 @@ impl VideoWorker{
     }
     pub fn owner(&self)->VideoOwner{self.shared.owner}
     pub fn owned_capture(&self)->bool{self.shared.window.is_some()}
+    pub fn decoder_mode(&self)->bool{self.shared.decode}
     pub fn remaining_authorized(&self)->Result<Duration>{
         if !self.shared.authority_live(){return Err(failure());}
         Ok(self.shared.deadline.saturating_duration_since(Instant::now()))
@@ -164,16 +192,19 @@ impl VideoWorker{
     pub fn helper_sha256(&self)->&ContentHash{&self.sha256}
     pub fn helper_witness(&self)->Result<ProcessWitness>{self.shared.process.witness()}
     fn call(&self,kind:u16,payload:Vec<u8>,timeout:Duration)->Result<Vec<u8>>{
+        self.call_with_receipt(kind,payload,timeout,None)
+    }
+    fn call_with_receipt(&self,kind:u16,payload:Vec<u8>,timeout:Duration,receipt:Option<DecoderReceipt>)->Result<Vec<u8>>{
         if !(if kind==STOP{self.shared.transport_live()}else{self.shared.authority_live()}){return Err(failure());}
         let(reply,receive)=mpsc::sync_channel(1);
         let result=(||{
-            self.sender.as_ref().ok_or_else(failure)?.try_send(Call{kind,payload,reply,timeout}).map_err(|_|failure())?;
+            self.sender.as_ref().ok_or_else(failure)?.try_send(Call{kind,payload,reply,timeout,receipt}).map_err(|_|failure())?;
             receive.recv_timeout(timeout+Duration::from_millis(50)).map_err(|_|failure())?
         })();
         if result.is_err(){self.shared.close();}result
     }
     pub fn configure(&mut self,profile:VideoProfile)->Result<bool>{
-        if self.profile.is_some()||!profile.valid(){return Err(failure());}
+        if self.profile.is_some()||!profile.valid()||self.shared.decode&&profile.require_hardware{return Err(failure());}
         let remaining=self.shared.deadline.saturating_duration_since(Instant::now()).as_millis();
         if remaining==0||remaining>1_800_000{return Err(failure());}
         let mut payload=Vec::with_capacity(61);payload.extend(self.shared.owner.capture.as_bytes());payload.extend(self.shared.owner.session.as_bytes());
@@ -188,7 +219,7 @@ impl VideoWorker{
     }
     /// Tight NV12. False means the worker did not accept this raw frame.
     pub fn submit(&mut self,bytes:Vec<u8>,timestamp_100ns:i64,keyframe:bool)->Result<bool>{
-        if self.owned_capture(){return Err(failure());}
+        if self.owned_capture()||self.shared.decode{return Err(failure());}
         let profile=self.profile.ok_or_else(failure)?;
         if timestamp_100ns<0||bytes.len()!=(profile.width*profile.height*3/2)as usize{return Err(failure());}
         let mut payload=Vec::with_capacity(9+bytes.len());payload.extend(timestamp_100ns.to_le_bytes());payload.push(u8::from(keyframe));payload.extend(bytes);
@@ -196,6 +227,7 @@ impl VideoWorker{
         match reply.as_slice(){[0,0,0,0]=>Ok(true),[1,0,0,0]=>Ok(false),_=>{self.shared.close();Err(failure())}}
     }
     pub fn take_packet(&mut self)->Result<Option<VideoPacket>>{
+        if self.shared.decode{return Err(failure());}
         if !self.shared.authority_live(){self.shared.close();return Err(failure());}
         let mut packets=self.shared.packets.lock().map_err(|_|failure())?;
         if packets.queue.front().is_some_and(|packet|Instant::now()>=packet.deadline){drop(packets);self.shared.close();return Err(failure());}
@@ -204,6 +236,18 @@ impl VideoWorker{
         drop(packets);
         if !self.shared.authority_live()||packet.as_ref().is_some_and(|value|Instant::now()>=value.deadline){self.shared.close();return Err(failure());}
         Ok(packet.map(|value|value.packet))
+    }
+    pub fn submit_compressed(&mut self,bytes:Vec<u8>,timestamp_100ns:i64,receipt:DecoderReceipt)->Result<bool>{
+        if !self.shared.decode||self.profile.is_none()||bytes.is_empty()||bytes.len()>2*1024*1024||!(0..=18_000_000_000).contains(&timestamp_100ns){return Err(failure());}
+        if !receipt.live(){self.shared.close();return Err(failure());}
+        let mut payload=Vec::with_capacity(16+bytes.len());payload.extend(timestamp_100ns.to_le_bytes());payload.extend(receipt.tick.to_le_bytes());payload.extend(bytes);
+        let reply=self.call_with_receipt(FRAME,payload,Duration::from_millis(100),Some(receipt))?;
+        match reply.as_slice(){[0,0,0,0]=>Ok(true),[1,0,0,0]=>Ok(false),_=>{self.shared.close();Err(failure())}}
+    }
+    pub fn take_decoded(&mut self)->Result<Option<DecodedVideoFrame>>{
+        if !self.shared.decode||!self.shared.authority_live(){return Err(failure());}
+        let frame=self.shared.frames.lock().map_err(|_|failure())?.pop_front();
+        if !self.shared.authority_live()||frame.as_ref().is_some_and(|frame|!frame.within_receive_age()){self.shared.close();return Err(failure());}Ok(frame)
     }
     /// Returns an intent fence, not a decoder-refresh receipt. Only a matching
     /// actual keyframe packet at/after the fence confirms the new keyframe.
@@ -219,6 +263,7 @@ impl VideoWorker{
         *self.shared.stop_deadline.lock().map_err(|_|failure())?=Some(Instant::now()+Duration::from_millis(1000));
         self.shared.revoking.store(true,Ordering::Release);
         if let Ok(mut packets)=self.shared.packets.lock(){packets.queue.clear();packets.bytes=0;}
+        if let Ok(mut frames)=self.shared.frames.lock(){frames.clear();}
         let receipt=self.call(STOP,Vec::new(),Duration::from_millis(750));
         let retired=self.close();
         if receipt?.as_slice()!=[0,0,0,0]{return Err(failure());}retired
@@ -233,7 +278,7 @@ impl Drop for VideoWorker{fn drop(&mut self){let _=self.close();}}
 fn exchange(input:&mut File,output:&mut File,shared:&Shared,id:&mut u64,kind:u16,payload:&[u8],timeout:Duration)->Result<(u16,Vec<u8>)>{
     if !shared.transport_live()||*id>=10_000_000||payload.len()>3_110_409{return Err(failure());}
     *id+=1;*shared.pending.lock().map_err(|_|failure())?=Some(Instant::now()+timeout);
-    let version:u16=if shared.window.is_some(){2}else{1};
+    let version:u16=if shared.decode{3}else if shared.window.is_some(){2}else{1};
     let mut header=Vec::with_capacity(20);header.extend(b"VLKV");header.extend(version.to_le_bytes());header.extend(kind.to_le_bytes());header.extend(id.to_le_bytes());header.extend((payload.len()as u32).to_le_bytes());
     input.write_all(&header).and_then(|_|input.write_all(payload)).map_err(|_|failure())?;
     let mut reply=[0u8;20];output.read_exact(&mut reply).map_err(|_|failure())?;
@@ -241,8 +286,9 @@ fn exchange(input:&mut File,output:&mut File,shared:&Shared,id:&mut u64,kind:u16
     let length=u32::from_le_bytes(reply[16..20].try_into().map_err(|_|failure())?)as usize;
     let status_length=if kind==CONFIGURE{if version==2{74}else{66}}else if kind==KEYFRAME&&version==2{12}else{4};
     if &reply[..4]!=b"VLKV"||reply[4..6]!=version.to_le_bytes()||u64::from_le_bytes(reply[8..16].try_into().map_err(|_|failure())?)!=*id||
-        !matches!(reply_kind,0x8000|0x8001)||length>2*1024*1024+65536+29||
-        (reply_kind==0x8001&&kind!=POLL)||(reply_kind==0x8000&&length!=4&&length!=status_length){return Err(failure());}
+        !matches!(reply_kind,0x8000|0x8001|0x8002)||length>(if shared.decode{1920*1080*3/2+32}else{2*1024*1024+65536+29})||
+        (reply_kind==0x8001&&(kind!=POLL||shared.decode))||(reply_kind==0x8002&&(kind!=POLL||!shared.decode))||
+        (reply_kind==0x8000&&length!=4&&length!=status_length){return Err(failure());}
     let mut bytes=vec![0u8;length];output.read_exact(&mut bytes).map_err(|_|failure())?;
     let pending=shared.pending.lock().map_err(|_|failure())?.take().ok_or_else(failure)?;
     // During explicit Stop, finish reading one already-issued Poll solely to
@@ -255,15 +301,32 @@ fn io_loop(mut input:File,mut output:File,shared:Arc<Shared>,receiver:mpsc::Rece
     let run=(||->Result<()>{
         let mut id=0;let mut configured=false;let mut last_poll=Instant::now();let mut first_input=true;
         let mut accepted:VecDeque<(i64,bool,Instant)>=VecDeque::new();
+        let mut compressed:VecDeque<(i64,DecoderReceipt)>=VecDeque::new();let mut decoded_profile:Option<(u32,u32)>=None;
         let mut native_sequence=0u64;let mut native_pts:Option<i64>=None;let mut keyframe_fences:VecDeque<u64>=VecDeque::new();
         while shared.transport_live(){
             if !shared.revoking.load(Ordering::Acquire)&&accepted.front().is_some_and(|(_,_,submitted)|submitted.elapsed()>=Duration::from_millis(250)){return Err(failure());}
+            if !shared.revoking.load(Ordering::Acquire)&&compressed.front().is_some_and(|(_,receipt)|!receipt.live()){return Err(failure());}
             if configured&&!shared.revoking.load(Ordering::Acquire)&&last_poll.elapsed()>=Duration::from_millis(8){
                 let requested_at=Instant::now();
                 let(kind,bytes)=exchange(&mut input,&mut output,&shared,&mut id,POLL,&[],Duration::from_millis(250))?;
                 last_poll=Instant::now();
                 if shared.revoking.load(Ordering::Acquire){
                     // Drain an in-flight Poll without accepting any media.
+                }else if kind==0x8002{
+                    if !shared.decode||bytes.len()<32{return Err(failure());}
+                    let pts=i64::from_le_bytes(bytes[..8].try_into().map_err(|_|failure())?);
+                    let width=u32::from_le_bytes(bytes[8..12].try_into().map_err(|_|failure())?);
+                    let height=u32::from_le_bytes(bytes[12..16].try_into().map_err(|_|failure())?);
+                    let stride=u32::from_le_bytes(bytes[16..20].try_into().map_err(|_|failure())?);
+                    let tick=u64::from_le_bytes(bytes[20..28].try_into().map_err(|_|failure())?);
+                    let length=u32::from_le_bytes(bytes[28..32].try_into().map_err(|_|failure())?)as usize;
+                    let(expected,receipt)=compressed.pop_front().ok_or_else(failure)?;
+                    if decoded_profile!=Some((width,height))||stride!=width||pts!=expected||tick!=receipt.tick||!receipt.live()||
+                        length!=(width as usize)*(height as usize)*3/2||bytes.len()!=32+length{return Err(failure());}
+                    let frame=DecodedVideoFrame{width,height,stride,timestamp_100ns:pts,nv12:bytes[32..].to_vec(),receipt};
+                    let mut frames=shared.frames.lock().map_err(|_|failure())?;
+                    if !shared.authority_live()||!frame.within_receive_age()||frames.len()>=2{return Err(failure());}
+                    frames.push_back(frame);
                 }else if kind==0x8001{
                     let owned=shared.window.is_some();let prefix=if owned{29}else{17};
                     if bytes.len()<prefix||bytes[8]>1{return Err(failure());}
@@ -300,12 +363,20 @@ fn io_loop(mut input:File,mut output:File,shared:Arc<Shared>,receiver:mpsc::Rece
             if call.kind!=STOP&&shared.revoking.load(Ordering::Acquire){return Err(failure());}
             if (!configured&&call.kind!=CONFIGURE&&call.kind!=STOP)||(configured&&call.kind==CONFIGURE){return Err(failure());}
             if shared.window.is_some()&&call.kind==FRAME||shared.window.is_none()&&call.kind==KEYFRAME{return Err(failure());}
+            if shared.decode&&call.kind==FRAME{
+                let receipt=call.receipt.ok_or_else(failure)?;
+                if call.payload.len()<=16||!receipt.live()||call.payload[8..16]!=receipt.tick.to_le_bytes(){return Err(failure());}
+            }else if call.receipt.is_some(){return Err(failure());}
             let submitted=Instant::now();
             let(kind,reply)=exchange(&mut input,&mut output,&shared,&mut id,call.kind,&call.payload,call.timeout)?;
             if kind!=0x8000{return Err(failure());}
             if call.kind==CONFIGURE{
                 let size=if shared.window.is_some(){69}else{61};let end=4+size;
                 if call.payload.len()!=size||reply.len()!=end+1||reply[..4]!=[0;4]||reply[4..end]!=call.payload[..]||reply[end]>1||call.payload[60]!=0&&reply[end]!=1{return Err(failure());}
+                if shared.decode{
+                    if reply[end]!=0{return Err(failure());}
+                    decoded_profile=Some((u32::from_le_bytes(call.payload[40..44].try_into().map_err(|_|failure())?),u32::from_le_bytes(call.payload[44..48].try_into().map_err(|_|failure())?)));
+                }
                 configured=true;
             }
             if call.kind==KEYFRAME{
@@ -315,9 +386,14 @@ fn io_loop(mut input:File,mut output:File,shared:Arc<Shared>,receiver:mpsc::Rece
                 if keyframe_fences.back()!=Some(&fence){if keyframe_fences.len()>=8{return Err(failure());}keyframe_fences.push_back(fence);}
             }
             if call.kind==FRAME&&reply.as_slice()==[0,0,0,0]{
-                if accepted.len()>=6||call.payload.len()<9{return Err(failure());}
                 let pts=i64::from_le_bytes(call.payload[..8].try_into().map_err(|_|failure())?);
-                accepted.push_back((pts,call.payload[8]!=0||first_input,submitted));first_input=false;
+                if shared.decode{
+                    if compressed.len()>=4{return Err(failure());}
+                    compressed.push_back((pts,call.receipt.ok_or_else(failure)?));
+                }else{
+                    if accepted.len()>=6||call.payload.len()<9{return Err(failure());}
+                    accepted.push_back((pts,call.payload[8]!=0||first_input,submitted));first_input=false;
+                }
             }
             call.reply.try_send(Ok(reply)).map_err(|_|failure())?;
             if call.kind==STOP{break;}

@@ -27,7 +27,8 @@
     "Bounded post-authentication RTP reorder lane connected to H.264 assembly, preserving original receipt age across duplicate/gap/window handling; no product/network caller",
     "Six additional inert reorder/assembly fixture sources, none executed; SRTP/recovery/decoder/platform qualification still missing",
     "Fixed Microsoft H.264 decoder candidate with bounded compressed/NV12 ownership, preserved receive age, timestamp order and locked 2D/crop checks; no build/activation/product caller",
-    "Private C++ decoder-worker v3 source connects configure/compressed-frame/poll/Stop to Decoder, preserves original local receiver tick and raw NV12 deadline; current Rust/service has no v3 caller"
+    "Private C++ decoder-worker v3 source connects configure/compressed-frame/poll/Stop to Decoder, preserves original local receiver tick and raw NV12 deadline",
+    "Rust distinct viewer decoder-v3 parent/job/pipe source, original boot/Instant receipts, exact accepted-input/NV12 output matching and broker-private unpresented-frame wrapper; no secure receiver/service/product caller or execution evidence"
   ],
   "static_review": "Source review and git diff whitespace check only",
   "build_executed": false,

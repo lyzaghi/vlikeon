@@ -121,6 +121,13 @@ typed viewer supervision/admission, clock/codec/secure receiver and presentation
 remain unfinished. No compile, protocol/decoder/media operation or test ran;
 all original remaining requirements stay open.
 
+The next item-56 checkpoint adds Rust decoder-v3 parent supervision, native
+receive-clock receipts, exact input/output/tight-NV12 admission and a private
+unpresented-frame broker wrapper. Viewer decode omits a local game handle but
+still requires independent exact-owner native authority. Actual secure receiver/
+ingress/reorder/codec/native service/display wiring remains due. No build,
+helper/decoder/media/clock or test ran; original full scope remains open.
+
 This fork's current assignment: items 51 and 52 are accepted with evidence in
 `SAVE_ARCHIVE_INTERCHANGE.md` and `STORAGE_FAULT_QUALIFICATION.md`. On 2026-10-23,
 the owner deferred Linux build/runtime work for item 53, then deferred build/test

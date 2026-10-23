@@ -73,7 +73,11 @@ The next source checkpoint connects Decoder to the worker's private v3 pipe
 actor. `engines/encode-windows/DECODE_PROTOCOL.md` records exact framing, original
 local receipt, raw NV12 replies and Stop semantics. No protocol was run.
 
-Remaining: actual native decoder parent IPC/admission/authority watchdog,
+The next source checkpoint adds the distinct Rust v3 parent, original ingress
+receipt handling and broker-private unpresented output. See
+`WINDOWS_DECODER_SUPERVISION.md`; no current product/secure receiver invokes it.
+
+Remaining: actual native decoder installed/viewer admission and observer wiring,
 negotiated parameter-set/VUI admission and secure receiver connection, display
 surface/UI/audio synchronization, other platform decoders and the complete
 build/runtime/fault/colour/latency/energy/device qualification. Item 56 stays open.

@@ -17,7 +17,7 @@ impl WindowsVideoFrames{
     /// The caller already owns an admitted job-contained worker and maintains
     /// its independent native lease while configure blocks. No lease is renewed.
     pub fn attach(mut worker:VideoWorker,profile:Profile,source_format:PixelFormat,require_hardware:bool)->Result<Self>{
-        if worker.owned_capture(){return Err(unavailable());}
+        if worker.owned_capture()||worker.decoder_mode(){return Err(unavailable());}
         profile.validate()?;
         let owner=worker.owner();let binding=Binding{capture:owner.capture,session:owner.session,generation:owner.generation};
         let mailbox=Arc::new(FrameMailbox::new(binding,profile,source_format,worker.remaining_authorized()?)?);
@@ -87,3 +87,32 @@ impl WindowsOwnedVideo{
     }
 }
 impl Drop for WindowsOwnedVideo{fn drop(&mut self){let _=self.worker.close();}}
+
+pub struct UnpresentedVideoFrame{pub owner:VideoOwner,pub frame:omniplay_stream_input::video_client::DecodedVideoFrame}
+/// Private viewer adapter, not receiver/codec/display permission. Separate
+/// installed admission and native receive/document/pair observation are due.
+pub struct WindowsVideoDecoder{worker:VideoWorker,closed:bool}
+impl WindowsVideoDecoder{
+    pub fn attach(mut worker:VideoWorker,profile:Profile)->Result<Self>{
+        profile.validate()?;if !worker.decoder_mode(){return Err(unavailable());}
+        worker.configure(VideoProfile{width:profile.width,height:profile.height,fps:profile.fps,bitrate:profile.bitrate_bps,require_hardware:false})?;
+        worker.remaining_authorized()?;Ok(Self{worker,closed:false})
+    }
+    pub fn submit_admitted(&mut self,annex_b:Vec<u8>,timestamp_100ns:i64,receipt:omniplay_stream_input::video_client::DecoderReceipt)->Result<bool>{
+        if self.closed{return Err(unavailable());}
+        match self.worker.submit_compressed(annex_b,timestamp_100ns,receipt){
+            Ok(accepted)=>Ok(accepted),Err(error)=>{self.closed=true;let _=self.worker.close();Err(error)},
+        }
+    }
+    pub fn take_unpresented(&mut self)->Result<Option<UnpresentedVideoFrame>>{
+        if self.closed{return Err(unavailable());}
+        match self.worker.take_decoded(){
+            Ok(frame)=>Ok(frame.map(|frame|UnpresentedVideoFrame{owner:self.worker.owner(),frame})),
+            Err(error)=>{self.closed=true;let _=self.worker.close();Err(error)},
+        }
+    }
+    pub fn revoke(&mut self)->Result<()>{
+        if self.closed{return Err(unavailable());}self.closed=true;self.worker.stop_confirmed()
+    }
+}
+impl Drop for WindowsVideoDecoder{fn drop(&mut self){let _=self.worker.close();}}

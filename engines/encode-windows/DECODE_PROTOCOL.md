@@ -84,10 +84,11 @@ Partial old output cannot be followed by a misleading Stop receipt on a corrupt
 stream. The actor polls MF every 8 ms outside OS calls and requires private
 parent activity within 500 ms after setup. Transport liveness is not permission.
 
-The decoder/pipe/OS can block, so the future typed decoder launcher must retain
+The decoder/pipe/OS can block, so the typed decoder launcher must retain
 an admitted immutable artifact, restricted handle list, creation-time job,
 resource bounds, original helper witness and independent authority/call watchdog.
-Current video parent is host/game-witness based and cannot simply be reused as
-viewer decoder authority. Actual typed v3 client, receiver clock/codec/native
+The Rust parent now has a distinct decoder-v3 mode with no local game witness
+and a mandatory native viewer authority lease. `WINDOWS_DECODER_SUPERVISION.md`
+documents the client/receipt/output source. Actual receiver clock/codec/native
 admission, SRTP/transport, presentation/UI and all platform/fault/performance
 qualification remain unfinished. No build, protocol execution or test occurred.
