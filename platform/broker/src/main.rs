@@ -12,6 +12,7 @@ mod stream_input;
 mod stream_gamepad;
 mod stream_gamepad_recovery;
 #[cfg(windows)]mod stream_video;
+#[cfg(windows)]mod stream_video_authority;
 
 use omniplay_contracts::{ErrorCode, PlatformError, Request, Response};
 use omniplay_core::Database;

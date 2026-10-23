@@ -176,3 +176,11 @@ raw-v1 mailbox injection stays separate. `WINDOWS_VIDEO_SUPERVISION.md` records
 these contracts. Actual installed admission, native authority observation lane,
 service/UI invocation and receiver/transport remain unconnected. Build/test is
 still deferred; no process or media operation was executed.
+
+The next source checkpoint adds typed exact-owner native authority observations
+and one independent observer lane. It rejects lost/stale/foreign evidence and
+retains the lane permit through actual source destruction. Four additional
+source-only admission tests are authored, unexecuted. No current native
+document/capture/pair-revocation source implements the observer interface and no
+service caller starts it; real authority integration remains unfinished. This
+does not waive installed admission, receiver/transport/UI or platform evidence.

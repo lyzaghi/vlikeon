@@ -67,6 +67,13 @@ No actual installed/native observation/service/UI/receiver path invokes it yet.
 No build/test, native dialog, helper launch or capture/media operation ran;
 all original remaining requirements remain open.
 
+Item 56 now has typed exact-owner native authority observations and a singleton
+independent observation-lane source. Foreign/stale/lost evidence closes the lease;
+blocked source/cleanup retains the lane permit and cannot revive expired authority.
+Four source admission tests are authored, not executed. Current service still
+lacks the actual native document/capture/pair-revocation observer implementation
+and caller; installed/product/receiver/UI and all original scope remain open.
+
 This fork's current assignment: items 51 and 52 are accepted with evidence in
 `SAVE_ARCHIVE_INTERCHANGE.md` and `STORAGE_FAULT_QUALIFICATION.md`. On 2026-10-23,
 the owner deferred Linux build/runtime work for item 53, then deferred build/test

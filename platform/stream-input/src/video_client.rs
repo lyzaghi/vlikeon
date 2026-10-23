@@ -57,17 +57,56 @@ impl Shared{
 /// Only a trusted native observer refreshes this handle. A received media packet
 /// or an automatic Poll never establishes document/pair/capture authority.
 pub struct VideoAuthorityLease{shared:Arc<Shared>}
+/// Native-host observation, never deserialize this from a renderer/peer. Each
+/// source must recheck its own current state; caching a true bit is not evidence.
+pub struct VideoAuthorityObservation{
+    pub owner:VideoOwner,pub checked_at:Instant,
+    pub document_alive:bool,pub capture_authorized:bool,pub pair_authorized:bool,
+}
+impl VideoAuthorityObservation{
+    fn permits(&self,expected:VideoOwner,now:Instant)->bool{
+        self.owner==expected&&self.document_alive&&self.capture_authorized&&self.pair_authorized&&
+            now.checked_duration_since(self.checked_at).is_some_and(|age|age<=Duration::from_millis(100))
+    }
+}
 impl VideoAuthorityLease{
-    pub fn observe(&self,sequence:u64,checked_at:Instant)->Result<()>{
+    pub fn owner(&self)->VideoOwner{self.shared.owner}
+    pub fn observe(&self,sequence:u64,observation:VideoAuthorityObservation)->Result<()>{
         let now=Instant::now();
-        if !self.shared.authority_live()||checked_at>now||now.duration_since(checked_at)>Duration::from_millis(100){return Err(failure());}
+        if !observation.permits(self.shared.owner,now)||!self.shared.authority_live(){self.shared.close();return Err(failure());}
         let mut lease=self.shared.lease.lock().map_err(|_|failure())?;
-        if now>=lease.deadline||sequence<=lease.sequence||sequence>10_000_000{return Err(failure());}
-        lease.sequence=sequence;lease.deadline=checked_at+Duration::from_millis(200);Ok(())
+        if now>=lease.deadline||sequence<=lease.sequence||sequence>10_000_000{drop(lease);self.shared.close();return Err(failure());}
+        lease.sequence=sequence;lease.deadline=observation.checked_at+Duration::from_millis(200);Ok(())
     }
     pub fn close(&self){self.shared.close();}
 }
 impl Drop for VideoAuthorityLease{fn drop(&mut self){self.close();}}
+
+#[cfg(test)]
+mod authority_tests{
+    use super::*;
+    fn owner()->VideoOwner{VideoOwner{capture:Uuid::from_u128(1),game:Uuid::from_u128(2),pair:Uuid::from_u128(3),session:Uuid::from_u128(4),generation:1}}
+    fn observation(now:Instant)->VideoAuthorityObservation{VideoAuthorityObservation{owner:owner(),checked_at:now,document_alive:true,capture_authorized:true,pair_authorized:true}}
+    #[test]fn current_exact_owner_is_admitted(){let now=Instant::now();assert!(observation(now).permits(owner(),now));}
+    #[test]fn every_owner_component_is_bound(){
+        let now=Instant::now();
+        for index in 0..5{
+            let mut value=observation(now);
+            match index{0=>value.owner.capture=Uuid::from_u128(9),1=>value.owner.game=Uuid::from_u128(9),2=>value.owner.pair=Uuid::from_u128(9),3=>value.owner.session=Uuid::from_u128(9),_=>value.owner.generation+=1}
+            assert!(!value.permits(owner(),now));
+        }
+    }
+    #[test]fn each_native_authority_loss_is_denied(){
+        let now=Instant::now();for index in 0..3{let mut value=observation(now);
+            match index{0=>value.document_alive=false,1=>value.capture_authorized=false,_=>value.pair_authorized=false}
+            assert!(!value.permits(owner(),now));
+        }
+    }
+    #[test]fn stale_and_future_observations_are_denied(){
+        let now=Instant::now();assert!(!observation(now).permits(owner(),now+Duration::from_millis(101)));
+        assert!(!observation(now+Duration::from_millis(1)).permits(owner(),now));
+    }
+}
 struct Call{kind:u16,payload:Vec<u8>,reply:SyncSender<Result<Vec<u8>>>,timeout:Duration}
 pub struct VideoWorker{shared:Arc<Shared>,sender:Option<SyncSender<Call>>,threads:Vec<JoinHandle<()>>,profile:Option<VideoProfile>,sha256:ContentHash}
 fn thread_handle(thread:&JoinHandle<()>)->Result<OwnedHandle>{

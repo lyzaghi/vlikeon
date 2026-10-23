@@ -108,3 +108,30 @@ wrapper has a current installed-admission/service command or product caller.
 Final codec/VUI/receiver negotiation, publication fences, native observation and
 consent/Stop UI remain due. No launch, compiler, driver, capture, media, timing or
 test execution occurred for this source checkpoint.
+
+## Independent native observation lane source
+
+The video lease now requires a typed `VideoAuthorityObservation` for the exact
+capture/game/pair/session/generation, native document/capture/pair authorization
+bits, and the original observation timestamp. Foreign owner, lost authority,
+future/stale (>100 ms) observation or invalid sequence permanently closes the
+transport; none can revive a lost lease. Four source-only admission tests were
+authored, not run. They do not qualify native observation correctness.
+
+`stream_video_authority.rs` adds one bounded process-local observer thread,
+separate from the blocking configure/media caller. `NativeVideoAuthority` has no
+default implementation that asserts success. Its installed native implementation
+must recheck document/capture registration and pairing revocation/lifetime; a
+signed certificate or cached renderer bit is insufficient. Current service has
+no such native source implementation or lane caller yet. This source is therefore
+not evidence that real pairing revocation/document closure reaches the worker.
+
+The lane observes every 25 ms after a completed check and preserves that source's
+timestamp. If a source blocks or stops refreshing, the independent worker lease
+expires after its existing 200 ms; the lane cannot renew it after expiration.
+Cancellation is cooperative and never joins a running thread. The source, lease
+and singleton permit remain held through actual observer destruction, including
+stalled cleanup. A Drop fence closes the lease before source destruction on
+normal exit or panic. A hung source prevents a replacement lane instead of
+accumulating detached observer threads. `finished` checks the actual thread handle,
+not a claimed state flag. No native source, lane, process or test was executed.

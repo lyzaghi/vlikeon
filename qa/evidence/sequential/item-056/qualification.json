@@ -14,7 +14,9 @@
     "Eight authored Rust colour/buffer/identity regression cases, none executed",
     "Unintegrated Windows WGC/D3D11 owned-window capture source, retained original process/item, local consent, bounded callback frames and SDR aspect-fit opaque BGRA readback; not built or run",
     "Owned-v2 C++ worker source connects WGC, explicit SDR conversion and MF with inherited game handle, host-alive fences, capture sequence/age, reliable keyframe fence and combined Stop receipts",
-    "Rust typed least-privilege original-game-handle owned-v2 launch/client, native sequence/age plus full RTT admission, keyframe-fence validation and private owned-video broker wrapper; no current product caller or execution evidence"
+    "Rust typed least-privilege original-game-handle owned-v2 launch/client, native sequence/age plus full RTT admission, keyframe-fence validation and private owned-video broker wrapper; no current product caller or execution evidence",
+    "Typed exact-owner/document/capture/pair native observations and singleton independent observation-lane source; actual native observer implementation and service caller remain missing",
+    "Four additional native-authority admission test sources (separate from eight colour cases), none executed"
   ],
   "static_review": "Source review and git diff whitespace check only",
   "build_executed": false,
