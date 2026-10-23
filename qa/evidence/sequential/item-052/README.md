@@ -1,4 +1,4 @@
-# Item 52 — fault checks passed, fixture cleanup pending
+# Item 52 — accepted fault qualification
 
 `qualification.json` records 28 passing native cases from `052a`, 16
 passing Web cases from `052e` and four physical NTFS full-disk cases from
@@ -22,9 +22,16 @@ before fixture writes because a disk-image pipeline bound null `Number`;
 
 The owner authorized UAC and process-only `RemoteSigned` for preparation.
 The VHDX was created, attached and used. Account/machine policy was not changed.
-The filler and reserve are gone. A UAC request to detach this exact image is
-still waiting for Windows confirmation; fixture cleanup and item closure are
-pending. `volume/volume-prepared.json` records preparation, not detach.
+The filler and reserve are gone. The exact image was detached after Windows
+confirmation. `volume/volume.json` records the final receipt;
+`volume/volume-052-detached-observation.json` records `Attached=false` and the
+absent owned diskpart process. `volume/volume-prepared.json` is the earlier
+preparation-only receipt. The image and synthetic profile remain retained.
+
+`qualification.json` accepts item 52 with 48 passing cases and no pending
+fixture work. It verifies 184 native inputs, 264 Web inputs and both physical
+fixture sources against their executed manifests. This does not claim
+power-loss durability or close other OS/device and product-release tasks.
 
 Frozen manifests identify actual execution inputs. `runtime_inputs` in the
 qualification records the current relevant native and Web inputs compared

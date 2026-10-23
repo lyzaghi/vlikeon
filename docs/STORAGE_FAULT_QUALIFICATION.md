@@ -1,8 +1,9 @@
 # Item 52 — storage fault and migration qualification
 
-Status: 48 fault checks passed: native `052a` (28), Web `052e` (16) and physical
-NTFS full disk `052g` (four). Closure awaits Windows UAC confirmation and
-verified detach of the owned QA VHDX. Item 52 remains unchecked until cleanup.
+Status: complete for item 52. All 48 fault checks passed: native `052a` (28),
+Web `052e` (16) and physical NTFS full disk `052g` (four). The owned QA VHDX
+was verified detached; its image and synthetic data remain retained. Evidence
+and source-identity checks are in `qa/evidence/sequential/item-052/qualification.json`.
 
 The required matrix covers actual filesystem exhaustion, SQLite capacity
 failure, interruption before and after save publication, aborted transactions,
@@ -90,11 +91,11 @@ without changing account or machine policy. The preparation receipt and
 diagnostics are retained in the evidence directory.
 
 After `052g`, the filler/reserve files were removed. Detach of the exact owned
-image was requested through a separate `diskpart` UAC operation, with no
-execution-policy change. At this checkpoint Windows `consent.exe` is still
-awaiting confirmation; no detach is claimed. The retained image and synthetic
-profile remain at the explicitly named QA path. No second prepare or detach
-operation should be started while that request is unresolved.
+image completed through a separate `diskpart` UAC operation, with no
+execution-policy change. `Get-DiskImage` subsequently reported `Attached=false`
+and the owned `diskpart` process was absent. The final receipt and detached
+observation are retained with the evidence. The image and synthetic profile
+remain at the explicitly named QA path; neither was deleted.
 
 Preparation command (UAC and a permitted script execution policy required):
 

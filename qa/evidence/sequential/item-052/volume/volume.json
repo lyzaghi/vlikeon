@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "image": "E:\\V10\\work\\vlikeon-items-50-109-01a16780\\full-disk-052\\vlikeon-storage-052.vhdx",
+  "mount": "E:\\V10\\work\\vlikeon-items-50-109-01a16780\\full-disk-052\\volume",
+  "maximum_bytes": 268435456,
+  "disk_number": 2,
+  "partition_number": 2,
+  "volume_unique_id": "\\\\?\\Volume{d442c5b7-0938-4322-b103-12d3b77e27d3}\\",
+  "prepared_at": "2026-10-23T10:45:32.8705185Z",
+  "detached_at": "2026-10-23T12:17:34.7838172Z"
+}
