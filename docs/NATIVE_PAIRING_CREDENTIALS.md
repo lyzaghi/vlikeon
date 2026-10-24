@@ -1840,6 +1840,17 @@ this checkpoint.
 
 ## Remaining implementation and qualification
 
+Android NativeCore now exposes an immutable native PeerApproval snapshot created
+only by the validated explicit poll helper. It retains exact ticket/grant hash,
+pair ID/input permission, cancellation delivery fence and a monotonic review
+deadline capped at 60 seconds and observed grant lifetime. Confirmation checks
+the live owner/fence/deadline, atomically consumes the snapshot once, and builds
+action 3 from its private retained ticket/hash; failures require rereview or
+journal reconciliation instead of replaying the same consent object.
+This helper does not prove user consent or display host/comparison information.
+Actual native dialog wiring must collect those confirmations; iOS equivalent,
+activation and runtime qualification remain unfinished. No build/test ran.
+
 Approved client poll now returns the SHA-256 document_hash of its retained signed
 grant. Trusted native action 3 requires ticket and reviewed_grant_hash (strict
 JSON <=256 bytes); other ticket actions remain <=128 bytes. Before taking the

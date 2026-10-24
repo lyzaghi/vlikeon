@@ -2,6 +2,12 @@
 
 ## Current sequence — 1–109 outstanding tasks
 
+Item 58 Android now has an immutable approved-poll review object and single-use
+native confirmation helper. It retains exact ticket/grant hash, displayed pair/
+input permission, delivery fence and at-most-60-second monotonic review lifetime.
+Only a current approved poll creates it. Source-only; actual dialog wiring,
+iOS equivalent, activation and build/test remain due.
+
 Item 58 now binds consented client persistence to an exact reviewed grant hash.
 Approved poll returns grant_hash; action 3 requires ticket plus reviewed_grant_hash
 and checks it against the retained signed grant before consuming the exchange.

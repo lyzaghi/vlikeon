@@ -191,6 +191,48 @@ public final class NativeCore {
     private static native boolean nativePairingInvalidateEpoch(long handle);
     private static native byte[] nativePairingIdentity(int operation,long handle,long revision,byte[] input);
     interface IdentityReply { void accept(IdentityReview review,String error); }
+    interface PeerApprovalReply { void accept(PeerApproval review,String error); }
+    /** Immutable approved-poll snapshot owned by trusted native UI only. */
+    static final class PeerApproval {
+        final String pairId,grantHash;final boolean inputAllowed;final long expires;
+        private final String ticket;private final Object deliveryFence;
+        private final java.util.concurrent.atomic.AtomicBoolean consumed=new java.util.concurrent.atomic.AtomicBoolean();
+        private PeerApproval(JSONObject value,Object fence) throws Exception {
+            JSONObject status=value.getJSONObject("status");
+            if(!"approved".equals(status.getString("state")))throw new IllegalStateException();
+            ticket=value.getString("ticket");pairId=status.getString("pair_id");grantHash=value.getString("grant_hash");
+            inputAllowed=status.getBoolean("input_allowed");deliveryFence=fence;
+            long remaining=status.getLong("expires_at_ms")-System.currentTimeMillis();
+            if(remaining<=0)throw new IllegalStateException();
+            expires=android.os.SystemClock.elapsedRealtime()+Math.min(60_000,remaining);
+        }
+    }
+    /** Poll explicitly; pending/declined is not an approvable snapshot. */
+    void reviewPairingPeer(String ticket,java.util.function.BooleanSupplier alive,PeerApprovalReply reply){
+        final Object fence=mPairingClientDeliveryFence.get();
+        try{
+            byte[] request=new JSONObject().put("ticket",ticket).toString().getBytes(StandardCharsets.UTF_8);
+            pairingClient(request,2,alive,response->{
+                PeerApproval review;
+                try{
+                    if(!alive.getAsBoolean()||mPairingClientDeliveryFence.get()!=fence)throw new IllegalStateException();
+                    review=new PeerApproval(pairingResult(response),fence);
+                }catch(Exception error){reply.accept(null,"No current host approval is available. Read pairing status before continuing.");return;}
+                reply.accept(review,null);
+            });
+        }catch(Exception error){reply.accept(null,"Pairing ticket is unavailable.");}
+    }
+    /** Call only after actual native peer/comparison/input consent to this snapshot. */
+    void confirmPairingPeer(PeerApproval review,java.util.function.BooleanSupplier alive,Reply reply){
+        if(review==null||!alive.getAsBoolean()||mPairingClientDeliveryFence.get()!=review.deliveryFence
+                ||android.os.SystemClock.elapsedRealtime()>=review.expires||!review.consumed.compareAndSet(false,true)){
+            reply.accept(failure("","cancelled","Peer review ended. Review the current host approval again."));return;
+        }
+        try{
+            byte[] request=new JSONObject().put("ticket",review.ticket).put("reviewed_grant_hash",review.grantHash).toString().getBytes(StandardCharsets.UTF_8);
+            pairingClient(request,3,()->alive.getAsBoolean()&&mPairingClientDeliveryFence.get()==review.deliveryFence&&android.os.SystemClock.elapsedRealtime()<review.expires,reply);
+        }catch(Exception error){reply.accept(failure("","runtime_unavailable","Peer confirmation could not be queued. Inspect native status."));}
+    }
     static final class IdentityReview {
         final String id,key,device,generation; final long expires;
         private IdentityReview(JSONObject value,String profile) throws Exception {
