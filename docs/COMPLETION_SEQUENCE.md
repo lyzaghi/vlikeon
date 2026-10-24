@@ -2,6 +2,11 @@
 
 ## Current sequence — 1–109 outstanding tasks
 
+Item 58 Android private JNI/caller now routes interrupted-candidate review with
+1024-byte bounds and exact address/revision, live expiry, grant/host text and
+explicit unavailable-comparison checks. Source-only; typed resume snapshot/UI,
+iOS caller and build/test remain due.
+
 Item 58 interrupted-candidate review now connects LocalHost and a dedicated
 mobile C ABI with foreground epoch/cancel/deadline and installed-origin checks.
 No activation or consent is inferred. Source-only; mobile caller/UI resume wiring

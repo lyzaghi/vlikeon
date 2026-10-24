@@ -1840,6 +1840,14 @@ this checkpoint.
 
 ## Remaining implementation and qualification
 
+Android native-only pairing action 6 now routes the separate candidate-review
+ABI. Its bounded serialized lane validates request scope/address/revision and
+response exact address/revision/pair, MaterialReady phase, host/hash formats,
+boolean permission, future integral expiry and comparison_available:false with
+local_consent_required:true. Existing deadline/owner/cancel fences and byte
+clearing apply. This does not create an activation snapshot or imply consent.
+Typed resume UI and iOS routing remain due; no build/test/native operation ran.
+
 Dedicated om_mobile_pairing_review_client_v1 now accepts exact native-status
 address/revision with a bounded original budget. Actual foreground provider epoch
 and cancellation are derived natively; address access is checked before/after.

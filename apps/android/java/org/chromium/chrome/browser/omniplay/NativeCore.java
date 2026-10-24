@@ -110,8 +110,8 @@ public final class NativeCore {
      * Never expose through renderer request/nativeCall or forward raw replies.
      */
     void pairingClient(byte[] ownedInput,int action,java.util.function.BooleanSupplier alive,Reply reply){
-        int maximum=action==0?16_384:(action==5?1024:(action==3?256:128));
-        if(ownedInput==null||ownedInput.length==0||ownedInput.length>maximum||action<0||action>5){
+        int maximum=action==0?16_384:(action>=5?1024:(action==3?256:128));
+        if(ownedInput==null||ownedInput.length==0||ownedInput.length>maximum||action<0||action>6){
             if(ownedInput!=null)java.util.Arrays.fill(ownedInput,(byte)0);reply.accept(failure("","invalid_request","Native pairing request is invalid."));return;
         }
         final Object deliveryFence=action==4?new Object():mPairingClientDeliveryFence.get();
@@ -134,12 +134,12 @@ public final class NativeCore {
             try{
                 String expectedTicket=null,reviewedHash=null;
                 JSONObject activation=null;
-                if(action==5){
+                if(action>=5){
                     activation=new JSONObject(new String(ownedInput,StandardCharsets.UTF_8));
                     JSONObject address=activation.getJSONObject("address");Object revision=activation.get("expected_revision");
-                    if(activation.length()!=3||address.length()!=5||!mProfile.equals(address.getString("profile"))||!"pair_encryption".equals(address.getString("kind"))
+                    if(activation.length()!=(action==5?3:2)||address.length()!=5||!mProfile.equals(address.getString("profile"))||!"pair_encryption".equals(address.getString("kind"))
                             ||!canonicalPairingId(address.getString("device"))||!canonicalPairingId(address.getString("id"))||!canonicalPairingId(address.getString("generation"))
-                            ||!activation.getString("reviewed_grant_hash").matches("[0-9a-f]{64}")||!(revision instanceof Number)
+                            ||(action==5&&!activation.getString("reviewed_grant_hash").matches("[0-9a-f]{64}"))||!(revision instanceof Number)
                             ||((Number)revision).doubleValue()!=((Number)revision).longValue()||((Number)revision).longValue()<1||((Number)revision).longValue()>=10_000_000)throw new IllegalStateException();
                 }else if(action!=0){
                     JSONObject request=new JSONObject(new String(ownedInput,StandardCharsets.UTF_8));
@@ -152,7 +152,18 @@ public final class NativeCore {
                 response=pairingResponse(nativePairingClientV1(mHandle,ownedInput,action,(int)Math.min(25_000,remaining)));
                 if("ok".equals(response.optString("status"))){
                     JSONObject value=response.getJSONObject("result");
-                    if(action==5){
+                    if(action==6){
+                        JSONObject address=value.getJSONObject("address"),expected=activation.getJSONObject("address");Object revision=value.get("revision"),expiry=value.get("expires_at_ms");
+                        if(value.getInt("credential_protocol")!=1||!"material_ready".equals(value.getString("phase"))||address.length()!=5
+                                ||!Boolean.TRUE.equals(value.get("local_consent_required"))||!Boolean.FALSE.equals(value.get("comparison_available"))
+                                ||!expected.getString("id").equals(value.getString("pair_id"))||!(value.get("input_allowed") instanceof Boolean)
+                                ||!value.getString("grant_hash").matches("[0-9a-f]{64}")||!value.getString("host_public_key").matches("[A-Za-z0-9_-]{42}[AEIMQUYcgkosw048]")
+                                ||!value.getString("host_fingerprint").matches("[0-9a-f]{64}")||!(revision instanceof Number)
+                                ||((Number)revision).doubleValue()!=activation.getLong("expected_revision")||!(expiry instanceof Number)
+                                ||((Number)expiry).doubleValue()!=((Number)expiry).longValue()||((Number)expiry).longValue()<=System.currentTimeMillis()
+                                ||((Number)expiry).longValue()>9_007_199_254_740_991L)throw new IllegalStateException();
+                        for(String field:new String[]{"profile","device","kind","id","generation"})if(!expected.getString(field).equals(address.getString(field)))throw new IllegalStateException();
+                    }else if(action==5){
                         JSONObject address=value.getJSONObject("address"),expected=activation.getJSONObject("address");Object revision=value.get("revision");
                         if(value.getInt("credential_protocol")!=1||!"active".equals(value.getString("phase"))||!Boolean.TRUE.equals(value.get("reload_required"))
                                 ||!activation.getString("reviewed_grant_hash").equals(value.getString("grant_hash"))||address.length()!=5
