@@ -12,6 +12,30 @@ use uuid::Uuid;
 /// Ownership lasts through the final vault/journal operation, including errors.
 pub struct CredentialLease{profile:Uuid,device:Uuid,root:PathBuf,_file:File,_directories:Vec<File>}
 impl CredentialLease{
+    /// Stable cooperative namespace identity, never a key or host attestation.
+    /// A copied/moved profile must not silently adopt another root's lock.
+    pub(crate) fn namespace_binding(&self,database:&Database,profile:Uuid)->Result<String>{
+        use sha2::{Digest,Sha256};
+        self.check(database,profile)?;
+        let mut hash=Sha256::new();hash.update(b"vlikeon.remote-play.credential-namespace.v1\0");
+        hash.update(self.profile.as_bytes());hash.update(self.device.as_bytes());
+        let path=self.root.as_os_str().as_encoded_bytes();hash.update((path.len() as u64).to_le_bytes());hash.update(path);
+        #[cfg(unix)]{
+            let root=self._directories.first().ok_or_else(invalid)?.metadata().map_err(storage_error)?;
+            let file=self._file.metadata().map_err(storage_error)?;
+            for value in [root.dev(),root.ino(),root.uid() as u64,file.dev(),file.ino(),file.uid() as u64]{hash.update(value.to_le_bytes());}
+        }
+        #[cfg(windows)]{
+            // Held deny-delete ancestor/file handles exclude replacement while
+            // a cooperating writer owns this path. Recreated lock/root identity
+            // is recovery debt, not permission to rewrite the journal binding.
+            let root=self._directories.last().ok_or_else(invalid)?.metadata().map_err(storage_error)?;
+            let file=self._file.metadata().map_err(storage_error)?;
+            hash.update(root.creation_time().to_le_bytes());hash.update(file.creation_time().to_le_bytes());
+        }
+        #[cfg(not(any(windows,unix)))]{return Err(invalid());}
+        self.check(database,profile)?;Ok(format!("{:x}",hash.finalize()))
+    }
     pub fn acquire(database:&Database,profile:Uuid)->Result<Self>{
         #[cfg(not(any(windows,unix)))]{let _=(database,profile);Err(PlatformError::new(ErrorCode::UnsupportedCapability,"Native credential writer exclusion needs this platform's admitted lease provider"))}
         #[cfg(unix)]{

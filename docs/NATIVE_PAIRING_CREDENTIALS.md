@@ -1203,6 +1203,40 @@ particular, obtaining a lock in one profile root is not by itself proof against
 an uncoordinated copied profile in another root. Actual retirement owner/root
 provenance and platform qualification remain required before positive receipts.
 
+## Cooperative lease namespace provenance
+
+The journal now records a version-domain-separated SHA-256 binding to the admitted
+profile/device/root and retained lock namespace. Unix includes held directory and
+lock-file device/inode/owner identities; Windows includes the admitted path and
+held root/lock creation identities under its existing deny-delete handles. The
+binding is metadata, not a key, hardware identity or OS attestation.
+
+The first successful mutation of a truly empty revision-zero history binds that
+history. Every later journal mutation admits the existing binding before changing
+state and checks it again before commit. Operational scoped loads now cover the
+candidate writer, recovery/vault deletion/relay retirement, signal/ICE operations
+and session registration. A copied/moved/recreated namespace cannot silently
+adopt its current lock or relabel an existing history. Read-only authority
+observation still uses its native registered entry; this change does not add
+cross-host attestation or a new transport/session retirement proof.
+
+Legacy histories without a binding remain inspectable through native status but
+are refused by operational loads/mutations. They are not overwritten, reset,
+re-paired or automatically upgraded. Native status exposes missing provenance;
+Android/iOS attention and detail views surface it and withhold recovery actions.
+Presence alone is not a live namespace-match attestation in a read-only status
+response. The operational lease admission remains authoritative.
+
+Explicit migration/root provenance review remains unfinished. Path aliases,
+backup/in-place rollback, filesystem identity reuse, volume remapping, cross-host
+copies and malicious same-user/admin namespace changes require separate admission
+and qualification; this is a cooperative same-installation protocol. It does not
+turn acquiring an arbitrary copied root's lock into WriterRetired evidence.
+
+No hashing/metadata/lease/SQL/native/key operation, compiler, build or test was
+executed. Only source review and whitespace inspection were performed. Actual
+writer/session retirement owners and all original scope remain unfinished.
+
 ## Remaining implementation and qualification
 
 - Journal/executor/lease/writer product integration, authority epochs, actual native owner

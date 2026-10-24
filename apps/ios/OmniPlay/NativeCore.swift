@@ -28,7 +28,8 @@ struct NativeRecoveryRecord {
 struct NativeRecoverySnapshot {
     let revision:UInt64,device:String,records:[NativeRecoveryRecord],expires:DispatchTime
     let relayRetirementAvailable:Bool
-    var needsAttention:Bool{records.contains{$0.sessionRecoveryRequired || ($0.nextStep != nil && $0.nextStep != "revalidate_before_use")}}
+    let namespaceProvenanceMissing:Bool
+    var needsAttention:Bool{namespaceProvenanceMissing || records.contains{$0.sessionRecoveryRequired || ($0.nextStep != nil && $0.nextStep != "revalidate_before_use")}}
 }
 
 /// Only this native object can call path-bearing authorization APIs. Each profile's
@@ -186,7 +187,8 @@ final class NativeCore {
                       let revision=value["revision"] as? NSNumber,revision.doubleValue>=0,revision.doubleValue<=10_000_000,revision.doubleValue==Double(revision.uint64Value),
                       let records=value["records"] as? [[String:Any]],records.count<=128,
                       let actions=value["recovery"] as? [[String:Any]],actions.count<=128,
-                      let relayAvailable=value["relay_retirement_available"] as? Bool else{throw OmniFailure.message("Trạng thái phục hồi không hợp lệ.")}
+                      let relayAvailable=value["relay_retirement_available"] as? Bool,
+                      let namespaceMissing=value["namespace_provenance_missing"] as? Bool else{throw OmniFailure.message("Trạng thái phục hồi không hợp lệ.")}
                 let steps:Set<String>=["fence_generation","revalidate_before_use","retire_writer","retire_local_sessions","wait_for_pair_cleanup","revoke_relay","remove_material","finalize_retirement"]
                 var next:[String:([String:Any],String)]=[:]
                 for action in actions{
@@ -210,7 +212,7 @@ final class NativeCore {
                     parsed.append(NativeRecoveryRecord(address:address,phase:phase,publicKey:key,nextStep:action?.1,sessionRecoveryRequired:sessionRecoveryRequired))
                 }
                 guard next.isEmpty,owner.active,DispatchTime.now()<expires else{throw OmniFailure.message("Trạng thái phục hồi đã hết hạn.")}
-                let snapshot=NativeRecoverySnapshot(revision:revision.uint64Value,device:device,records:parsed,expires:expires,relayRetirementAvailable:relayAvailable)
+                let snapshot=NativeRecoverySnapshot(revision:revision.uint64Value,device:device,records:parsed,expires:expires,relayRetirementAvailable:relayAvailable,namespaceProvenanceMissing:namespaceMissing)
                 DispatchQueue.main.async{completion(.success(snapshot))}
             }catch{DispatchQueue.main.async{completion(.failure(error))}}
         }
@@ -220,7 +222,7 @@ final class NativeCore {
         queue.async{
             do{
                 let started=DispatchTime.now()
-                guard owner.active,started<snapshot.expires,self.handle != 0,self.pairingAttached,
+                guard owner.active,started<snapshot.expires,self.handle != 0,self.pairingAttached,!snapshot.namespaceProvenanceMissing,
                       ["fence_generation","finalize_retirement","remove_material","revoke_relay"].contains(record.nextStep ?? ""),
                       (record.nextStep != "revoke_relay" || snapshot.relayRetirementAvailable),
                       snapshot.records.contains(where:{$0.generation==record.generation&&$0.phase==record.phase&&$0.nextStep==record.nextStep&&NSDictionary(dictionary:$0.address).isEqual(to:record.address)}) else{throw OmniFailure.message("Hãy mở lại trạng thái trước khi phục hồi.")}

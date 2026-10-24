@@ -60,7 +60,7 @@ pub fn advance_metadata(database:&Database,lease:&CredentialLease,profile:Uuid,a
     if deadline.saturating_duration_since(started)>Duration::from_secs(30){return Err(conflict());}
     address.validate()?;
     if address.profile()!=profile||address.device()!=database.device_id{return Err(conflict());}
-    let snapshot=journal::load(database,profile)?;check_deadline(deadline)?;
+    let snapshot=journal::load_scoped(database,lease,profile)?;check_deadline(deadline)?;
     if snapshot.revision()!=expected||!snapshot.records().iter().any(|record|record.address()==address){return Err(conflict());}
     let actions=snapshot.recovery_plan(checked_now(now,started)?)?;
     let Some(action)=actions.iter().find(|action|action.address()==address)else{return Ok(StepOutcome::AlreadyRetired);};
@@ -88,7 +88,7 @@ pub fn remove_retired_material(database:&Database,lease:&CredentialLease,profile
     if deadline.saturating_duration_since(started)>Duration::from_secs(30){return Err(conflict());}
     address.validate()?;
     if address.profile()!=profile||address.device()!=database.device_id{return Err(conflict());}
-    let snapshot=journal::load(database,profile)?;check_deadline(deadline)?;
+    let snapshot=journal::load_scoped(database,lease,profile)?;check_deadline(deadline)?;
     if snapshot.revision()!=expected{return Err(conflict());}
     let plan=snapshot.recovery_plan(checked_now(now,started)?)?;
     if !plan.iter().any(|action|action.address()==address&&matches!(action.step(),RecoveryStep::RemoveMaterial)){return Err(conflict());}
@@ -108,7 +108,7 @@ pub fn retire_pair_remote(database:&Database,lease:&CredentialLease,profile:Uuid
     expected:u64,store:&dyn PairingSecretStore,relay:&NativePairRelay,now:u64,deadline:Instant,cancel:&AtomicBool)->Result<Journal>{
     let started=Instant::now();check_deadline(deadline)?;lease.check(database,profile)?;
     if deadline.saturating_duration_since(started)>Duration::from_secs(30)||address.kind()!=SecretKind::PairEncryption||cancel.load(Ordering::Acquire){return Err(conflict());}
-    let snapshot=journal::load(database,profile)?;check_deadline(deadline)?;
+    let snapshot=journal::load_scoped(database,lease,profile)?;check_deadline(deadline)?;
     if snapshot.revision()!=expected{return Err(conflict());}
     let record=snapshot.records().iter().find(|record|record.address()==address).ok_or_else(conflict)?;
     if record.phase()!=Phase::Revoking||!record.writer_retired()||!record.local_retired()||record.relay_retired(){return Err(conflict());}
@@ -146,7 +146,7 @@ pub fn advance(database:&Database,lease:&CredentialLease,profile:Uuid,address:Cr
     address.validate()?;
     if address.profile()!=profile||address.device()!=database.device_id{return Err(conflict());}
     owner.check_exclusive(profile,database.device_id)?;check_deadline(deadline)?;
-    let snapshot=journal::load(database,profile)?;check_deadline(deadline)?;
+    let snapshot=journal::load_scoped(database,lease,profile)?;check_deadline(deadline)?;
     if snapshot.revision()!=expected_revision{return Err(conflict());}
     let record=snapshot.records().iter().find(|record|record.address()==address).ok_or_else(conflict)?;
     let actions=snapshot.recovery_plan(checked_now(now,started)?)?;

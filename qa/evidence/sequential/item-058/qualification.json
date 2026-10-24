@@ -75,7 +75,10 @@
     "Android/iOS explicit dialog cancellation invalidates native epoch/token before queued review cleanup; cooperative cancellation and uncertain commits still require reconciliation",
     "Native public status preserves retained session-ownership debt as a boolean; typed mobile records and native details do not infer release from restart or age",
     "Game Hub startup inspection source reads status with its own cancellation lifetime and presents native attention/uninspected indicators without executing cleanup or querying vault/network",
-    "Static source review corrected Unix held/named namespace revalidation placement from associated acquire function to per-admission check method; no compiler or lock behavior was executed"
+    "Static source review corrected Unix held/named namespace revalidation placement from associated acquire function to per-admission check method; no compiler or lock behavior was executed",
+    "Fresh journal mutations bind cooperative profile/device/root/held-lock namespace metadata; every mutation admits the binding before change and again before commit",
+    "Scoped loads cover native writer, recovery, key removal, relay retirement, signal/ICE operations and session registration; copied or legacy history is not silently rebound",
+    "Legacy unbound histories remain native-inspectable and mobile UI surfaces missing provenance while withholding mutating recovery actions; explicit migration remains unfinished"
   ],
   "build_executed": false,
   "tests_executed": false,

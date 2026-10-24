@@ -131,7 +131,7 @@ pub fn prepare_send(database:&Database,profile:Uuid,address:CredentialAddress,se
     let clock=Clock::new(now,deadline)?;
     if body.is_empty()||body.len()>MAX_PACKET_BYTES-16{return Err(denied());}
     let lease=CredentialLease::acquire(database,profile)?;clock.authority(owner,address,session,epoch)?;
-    let snapshot=journal::load(database,profile)?;owned(active(&snapshot,address,expected,clock.current()?)?,session,epoch)?;
+    let snapshot=journal::load_scoped(database,&lease,profile)?;owned(active(&snapshot,address,expected,clock.current()?)?,session,epoch)?;
     // Reservation commits before key loading/encryption. Any later error burns
     // the sequence and leaves its committed revision for explicit reload.
     let(reserved,sequence)=journal::reserve_signal_sequence(database,&lease,profile,expected,address,clock.current()?)?;
@@ -154,7 +154,7 @@ pub fn accept_received(database:&Database,profile:Uuid,address:CredentialAddress
     let clock=Clock::new(now,deadline)?;
     if metadata.session_id!=session{return Err(denied());}
     let lease=CredentialLease::acquire(database,profile)?;clock.authority(owner,address,session,epoch)?;
-    let snapshot=journal::load(database,profile)?;let record=active(&snapshot,address,expected,clock.current()?)?;
+    let snapshot=journal::load_scoped(database,&lease,profile)?;let record=active(&snapshot,address,expected,clock.current()?)?;
     owned(record,session,epoch)?;
     if cursor<=record.receive_cursor()||metadata.sequence<=record.receive_sequence(){return Err(denied());}
     let cipher=cipher(store,record,&clock)?;
@@ -178,7 +178,7 @@ pub fn send_prepared(database:&Database,profile:Uuid,prepared:&OutgoingSignal,ex
     let clock=Clock::new(now,deadline)?;let address=prepared.address;
     let session=prepared.metadata.session_id;let epoch=prepared.epoch;
     let lease=CredentialLease::acquire(database,profile)?;clock.authority(owner,address,session,epoch)?;
-    let snapshot=journal::load(database,profile)?;let record=active(&snapshot,address,expected,clock.current()?)?;
+    let snapshot=journal::load_scoped(database,&lease,profile)?;let record=active(&snapshot,address,expected,clock.current()?)?;
     owned(record,session,epoch)?;
     let grant=record.grant().ok_or_else(denied)?;
     if prepared.revision>expected||prepared.metadata.sequence==0||prepared.metadata.sequence>record.send_sequence()||
@@ -205,7 +205,7 @@ pub fn poll_received(database:&Database,profile:Uuid,address:CredentialAddress,s
     store:&dyn PairingSecretStore,owner:&mut dyn NativeSignalAuthority,relay:&NativePairRelay,now:u64,deadline:Instant,cancel:&AtomicBool)->Result<PolledSignals>{
     let clock=Clock::new(now,deadline)?;
     let lease=CredentialLease::acquire(database,profile)?;clock.authority(owner,address,session,epoch)?;
-    let snapshot=journal::load(database,profile)?;let record=active(&snapshot,address,expected,clock.current()?)?;
+    let snapshot=journal::load_scoped(database,&lease,profile)?;let record=active(&snapshot,address,expected,clock.current()?)?;
     owned(record,session,epoch)?;
     let metadata=record.grant().ok_or_else(denied)?;
     let grant=verify_grant(metadata.document(),metadata.audience(),clock.current()?)?;
@@ -241,7 +241,7 @@ pub fn request_ice(database:&Database,profile:Uuid,address:CredentialAddress,ses
     if allowed_turn_urls.len()>32||require_relay&&allowed_turn_urls.is_empty(){return Err(denied());}
     for url in allowed_turn_urls{native_ice::validate_turn_uri(url)?;}
     let lease=CredentialLease::acquire(database,profile)?;clock.authority(owner,address,session,epoch)?;
-    let snapshot=journal::load(database,profile)?;let record=active(&snapshot,address,expected,clock.current()?)?;
+    let snapshot=journal::load_scoped(database,&lease,profile)?;let record=active(&snapshot,address,expected,clock.current()?)?;
     owned(record,session,epoch)?;
     let grant=record.grant().ok_or_else(denied)?;
     let identity_record=snapshot.records().iter().find(|identity|identity.address().kind()==SecretKind::DeviceSigning&&identity.phase()==Phase::Active&&identity.public_key()==record.public_key()).ok_or_else(denied)?;

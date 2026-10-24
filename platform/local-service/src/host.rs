@@ -60,7 +60,8 @@ impl LocalHost {
         Ok(json!({"credential_protocol":1,"profile_id":self.profile_id,"device_id":self.database.device_id,
             "revision":snapshot.revision(),"policy_available":omniplay_core::stream_signal_authority::require_installed_pairing_policy().is_ok(),"records":records,
             "recovery_protocol":1,"observed_at_ms":observed_at_ms,"recovery":recovery,
-            "relay_retirement_available":omniplay_core::stream_signal_authority::installed_retirement_origins().is_ok()}))
+            "relay_retirement_available":omniplay_core::stream_signal_authority::installed_retirement_origins().is_ok(),
+            "namespace_provenance_missing":snapshot.namespace_provenance_missing()}))
     }
     /// Explicit native recovery dispatch, not automatic startup cleanup. May
     /// permanently fence a candidate; caller must not use this as a status read.
@@ -125,7 +126,8 @@ impl LocalHost {
         omniplay_core::stream_signal_authority::require_installed_pairing_policy()?;
         if provider_epoch==0{return Err(PlatformError::new(ErrorCode::PermissionDenied,"Native pairing lifecycle is unavailable"));}
         let deadline=std::time::Instant::now()+std::time::Duration::from_secs(60);
-        let snapshot=omniplay_core::stream_credentials::load(&self.database,self.profile_id)?;
+        let lease=omniplay_core::stream_credential_lease::CredentialLease::acquire(&self.database,self.profile_id)?;
+        let snapshot=omniplay_core::stream_credentials::load_scoped(&self.database,&lease,self.profile_id)?;
         if snapshot.revision()!=expected{return Err(PlatformError::new(ErrorCode::Conflict,"Reload native pairing status before reviewing identity"));}
         let mut identities=snapshot.records().iter().filter(|record|
             record.address().kind()==omniplay_streaming::native_credentials::SecretKind::DeviceSigning&&

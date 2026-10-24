@@ -71,7 +71,7 @@ impl<'a> NativeSignalRegistry<'a>{
         self.entries.retain(|_,entry|entry.deadline>Instant::now()&&entry.permit.upgrade().is_some_and(|permit|permit.alive.load(Ordering::Acquire)));
         if self.entries.len()>=16||self.entries.contains_key(&session){return Err(denied());}
         let lease=CredentialLease::acquire(self.database,self.profile)?;
-        let snapshot=journal::load(self.database,self.profile)?;
+        let snapshot=journal::load_scoped(self.database,&lease,self.profile)?;
         if snapshot.revision()!=expected{return Err(denied());}
         let record=snapshot.records().iter().find(|record|record.address()==address).ok_or_else(denied)?;
         if record.phase()!=Phase::Active||!policy.relay_origins.iter().any(|origin|record.grant().is_some_and(|grant|grant.audience()==origin)){return Err(denied());}

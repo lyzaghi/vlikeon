@@ -65,10 +65,16 @@ impl Record{
     pub fn relay_retired(&self)->bool{self.relay_retired}
 }
 #[derive(Clone,Serialize,Deserialize)]#[serde(deny_unknown_fields)]
-pub struct Journal{schema_version:u32,profile:Uuid,device:Uuid,revision:u64,records:Vec<Record>}
+pub struct Journal{schema_version:u32,profile:Uuid,device:Uuid,revision:u64,records:Vec<Record>,lease_namespace:Option<String>}
 impl Journal{
     pub fn revision(&self)->u64{self.revision}
     pub fn records(&self)->&[Record]{&self.records}
+    /// Legacy journal inspection only; absence is never silently trusted for
+    /// an existing history. An explicit provenance/migration path is required.
+    pub fn namespace_provenance_missing(&self)->bool{self.lease_namespace.is_none()&&(self.revision!=0||!self.records.is_empty())}
+    fn admit_namespace(&self,binding:&str)->Result<()>{
+        match self.lease_namespace.as_deref(){Some(recorded)if recorded==binding=>Ok(()),None if !self.namespace_provenance_missing()=>Ok(()),_=>Err(namespace_error())}
+    }
     /// Read-only restart plan, not execution/retirement evidence. Reload after
     /// each durable transition or external operation; this snapshot is no lease.
     pub fn recovery_plan(&self,now:u64)->Result<Vec<RecoveryAction>>{
@@ -91,6 +97,7 @@ impl Journal{
         }Ok(actions)
     }
     fn validate(&self)->Result<()>{
+        if self.lease_namespace.as_ref().is_some_and(|binding|binding.len()!=64||!binding.bytes().all(|byte|byte.is_ascii_digit()||(b'a'..=b'f').contains(&byte))){return Err(invalid());}
         if self.schema_version!=1||self.profile.is_nil()||self.device.is_nil()||self.revision>MAX_REVISION||self.records.len()>MAX_RECORDS||self.revision==0&&!self.records.is_empty(){return Err(invalid());}
         let mut generations=BTreeSet::new();let mut live=BTreeSet::new();
         for record in &self.records{
@@ -149,7 +156,7 @@ fn read(connection:&rusqlite::Connection,profile:Uuid,device:Uuid)->Result<Journ
     if profile.is_nil()||device.is_nil(){return Err(invalid());}
     // Bound the SQL value before fetching the full JSON string.
     let length:Option<i64>=connection.query_row("SELECT length(CAST(value AS BLOB)) FROM preferences WHERE key=?1",[KEY],|row|row.get(0)).optional().map_err(storage_error)?;
-    let Some(length)=length else{return Ok(Journal{schema_version:1,profile,device,revision:0,records:Vec::new()});};
+    let Some(length)=length else{return Ok(Journal{schema_version:1,profile,device,revision:0,records:Vec::new(),lease_namespace:None});};
     if length<=0||length>MAX_BYTES as i64{return Err(invalid());}
     let json:String=connection.query_row("SELECT value FROM preferences WHERE key=?1",[KEY],|row|row.get(0)).map_err(storage_error)?;
     if json.len()>MAX_BYTES{return Err(invalid());}
@@ -160,19 +167,30 @@ pub fn load(database:&Database,profile:Uuid)->Result<Journal>{
     let tx=Transaction::new_unchecked(&database.connection,TransactionBehavior::Deferred).map_err(storage_error)?;
     let journal=read(&tx,profile,database.device_id)?;tx.commit().map_err(storage_error)?;Ok(journal)
 }
+fn namespace_error()->PlatformError{PlatformError::new(ErrorCode::PermissionDenied,"Native credential lock namespace changed or lacks provenance; explicit profile recovery is required")}
+/// Operational load; read-only load() remains available for native inspection
+/// of copied/legacy journals, without relabeling their credential ownership.
+pub fn load_scoped(database:&Database,lease:&CredentialLease,profile:Uuid)->Result<Journal>{
+    let binding=lease.namespace_binding(database,profile)?;
+    let journal=load(database,profile)?;journal.admit_namespace(&binding)?;
+    lease.check(database,profile)?;Ok(journal)
+}
 fn update(database:&Database,lease:&CredentialLease,profile:Uuid,expected:u64,change:impl FnOnce(&mut Journal)->Result<()>)->Result<Journal>{
     lease.check(database,profile)?;
+    let binding=lease.namespace_binding(database,profile)?;
     let mode:String=database.connection.query_row("PRAGMA journal_mode",[],|row|row.get(0)).map_err(storage_error)?;
     let synchronous:u32=database.connection.query_row("PRAGMA synchronous",[],|row|row.get(0)).map_err(storage_error)?;
     if !database.connection.is_autocommit()||mode!="wal"||!matches!(synchronous,2|3){return Err(invalid());}
     let tx=Transaction::new_unchecked(&database.connection,TransactionBehavior::Immediate).map_err(storage_error)?;
     let mut journal=read(&tx,profile,database.device_id)?;
     if journal.revision!=expected||expected>=MAX_REVISION{return Err(conflict());}
+    journal.admit_namespace(&binding)?;journal.lease_namespace=Some(binding.clone());
     change(&mut journal)?;journal.revision+=1;journal.validate()?;
     let json=serde_json::to_string(&journal).map_err(storage_error)?;
     if json.len()>MAX_BYTES{return Err(PlatformError::new(ErrorCode::ResourceLimit,"Native pairing cleanup records exceed the profile bound"));}
     tx.execute("INSERT INTO preferences(key,value) VALUES(?1,?2) ON CONFLICT(key) DO UPDATE SET value=excluded.value",params![KEY,json]).map_err(storage_error)?;
-    lease.check(database,profile)?;tx.commit().map_err(storage_error)?;Ok(journal)
+    if lease.namespace_binding(database,profile)?!=binding{return Err(namespace_error());}
+    tx.commit().map_err(storage_error)?;Ok(journal)
 }
 fn selected(journal:&mut Journal,address:CredentialAddress)->Result<&mut Record>{
     journal.records.iter_mut().find(|record|record.address==address).ok_or_else(conflict)

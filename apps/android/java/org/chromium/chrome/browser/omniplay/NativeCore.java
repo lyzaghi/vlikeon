@@ -200,11 +200,13 @@ public final class NativeCore {
     static final class RecoverySnapshot {
         final long revision,expires;final java.util.List<RecoveryRecord> records;
         final boolean relayRetirementAvailable;
-        boolean needsAttention(){for(RecoveryRecord record:records)if(record.sessionRecoveryRequired||(record.nextStep!=null&&!"revalidate_before_use".equals(record.nextStep)))return true;return false;}
+        final boolean namespaceProvenanceMissing;
+        boolean needsAttention(){if(namespaceProvenanceMissing)return true;for(RecoveryRecord record:records)if(record.sessionRecoveryRequired||(record.nextStep!=null&&!"revalidate_before_use".equals(record.nextStep)))return true;return false;}
         private RecoverySnapshot(JSONObject status,String profile,long deadline) throws Exception {
             if(status.getInt("credential_protocol")!=1||status.getInt("recovery_protocol")!=1||!profile.equals(status.getString("profile_id"))||!canonicalPairingId(status.getString("device_id")))throw new IllegalStateException();
             revision=status.getLong("revision");expires=deadline;
             relayRetirementAvailable=status.getBoolean("relay_retirement_available");
+            namespaceProvenanceMissing=status.getBoolean("namespace_provenance_missing");
             if(revision<0||revision>10_000_000||android.os.SystemClock.elapsedRealtime()>=expires)throw new IllegalStateException();
             org.json.JSONArray rows=status.getJSONArray("records"),actions=status.getJSONArray("recovery");
             if(rows.length()>128||actions.length()>128)throw new IllegalStateException();
@@ -237,7 +239,7 @@ public final class NativeCore {
     void advancePairingRecovery(RecoverySnapshot snapshot,RecoveryRecord record,java.util.function.BooleanSupplier alive,Reply reply){
         work(()->{
             long remaining=snapshot.expires-android.os.SystemClock.elapsedRealtime();
-            if(!alive.getAsBoolean()||!mPairingAttached||remaining<1_000||!snapshot.records.contains(record)||!record.canAdvance()||("revoke_relay".equals(record.nextStep)&&!snapshot.relayRetirementAvailable))throw new IllegalStateException();
+            if(!alive.getAsBoolean()||!mPairingAttached||remaining<1_000||snapshot.namespaceProvenanceMissing||!snapshot.records.contains(record)||!record.canAdvance()||("revoke_relay".equals(record.nextStep)&&!snapshot.relayRetirementAvailable))throw new IllegalStateException();
             byte[] input=new JSONObject().put("address",record.address()).put("expected_revision",snapshot.revision).toString().getBytes(StandardCharsets.UTF_8);
             JSONObject response;
             int action="revoke_relay".equals(record.nextStep)?2:("remove_material".equals(record.nextStep)?1:0);

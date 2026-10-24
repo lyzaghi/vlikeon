@@ -24,12 +24,12 @@ impl<'a> NativeCredentialWriter<'a>{
     pub fn open(database:&'a Database,profile:Uuid,store:&'a dyn PairingSecretStore)->Result<Self>{
         let lease=CredentialLease::acquire(database,profile)?;
         // Refuse corrupt/mismatched history before generating a replacement key.
-        let _=journal::load(database,profile)?;
+        let _=journal::load_scoped(database,&lease,profile)?;
         Ok(Self{database,profile,store,lease})
     }
     pub fn prepare_identity(&mut self,expected:u64,deadline:Instant)->Result<Candidate>{
         begin(deadline)?;
-        let snapshot=journal::load(self.database,self.profile)?;check(deadline)?;
+        let snapshot=journal::load_scoped(self.database,&self.lease,self.profile)?;check(deadline)?;
         if snapshot.revision()!=expected||snapshot.records().iter().any(|record|record.address().kind()==SecretKind::DeviceSigning&&record.phase()!=Phase::Retired){return Err(conflict());}
         let identity=NativeSigningIdentity::generate()?;check(deadline)?;
         let public_key=identity.public_key();let address=CredentialAddress::new_identity(self.profile,self.database.device_id)?;
@@ -51,7 +51,7 @@ impl<'a> NativeCredentialWriter<'a>{
     /// journal transition; no existing peer/pair is migrated or approved here.
     pub fn activate_identity_after_local_consent(&mut self,address:CredentialAddress,expected:u64,now:u64,deadline:Instant)->Result<u64>{
         let started=begin(deadline)?;
-        let snapshot=journal::load(self.database,self.profile)?;check(deadline)?;
+        let snapshot=journal::load_scoped(self.database,&self.lease,self.profile)?;check(deadline)?;
         if snapshot.revision()!=expected{return Err(conflict());}
         let record=snapshot.records().iter().find(|record|record.address()==address).ok_or_else(conflict)?;
         if address.kind()!=SecretKind::DeviceSigning||record.phase()!=Phase::MaterialReady{return Err(conflict());}
@@ -66,7 +66,7 @@ impl<'a> NativeCredentialWriter<'a>{
     pub fn prepare_pair(&mut self,expected:u64,identity_address:CredentialAddress,document:&SignedDocument,
         audience:&str,key:&NativePairKey,now:u64,deadline:Instant)->Result<Candidate>{
         let started=begin(deadline)?;validate_audience(audience)?;
-        let snapshot=journal::load(self.database,self.profile)?;check(deadline)?;
+        let snapshot=journal::load_scoped(self.database,&self.lease,self.profile)?;check(deadline)?;
         if snapshot.revision()!=expected{return Err(conflict());}
         let identity_record=snapshot.records().iter().find(|record|record.address()==identity_address).ok_or_else(conflict)?;
         if identity_address.kind()!=SecretKind::DeviceSigning||identity_record.phase()!=Phase::Active{return Err(conflict());}

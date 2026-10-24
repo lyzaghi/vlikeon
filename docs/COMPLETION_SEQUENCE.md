@@ -2,6 +2,14 @@
 
 ## Current sequence — 1–109 outstanding tasks
 
+Item 58 now authors a cooperative lease namespace binding in fresh journal
+history, admitted before all mutations and scoped writer/recovery/signal/ICE
+loads. Existing copied/moved or legacy unbound histories are not silently rebound;
+native inspection remains available and mobile UI surfaces missing provenance.
+This is not hardware/cross-host attestation or a producer-retired receipt. No
+hash/filesystem/lease/SQL/native/compiler/build/test was executed. Explicit
+migration, owner integration and qualification remain due; full scope stays open.
+
 Item 58 writer-retirement source review found the Unix lease namespace block
 misplaced in acquire() instead of check(&self). It now runs in the intended
 per-admission method, including acquisition's final check. No compiler/native/
