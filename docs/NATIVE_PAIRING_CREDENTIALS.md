@@ -1840,6 +1840,15 @@ this checkpoint.
 
 ## Remaining implementation and qualification
 
+Confirmed live host close now matches identity/audience/exact signed invitation
+hash against current durable intents and completes only that entry transactionally
+under the same lease/revision after native relay acknowledgment. No caller boolean
+can invoke this crate-private transition. A missing legacy intent does not invent
+one; other intents remain untouched. Network, deadline/cancel or journal failure
+leaves intent for recovery (late postcommit errors may require reload). In-memory
+close confirmation permits exact retry of journal completion. No build/test/SQL/
+HTTP operation ran; restart cleanup and expired-invite reconciliation remain due.
+
 Writer registration now invokes transactional retain_host_invitation before
 network admission while holding the same credential lease and original deadline.
 After intent commit it rechecks lease/deadline/cancellation, then sends register.

@@ -139,6 +139,13 @@ impl<'a> NativeCredentialWriter<'a>{
         // close() fences locally before remote cancellation/deadline admission.
         invitation.close(relay,&signer,elapsed_now(now,started)?,deadline,cancel)?;
         self.lease.check(self.database,self.profile)?;check(deadline)?;
+        if cancel.load(std::sync::atomic::Ordering::Acquire){return Err(conflict());}
+        let hash=omniplay_streaming::document_hash(invitation.signed_invite())?;
+        if current.host_invitations().iter().any(|entry|entry.identity()==address&&entry.audience()==metadata.audience&&
+            omniplay_streaming::document_hash(entry.document()).ok().as_deref()==Some(hash.as_str())){
+            journal::complete_host_invitation(self.database,&self.lease,self.profile,current.revision(),address,invitation.signed_invite(),&metadata.audience)?;
+            self.lease.check(self.database,self.profile)?;check(deadline)?;
+        }
         if cancel.load(std::sync::atomic::Ordering::Acquire){return Err(conflict());}Ok(())
     }
     pub fn join_client(&self,expected:u64,address:CredentialAddress,pending:&mut omniplay_streaming::native_pair_exchange::NativeClientPairing,

@@ -2,6 +2,11 @@
 
 ## Current sequence — 1–109 outstanding tasks
 
+Item 58 confirmed host close now removes only its exact durable invitation
+intent under the retained scoped lease, after bound relay acknowledgment and
+deadline/cancel checks. Uncertain results retain recovery debt. Source-only;
+restart cleanup/expiry reconciliation and build/test remain due.
+
 Item 58 host registration now commits signed invitation cleanup intent under the
 same scoped lease before any HTTP and returns the committed revision to its
 controller. Failure retains durable intent; source-only, no build/test. Intent

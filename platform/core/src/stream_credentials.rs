@@ -215,6 +215,17 @@ fn selected(journal:&mut Journal,address:CredentialAddress)->Result<&mut Record>
     journal.records.iter_mut().find(|record|record.address==address).ok_or_else(conflict)
 }
 /// Commit before any registration HTTP. Same signed document retry is idempotent;
+/// Cleanup writer calls only after an exact bound relay close acknowledgment.
+pub(crate) fn complete_host_invitation(database:&Database,lease:&CredentialLease,profile:Uuid,expected:u64,
+    identity:CredentialAddress,document:&SignedDocument,audience:&str)->Result<Journal>{
+    let hash=document_hash(document)?;
+    update(database,lease,profile,expected,|journal|{
+        let position=journal.host_invitations.iter().position(|entry|entry.identity==identity&&entry.audience==audience&&
+            document_hash(&entry.document).ok().as_deref()==Some(hash.as_str())).ok_or_else(conflict)?;
+        journal.host_invitations.remove(position);Ok(())
+    })
+}
+/// Commit before any registration HTTP. Same signed document retry is idempotent;
 /// a conflicting invite ID never replaces cleanup ownership.
 pub(crate) fn retain_host_invitation(database:&Database,lease:&CredentialLease,profile:Uuid,expected:u64,
     identity:CredentialAddress,document:&SignedDocument,audience:&str)->Result<Journal>{
