@@ -20,7 +20,7 @@ struct NativeIdentityReview {
     let id:String, publicKey:String, device:String, generation:String
     let expires:DispatchTime
 }
-enum NativeClientPairingAction:UInt32 { case begin=0,join=1,poll=2,persistAfterPeerConsent=3,cancel=4,activate=5 }
+enum NativeClientPairingAction:UInt32 { case begin=0,join=1,poll=2,persistAfterPeerConsent=3,cancel=4,activate=5,reviewSaved=6 }
 /// Immutable approved-poll metadata for a trusted native confirmation view.
 final class NativePeerApproval {
     let pairID:String,inputAllowed:Bool,expires:DispatchTime
@@ -280,7 +280,7 @@ final class NativeCore {
         let fail:(String)->Void={message in
             owned.clear();DispatchQueue.main.async{completion(.failure(OmniFailure.message(message)))}
         }
-        let maximum=action == .begin ? 16_384:(action == .activate ? 1024:(action == .persistAfterPeerConsent ? 256:128))
+        let maximum=action == .begin ? 16_384:((action == .activate || action == .reviewSaved) ? 1024:(action == .persistAfterPeerConsent ? 256:128))
         guard !owned.bytes.isEmpty,owned.bytes.count<=maximum else{fail("Yêu cầu ghép đôi vượt giới hạn.");return}
         let deliveryToken=pairingClientDeliveryFence.capture(cancel:action == .cancel)
         if action == .cancel{
@@ -299,11 +299,13 @@ final class NativeCore {
                 var expectedTicket:String?
                 var reviewedHash:String?
                 var activation:[String:Any]?
-                if action == .activate{
-                    guard let request=try JSONSerialization.jsonObject(with:owned.bytes) as? [String:Any],request.count==3,
+                if action == .activate || action == .reviewSaved{
+                    guard let request=try JSONSerialization.jsonObject(with:owned.bytes) as? [String:Any],request.count==(action == .activate ? 3:2),
                           let address=request["address"] as? [String:Any],address.count==5,address["profile"] as? String==self.profileID.uuidString.lowercased(),address["kind"] as? String=="pair_encryption",
-                          let hash=request["reviewed_grant_hash"] as? String,NativePairingText.fingerprint(hash),
                           let revision=request["expected_revision"] as? NSNumber,CFGetTypeID(revision) != CFBooleanGetTypeID(),revision.doubleValue>=1,revision.doubleValue<10_000_000,revision.doubleValue==Double(revision.uint64Value) else{throw OmniFailure.message("Yêu cầu kích hoạt không hợp lệ.")}
+                    if action == .activate{
+                        guard let hash=request["reviewed_grant_hash"] as? String,NativePairingText.fingerprint(hash) else{throw OmniFailure.message("Thiếu grant đã duyệt.")}
+                    }
                     for field in ["device","id","generation"]{
                         guard let text=address[field] as? String,let id=UUID(uuidString:text),id.uuidString.lowercased()==text,
                               id != UUID(uuid:(0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0)) else{throw OmniFailure.message("Địa chỉ kích hoạt không hợp lệ.")}
@@ -327,11 +329,25 @@ final class NativeCore {
                 let value=try self.unwrap(owned.bytes.withUnsafeBytes{raw in
                     let pointer=raw.bindMemory(to:UInt8.self).baseAddress
                     if action == .activate{return try self.consume(om_mobile_pairing_activate_client_v1(self.handle,pointer,raw.count,budget))}
+                    if action == .reviewSaved{return try self.consume(om_mobile_pairing_review_client_v1(self.handle,pointer,raw.count,budget))}
                     return try self.consume(action == .begin
                         ? om_mobile_pairing_client_begin_v1(self.handle,pointer,raw.count,budget)
                         : om_mobile_pairing_client_action_v1(self.handle,pointer,raw.count,action.rawValue,budget))
                 })
-                if action == .activate{
+                if action == .reviewSaved{
+                    guard let request=activation,let expected=request["address"] as? [String:Any],let address=value["address"] as? [String:Any],address.count==5,
+                          NSDictionary(dictionary:expected).isEqual(to:address),value["pair_id"] as? String==expected["id"] as? String,
+                          (value["credential_protocol"] as? NSNumber)?.uint32Value==1,value["phase"] as? String=="material_ready",
+                          let previous=request["expected_revision"] as? NSNumber,let revision=value["revision"] as? NSNumber,CFGetTypeID(revision) != CFBooleanGetTypeID(),revision.doubleValue==previous.doubleValue,
+                          let hash=value["grant_hash"] as? String,NativePairingText.fingerprint(hash),
+                          let host=value["host_public_key"] as? String,NativePairingText.publicKey(host),
+                          let fingerprint=value["host_fingerprint"] as? String,NativePairingText.fingerprint(fingerprint),
+                          let consent=value["local_consent_required"] as? NSNumber,CFGetTypeID(consent)==CFBooleanGetTypeID(),consent.boolValue,
+                          let comparison=value["comparison_available"] as? NSNumber,CFGetTypeID(comparison)==CFBooleanGetTypeID(),!comparison.boolValue,
+                          let permission=value["input_allowed"] as? NSNumber,CFGetTypeID(permission)==CFBooleanGetTypeID(),
+                          let expiry=value["expires_at_ms"] as? NSNumber,CFGetTypeID(expiry) != CFBooleanGetTypeID(),expiry.doubleValue>Date().timeIntervalSince1970*1000,
+                          expiry.doubleValue<=9_007_199_254_740_991,expiry.doubleValue==Double(expiry.uint64Value) else{throw OmniFailure.message("Kết quả đọc lại không khớp bản ghép đôi đã lưu.")}
+                }else if action == .activate{
                     guard let request=activation,let expected=request["address"] as? [String:Any],let address=value["address"] as? [String:Any],address.count==5,
                           NSDictionary(dictionary:expected).isEqual(to:address),value["grant_hash"] as? String==request["reviewed_grant_hash"] as? String,
                           (value["credential_protocol"] as? NSNumber)?.uint32Value==1,value["phase"] as? String=="active",

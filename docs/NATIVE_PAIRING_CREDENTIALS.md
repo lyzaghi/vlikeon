@@ -1840,6 +1840,15 @@ this checkpoint.
 
 ## Remaining implementation and qualification
 
+iOS native-only reviewSaved now routes the dedicated saved-client review ABI,
+not generic ticket actions. Request bounds and canonical address/revision checks
+match activation scope. Response checks exact address/pair/revision, MaterialReady,
+canonical host/fingerprint/grant hash, actual boolean input permission and fresh
+consent/unavailable comparison flags, plus future integral safe-range expiry.
+Existing owned Data cleanup, queue/deadline/owner/cancel predicates apply. No
+activation capability or user consent is inferred. Typed resume snapshots/views
+remain due; no compiler/build/test or runtime operation ran.
+
 Android native-only pairing action 6 now routes the separate candidate-review
 ABI. Its bounded serialized lane validates request scope/address/revision and
 response exact address/revision/pair, MaterialReady phase, host/hash formats,

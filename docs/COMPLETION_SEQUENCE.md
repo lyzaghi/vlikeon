@@ -2,6 +2,11 @@
 
 ## Current sequence — 1–109 outstanding tasks
 
+Item 58 iOS private lane now routes saved-client review with bounded scope/
+revision request and exact candidate/permission/expiry/hash response admission.
+It requires comparison unavailable and fresh consent flags. Source-only;
+resume snapshots/views and build/test remain due.
+
 Item 58 Android private JNI/caller now routes interrupted-candidate review with
 1024-byte bounds and exact address/revision, live expiry, grant/host text and
 explicit unavailable-comparison checks. Source-only; typed resume snapshot/UI,
