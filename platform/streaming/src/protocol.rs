@@ -81,6 +81,7 @@ pub enum RelayOperation {
     ApprovePair {invite_id:Uuid,client_public_key:String,grant:SignedDocument},
     DeclinePair {invite_id:Uuid,client_public_key:String},
     CloseInvite {invite_id:Uuid},
+    ReconcileExpiredInvite {invite:SignedDocument},
     Send {grant:SignedDocument,message_id:Uuid,session_id:Uuid,sequence:u64,expires_at_ms:u64,iv:String,ciphertext:String},
     Receive {grant:SignedDocument,after:u64,limit:u16},
     IceCredentials {grant:SignedDocument},

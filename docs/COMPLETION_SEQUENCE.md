@@ -2,6 +2,11 @@
 
 ## Current sequence — 1–109 outstanding tasks
 
+Item 58 relay source now authors authenticated expired-invitation reconciliation:
+original host-signed invite, server expiry and transaction-verified live absence
+produce an exact bound receipt without revoking pairs. Native receipt consumer
+and UI remain unwired. Source-only; no SQL/network/build/test ran.
+
 Item 58 iOS now connects durable invitation records to explicit restart-cleanup
 confirmation and bounded recovery ABI, with exact snapshot/receipt admission and
 immediate delivery fencing. Expired records remain visible without a completion

@@ -1840,6 +1840,16 @@ this checkpoint.
 
 ## Remaining implementation and qualification
 
+RelayOperation ReconcileExpiredInvite now accepts the original host-signed public
+invitation. Server verifies it against authenticated request sender and installed
+audience at historical creation, then requires expiry by server time and no live
+invite row after same-transaction expiry pruning. Conflicting live rows refuse.
+Bound receipt includes original invite ID/hash/host/expiry, expired_absent reason
+and pairs_revoked:false. No pair, grant or session is revoked; no live invitation
+can be resurrected because CreateInvite still validates current expiry. This is
+source protocol/server work only: native receipt admission and durable completion
+are not wired. No SQL/network/compiler/build/test or deployment ran.
+
 iOS status now lists durable invitation cleanup entries and displays invite ID,
 signer generation, service and expiry in a separate confirmation. Unexpired
 entries with provenance and retirement configuration can invoke the dedicated

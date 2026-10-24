@@ -126,6 +126,21 @@ impl Store {
                 if tx.execute("DELETE FROM invites WHERE id=?1",[invite_id.to_string()]).map_err(sql)?!=1{return Err(ApiError::conflict());}
                 Ok(json!({"closed":true,"close_protocol":1,"invite_id":invite_id,"host_public_key":sender,"invite_hash":hash}))
             }
+            RelayOperation::ReconcileExpiredInvite{invite:document}=>{
+                // Authenticated historical metadata is cleanup evidence only;
+                // never accept local expiry or arbitrary absent UUID as proof.
+                let invite:Invite=verify(sender,INVITE_DOMAIN,&document,4096).map_err(|_|ApiError::unauthorized())?;
+                invite.validate(audience,invite.created_at_ms).map_err(|_|ApiError::invalid())?;
+                if invite.id.is_nil()||invite.host_public_key!=sender{return Err(ApiError::unauthorized());}
+                if invite.expires_at_ms>now{return Err(ApiError::conflict());}
+                let live:bool=tx.query_row("SELECT EXISTS(SELECT 1 FROM invites WHERE id=?1)",[invite.id.to_string()],|row|row.get(0)).map_err(sql)?;
+                // execute() prunes expired invites in this same transaction.
+                // A live conflicting row is not deleted or relabeled here.
+                if live{return Err(ApiError::conflict());}
+                Ok(json!({"expired_invite_protocol":1,"closed":true,"reason":"expired_absent",
+                    "invite_id":invite.id,"host_public_key":sender,"invite_hash":document_hash(&document).map_err(|_|ApiError::invalid())?,
+                    "expires_at_ms":invite.expires_at_ms,"pairs_revoked":false}))
+            }
             RelayOperation::Send{grant:document,message_id,session_id,sequence,expires_at_ms,iv,ciphertext}=>{
                 let grant=pair(tx,sender,&document,audience,now)?;let pair_id=grant.id.to_string();
                 let previous:Option<(String,String,u64,u64,String,String,u64,String)>=tx.query_row("SELECT pair,session,sequence,expires,iv,ciphertext,cursor,sender FROM messages WHERE message_id=?1",[message_id.to_string()],|r|Ok((r.get(0)?,r.get(1)?,r.get(2)?,r.get(3)?,r.get(4)?,r.get(5)?,r.get(6)?,r.get(7)?))).optional().map_err(sql)?;
