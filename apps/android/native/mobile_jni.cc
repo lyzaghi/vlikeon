@@ -216,6 +216,22 @@ Java_org_chromium_chrome_browser_omniplay_NativeCore_nativePairingClientV1(JNIEn
   return response_bytes(env,om_mobile_pairing_client_action_v1(static_cast<uint64_t>(handle),bytes.data(),bytes.size(),static_cast<uint32_t>(action),static_cast<uint32_t>(budget)));
 }
 
+// Dedicated native host dispatch; no renderer/nativeCall route or proof sharing.
+extern "C" JNIEXPORT jbyteArray JNICALL
+Java_org_chromium_chrome_browser_omniplay_NativeCore_nativePairingHostV1(JNIEnv* env,jclass,jlong handle,jbyteArray input,jint action,jint budget){
+  if(handle<=0||!input||budget<1000||budget>25000||action<0||action>7)return nullptr;
+  const auto length=env->GetArrayLength(input);
+  const auto maximum=(action>=1&&action<=3)?128:1024;
+  if(exception(env)||length<=0||length>maximum)return nullptr;
+  std::vector<uint8_t> bytes(static_cast<size_t>(length));WipeBytes wipe{bytes};
+  env->GetByteArrayRegion(input,0,length,reinterpret_cast<jbyte*>(bytes.data()));if(exception(env))return nullptr;
+  const auto native_handle=static_cast<uint64_t>(handle);const auto native_budget=static_cast<uint32_t>(budget);
+  if(action==0)return response_bytes(env,om_mobile_pairing_host_begin_v1(native_handle,bytes.data(),bytes.size(),native_budget));
+  if(action<=3)return response_bytes(env,om_mobile_pairing_host_action_v1(native_handle,bytes.data(),bytes.size(),static_cast<uint32_t>(action),native_budget));
+  if(action<=5)return response_bytes(env,om_mobile_pairing_host_peer_v1(native_handle,bytes.data(),bytes.size(),static_cast<uint32_t>(action-3),native_budget));
+  return response_bytes(env,om_mobile_pairing_host_candidate_v1(native_handle,bytes.data(),bytes.size(),static_cast<uint32_t>(action-5),native_budget));
+}
+
 extern "C" JNIEXPORT jbyteArray JNICALL
 Java_org_chromium_chrome_browser_omniplay_NativeCore_nativeOpen(JNIEnv* env,jclass,jbyteArray input,jobject provider){
   if(!input||!provider)return nullptr;const jsize length=env->GetArrayLength(input);if(exception(env)||length<=0||length>1024*1024)return nullptr;

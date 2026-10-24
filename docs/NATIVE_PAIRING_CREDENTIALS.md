@@ -1840,6 +1840,15 @@ this checkpoint.
 
 ## Remaining implementation and qualification
 
+Android private nativePairingHostV1 now dispatches begin/register/poll/close,
+peer persist/decline and saved host candidate review/activation to separate Rust
+ABI entries. Action/budget/input bounds precede array copy; native vector is
+cleared through existing RAII on every return. Java declaration and shrinker
+signature match. No renderer/nativeCall route or share proof is added. This
+bridge has no Java operation caller/UI yet and is not runtime evidence. No
+compiler/build/test or native operation ran; caller lifecycle/reply validation,
+product host views and durable cleanup remain unfinished.
+
 Confirmed reviewed-host activation now advances an existing invitation's expected
 journal revision only when it exactly matched activation's expected revision.
 The new revision comes from the successful leased writer, allowing subsequent

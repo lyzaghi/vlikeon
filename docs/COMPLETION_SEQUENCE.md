@@ -2,6 +2,10 @@
 
 ## Current sequence — 1–109 outstanding tasks
 
+Item 58 Android now has private versioned JNI host dispatch for bounded begin,
+ticket, peer and candidate ABI actions with retained byte wipe and exact keep
+signature. No Java caller/UI/proof sharing yet; source-only, no build/test ran.
+
 Item 58 confirmed reviewed-host activation now advances a matching live invitation
 revision from the actual writer result, preserving subsequent close/poll admission.
 Stale invitations/uncertain failures are not rebased. Source-only; build/test due.
