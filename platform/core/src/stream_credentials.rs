@@ -128,7 +128,8 @@ impl Journal{
         Ok(())
     }
 }
-#[derive(Clone,Copy)]
+#[derive(Clone,Copy,Serialize)]
+#[serde(rename_all="snake_case")]
 pub enum RecoveryStep{FenceGeneration,RevalidateBeforeUse,RetireWriter,RetireLocalSessions,WaitForPairCleanup,RevokeRelay,RemoveMaterial,FinalizeRetirement}
 #[derive(Clone,Copy)]
 pub struct RecoveryAction{address:CredentialAddress,step:RecoveryStep}

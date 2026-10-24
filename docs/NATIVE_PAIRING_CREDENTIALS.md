@@ -954,6 +954,39 @@ build or test was executed. Only source review and whitespace inspection were
 performed. Menu discoverability, localization, lifecycle/lock/deadline behavior
 and all device/ABI qualification remain due.
 
+## Native recovery status and metadata dispatch
+
+LocalHost status now includes recovery protocol 1, the native observation time
+and each nonretired generation's exact next step. These are derived from the
+same validated journal snapshot/revision as the public records. They are an
+advisory read, not a lease, producer receipt or instruction to execute a plan.
+In particular, MaterialReady can belong to an ongoing consent flow; its recovery
+plan entry does not by itself prove abandonment.
+
+A separate native-only metadata recovery entry accepts the exact status address
+and expected revision, obtains the real profile credential lease and dispatches
+at most one metadata transition. Only FenceGeneration or FinalizeRetirement can
+commit; active valid generations require separate revalidation and all external
+writer/session/relay/vault steps remain pending. Existing finalization invariants
+still require all retained cleanup receipts. No fallback NativeRecoveryOwner or
+caller-supplied retirement flags were introduced.
+
+Explicit identity fencing also fences its pairs under the existing journal
+transaction. LocalHost clears any pending identity consent review before this
+dispatch. Therefore this is not a status operation or an automatic startup loop;
+a real native recovery controller must select it deliberately and present any
+required user decision. Streaming-disabled policy does not block cleanup.
+
+The mobile entry bounds input to 1024 bytes and the original operation budget
+to 1–25 seconds, and rechecks foreground/provider epoch and deadline before
+publication. No secrets or vault callbacks are used by this metadata step. A
+late/error response may follow a durable fence or finalization; reload status
+instead of assuming rollback. Pending does not mean that a backend was stopped.
+
+App recovery UI/JNI callers, actual retirement owners and startup reconciliation
+remain unfinished. No native endpoint, lock/file/SQL mutation, build or test was
+executed. Source review and whitespace checks are the only verification here.
+
 ## Remaining implementation and qualification
 
 - Journal/executor/lease/writer product integration, authority epochs, actual native owner

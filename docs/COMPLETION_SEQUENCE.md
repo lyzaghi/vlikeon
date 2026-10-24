@@ -2,6 +2,14 @@
 
 ## Current sequence — 1–109 outstanding tasks
 
+Item 58 now connects LocalHost status to the journal's exact recovery plan and
+authors a native one-step metadata recovery entry with real credential lease,
+revision/generation admission and foreground/deadline checks. Only journal fence
+or fully receipted finalization can commit; unobserved producer/relay/vault steps
+stay pending. No automatic startup cleanup or fabricated owner was added. App
+recovery UI and actual retirement owners remain due. No native/file/SQL/build/test
+was executed; item 58 and the full original 51–109 scope remain incomplete.
+
 Item 58 now authors Android dedicated JNI identity operations, serialized typed
 review callers and a native Game Hub actions/consent dialog. Admission checks
 current trusted tab/activity and unlocked device; one-use review metadata remains

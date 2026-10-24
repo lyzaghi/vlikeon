@@ -65,6 +65,17 @@ OmniBuffer om_mobile_attach_pairing_credentials_v1(uint64_t handle,OmniPairingCr
  * side effects: reload status before retry. No keys/seeds leave native memory.
  */
 OmniBuffer om_mobile_pairing_status(uint64_t handle);
+/* Explicit native recovery only. Input is borrowed JSON at most 1024 bytes:
+ * {"address":<exact status address>,"expected_revision":<status revision>}.
+ * Budget is 1000..25000 ms. May permanently fence the selected generation;
+ * identity fencing also fences its pairs. Never dispatch a plan automatically
+ * or treat MaterialReady as abandoned merely because it appears in a plan.
+ * Only metadata fencing/finalization is executed; unobserved writer/session/
+ * relay/vault steps stay pending. No retirement flags are accepted. Allowed
+ * while installed streaming policy is disabled. Reload after every outcome or
+ * error, which may follow a durable commit. This does not stop native backends.
+ */
+OmniBuffer om_mobile_pairing_advance_metadata_v1(uint64_t handle,const uint8_t* data,size_t length,uint32_t budget_ms);
 OmniBuffer om_mobile_pairing_prepare_identity_v1(uint64_t handle,uint64_t expected_revision,uint32_t budget_ms);
 /* Native UI must display the returned exact identity/action, then invoke
  * confirmation ONLY after explicit user approval. Token alone is not consent.

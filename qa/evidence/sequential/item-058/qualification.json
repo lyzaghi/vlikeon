@@ -57,7 +57,10 @@
     "iOS transient flow lifetime suppresses stale UI callbacks across cancel, expiry, resign-active, protected-data loss, suspension, view departure, fullscreen and load failure; no automatic replacement/retry",
     "Dedicated Android JNI identity operations and private retained Java declaration bound confirmation input and remain separate from renderer dispatch",
     "Android native Game Hub actions/consent dialog source uses serialized typed reviews, worker-established monotonic UI expiry and explicit approval of exact public identity metadata",
-    "Android current-tab/resumed/unlocked UI admission and atomic review lifetime suppress stale callbacks across pause, disconnect, cancel and expiry; policy remains disabled"
+    "Android current-tab/resumed/unlocked UI admission and atomic review lifetime suppress stale callbacks across pause, disconnect, cancel and expiry; policy remains disabled",
+    "LocalHost public status includes recovery protocol, observation time and exact per-generation next step from the same validated journal revision",
+    "Native metadata-only recovery entry retains the real credential lease and admits exact generation/revision; only fence or fully receipted finalization can commit",
+    "Mobile recovery ABI bounds input/deadline and rechecks foreground epoch; unobserved external cleanup stays pending and no automatic startup dispatch or fallback owner is provided"
   ],
   "build_executed": false,
   "tests_executed": false,

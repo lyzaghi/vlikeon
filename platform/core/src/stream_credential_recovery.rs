@@ -50,6 +50,31 @@ fn checked_now(now:u64,started:Instant)->Result<u64>{
     now.checked_add(u64::try_from(started.elapsed().as_millis()).map_err(|_|conflict())?).ok_or_else(conflict)
 }
 
+/// Only metadata transitions, with the real profile lease retained. This does
+/// not supply/default any writer, session, vault or relay retirement receipt.
+/// Native recovery controller explicitly selects an exact generation/revision;
+/// never run a returned plan automatically while a consent flow is pending.
+pub fn advance_metadata(database:&Database,lease:&CredentialLease,profile:Uuid,address:CredentialAddress,
+    expected:u64,now:u64,deadline:Instant)->Result<StepOutcome>{
+    let started=Instant::now();check_deadline(deadline)?;lease.check(database,profile)?;
+    if deadline.saturating_duration_since(started)>Duration::from_secs(30){return Err(conflict());}
+    address.validate()?;
+    if address.profile()!=profile||address.device()!=database.device_id{return Err(conflict());}
+    let snapshot=journal::load(database,profile)?;check_deadline(deadline)?;
+    if snapshot.revision()!=expected||!snapshot.records().iter().any(|record|record.address()==address){return Err(conflict());}
+    let actions=snapshot.recovery_plan(checked_now(now,started)?)?;
+    let Some(action)=actions.iter().find(|action|action.address()==address)else{return Ok(StepOutcome::AlreadyRetired);};
+    let updated=match action.step(){
+        RecoveryStep::FenceGeneration=>journal::revoke(database,lease,profile,expected,address)?,
+        RecoveryStep::FinalizeRetirement=>journal::finalize_retirement(database,lease,profile,expected,address)?,
+        RecoveryStep::RevalidateBeforeUse=>return Ok(StepOutcome::RevalidationRequired),
+        // Keep every unobserved external producer/deletion action pending.
+        _=>return Ok(StepOutcome::Pending),
+    };
+    check_deadline(deadline)?;lease.check(database,profile)?;
+    Ok(StepOutcome::Committed{revision:updated.revision()})
+}
+
 #[derive(Deserialize)]#[serde(deny_unknown_fields)]
 struct RelayRetirement{revoked:bool,retirement_protocol:u32,pair_id:Uuid,grant_hash:String,reason:String}
 

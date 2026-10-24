@@ -48,13 +48,37 @@ impl LocalHost {
     pub fn native_pairing_status(&self)->Result<Value>{
         self.ensure_open()?;
         let snapshot=omniplay_core::stream_credentials::load(&self.database,self.profile_id)?;
+        let observed_at_ms=omniplay_core::now_ms();
+        let recovery:Vec<_>=snapshot.recovery_plan(observed_at_ms)?.iter().map(|action|
+            json!({"address":action.address(),"next_step":action.step()})).collect();
         let records:Vec<_>=snapshot.records().iter().map(|record|json!({
             "address":record.address(),"phase":record.phase(),"public_key":record.public_key(),
             "writer_retired":record.writer_retired(),"material_absent":record.material_absent(),
             "local_retired":record.local_retired(),"relay_retired":record.relay_retired()
         })).collect();
         Ok(json!({"credential_protocol":1,"profile_id":self.profile_id,"device_id":self.database.device_id,
-            "revision":snapshot.revision(),"policy_available":omniplay_core::stream_signal_authority::require_installed_pairing_policy().is_ok(),"records":records}))
+            "revision":snapshot.revision(),"policy_available":omniplay_core::stream_signal_authority::require_installed_pairing_policy().is_ok(),"records":records,
+            "recovery_protocol":1,"observed_at_ms":observed_at_ms,"recovery":recovery}))
+    }
+    /// Explicit native recovery dispatch, not automatic startup cleanup. May
+    /// permanently fence a candidate; caller must not use this as a status read.
+    /// Disabled streaming does not prevent cleanup of existing generations.
+    pub fn native_pairing_advance_metadata(&mut self,address:omniplay_streaming::native_credentials::CredentialAddress,
+        expected:u64,deadline:std::time::Instant)->Result<Value>{
+        self.ensure_open()?;
+        if std::time::Instant::now()>=deadline{return Err(PlatformError::new(ErrorCode::DeadlineExceeded,"Native recovery operation expired before lease admission"));}
+        let lease=omniplay_core::stream_credential_lease::CredentialLease::acquire(&self.database,self.profile_id)?;
+        self.identity_review=None;
+        let outcome=omniplay_core::stream_credential_recovery::advance_metadata(&self.database,&lease,self.profile_id,address,
+            expected,omniplay_core::now_ms(),deadline)?;
+        use omniplay_core::stream_credential_recovery::StepOutcome;
+        let value=match outcome{
+            StepOutcome::Committed{revision}=>json!({"outcome":"committed","revision":revision}),
+            StepOutcome::Pending=>json!({"outcome":"pending"}),
+            StepOutcome::RevalidationRequired=>json!({"outcome":"revalidation_required"}),
+            StepOutcome::AlreadyRetired=>json!({"outcome":"already_retired"}),
+        };
+        Ok(json!({"recovery_protocol":1,"address":address,"result":value,"reload_required":true}))
     }
     /// Trusted native foreground/consent controller supplies the scoped store.
     /// Prepares MaterialReady only; no identity activation or pairing approval.
