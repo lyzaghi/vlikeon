@@ -387,6 +387,36 @@ background/cancellation supervision, product/startup/mobile callers and all
 HTTP/crypto/replay interoperability/platform qualification remain unfinished.
 This is not item-59 relay/TURN deployment and does not enable streaming policy.
 
+## Bounded receive polling and ordered acceptance source
+
+`poll_received` now connects the native active pair and pinned identity vault
+reload to a signed HTTPS Receive request, starting from the durable journal
+cursor and requesting at most eight packets. It retains the lease through HTTP,
+rejects unknown response fields and oversized batches, and admits each packet's
+pinned peer, increasing cursor/sequence, nonzero message/session IDs, bounded
+time/IV/ciphertext and within-batch message uniqueness. Post-network native
+authority, pair expiry and cancellation are rechecked. This poll does not decrypt,
+advance a cursor or accept any remote session as locally authorized.
+
+The returned `PolledSignals` is an encrypted batch bound to the original
+credential generation, epoch, journal revision and operation deadline. It has
+no skip/advance setter. `accept_next` requires the locally admitted session to
+match its head packet and calls the connected authentication -> current-authority
+-> journal acceptance -> post-commit authority pipeline. Only successful return
+advances its private batch position/revision. Later packets cannot skip a failed
+or foreign-session head. Cancellation before delivery refuses publication; if
+acceptance already committed, reload/re-poll rather than rolling replay state
+back. A deadline cannot be extended by supplying a new one to the batch.
+
+The original per-call lease is released after poll; each accepted head reacquires
+it and checks the exact revision, so concurrent native journal work can invalidate
+the batch. That conflict needs reload/re-poll, not blind delivery. This is not a
+long-lived receiver ownership lease, a reconnect loop or a native session router.
+Unknown/closed-session recovery and deliberate discard policy remain unfinished;
+there is no automatic cursor jump to hide them. ICE/revocation, native authority,
+approval/product/startup/mobile integration and all actual HTTP/crypto/replay/
+cancel/platform verification are still required. No poll or acceptance was run.
+
 ## Required durable ordering and integration
 
 The journal authors the state transitions below. Their external effects and

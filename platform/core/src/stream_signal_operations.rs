@@ -1,14 +1,15 @@
-//! Native per-operation signal pipeline with paired HTTP send orchestration.
+//! Native per-operation signal pipeline with paired HTTP send/receive orchestration.
 //! No product caller is installed. Outputs are not indefinite session authority.
 use crate::{Database,stream_credentials::{self as journal,Journal,Record,Phase},stream_credential_lease::CredentialLease};
 use omniplay_contracts::{ErrorCode,PlatformError,Result};
-use omniplay_streaming::{RelayOperation,SignedDocument,MAX_PACKET_BYTES,document_hash,native_relay::NativePairRelay,
+use omniplay_streaming::{RelayOperation,RelayPacket,SignedDocument,MAX_PACKET_BYTES,document_hash,verify_grant,decode,native_relay::NativePairRelay,
     native_credentials::{CredentialAddress,SecretKind,PairingSecretStore,load_pair,load_identity},
     native_signal::{SignalMetadata,EncryptedSignal,NativeSignalCipher}};
 use std::time::{Duration,Instant};
 use uuid::Uuid;
 use serde::Deserialize;
 use std::sync::atomic::{AtomicBool,Ordering};
+use std::collections::BTreeSet;
 use zeroize::Zeroizing;
 
 /// Native observations must retain their original observation time. No serde
@@ -54,6 +55,33 @@ impl SentSignal{
     pub fn message_id(&self)->Uuid{self.message_id}
     pub fn sequence(&self)->u64{self.sequence}
     pub fn cursor(&self)->u64{self.cursor}
+}
+#[derive(Deserialize)]#[serde(deny_unknown_fields)]
+struct ReceiveReply{packets:Vec<RelayPacket>}
+/// Encrypted, unacknowledged batch. Cursor remains unchanged until accept_next
+/// authenticates and commits each head packet. Never skip a foreign-session
+/// head: the native receiver controller must explicitly route/recover it.
+pub struct PolledSignals{address:CredentialAddress,epoch:u64,revision:u64,deadline:Instant,packets:Vec<RelayPacket>,next:usize}
+impl PolledSignals{
+    pub fn next_packet(&self)->Option<&RelayPacket>{self.packets.get(self.next)}
+    pub fn revision(&self)->u64{self.revision}
+    pub fn remaining(&self)->usize{self.packets.len().saturating_sub(self.next)}
+    /// Caller supplies the locally admitted session, not a remote-created local
+    /// authority. Failure leaves the batch index and expected revision intact;
+    /// a commit may be uncertain, so reload/re-poll instead of skipping ahead.
+    pub fn accept_next(&mut self,database:&Database,profile:Uuid,session:Uuid,store:&dyn PairingSecretStore,
+        owner:&mut dyn NativeSignalAuthority,now:u64,deadline:Instant,cancel:&AtomicBool)->Result<CommittedSignal>{
+        if cancel.load(Ordering::Acquire){return Err(PlatformError::new(ErrorCode::Cancelled,"Native signaling batch was cancelled"));}
+        if deadline>self.deadline||Instant::now()>=self.deadline{return Err(denied());}
+        let packet=self.next_packet().ok_or_else(denied)?;
+        if packet.session_id!=session{return Err(denied());}
+        let metadata=SignalMetadata{message_id:packet.message_id,session_id:packet.session_id,sequence:packet.sequence,expires_at_ms:packet.expires_at_ms};
+        let encrypted=EncryptedSignal{iv:packet.iv.clone(),ciphertext:packet.ciphertext.clone()};
+        let accepted=accept_received(database,profile,self.address,session,self.epoch,self.revision,store,owner,
+            &packet.sender_public_key,packet.cursor,&metadata,&encrypted,now,deadline)?;
+        if cancel.load(Ordering::Acquire){return Err(PlatformError::new(ErrorCode::Cancelled,"Native signaling delivery was cancelled after acceptance; reload its committed cursor"));}
+        self.revision=accepted.revision();self.next+=1;Ok(accepted)
+    }
 }
 struct Clock{now:u64,started:Instant,deadline:Instant}
 impl Clock{
@@ -152,4 +180,37 @@ pub fn send_prepared(database:&Database,profile:Uuid,prepared:&OutgoingSignal,ex
     if prepared.metadata.expires_at_ms<=current{return Err(denied());}
     if cancel.load(Ordering::Acquire){return Err(PlatformError::new(ErrorCode::Cancelled,"Native signaling send was cancelled"));}
     Ok(SentSignal{message_id:prepared.metadata.message_id,sequence:prepared.metadata.sequence,cursor:acknowledgement.cursor})
+}
+
+/// Polls at most eight packets without acknowledging any of them. Native owner
+/// must provide receiver/session lifecycle authority; no autonomous poll loop,
+/// ownership renewal or unknown-session acceptance is supplied by this call.
+pub fn poll_received(database:&Database,profile:Uuid,address:CredentialAddress,session:Uuid,epoch:u64,expected:u64,
+    store:&dyn PairingSecretStore,owner:&mut dyn NativeSignalAuthority,relay:&NativePairRelay,now:u64,deadline:Instant,cancel:&AtomicBool)->Result<PolledSignals>{
+    let clock=Clock::new(now,deadline)?;
+    let lease=CredentialLease::acquire(database,profile)?;clock.authority(owner,address,session,epoch)?;
+    let snapshot=journal::load(database,profile)?;let record=active(&snapshot,address,expected,clock.current()?)?;
+    let metadata=record.grant().ok_or_else(denied)?;
+    let grant=verify_grant(metadata.document(),metadata.audience(),clock.current()?)?;
+    let peer=if record.public_key()==grant.host_public_key{&grant.client_public_key}else{&grant.host_public_key};
+    let identity_record=snapshot.records().iter().find(|identity|identity.address().kind()==SecretKind::DeviceSigning&&identity.phase()==Phase::Active&&identity.public_key()==record.public_key()).ok_or_else(denied)?;
+    let identity=load_identity(store,&identity_record.address(),identity_record.public_key())?;
+    clock.authority(owner,address,session,epoch)?;lease.check(database,profile)?;
+    let response=relay.request(&identity,metadata.audience(),RelayOperation::Receive{grant:metadata.document().clone(),after:record.receive_cursor(),limit:8},clock.current()?,deadline,cancel)?;
+    let response:ReceiveReply=serde_json::from_value(response).map_err(|_|denied())?;
+    if response.packets.len()>8{return Err(denied());}
+    let mut cursor=record.receive_cursor();let mut sequence=record.receive_sequence();let mut messages=BTreeSet::new();
+    for packet in &response.packets{
+        let current=clock.current()?;
+        if packet.cursor<=cursor||packet.cursor>9_007_199_254_740_991||packet.sequence<=sequence||packet.sequence>1_000_000||
+            packet.message_id.is_nil()||packet.session_id.is_nil()||packet.sender_public_key!=*peer||!messages.insert(packet.message_id)||
+            packet.expires_at_ms==0||packet.expires_at_ms>9_007_199_254_740_991||packet.expires_at_ms<=current.saturating_sub(30_000)||
+            packet.expires_at_ms>current.saturating_add(90_000)||packet.expires_at_ms>grant.expires_at_ms{return Err(denied());}
+        if decode(&packet.iv,12)?.len()!=12||decode(&packet.ciphertext,MAX_PACKET_BYTES)?.len()<16{return Err(denied());}
+        cursor=packet.cursor;sequence=packet.sequence;
+    }
+    clock.authority(owner,address,session,epoch)?;lease.check(database,profile)?;
+    active(&snapshot,address,expected,clock.current()?)?;
+    if cancel.load(Ordering::Acquire){return Err(PlatformError::new(ErrorCode::Cancelled,"Native signaling receive was cancelled"));}
+    Ok(PolledSignals{address,epoch,revision:expected,deadline,packets:response.packets,next:0})
 }

@@ -2,6 +2,13 @@
 
 ## Current sequence — 1–109 outstanding tasks
 
+Item 58 now connects bounded native HTTPS receive polling to a non-skippable
+encrypted batch and sequential authenticated/journal-committed acceptance. Poll
+does not advance the cursor; original epoch/revision/deadline and native session
+authority are checked before delivery. Unknown-session recovery, actual receiver
+ownership/authority, ICE/revocation and product/mobile dispatch remain unfinished.
+No HTTP/vault/crypto/SQL/build/test was executed; original scope remains open.
+
 Item 58 now authors a bounded allowlisted paired HTTPS relay client and connects
 prepared-send packets to pinned vault identity/request signing and exact send
 acknowledgment admission under the retained credential lease. Original session
