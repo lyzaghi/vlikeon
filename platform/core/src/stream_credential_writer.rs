@@ -45,6 +45,33 @@ impl<'a> NativeCredentialWriter<'a>{
         check(deadline)?;
         Ok(Candidate{address,public_key,revision:ready.revision()})
     }
+    fn active_signer(&self,expected:u64,address:CredentialAddress)->Result<NativeSigningIdentity>{
+        let snapshot=journal::load_scoped(self.database,&self.lease,self.profile)?;
+        if snapshot.revision()!=expected{return Err(conflict());}
+        let record=snapshot.records().iter().find(|record|record.address()==address&&record.phase()==Phase::Active&&address.kind()==SecretKind::DeviceSigning).ok_or_else(conflict)?;
+        load_identity(self.store,&address,record.public_key())
+    }
+    pub fn begin_client(&self,expected:u64,address:CredentialAddress,code:&str,host:&str,audience:&str,label:&str,
+        now:u64,deadline:Instant)->Result<omniplay_streaming::native_pair_exchange::NativeClientPairing>{
+        let started=begin(deadline)?;let signer=self.active_signer(expected,address)?;check(deadline)?;
+        let pending=omniplay_streaming::native_pair_exchange::NativeClientPairing::from_invitation_code(&signer,code,host,audience,label,elapsed_now(now,started)?)?;
+        self.lease.check(self.database,self.profile)?;check(deadline)?;Ok(pending)
+    }
+    pub fn join_client(&self,expected:u64,address:CredentialAddress,pending:&mut omniplay_streaming::native_pair_exchange::NativeClientPairing,
+        relay:&omniplay_streaming::native_relay::NativePairRelay,now:u64,deadline:Instant,cancel:&std::sync::atomic::AtomicBool)->Result<()>{
+        let started=begin(deadline)?;let signer=self.active_signer(expected,address)?;check(deadline)?;
+        pending.submit_join(relay,&signer,elapsed_now(now,started)?,deadline,cancel)?;
+        self.lease.check(self.database,self.profile)?;check(deadline)?;
+        if cancel.load(std::sync::atomic::Ordering::Acquire){return Err(conflict());}Ok(())
+    }
+    pub fn poll_client(&self,expected:u64,address:CredentialAddress,pending:&mut omniplay_streaming::native_pair_exchange::NativeClientPairing,
+        relay:&omniplay_streaming::native_relay::NativePairRelay,now:u64,deadline:Instant,cancel:&std::sync::atomic::AtomicBool)
+        ->Result<omniplay_streaming::native_pair_exchange::NativeClientPairingStatus>{
+        let started=begin(deadline)?;let signer=self.active_signer(expected,address)?;check(deadline)?;
+        let result=pending.poll_status(relay,&signer,elapsed_now(now,started)?,deadline,cancel)?;
+        self.lease.check(self.database,self.profile)?;check(deadline)?;
+        if cancel.load(std::sync::atomic::Ordering::Acquire){return Err(conflict());}Ok(result)
+    }
     /// Native host calls only AFTER its actual local opt-in. This method is not
     /// a consent dialog and must never be exposed as a renderer signing API.
     /// The admitted identity is reloaded with its pinned public key before the

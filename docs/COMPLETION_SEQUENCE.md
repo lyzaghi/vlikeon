@@ -2,6 +2,13 @@
 
 ## Current sequence — 1–109 outstanding tasks
 
+Item 58 now authors LocalHost-owned single pending client ticket bound to exact
+identity/revision/native epoch, scoped signer reload for begin/join/poll and
+consume-on-consent candidate publication. Cancel/detach/close discard transient
+proof; no peer/transport authority is automatically activated. No native/vault/
+crypto/SQL/HTTP/compiler/build/test ran. Mobile ABI/UI foreground/peer consent
+wiring, host controller and recovery qualification remain due; full scope is open.
+
 Item 58 now authors host decline with immediate local approval fence and retained
 exact hello evidence, plus terminal native invite close that clears proof. Server
 decline checks actual pending/declined state and no longer acknowledges missing/

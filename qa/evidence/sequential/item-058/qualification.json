@@ -115,6 +115,7 @@
     "Host decline fences local approval before dispatch, retains bounded exact hello retry evidence and requires bound receipt; server refuses missing/approved joins instead of false positive acknowledgment",
     "Native invite close clears proof and terminally fences local use, requiring exact owned-deletion receipt without treating NotFound or lost response as confirmation; durable crash/post-expiry reconciliation remains unfinished"
   ],
+  "pending_client_controller_source": "LocalHost owns one ticket bound to identity/revision/native epoch; begin/join/poll reload scoped Active signer; consent consumes exact transcript into MaterialReady; mobile ABI/UI remains unintegrated",
   "build_executed": false,
   "tests_executed": false,
   "vault_api_executed": false,

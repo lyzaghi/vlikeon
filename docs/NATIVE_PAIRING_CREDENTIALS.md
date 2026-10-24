@@ -1695,6 +1695,34 @@ No relay/SQL/native/crypto/parser operation, deployment, compiler, build or test
 ran. Real controller/UI/foreground wiring, receipt persistence and qualification
 remain required; item 58 and the original full objective remain open.
 
+## LocalHost owns the pending client controller
+
+LocalHost now retains at most one opaque pending client transcript, with a fresh
+native ticket bound to the exact identity generation, journal revision and native
+lifecycle epoch. Begin checks enabled installed origins and reloads the Active
+pinned signer under the credential lease before creating the transcript. A live
+pending object is not silently replaced. Public output contains ticket, peer key/
+fingerprint, comparison code and expiry; proof/exchange never enters that output.
+
+Join and poll accept only ticket/epoch and reload that same identity/revision
+under the scoped lease before each signed network operation. They cannot accept
+replacement invite/hello/grant/key material. Explicit cancellation drops the exact
+pending transcript; detach/close clear it with other transient capabilities. These
+local actions do not revoke an already approved remote pair or prove remote exit.
+
+The native consent entry takes and consumes the pending object before handing it
+to the existing approved-client writer. Errors after candidate publication require
+journal inspection, not recreation of the ephemeral exchange. It returns only
+MaterialReady metadata and does not automatically activate a pair. Host identity
+revocation or any journal revision change makes old pending operations refuse.
+
+Actual mobile ABI/UI wiring must supply/check the real foreground epoch and
+cancellation token around these calls, independently approve the peer key and
+comparison/input permission, and clear scanned-code input. These methods are not
+renderer commands and no UI dialog/OS attestation is implied by calling them.
+No native/vault/crypto/SQL/network call, compiler, build or test ran. Mobile/host
+controller completion and full recovery/qualification scope remain unfinished.
+
 ## Remaining implementation and qualification
 
 - Journal/executor/lease/writer product integration, authority epochs, actual native owner

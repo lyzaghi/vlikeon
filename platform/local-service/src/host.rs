@@ -6,6 +6,8 @@ use uuid::Uuid;
 
 struct NativeIdentityReview{ id:Uuid,address:omniplay_streaming::native_credentials::CredentialAddress,
     revision:u64,provider_epoch:u64,deadline:std::time::Instant }
+struct NativePendingClient{id:Uuid,identity:omniplay_streaming::native_credentials::CredentialAddress,revision:u64,epoch:u64,
+    pairing:omniplay_streaming::native_pair_exchange::NativeClientPairing}
 /// Trusted native UI supplies file capabilities. WebView requests contain UUIDs,
 /// never arbitrary filesystem paths or native executable locations.
 pub struct LocalHost {
@@ -17,6 +19,7 @@ pub struct LocalHost {
     sync_jobs:crate::sync_jobs::SyncJobs,lifecycle:Arc<crate::SyncLifecycle>,
     sessions:WebSessions,assistant:Assistant,results:HashMap<Uuid,(Vec<u8>,Response)>,order:VecDeque<Uuid>,
     identity_review:Option<NativeIdentityReview>,
+    pairing_client:Option<NativePendingClient>,
 }
 impl LocalHost {
     pub fn open(root:&Path,profile_id:Uuid)->Result<Self>{
@@ -28,7 +31,7 @@ impl LocalHost {
     fn open_inner(root:&Path,profile_id:Uuid,credentials:Option<Arc<dyn omniplay_sync_client::CredentialStore>>)->Result<Self>{
         let database=Database::open(root)?;SessionManager::recover_interrupted(&database)?;
         let lifecycle=Arc::new(crate::SyncLifecycle::default());
-        Ok(Self{profile_id,database,credentials,sync_jobs:crate::sync_jobs::SyncJobs::new(lifecycle.clone()),lifecycle,owner:Uuid::new_v4(),closed:false,asset_ranges:Arc::new(crate::asset_ranges::AssetRanges::default()),permissions:PermissionBroker::default(),directories:DirectoryGrants::default(),transfers:crate::transfers::Transfers::default(),imports:crate::import_jobs::ImportJobs::default(),device_probe:omniplay_device_info::DeviceProbe::default(),sessions:WebSessions::default(),assistant:Assistant::default(),results:HashMap::new(),order:VecDeque::new(),identity_review:None})
+        Ok(Self{profile_id,database,credentials,sync_jobs:crate::sync_jobs::SyncJobs::new(lifecycle.clone()),lifecycle,owner:Uuid::new_v4(),closed:false,asset_ranges:Arc::new(crate::asset_ranges::AssetRanges::default()),permissions:PermissionBroker::default(),directories:DirectoryGrants::default(),transfers:crate::transfers::Transfers::default(),imports:crate::import_jobs::ImportJobs::default(),device_probe:omniplay_device_info::DeviceProbe::default(),sessions:WebSessions::default(),assistant:Assistant::default(),results:HashMap::new(),order:VecDeque::new(),identity_review:None,pairing_client:None})
     }
     pub fn credential_store(&self)->Option<Arc<dyn omniplay_sync_client::CredentialStore>>{self.credentials.clone()}
     fn ensure_open(&self)->Result<()>{if self.closed{Err(PlatformError::new(ErrorCode::NotFound,"Mobile profile is closed"))}else{Ok(())}}
@@ -169,6 +172,61 @@ impl LocalHost {
         Ok(json!({"credential_protocol":1,"address":review.address,"revision":revision,"phase":"active","approves_remote_peer":false}))
     }
     pub fn native_pairing_cancel_identity_review(&mut self){self.identity_review=None;}
+    /// Native controller only; code includes bearer proof and must never enter
+    /// renderer commands/logs. Epoch comes from the attached live native host.
+    pub fn native_pairing_client_begin(&mut self,store:&dyn omniplay_streaming::native_credentials::PairingSecretStore,
+        identity:omniplay_streaming::native_credentials::CredentialAddress,expected:u64,epoch:u64,
+        code:&str,host:&str,audience:&str,label:&str,deadline:std::time::Instant)->Result<Value>{
+        self.ensure_open()?;let origins=omniplay_core::stream_signal_authority::installed_pairing_origins()?;
+        if std::time::Instant::now()>=deadline{return Err(PlatformError::new(ErrorCode::DeadlineExceeded,"Native pairing expired before controller admission"));}
+        if epoch==0||!origins.iter().any(|origin|origin==audience){return Err(PlatformError::new(ErrorCode::PermissionDenied,"Native pairing scope or relay is unavailable"));}
+        if self.pairing_client.as_ref().is_some_and(|pending|std::time::Instant::now()<pending.pairing.native_deadline()){
+            return Err(PlatformError::new(ErrorCode::Busy,"Cancel or finish the current native client pairing first"));
+        }
+        self.pairing_client=None;
+        let writer=omniplay_core::stream_credential_writer::NativeCredentialWriter::open(&self.database,self.profile_id,store)?;
+        let pending=writer.begin_client(expected,identity,code,host,audience,label,omniplay_core::now_ms(),deadline)?;
+        let id=Uuid::new_v4();let result=json!({"pairing_protocol":1,"ticket":id,"comparison_code":pending.comparison_code(),
+            "host_public_key":host,"host_fingerprint":omniplay_streaming::key_id(host)?,"expires_at_ms":pending.expires_at_ms(),"revision":expected});
+        self.pairing_client=Some(NativePendingClient{id,identity,revision:expected,epoch,pairing:pending});Ok(result)
+    }
+    /// Exact ticket/epoch only; no replacement invite, hello, key or grant.
+    pub fn native_pairing_client_join_or_poll(&mut self,store:&dyn omniplay_streaming::native_credentials::PairingSecretStore,
+        ticket:Uuid,epoch:u64,poll:bool,deadline:std::time::Instant,cancel:&std::sync::atomic::AtomicBool)->Result<Value>{
+        self.ensure_open()?;
+        let origins=omniplay_core::stream_signal_authority::installed_pairing_origins()?;
+        if std::time::Instant::now()>=deadline||cancel.load(std::sync::atomic::Ordering::Acquire){return Err(PlatformError::new(ErrorCode::Cancelled,"Native pairing operation expired or was cancelled"));}
+        let pending=self.pairing_client.as_mut().ok_or_else(||PlatformError::new(ErrorCode::NotFound,"Native client pairing is absent"))?;
+        if pending.id!=ticket||pending.epoch!=epoch||epoch==0||std::time::Instant::now()>=pending.pairing.native_deadline(){return Err(PlatformError::new(ErrorCode::PermissionDenied,"Native pairing ticket expired or changed lifecycle"));}
+        let relay=omniplay_streaming::native_relay::NativePairRelay::new(origins)?;
+        let writer=omniplay_core::stream_credential_writer::NativeCredentialWriter::open(&self.database,self.profile_id,store)?;
+        if !poll{writer.join_client(pending.revision,pending.identity,&mut pending.pairing,&relay,omniplay_core::now_ms(),deadline,cancel)?;
+            return Ok(json!({"pairing_protocol":1,"ticket":ticket,"state":"pending","approves_peer":false}));}
+        use omniplay_streaming::native_pair_exchange::NativeClientPairingStatus;
+        let status=writer.poll_client(pending.revision,pending.identity,&mut pending.pairing,&relay,omniplay_core::now_ms(),deadline,cancel)?;
+        let status=match status{NativeClientPairingStatus::Pending=>json!({"state":"pending"}),NativeClientPairingStatus::Declined=>json!({"state":"declined"}),
+            NativeClientPairingStatus::Approved{pair_id,input_allowed,expires_at_ms}=>json!({"state":"approved","pair_id":pair_id,"input_allowed":input_allowed,"expires_at_ms":expires_at_ms})};
+        Ok(json!({"pairing_protocol":1,"ticket":ticket,"status":status,"local_consent_required":true}))
+    }
+    pub fn native_pairing_client_cancel(&mut self,ticket:Uuid)->Result<()>{
+        self.ensure_open()?;
+        if self.pairing_client.as_ref().is_none_or(|pending|pending.id!=ticket){return Err(PlatformError::new(ErrorCode::NotFound,"Native client pairing ticket is absent"));}
+        self.pairing_client=None;Ok(())
+    }
+    /// Actual native comparison/peer/input consent must precede this call.
+    /// Consumes the exact pending transcript even on uncertain writer failure;
+    /// inspect durable journal state rather than recreating the exchange.
+    pub fn native_pairing_client_prepare_after_local_consent(&mut self,store:&dyn omniplay_streaming::native_credentials::PairingSecretStore,
+        ticket:Uuid,epoch:u64,deadline:std::time::Instant,cancel:&std::sync::atomic::AtomicBool)->Result<Value>{
+        self.ensure_open()?;omniplay_core::stream_signal_authority::require_installed_pairing_policy()?;
+        let pending=self.pairing_client.as_ref().ok_or_else(||PlatformError::new(ErrorCode::NotFound,"Native client pairing is absent"))?;
+        if pending.id!=ticket||pending.epoch!=epoch||epoch==0||std::time::Instant::now()>=deadline.min(pending.pairing.native_deadline())||cancel.load(std::sync::atomic::Ordering::Acquire){
+            return Err(PlatformError::new(ErrorCode::PermissionDenied,"Native pairing ticket expired, cancelled or changed lifecycle"));
+        }
+        let pending=self.pairing_client.take().ok_or_else(||PlatformError::new(ErrorCode::NotFound,"Native client pairing is absent"))?;
+        let value=self.native_pairing_prepare_client_after_local_consent(store,pending.identity,pending.revision,pending.pairing,deadline)?;
+        if cancel.load(std::sync::atomic::Ordering::Acquire){return Err(PlatformError::new(ErrorCode::Cancelled,"Native candidate may have committed; reload pairing status"));}Ok(value)
+    }
     /// Actual native peer-consent controller must approve the exact candidate.
     /// No renderer dispatch and current disabled installed policy refuses.
     pub fn native_pairing_activate_client_after_local_consent(&self,store:&dyn omniplay_streaming::native_credentials::PairingSecretStore,
@@ -345,7 +403,7 @@ impl LocalHost {
             _=>Err(PlatformError::new(ErrorCode::UnsupportedCapability,"This operation is not enabled by the current mobile platform policy")),
         }
     }
-    fn clear_transient(&mut self){self.identity_review=None;self.asset_ranges.close_owner(self.owner);self.sync_jobs.cancel_all();self.sync_jobs.abandon_actions(self.owner);self.imports.cancel_all();self.sessions.close(&self.database);self.transfers.clear();self.permissions.revoke_owner(self.owner);self.directories.revoke_owner(self.owner);}
+    fn clear_transient(&mut self){self.identity_review=None;self.pairing_client=None;self.asset_ranges.close_owner(self.owner);self.sync_jobs.cancel_all();self.sync_jobs.abandon_actions(self.owner);self.imports.cancel_all();self.sessions.close(&self.database);self.transfers.clear();self.permissions.revoke_owner(self.owner);self.directories.revoke_owner(self.owner);}
     pub fn close(&mut self){self.closed=true;self.lifecycle.set_foreground(false);self.clear_transient();}
     pub fn detach(&mut self){self.clear_transient();self.owner=Uuid::new_v4();self.transfers=crate::transfers::Transfers::default();self.results.clear();self.order.clear();}
     pub fn suspend(&mut self)->Result<()>{let ids=self.sessions.list().into_iter().filter(|s|s.state==SessionState::Running).map(|s|s.id).collect::<Vec<_>>();for id in ids{self.sessions.heartbeat(&self.database,id,SessionState::Paused)?;}Ok(())}
