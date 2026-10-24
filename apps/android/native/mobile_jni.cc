@@ -186,6 +186,14 @@ Java_org_chromium_chrome_browser_omniplay_NativeCore_nativeAttachPairing(JNIEnv*
   // the same native context; no Java object/secret appears in renderer protocol.
   return response_bytes(env,om_mobile_attach_pairing_credentials_v1(static_cast<uint64_t>(handle),callbacks));
 }
+extern "C" JNIEXPORT jbyteArray JNICALL
+Java_org_chromium_chrome_browser_omniplay_NativeCore_nativePairingRecovery(JNIEnv* env,jclass,jlong handle,jbyteArray input,jint budget){
+  if(handle<=0||!input||budget<1000||budget>25000)return nullptr;
+  const auto length=env->GetArrayLength(input);if(exception(env)||length<=0||length>1024)return nullptr;
+  uint8_t bytes[1024]{};
+  env->GetByteArrayRegion(input,0,length,reinterpret_cast<jbyte*>(bytes));if(exception(env))return nullptr;
+  return response_bytes(env,om_mobile_pairing_advance_metadata_v1(static_cast<uint64_t>(handle),bytes,static_cast<size_t>(length),static_cast<uint32_t>(budget)));
+}
 
 extern "C" JNIEXPORT jbyteArray JNICALL
 Java_org_chromium_chrome_browser_omniplay_NativeCore_nativeOpen(JNIEnv* env,jclass,jbyteArray input,jobject provider){

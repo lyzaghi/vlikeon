@@ -168,6 +168,74 @@ public final class NativeCore {
         },reply);
     }
     void cancelPairingIdentityReview(){mIo.execute(()->{if(mHandle!=0)try{pairingResponse(nativePairingIdentity(4,mHandle,0,null));}catch(Exception|LinkageError ignored){/* Review remains bounded by epoch/expiry. */}});}
+    private static native byte[] nativePairingRecovery(long handle,byte[] input,int budget);
+    interface RecoveryReply { void accept(RecoverySnapshot snapshot,String error); }
+    static final class RecoveryRecord {
+        final String profile,device,kind,item,generation,phase,key,nextStep;
+        private RecoveryRecord(JSONObject record,String expectedProfile,String expectedDevice,JSONObject action) throws Exception {
+            JSONObject address=record.getJSONObject("address");profile=address.getString("profile");device=address.getString("device");
+            kind=address.getString("kind");item=address.getString("id");generation=address.getString("generation");phase=record.getString("phase");key=record.getString("public_key");
+            nextStep=action==null?null:action.getString("next_step");
+            if(!profile.equals(expectedProfile)||!device.equals(expectedDevice)||!canonicalPairingId(profile)||!canonicalPairingId(device)||!canonicalPairingId(item)||!canonicalPairingId(generation)
+                    ||!("device_signing".equals(kind)||"pair_encryption".equals(kind))||("device_signing".equals(kind)&&!item.equals(device))
+                    ||!java.util.Arrays.asList("reserved","writing","material_ready","active","revoking","retired").contains(phase)||!key.matches("[A-Za-z0-9_-]{43}")
+                    ||!matchesAddress(address)||("retired".equals(phase)!=(action==null)))throw new IllegalStateException();
+            if(action!=null&&(!matchesAddress(action.getJSONObject("address"))||!java.util.Arrays.asList("fence_generation","revalidate_before_use","retire_writer","retire_local_sessions","wait_for_pair_cleanup","revoke_relay","remove_material","finalize_retirement").contains(nextStep)))throw new IllegalStateException();
+        }
+        boolean isIdentity(){return "device_signing".equals(kind);}
+        boolean canAdvance(){return "fence_generation".equals(nextStep)||"finalize_retirement".equals(nextStep);}
+        private boolean matchesAddress(JSONObject value) throws Exception {
+            return value.length()==5&&profile.equals(value.getString("profile"))&&device.equals(value.getString("device"))&&kind.equals(value.getString("kind"))&&item.equals(value.getString("id"))&&generation.equals(value.getString("generation"));
+        }
+        private JSONObject address() throws Exception{return new JSONObject().put("profile",profile).put("device",device).put("kind",kind).put("id",item).put("generation",generation);}
+    }
+    static final class RecoverySnapshot {
+        final long revision,expires;final java.util.List<RecoveryRecord> records;
+        private RecoverySnapshot(JSONObject status,String profile,long deadline) throws Exception {
+            if(status.getInt("credential_protocol")!=1||status.getInt("recovery_protocol")!=1||!profile.equals(status.getString("profile_id"))||!canonicalPairingId(status.getString("device_id")))throw new IllegalStateException();
+            revision=status.getLong("revision");expires=deadline;
+            if(revision<0||revision>10_000_000||android.os.SystemClock.elapsedRealtime()>=expires)throw new IllegalStateException();
+            org.json.JSONArray rows=status.getJSONArray("records"),actions=status.getJSONArray("recovery");
+            if(rows.length()>128||actions.length()>128)throw new IllegalStateException();
+            java.util.Map<String,JSONObject> pending=new java.util.HashMap<>();
+            for(int i=0;i<actions.length();i++){
+                JSONObject action=actions.getJSONObject(i);String generation=action.getJSONObject("address").getString("generation");
+                if(pending.put(generation,action)!=null)throw new IllegalStateException();
+            }
+            java.util.ArrayList<RecoveryRecord> parsed=new java.util.ArrayList<>();java.util.Set<String> seen=new java.util.HashSet<>();
+            for(int i=0;i<rows.length();i++){
+                JSONObject row=rows.getJSONObject(i);String generation=row.getJSONObject("address").getString("generation");
+                if(!seen.add(generation))throw new IllegalStateException();
+                parsed.add(new RecoveryRecord(row,profile,status.getString("device_id"),pending.remove(generation)));
+            }
+            if(!pending.isEmpty())throw new IllegalStateException();records=java.util.Collections.unmodifiableList(parsed);
+        }
+    }
+    /** Read only, including when installed streaming policy is disabled. */
+    void pairingRecoveryStatus(java.util.function.BooleanSupplier alive,RecoveryReply reply){
+        java.util.concurrent.atomic.AtomicReference<RecoverySnapshot> snapshot=new java.util.concurrent.atomic.AtomicReference<>();
+        work(()->{
+            if(!alive.getAsBoolean()||!mPairingAttached)throw new IllegalStateException();
+            long expires=android.os.SystemClock.elapsedRealtime()+30_000;
+            JSONObject response=pairingResponse(nativePairingIdentity(0,mHandle,0,null));
+            snapshot.set(new RecoverySnapshot(pairingResult(response),mProfile,expires));
+            if(!alive.getAsBoolean())throw new IllegalStateException();return response;
+        },response->{if("ok".equals(response.optString("status"))&&snapshot.get()!=null)reply.accept(snapshot.get(),null);else reply.accept(null,"Recovery status is unavailable. Open it again before continuing.");});
+    }
+    /** Explicit approval of the exact snapshot record; no automatic cleanup. */
+    void advancePairingMetadata(RecoverySnapshot snapshot,RecoveryRecord record,java.util.function.BooleanSupplier alive,Reply reply){
+        work(()->{
+            long remaining=snapshot.expires-android.os.SystemClock.elapsedRealtime();
+            if(!alive.getAsBoolean()||!mPairingAttached||remaining<1_000||!snapshot.records.contains(record)||!record.canAdvance())throw new IllegalStateException();
+            byte[] input=new JSONObject().put("address",record.address()).put("expected_revision",snapshot.revision).toString().getBytes(StandardCharsets.UTF_8);
+            JSONObject response;
+            try{response=pairingResponse(nativePairingRecovery(mHandle,input,(int)Math.min(25_000,remaining)));}finally{java.util.Arrays.fill(input,(byte)0);}
+            JSONObject value=pairingResult(response);String outcome=value.getJSONObject("result").getString("outcome");
+            if(!alive.getAsBoolean()||value.getInt("recovery_protocol")!=1||!value.getBoolean("reload_required")||!record.matchesAddress(value.getJSONObject("address"))
+                    ||!java.util.Arrays.asList("committed","pending","revalidation_required","already_retired").contains(outcome))throw new IllegalStateException();
+            return response;
+        },reply);
+    }
     private static native byte[] nativeAttachPairing(long handle, PairingCredentials provider);
     private boolean attachPairingCredentials() throws Exception {
         byte[] scopeBytes = null, attachedBytes = null;

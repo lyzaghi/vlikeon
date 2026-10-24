@@ -1017,6 +1017,39 @@ sheet/presentation/accessibility behavior, device lifecycle, ABI/vault/SQL and
 compilation remain unverified. No UI/native call, build or test was executed.
 Android recovery UI and actual external retirement owners remain unfinished.
 
+## Android native recovery inspection and explicit metadata action
+
+The native Game Hub actions menu now includes status/recovery, separately from
+identity setup. Status remains readable when streaming policy is disabled. A
+typed immutable Java snapshot admits the native protocol/profile/device/revision,
+at most 128 records/actions, unique canonical generation addresses, known phases
+and recovery steps, and an exact record/action address match. Retired records
+have no next action. Snapshot lifetime starts before native status I/O and is not
+restarted by main-thread delivery delays.
+
+The native list/detail dialogs show exact public key, device, generation, phase
+and next step. Merely opening a row never executes recovery. External producer,
+relay and vault cleanup remains waiting with no execution action. Journal fencing
+requires a native approval action after displaying its permanence, pair effects
+and the distinction from actually stopping connections/deleting keys. Fully
+receipted finalization has a separate finish action.
+
+The private, shrinker-retained recovery JNI method accepts at most 1024 borrowed
+JSON bytes and a 1–25 second budget. Its Java caller sends only the exact selected
+immutable snapshot record and expected revision, with a budget capped by the
+remaining 30-second snapshot lifetime. Rust reselects the current plan under its
+credential lease; Java admits the exact returned address/protocol/outcome and
+requires status reload. No retirement flags or secret bytes cross this entry.
+
+Recovery shares the existing atomic native dialog lifetime and pause/disconnect/
+close/cancel/expiry invalidation. Cancellation cannot preempt synchronous native
+work or undo an already committed fence. There is no automatic follow-on step,
+replacement key, producer-retired assumption or cleanup retry.
+
+No Java/C++ compilation, Android dialog/menu, JNI endpoint, lease/SQL mutation,
+vault, build or test was executed. Actual device/lifecycle/presentation/localization
+qualification, startup reconciliation and external retirement owners remain due.
+
 ## Remaining implementation and qualification
 
 - Journal/executor/lease/writer product integration, authority epochs, actual native owner

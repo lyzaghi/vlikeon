@@ -2,6 +2,14 @@
 
 ## Current sequence — 1–109 outstanding tasks
 
+Item 58 now authors Android native recovery list/detail/approval UI, immutable
+bounded status/plan snapshots and a private recovery JNI caller. Exact selected
+address/revision and remaining snapshot budget bind metadata actions; external
+producer/relay/vault steps stay waiting. Policy remains disabled and status is
+still readable. No compiler/UI/JNI/native/file/SQL/build/test was executed.
+Startup reconciliation, actual retirement owners and qualification remain due;
+item 58 and the complete original 51–109 scope remain unfinished.
+
 Item 58 now authors iOS native recovery status/list/detail UI and an explicit
 metadata-action caller. Record/plan/address/revision admission and a bounded
 snapshot lifetime prevent automatic plan execution; waiting external cleanup has

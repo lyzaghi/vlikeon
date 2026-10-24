@@ -156,7 +156,7 @@ public final class GameHubController implements AutoCloseable {
     private void showNativeHubActions(){
         if(!identityUiAvailable()||mIdentityDialog!=null||mIdentityFlow!=null)return;
         AlertDialog menu=new AlertDialog.Builder(mActivity).setTitle("Vlikeon Game Hub")
-                .setItems(new String[]{"Continue to library","Remote Play identity"},(dialog,index)->{mIdentityDialog=null;if(index==1)beginIdentityReview();})
+                .setItems(new String[]{"Continue to library","Remote Play identity","Remote Play status and recovery"},(dialog,index)->{mIdentityDialog=null;if(index==1)beginIdentityReview();else if(index==2)beginPairingRecovery();})
                 .setNegativeButton(android.R.string.cancel,(dialog,which)->mIdentityDialog=null).create();
         mIdentityDialog=menu;menu.setOnDismissListener(dialog->{if(mIdentityDialog==menu)mIdentityDialog=null;});menu.show();
     }
@@ -185,6 +185,59 @@ public final class GameHubController implements AutoCloseable {
             mIdentityDialog=alert;alert.setOnCancelListener(dialog->cancelIdentityReview());
             mIdentityExpiry=()->{if(mIdentityFlow==owner)cancelIdentityReview();};mMain.postDelayed(mIdentityExpiry,remaining);alert.show();
         });
+    }
+    private void beginPairingRecovery(){
+        if(!identityUiAvailable()||mIdentityFlow!=null)return;
+        java.util.concurrent.atomic.AtomicBoolean owner=new java.util.concurrent.atomic.AtomicBoolean(true);mIdentityFlow=owner;
+        mCore.pairingRecoveryStatus(owner::get,(snapshot,error)->{
+            if(mIdentityFlow!=owner||!owner.get())return;
+            if(!identityUiAvailable()){cancelIdentityReview();return;}
+            if(snapshot==null){cancelIdentityReview();identityNotice(error);return;}
+            long remaining=snapshot.expires-android.os.SystemClock.elapsedRealtime();
+            if(remaining<=0){cancelIdentityReview();identityNotice("Recovery status expired. Open it again.");return;}
+            if(snapshot.records.isEmpty()){cancelIdentityReview();identityNotice("This device has no Remote Play identity or pair records.");return;}
+            String[] titles=new String[snapshot.records.size()];
+            for(int i=0;i<titles.length;i++){NativeCore.RecoveryRecord record=snapshot.records.get(i);titles[i]=(record.isIdentity()?"Identity · ":"Device pair · ")+record.generation;}
+            AlertDialog list=new AlertDialog.Builder(mActivity).setTitle("Remote Play status")
+                    .setItems(titles,(dialog,index)->{mIdentityDialog=null;showPairingRecovery(snapshot,snapshot.records.get(index),owner);})
+                    .setNegativeButton(android.R.string.cancel,(dialog,which)->cancelIdentityReview()).create();
+            mIdentityDialog=list;list.setOnCancelListener(dialog->cancelIdentityReview());
+            mIdentityExpiry=()->{if(mIdentityFlow==owner)cancelIdentityReview();};mMain.postDelayed(mIdentityExpiry,remaining);list.show();
+        });
+    }
+    private static String recoveryPhase(String phase){
+        switch(phase){case "reserved":return "Reserved";case "writing":return "Key write not confirmed";case "material_ready":return "Awaiting identity approval";case "active":return "Active";case "revoking":return "Being revoked";case "retired":return "Cleanup complete";default:return "Unknown";}
+    }
+    private static String recoveryStep(String step){
+        if(step==null)return "No cleanup step remains.";
+        switch(step){
+            case "fence_generation":return "Disable this generation before recovery.";
+            case "revalidate_before_use":return "Live authorization must be checked before use.";
+            case "retire_writer":return "Waiting for confirmation that the key writer has stopped.";
+            case "retire_local_sessions":return "Waiting for confirmation that local sessions have stopped.";
+            case "wait_for_pair_cleanup":return "Waiting for device pair cleanup.";
+            case "revoke_relay":return "Waiting for relay revocation confirmation.";
+            case "remove_material":return "Waiting for key removal and vault verification.";
+            case "finalize_retirement":return "Finish cleanup.";
+            default:return "Recovery status must be reloaded.";
+        }
+    }
+    private void showPairingRecovery(NativeCore.RecoverySnapshot snapshot,NativeCore.RecoveryRecord record,java.util.concurrent.atomic.AtomicBoolean owner){
+        if(mIdentityFlow!=owner||!owner.get()||!identityUiAvailable()||android.os.SystemClock.elapsedRealtime()>=snapshot.expires){cancelIdentityReview();return;}
+        String message="Device: "+record.device+"\nGeneration: "+record.generation+"\nStatus: "+recoveryPhase(record.phase)+"\nPublic key:\n"+record.key+"\n\n"+recoveryStep(record.nextStep);
+        if("fence_generation".equals(record.nextStep))message+="\n\nDisabling this generation is permanent. Disabling an identity also disables its pairs. This does not confirm that connections stopped or keys were deleted.";
+        AlertDialog.Builder builder=new AlertDialog.Builder(mActivity).setTitle("Remote Play record").setMessage(message)
+                .setNegativeButton(android.R.string.cancel,(dialog,which)->cancelIdentityReview());
+        if(record.canAdvance())builder.setPositiveButton("fence_generation".equals(record.nextStep)?"Disable this generation":"Finish cleanup",(dialog,which)->{
+            mIdentityDialog=null;
+            if(mIdentityFlow!=owner||!owner.get()||!identityUiAvailable()||android.os.SystemClock.elapsedRealtime()>=snapshot.expires){cancelIdentityReview();return;}
+            mCore.advancePairingMetadata(snapshot,record,owner::get,response->{
+                if(mIdentityFlow!=owner||!owner.get())return;cancelIdentityReview();
+                if(!identityUiAvailable())return;
+                identityNotice("ok".equals(response.optString("status"))?"Open status and recovery again to inspect the current result and next step.":"The result could not be confirmed. Open status and recovery again before continuing.");
+            });
+        });
+        AlertDialog alert=builder.create();mIdentityDialog=alert;alert.setOnCancelListener(dialog->cancelIdentityReview());alert.show();
     }
     private void cancelIdentityReview(){
         boolean hadFlow=mIdentityFlow!=null;
