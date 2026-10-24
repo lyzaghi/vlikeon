@@ -87,7 +87,9 @@
     "Desktop generic keyring provider retains exact public retirement markers in a separate service and refuses marked generation reads/writes with remaining material",
     "Desktop cleanup requires marker read-back before deletion, explicit secret absence and marker read-back afterward; generic backend late-write containment and WriterRetired proof remain unfinished",
     "Explicit Active-generation native revocation admits exact revision/namespace/lease and retains session/backend/relay/key cleanup debt instead of treating RevalidateBeforeUse as abandonment",
-    "Android/iOS native detail approval routes active records through the dedicated revocation entry and explains permanent identity-to-pair fencing; no actual UI/native/SQL operation was executed"
+    "Android/iOS native detail approval routes active records through the dedicated revocation entry and explains permanent identity-to-pair fencing; no actual UI/native/SQL operation was executed",
+    "Session release now requires an explicit actual native backend-retirement owner, original bounded deadline and exact registered Arc/session/epoch/revision admission before crate-private journal release",
+    "Closed/expired native registry entries retain cleanup tracking within the existing bound; pending/error retirement does not clear durable session ownership; actual backend owner remains unimplemented"
   ],
   "build_executed": false,
   "tests_executed": false,

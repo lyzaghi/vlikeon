@@ -1356,6 +1356,36 @@ follow a committed fence. No automatic retry, replacement or session release is
 introduced. No native/UI/SQL/lease/vault operation, compiler, build or test ran.
 Actual producer retirement and interrupted-session recovery remain unfinished.
 
+## Session release requires the actual backend owner
+
+Source review found that registry release previously closed its permit then
+cleared durable session ownership without requiring a backend retirement call.
+The native contract documented retirement but did not enforce that prerequisite.
+Release now requires a native owner implementing NativeSessionRetirement and an
+original deadline of at most 30 seconds. There is no default implementation or
+renderer acknowledgment path. Actual ICE/media/input/gamepad/signaling owner
+integration remains unfinished and cannot be replaced by a constant confirmation.
+
+The registry closes the permit first, admits the exact registered Arc identity,
+generation/session/epoch/revision and scoped credential lease, then invokes the
+owner to cancel/join and confirm all scoped backend work. Pending/error/timeout
+retains journal ownership and the registry entry. After confirmation, the journal
+mutation re-admits exact ownership/revision/namespace before clearing it. The raw
+release mutation is crate-private. A late post-commit error requires status reload.
+
+Closed or expired registry entries are no longer pruned automatically. They count
+toward the existing 16-entry bound until actual retirement, preventing elapsed
+time or a dropped weak guard from silently discarding native cleanup tracking.
+Dropping the whole registry/permit still leaves durable recovery debt. This change
+does not implement crash recovery or prove that any backend has actually stopped.
+
+The owner callback executes under the retained credential lease and must not
+reacquire it or reenter the registry. Existing in-flight cooperative operations
+must leave their lease before release can acquire it; unrelated retained backend
+work requires its own cancellation/join path. Device/service qualification of
+those paths remains due. No backend/native/SQL operation, compiler, build or test
+was executed; only source review and whitespace checks were performed.
+
 ## Remaining implementation and qualification
 
 - Journal/executor/lease/writer product integration, authority epochs, actual native owner

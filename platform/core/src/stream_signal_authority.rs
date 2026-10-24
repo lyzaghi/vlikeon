@@ -55,6 +55,15 @@ pub fn installed_retirement_origins()->Result<Vec<String>>{
 /// Native product entry gate only; this does not supply local consent or a
 /// session grant. Current installed policy is disabled and therefore refuses.
 pub fn require_installed_pairing_policy()->Result<()>{installed_policy().map(|_|())}
+/// Real native controller owns all backends for this exact session. Confirmed
+/// means canceled/joined signaling work and confirmed ICE/media/input/gamepad
+/// retirement, including work retained after document close. No default owner.
+/// Implementations must not reacquire the credential lease held by release(),
+/// reenter this registry, or equate a closed permit/PID timeout with retirement.
+pub trait NativeSessionRetirement{
+    fn retire(&mut self,address:CredentialAddress,session:Uuid,epoch:u64,deadline:Instant)
+        ->Result<crate::stream_credential_recovery::Retirement>;
+}
 pub struct NativeSignalRegistry<'a>{database:&'a Database,profile:Uuid,entries:BTreeMap<Uuid,Entry>}
 impl<'a> NativeSignalRegistry<'a>{
     pub fn new(database:&'a Database,profile:Uuid)->Result<Self>{
@@ -66,9 +75,8 @@ impl<'a> NativeSignalRegistry<'a>{
         let started=Instant::now();let now=now_ms();let policy=installed_policy()?;
         if document.state.profile!=self.profile||!document.state.alive.load(Ordering::Acquire)||session.is_nil()||
             address.profile()!=self.profile||address.device()!=self.database.device_id{return Err(denied());}
-        // In-memory expired entries are pruned, but their journal ownership is
-        // NEVER cleared by this prune or time. A new registration still refuses.
-        self.entries.retain(|_,entry|entry.deadline>Instant::now()&&entry.permit.upgrade().is_some_and(|permit|permit.alive.load(Ordering::Acquire)));
+        // Closed/expired entries retain native cleanup ownership. Never prune
+        // them by time/liveness: the real backend owner must retire them first.
         if self.entries.len()>=16||self.entries.contains_key(&session){return Err(denied());}
         let lease=CredentialLease::acquire(self.database,self.profile)?;
         let snapshot=journal::load_scoped(self.database,&lease,self.profile)?;
@@ -85,12 +93,29 @@ impl<'a> NativeSignalRegistry<'a>{
         self.entries.insert(session,Entry{address,epoch,document:Arc::downgrade(&document.state),permit:Arc::downgrade(&state),deadline});
         Ok(NativeSignalPermit{address,session,epoch,revision:registered.revision(),state})
     }
-    pub fn release(&mut self,permit:&NativeSignalPermit,expected:u64)->Result<u64>{
+    /// Returns None for pending retirement; permit stays permanently closed and
+    /// the entry/journal owner remain. A late error may follow a durable release.
+    pub fn release(&mut self,permit:&NativeSignalPermit,expected:u64,
+        owner:&mut dyn NativeSessionRetirement,deadline:Instant)->Result<Option<u64>>{
         permit.close();
-        if self.entries.get(&permit.session).is_some_and(|entry|entry.address!=permit.address||entry.epoch!=permit.epoch){return Err(denied());}
+        let started=Instant::now();
+        if deadline<=started||deadline.saturating_duration_since(started)>Duration::from_secs(30){return Err(denied());}
+        let entry=self.entries.get(&permit.session).ok_or_else(denied)?;
+        let registered=entry.permit.upgrade().ok_or_else(denied)?;
+        if entry.address!=permit.address||entry.epoch!=permit.epoch||!Arc::ptr_eq(&registered,&permit.state){return Err(denied());}
         let lease=CredentialLease::acquire(self.database,self.profile)?;
+        let snapshot=journal::load_scoped(self.database,&lease,self.profile)?;
+        if snapshot.revision()!=expected||!snapshot.records().iter().any(|record|record.address()==permit.address&&
+            record.signal_session()==Some(permit.session)&&record.signal_epoch()==permit.epoch)||Instant::now()>=deadline{return Err(denied());}
+        let retired=owner.retire(permit.address,permit.session,permit.epoch,deadline)?;
+        lease.check(self.database,self.profile)?;
+        if Instant::now()>=deadline{return Err(denied());}
+        if matches!(retired,crate::stream_credential_recovery::Retirement::Pending){return Ok(None);}
+        // The journal mutation re-admits revision/namespace/exact owner after
+        // backend work; no owner acknowledgment authorizes overwriting changes.
         let released=journal::release_signal_session(self.database,&lease,self.profile,expected,permit.address,permit.session,permit.epoch)?;
-        self.entries.remove(&permit.session);Ok(released.revision())
+        self.entries.remove(&permit.session);
+        if Instant::now()>=deadline{return Err(denied());}Ok(Some(released.revision()))
     }
 }
 impl NativeSignalAuthority for NativeSignalRegistry<'_>{

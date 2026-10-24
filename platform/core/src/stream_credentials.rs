@@ -340,7 +340,7 @@ pub fn reserve_signal_session(database:&Database,lease:&CredentialLease,profile:
 /// Caller must first close its native authority and retire all scoped operations.
 /// The retained file lease prevents another participating operation from being
 /// in its vault/HTTP/commit lane while this ownership is released.
-pub fn release_signal_session(database:&Database,lease:&CredentialLease,profile:Uuid,expected:u64,address:CredentialAddress,session:Uuid,epoch:u64)->Result<Journal>{
+pub(crate) fn release_signal_session(database:&Database,lease:&CredentialLease,profile:Uuid,expected:u64,address:CredentialAddress,session:Uuid,epoch:u64)->Result<Journal>{
     update(database,lease,profile,expected,|journal|{
         let record=selected(journal,address)?;
         if record.signal_session!=Some(session)||record.signal_epoch!=epoch{return Err(conflict());}

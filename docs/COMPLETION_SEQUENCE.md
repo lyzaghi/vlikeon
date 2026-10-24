@@ -2,6 +2,14 @@
 
 ## Current sequence — 1–109 outstanding tasks
 
+Item 58 source review found session release could clear journal ownership after
+permit close without an enforced backend-retirement call. Release now requires
+the actual native owner, bounded deadline and exact registered permit/session/
+epoch/revision under the scoped lease. Pending/error retains ownership; closed
+entries are no longer automatically pruned. The actual backend owner is still
+unimplemented. No backend/native/SQL/compiler/build/test was executed; full
+original scope remains unfinished.
+
 Item 58 now authors explicit native revocation of Active identity/pair generations,
 separate from advisory recovery plan execution. Android/iOS detail approval routes
 through exact address/revision/namespace/foreground/deadline admission to the
