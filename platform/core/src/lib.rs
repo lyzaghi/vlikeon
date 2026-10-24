@@ -26,6 +26,7 @@ pub mod stream_credentials;
 pub mod stream_credential_recovery;
 pub mod stream_credential_lease;
 pub mod stream_credential_writer;
+pub mod stream_signal_operations;
 pub mod stream_gamepad_arbitration;
 pub mod media_import;
 pub mod asset_storage;

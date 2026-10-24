@@ -295,12 +295,52 @@ for reviewed recovery instead of silently resetting replay history. This is
 not protection against restoring an entire old profile snapshot; backup/restore
 anti-rollback and copied-profile admission remain required.
 
-AEAD and journal APIs are authored separately; no native transport currently
-connects reservation -> encryption -> relay or authentication -> acceptance ->
-session delivery. Receiver ownership/epoch leases, native relay requests,
-revocation wiring and actual WebCrypto/native vectors/replay/crash cases remain
-unfinished. No encryption, decryption, database, vault, network, build or test
-operation was run for this checkpoint.
+The native operation pipeline below now connects AEAD and journal sequencing in
+source. Relay HTTP, product delivery, native authority providers, revocation
+wiring and actual WebCrypto/native vectors/replay/crash cases remain unfinished.
+No encryption, decryption, database, vault, network, build or test operation was
+run for these checkpoints.
+
+## Native per-operation signal pipeline source
+
+`stream_signal_operations.rs` now connects scoped credential exclusion, active
+generation admission, vault key loading, AEAD and durable sequence acceptance.
+Each call owns one lease through all SQL/vault/crypto work; key/cipher temporaries
+are dropped before that lease. An original operation deadline of at most 30
+seconds and native wall time plus monotonic elapsed checks apply. OS/provider/
+SQL calls can still block beyond a deadline; there is no hard-preemption claim.
+
+`prepare_send` admits the exact active generation/revision and session authority,
+commits the next send sequence before key loading, reloads the exact signed-grant-
+bound pair key and seals a bounded packet. It checks authority around slow work
+and pair/packet expiry before returning immutable outgoing metadata/ciphertext.
+The returned relay Send operation uses that same packet for retries. Errors or
+late outcomes after reservation burn the number; the caller reloads the revision.
+No send is performed and no new sequence is invented for a network retry here.
+
+`accept_received` requires the locally expected session, rejects already accepted
+cursor/sequence before vault work, decrypts/authenticates under the pinned peer,
+then checks authority before committing replay acceptance. It rechecks current
+authority and pair/packet expiry after the commit before returning zeroizing
+JSON bytes. Failed/uncertain commits never deliver bytes. A successful commit
+followed by failed authority admission may consume a message without delivering
+it; the transport needs explicit reconnect/session recovery, not replay rollback.
+
+`NativeSignalAuthority` is required and has no default implementation. Its
+native observation binds exact credential generation, session and original epoch
+and must be authorized, nonfuture and at most 100 ms old at admission. The real
+provider must observe the live native document/session/pair and installed relay
+policy. A journal Active bit, loaded key or fabricated timestamp is not such a
+provider. Current code supplies the interface/admission checks but no actual
+product registry/observer implementation. Epoch changes reject in-flight results.
+
+These outputs are not indefinite capabilities: the relay owner must recheck
+authority/deadline before every network attempt, and queued/delayed receive
+delivery must recheck before dispatch. Per-call exclusion is not a long-lived
+receiver ownership lease or a cross-profile/profile-clone arbiter. HTTP signing,
+receiver lifecycle, real native authority, session dispatch, startup/mobile
+integration and runtime verification remain due. Neither operation has a current
+product caller or has been executed.
 
 ## Required durable ordering and integration
 

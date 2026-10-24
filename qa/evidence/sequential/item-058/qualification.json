@@ -23,7 +23,9 @@
     "Single-use native P-256/HKDF-SHA256 exchange source verifies pinned-peer signed invite/hello/grant transcript, local exchange/nonce, lifetime and browser KDF layout",
     "Raw NativePairKey construction is crate-private; source exchange produces opaque zeroizing pair material without secret export",
     "Native AES-GCM signal primitive with browser AAD layout, bounded metadata/body and pinned peer/certificate; decrypted bytes remain uncommitted",
-    "Durable per-generation send reservation, receive sequence/cursor and bounded duplicate-message history; missing counters are refused instead of reset"
+    "Durable per-generation send reservation, receive sequence/cursor and bounded duplicate-message history; missing counters are refused instead of reset",
+    "Native per-operation pipeline connects retained lease, active generation/vault load, reserved send AEAD and authenticated receive acceptance before plaintext publication",
+    "Required exact generation/session/epoch native observations around slow work; no actual native authority or relay/product caller implementation yet"
   ],
   "build_executed": false,
   "tests_executed": false,
@@ -34,7 +36,7 @@
   "durable_lifecycle_integrated": false,
   "remaining": [
     "Journal/executor/lease/writer product integration, native consent/session owner, copied-profile coordination, startup dispatch and authenticated relay approval/revocation",
-    "Native consent/invitation-secret/relay controller integration, WebCrypto/native crypto interoperability and actual AEAD/replay transport wiring",
+    "Native consent/invitation-secret/relay controller, real session authority/receiver lifecycle, HTTP signing/delivery and WebCrypto/native interoperability",
     "Native broker authority and document/session capability integration",
     "Separate Android/iOS credential provider ABI and app integration",
     "Lock, restore, rotation, profile/device deletion and explicit browser-to-native re-pairing",

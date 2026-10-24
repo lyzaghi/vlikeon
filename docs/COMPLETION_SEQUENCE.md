@@ -2,6 +2,14 @@
 
 ## Current sequence — 1–109 outstanding tasks
 
+Item 58 now connects a native per-operation signal pipeline: retained lease,
+active generation/vault admission, durable send reservation before encryption,
+and authenticated receive acceptance before returning plaintext. Required native
+observations bind exact generation/session/epoch around slow work; late or
+uncertain receipts never publish payloads. Actual authority providers, relay HTTP
+and session/product/mobile dispatch remain missing. No crypto/SQL/vault/network,
+build or test was executed; item 58 and original completion scope stay open.
+
 Item 58 now authors bounded native signal AES-GCM matching browser AAD layout,
 plus journal send-sequence reservation and authenticated receive cursor/sequence/
 message acceptance metadata. Missing counters refuse recovery instead of
