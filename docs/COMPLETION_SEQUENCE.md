@@ -2,6 +2,13 @@
 
 ## Current sequence — 1–109 outstanding tasks
 
+Item 58 now authors bounded native signal AES-GCM matching browser AAD layout,
+plus journal send-sequence reservation and authenticated receive cursor/sequence/
+message acceptance metadata. Missing counters refuse recovery instead of
+resetting history. Cipher plaintext is explicitly uncommitted and the two APIs
+still need real native transport/epoch integration; no crypto, SQL, network,
+vault, build or test was executed. Full original 51–109 scope remains open.
+
 Item 58 now authors a consumed-on-finish native P-256/HKDF exchange with pinned
 peer/identity signatures and exact invite/hello/grant, ECDH/nonce/hash/lifetime
 checks, matching the browser KDF layout in source. Raw pair-key construction is

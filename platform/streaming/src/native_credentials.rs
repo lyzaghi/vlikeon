@@ -87,7 +87,7 @@ impl NativeSigningIdentity{
 }
 #[derive(Clone,Copy)]pub enum SigningDomain{Request,Invite,Hello,Grant}
 
-fn validate_object(body:&[u8])->Result<()>{
+pub(crate) fn validate_object(body:&[u8])->Result<()>{
     struct ObjectOnly;
     impl<'de> Visitor<'de> for ObjectOnly{
         type Value=();
@@ -101,10 +101,16 @@ fn validate_object(body:&[u8])->Result<()>{
     parser.end().map_err(|_|invalid())
 }
 
-/// Created only by the future native authenticated key exchange. This wrapper
+/// Created by the native signed-transcript exchange or validated vault load. This wrapper
 /// cannot serialize, clone, debug-print or export its key to the renderer.
 pub struct NativePairKey{bytes:Zeroizing<[u8;32]>}
-impl NativePairKey{pub(crate) fn from_derived(bytes:Zeroizing<[u8;32]>)->Self{Self{bytes}}}
+impl NativePairKey{
+    pub(crate) fn from_derived(bytes:Zeroizing<[u8;32]>)->Self{Self{bytes}}
+    pub(crate) fn into_signal_key(self)->Result<ring::aead::LessSafeKey>{
+        let key=ring::aead::UnboundKey::new(&ring::aead::AES_256_GCM,&self.bytes[..]).map_err(|_|vault_error())?;
+        Ok(ring::aead::LessSafeKey::new(key))
+    }
+}
 
 fn encode(address:&CredentialAddress,binding:&[u8;32],secret:&[u8;32])->Result<Zeroizing<Vec<u8>>>{
     address.validate()?;let mut record=Zeroizing::new(Vec::with_capacity(SECRET_RECORD_BYTES));

@@ -256,6 +256,52 @@ API review follows the pinned package's
 and [HKDF API](https://docs.rs/ring/0.17.14/ring/hkdf/index.html).
 No RNG, agreement, HKDF, signing, vault or native API was executed here.
 
+## Native signal AEAD and replay metadata source
+
+`native_signal.rs` now authors AES-256-GCM with 12-byte OS-random nonces and
+16-byte tags, using the existing 48-KiB ciphertext bound. The AAD is the same
+JSON array/order as browser `signalAad`: domain, pair UUID, sender public key,
+message UUID, session UUID, sequence and expiry. Values require canonical UUID
+serialization and JS-safe bounded integers. The cipher pins the signed grant's
+local/peer identities and expiry; it has no raw-key export. Send metadata must
+already have a durable sequence reservation. Send lifetime is at most 60 seconds
+and bounded by the pair certificate, with a post-crypto expiry check. Random
+nonce collision resistance is inherited from the RNG design, not a proof of
+counter-based uniqueness.
+
+Receive accepts only the pinned peer, validates lengths/metadata and AES-GCM
+authentication, parses a bounded JSON object and returns zeroizing plaintext.
+The existing browser receive tolerance of 30 seconds past packet expiry and
+90 seconds future is retained, while the pair certificate itself must be live.
+`open_uncommitted` explicitly does not acknowledge replay acceptance or authorize
+delivery; its caller must still check the journal/current document and commit
+acceptance before dispatch. The cipher object must be retired on revocation;
+its own certificate check is not a live authority lease.
+
+The native journal now retains per-generation send/receive sequences, relay
+cursor and the last 256 accepted message UUIDs. `reserve_signal_sequence`
+requires the active pair and writer lease, checks original expiry after SQL
+waiting and durably burns the next number before encryption/send. Ambiguous or
+failed sends cannot roll that number back; transport retries must reuse the
+same already sealed packet. One million sends requires explicit re-pairing.
+
+`accept_signal` is native-only and requires prior authentication of the exact
+packet. It rechecks the active generation/expiry, pinned peer, increasing cursor
+and sequence, bounded message/session IDs/time and duplicate-message history,
+then commits them in the same revision-checked journal transaction. Delivery
+must wait for commit and recheck live authority. Required counter fields are
+not defaulted to zero if absent; older/incomplete journal records are refused
+for reviewed recovery instead of silently resetting replay history. This is
+not protection against restoring an entire old profile snapshot; backup/restore
+anti-rollback and copied-profile admission remain required.
+
+AEAD and journal APIs are authored separately; no native transport currently
+connects reservation -> encryption -> relay or authentication -> acceptance ->
+session delivery. Receiver ownership/epoch leases, native relay requests,
+revocation wiring and actual WebCrypto/native vectors/replay/crash cases remain
+unfinished. No encryption, decryption, database, vault, network, build or test
+operation was run for this checkpoint.
+
 ## Required durable ordering and integration
 
 The journal authors the state transitions below. Their external effects and
@@ -288,8 +334,8 @@ The caller must fence and retire writers first. Failed cleanup keeps debt.
   and startup recovery execution,
   rotation/re-pair and local/relay revocation orchestration.
 - Native pairing-controller integration of the authored ECDH/HKDF transcript
-  exchange, plus encrypted signaling sequence/replay lifecycle compatible with
-  the current signed protocol; no secret IPC export.
+  exchange and authored signal AEAD/replay metadata into a real transport,
+  compatible with the current signed protocol; no secret IPC export.
 - Broker operations and document-scoped native capabilities, with explicit
   native opt-in and locking/background/expiry behavior.
 - Separate Android Keystore/iOS Keychain provider namespace and scoped callback

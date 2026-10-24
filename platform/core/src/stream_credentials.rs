@@ -39,6 +39,10 @@ impl GrantMetadata{
 pub struct Record{
     address:CredentialAddress,public_key:String,grant_hash:Option<String>,expires_at_ms:Option<u64>,
     #[serde(default)]grant:Option<GrantMetadata>,
+    send_sequence:u64,
+    receive_sequence:u64,
+    receive_cursor:u64,
+    seen_messages:Vec<Uuid>,
     phase:Phase,writer_retired:bool,material_absent:bool,local_retired:bool,relay_retired:bool,
 }
 impl Record{
@@ -49,6 +53,9 @@ impl Record{
     pub fn expires_at_ms(&self)->Option<u64>{self.expires_at_ms}
     /// Native recovery metadata only. Grant presence never revives authority.
     pub fn grant(&self)->Option<&GrantMetadata>{self.grant.as_ref()}
+    pub fn send_sequence(&self)->u64{self.send_sequence}
+    pub fn receive_sequence(&self)->u64{self.receive_sequence}
+    pub fn receive_cursor(&self)->u64{self.receive_cursor}
     pub fn writer_retired(&self)->bool{self.writer_retired}
     pub fn material_absent(&self)->bool{self.material_absent}
     pub fn local_retired(&self)->bool{self.local_retired}
@@ -85,11 +92,15 @@ impl Journal{
         let mut generations=BTreeSet::new();let mut live=BTreeSet::new();
         for record in &self.records{
             let address=record.address;address.validate()?;key(&record.public_key)?;
+            if record.send_sequence>1_000_000||record.receive_sequence>1_000_000||record.receive_cursor>9_007_199_254_740_991||
+                record.seen_messages.len()>256||record.seen_messages.iter().any(Uuid::is_nil)||
+                record.seen_messages.iter().copied().collect::<BTreeSet<_>>().len()!=record.seen_messages.len()||
+                (record.receive_sequence==0)!=(record.receive_cursor==0)||(record.receive_sequence==0)!=record.seen_messages.is_empty(){return Err(invalid());}
             if address.profile()!=self.profile||address.device()!=self.device||!generations.insert(address.generation()){return Err(invalid());}
             let kind=match address.kind(){SecretKind::DeviceSigning=>0u8,SecretKind::PairEncryption=>1};
             if record.phase!=Phase::Retired&&!live.insert((kind,address.id())){return Err(invalid());}
             match address.kind(){
-                SecretKind::DeviceSigning=>if record.grant_hash.is_some()||record.expires_at_ms.is_some()||record.grant.is_some(){return Err(invalid());},
+                SecretKind::DeviceSigning=>if record.grant_hash.is_some()||record.expires_at_ms.is_some()||record.grant.is_some()||record.send_sequence!=0||record.receive_sequence!=0||record.receive_cursor!=0||!record.seen_messages.is_empty(){return Err(invalid());},
                 SecretKind::PairEncryption=>{
                     let metadata=record.grant.as_ref().ok_or_else(invalid)?;
                     let grant=metadata.historical_grant()?;
@@ -166,6 +177,7 @@ fn add(journal:&mut Journal,address:CredentialAddress,public_key:String,grant_ha
     if journal.records.len()>=MAX_RECORDS{return Err(PlatformError::new(ErrorCode::ResourceLimit,"Native pairing generation history requires explicit maintenance before adding credentials"));}
     if journal.records.iter().any(|record|record.address.generation()==address.generation()||record.address.kind()==address.kind()&&record.address.id()==address.id()&&record.phase!=Phase::Retired){return Err(conflict());}
     journal.records.push(Record{address,public_key,grant_hash,expires_at_ms,grant,phase:Phase::Reserved,
+        send_sequence:0,receive_sequence:0,receive_cursor:0,seen_messages:Vec::new(),
         writer_retired:true,material_absent:false,local_retired:false,relay_retired:false});Ok(())
 }
 pub fn reserve_identity(database:&Database,lease:&CredentialLease,profile:Uuid,expected:u64,address:CredentialAddress,public_key:String)->Result<Journal>{
@@ -249,4 +261,40 @@ pub fn observe_cleanup(database:&Database,lease:&CredentialLease,profile:Uuid,ex
 }
 fn after_wait(now:u64,started:Instant)->Result<u64>{
     now.checked_add(u64::try_from(started.elapsed().as_millis()).map_err(|_|invalid())?).ok_or_else(invalid)
+}
+
+/// Commit a never-reused send sequence BEFORE encryption or network delivery.
+/// Failed/uncertain sends burn the reservation; retries reuse the same packet.
+pub fn reserve_signal_sequence(database:&Database,lease:&CredentialLease,profile:Uuid,expected:u64,address:CredentialAddress,now:u64)->Result<(Journal,u64)>{
+    let started=Instant::now();let mut reserved=0;
+    let updated=update(database,lease,profile,expected,|journal|{
+        let record=selected(journal,address)?;let current=after_wait(now,started)?;
+        if address.kind()!=SecretKind::PairEncryption||record.phase!=Phase::Active||
+            record.expires_at_ms.is_none_or(|expiry|expiry<=current)||record.send_sequence>=1_000_000{return Err(conflict());}
+        record.send_sequence+=1;reserved=record.send_sequence;Ok(())
+    })?;
+    Ok((updated,reserved))
+}
+
+/// Native transport calls only AFTER authenticating/decrypting the exact packet
+/// with its current generation key, BEFORE delivering payload bytes. This
+/// metadata API is not itself an AEAD proof, receiver lease or document grant.
+pub fn accept_signal(database:&Database,lease:&CredentialLease,profile:Uuid,expected:u64,address:CredentialAddress,
+    sender:&str,cursor:u64,metadata:&omniplay_streaming::native_signal::SignalMetadata,now:u64)->Result<Journal>{
+    let started=Instant::now();
+    update(database,lease,profile,expected,|journal|{
+        let record=selected(journal,address)?;let current=after_wait(now,started)?;
+        if address.kind()!=SecretKind::PairEncryption||record.phase!=Phase::Active||record.expires_at_ms.is_none_or(|expiry|expiry<=current)||
+            cursor<=record.receive_cursor||cursor>9_007_199_254_740_991||metadata.sequence<=record.receive_sequence||metadata.sequence>1_000_000||
+            metadata.message_id.is_nil()||metadata.session_id.is_nil()||record.seen_messages.contains(&metadata.message_id)||
+            metadata.expires_at_ms==0||metadata.expires_at_ms>9_007_199_254_740_991||
+            metadata.expires_at_ms<=current.saturating_sub(30_000)||metadata.expires_at_ms>current.saturating_add(90_000)||
+            record.expires_at_ms.is_some_and(|expiry|metadata.expires_at_ms>expiry){return Err(conflict());}
+        let grant=record.grant.as_ref().ok_or_else(invalid)?.historical_grant()?;
+        let peer=if record.public_key==grant.host_public_key{&grant.client_public_key}else{&grant.host_public_key};
+        if sender!=peer{return Err(conflict());}
+        record.receive_sequence=metadata.sequence;record.receive_cursor=cursor;
+        if record.seen_messages.len()==256{record.seen_messages.remove(0);}
+        record.seen_messages.push(metadata.message_id);Ok(())
+    })
 }

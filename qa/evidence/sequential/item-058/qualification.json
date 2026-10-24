@@ -21,7 +21,9 @@
     "Native candidate writer connects the retained lease, reserve/write intent journal, exact vault write/read-back and MaterialReady publication",
     "Identity activation after native caller consent reloads the pinned vault key; pair preparation revalidates the active identity and signed grant without assuming relay approval",
     "Single-use native P-256/HKDF-SHA256 exchange source verifies pinned-peer signed invite/hello/grant transcript, local exchange/nonce, lifetime and browser KDF layout",
-    "Raw NativePairKey construction is crate-private; source exchange produces opaque zeroizing pair material without secret export"
+    "Raw NativePairKey construction is crate-private; source exchange produces opaque zeroizing pair material without secret export",
+    "Native AES-GCM signal primitive with browser AAD layout, bounded metadata/body and pinned peer/certificate; decrypted bytes remain uncommitted",
+    "Durable per-generation send reservation, receive sequence/cursor and bounded duplicate-message history; missing counters are refused instead of reset"
   ],
   "build_executed": false,
   "tests_executed": false,
@@ -32,7 +34,7 @@
   "durable_lifecycle_integrated": false,
   "remaining": [
     "Journal/executor/lease/writer product integration, native consent/session owner, copied-profile coordination, startup dispatch and authenticated relay approval/revocation",
-    "Native consent/invitation-secret/relay controller integration, WebCrypto/native KDF interoperability and encrypted signaling sequence/replay lifecycle",
+    "Native consent/invitation-secret/relay controller integration, WebCrypto/native crypto interoperability and actual AEAD/replay transport wiring",
     "Native broker authority and document/session capability integration",
     "Separate Android/iOS credential provider ABI and app integration",
     "Lock, restore, rotation, profile/device deletion and explicit browser-to-native re-pairing",
