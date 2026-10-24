@@ -2,6 +2,12 @@
 
 ## Current sequence — 1–109 outstanding tasks
 
+Item 58 now authors iOS typed client ABI calls with consumed Data input, bounded
+ordinary/cancel admission and queue-inclusive original deadline. Immediate native
+epoch invalidation precedes queued cancel; owned buffers are best-effort cleared.
+No Swift/compiler/native/vault/HTTP/build/test ran. Actual peer-consent UI and
+typed reply/ticket admission remain due; full original scope remains incomplete.
+
 Item 58 now authors private versioned Android JNI client pairing dispatch and
 an owned-byte-array serialized caller with size/admission/queue/deadline bounds.
 Cancellation invalidates native epoch before queued cleanup; proof bytes are

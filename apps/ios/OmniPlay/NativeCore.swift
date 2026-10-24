@@ -19,6 +19,15 @@ struct NativeIdentityReview {
     let id:String, publicKey:String, device:String, generation:String
     let expires:DispatchTime
 }
+enum NativeClientPairingAction:UInt32 { case begin=0,join=1,poll=2,persistAfterPeerConsent=3,cancel=4 }
+/// Consumes the caller's Data variable; Swift/OS aliases are outside this
+/// owner's best-effort wipe guarantee. Never log or forward to WebKit.
+private final class NativePairingInput {
+    var bytes:Data
+    init(taking source:inout Data){bytes=Data();swap(&bytes,&source)}
+    func clear(){bytes.resetBytes(in:0..<bytes.count);bytes.removeAll(keepingCapacity:false)}
+    deinit{clear()}
+}
 struct NativeRecoveryRecord {
     let address:[String:Any],phase:String,publicKey:String,nextStep:String?
     let sessionRecoveryRequired:Bool
@@ -53,6 +62,8 @@ final class NativeCore {
     private let mediaQueue=DispatchQueue(label:"com.omniplay.mobile.media",qos:.userInitiated)
     private let mediaPermit=DispatchSemaphore(value:1)
     private let requestPermit=DispatchSemaphore(value:16)
+    private let pairingClientPermit=DispatchSemaphore(value:1)
+    private let pairingClientQueuePermit=DispatchSemaphore(value:2)
     private let authorizationPermit=DispatchSemaphore(value:16)
     private let stateLock = NSLock()
     private var storedHandle: UInt64 = 0
@@ -173,6 +184,46 @@ final class NativeCore {
     func cancelPairingIdentityReview(){
         let owned=handle;if owned != 0{_ = om_mobile_pairing_invalidate_epoch(owned)}
         queue.async{if self.handle != 0{let value=om_mobile_pairing_cancel_identity_review(self.handle);om_mobile_free(value)}}
+    }
+    /// Trusted native UI only. The UI independently confirms host key and
+    /// comparison/input consent before persistAfterPeerConsent. No renderer
+    /// request may call this or receive its raw replies/tickets.
+    func pairingClient(_ action:NativeClientPairingAction,input:inout Data,owner:NativeDocumentLifetime,
+        completion:@escaping @MainActor (Result<[String:Any],Error>)->Void){
+        let owned=NativePairingInput(taking:&input)
+        let fail:(String)->Void={message in
+            owned.clear();DispatchQueue.main.async{completion(.failure(OmniFailure.message(message)))}
+        }
+        let maximum=action == .begin ? 16_384:128
+        guard !owned.bytes.isEmpty,owned.bytes.count<=maximum else{fail("Yêu cầu ghép đôi vượt giới hạn.");return}
+        if action == .cancel{
+            let current=handle
+            guard current != 0,om_mobile_pairing_invalidate_epoch(current)==1 else{fail("Chưa xác nhận được thao tác hủy. Hãy mở lại trạng thái.");return}
+        }
+        let reservesOperation=action != .cancel
+        if reservesOperation && pairingClientPermit.wait(timeout:.now()) != .success{fail("Thao tác ghép đôi trước vẫn đang kết thúc.");return}
+        guard pairingClientQueuePermit.wait(timeout:.now()) == .success else{
+            if reservesOperation{pairingClientPermit.signal()};fail("Hàng đợi ghép đôi đang bận.");return
+        }
+        let deadline=DispatchTime.now()+25
+        queue.async{
+            defer{owned.clear();self.pairingClientQueuePermit.signal();if reservesOperation{self.pairingClientPermit.signal()}}
+            do{
+                let now=DispatchTime.now()
+                guard self.handle != 0,now<deadline,(action == .cancel || (owner.active&&self.pairingAttached)) else{throw OmniFailure.message("Phiên ghép đôi đã kết thúc. Hãy mở lại trạng thái.")}
+                let remaining=(deadline.uptimeNanoseconds-now.uptimeNanoseconds)/1_000_000
+                guard remaining>=1000 else{throw OmniFailure.message("Yêu cầu ghép đôi đã hết hạn trong hàng đợi.")}
+                let budget=UInt32(min(25_000,remaining))
+                let value=try self.unwrap(owned.bytes.withUnsafeBytes{raw in
+                    let pointer=raw.bindMemory(to:UInt8.self).baseAddress
+                    return try self.consume(action == .begin
+                        ? om_mobile_pairing_client_begin_v1(self.handle,pointer,raw.count,budget)
+                        : om_mobile_pairing_client_action_v1(self.handle,pointer,raw.count,action.rawValue,budget))
+                })
+                guard DispatchTime.now()<deadline,(action == .cancel || owner.active) else{throw OmniFailure.message("Kết quả ghép đôi đã cũ. Hãy mở lại trạng thái trước khi tiếp tục.")}
+                DispatchQueue.main.async{completion(.success(value))}
+            }catch{DispatchQueue.main.async{completion(.failure(error))}}
+        }
     }
     /// Read-only native recovery inspection remains available with policy off.
     func pairingRecoveryStatus(owner:NativeDocumentLifetime,completion:@escaping @MainActor (Result<NativeRecoverySnapshot,Error>)->Void){

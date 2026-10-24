@@ -1773,6 +1773,28 @@ No Java/C++ compiler, JNI/native/crypto/vault/network operation, build or test r
 There is no product UI caller yet. Android peer/share UI, iOS client caller and
 host controller/recovery/qualification remain unfinished.
 
+## iOS client ABI caller and owned input
+
+NativeCore now authors a dedicated typed-action client caller for begin/join/poll/
+consented persistence/cancel. It takes an inout Data variable into a private owner,
+leaving that variable empty, bounds the payload and clears its owned storage on
+every completion/admission failure. Swift copy-on-write aliases and OS/UI/parser
+copies remain outside the best-effort wipe guarantee. No proof-bearing JSON is
+converted to a Swift String by this caller or forwarded through HubBridge.
+
+Only one ordinary client operation is admitted; a separate two-slot bound permits
+local cancellation to queue behind one in-flight operation. Cancel invalidates
+native epoch before entering the serialized I/O lane. The original 25-second
+deadline starts before queueing and only remaining time reaches the C ABI. Native
+foreground/provider epoch checks remain authoritative. Completion still needs UI
+lifetime/ticket/metadata admission on the main thread, not raw response forwarding.
+
+The persist action is named persistAfterPeerConsent and must only be called after
+actual native host-key/comparison/input permission approval. A typed enum does not
+prove that consent occurred. No UI flow calls this method yet; scan/paste/share
+handling and typed public response models remain due. No Swift compiler, native
+ABI/vault/crypto/SQL/HTTP operation, build or test ran. Current policy remains off.
+
 ## Remaining implementation and qualification
 
 - Journal/executor/lease/writer product integration, authority epochs, actual native owner
