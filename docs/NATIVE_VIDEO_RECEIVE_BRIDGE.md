@@ -1,5 +1,15 @@
 # Native ordered RTP to decoder bridge — item 56
 
+UdpVideoIngress now owns an already connected ICE-selected UDP socket and polls
+up to 32 datagrams without blocking, forwarding through VideoIngress to the
+registry. A full UDP-sized buffer detects oversize instead of accepting truncated
+prefixes; encrypted packets have no heap backlog. Error/retirement closes the
+socket and preserves transport/video cleanup. A required native OS receipt
+adapter must correlate actual ingress time including kernel queue residence;
+there is no fresh post-dequeue timestamp fallback. The Windows ancillary-time
+adapter, actual ICE/DTLS/SRTP implementation and product scheduler/caller remain
+missing. No socket/network/build/test operation ran.
+
 VideoIngress now connects a required native SRTP receiver backend directly to
 the broker registry with original ingress receipts, exact media-owner checks and
 bounded datagram/decrypted RTP sizes. Authentication/decryption/replay rejection

@@ -2,6 +2,8 @@
 
 ## Current sequence — 1–109 outstanding tasks
 
+Source checkpoint: a concrete nonblocking UDP socket caller now forwards bounded batches from the fixed ICE-selected peer into native authenticated ingress. Original OS-receipt correlation is mandatory; no stale queued packet receives a new timestamp. Windows timestamp adapter, ICE/DTLS/SRTP engine and product caller remain unfinished; build/test stay deferred.
+
 Source checkpoint: bounded native transport ingress adapter now forwards only backend-authenticated/decrypted/replay-filtered RTP to the exact document/video registry, preserving original receipts. Coordinated transport/video cleanup tracks each completion across retries. Actual SRTP/DTLS/ICE engine and socket/product caller remain unfinished; build/test stay deferred.
 
 Source checkpoint: bounded control-input reader lane now lets the broker run receiver maintenance on 25-ms idle timeouts, including partial stdin reads. Ordered request backpressure and zeroizing queued messages remain; no database/session ownership moves to the reader. Blocking broker/OS work and actual transport integration remain open. Build/test stay deferred.
