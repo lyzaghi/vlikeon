@@ -1840,6 +1840,16 @@ this checkpoint.
 
 ## Remaining implementation and qualification
 
+Invitation close now permits exact retained Active or Revoking identity material
+on its cleanup-only stack. Current scoped journal must contain the original
+DeviceSigning generation, matching pinned invitation host key, with material not
+marked absent; vault load revalidates it. The retained lease spans signing/HTTP
+and postchecks. No retired/missing/replacement identity fallback exists and no
+Revoking signer reaches normal pairing actions. Durable invitation ownership is
+still absent, so identity material retention across cleanup/crash is not yet
+guaranteed by this path. No build/test/runtime operation ran. Expired invitation
+and durable cleanup qualification remain unfinished.
+
 Host close no longer treats the invitation's old peer-consent revision as cleanup
 authority. It reloads current journal revision under the already-held scoped lease
 and still requires the original exact Active identity address/generation plus

@@ -116,8 +116,8 @@ impl<'a> NativeCredentialWriter<'a>{
         self.lease.check(self.database,self.profile)?;check(deadline)?;
         if cancel.load(std::sync::atomic::Ordering::Acquire){return Err(conflict());}Ok(())
     }
-    /// Live Active-identity close path; retain the invitation on uncertain reply.
-    /// Does not revoke approved pairs or implement crash/revoking-identity cleanup.
+    /// Cleanup-only retained Active/Revoking identity; uncertain reply retains owner.
+    /// Does not revoke approved pairs or implement crash/expired-invite recovery.
     pub fn close_host(&self,address:CredentialAddress,invitation:&mut omniplay_streaming::native_pair_exchange::NativeHostInvitation,
         relay:&omniplay_streaming::native_relay::NativePairRelay,now:u64,deadline:Instant,cancel:&std::sync::atomic::AtomicBool)->Result<()>{
         let started=begin(deadline)?;
@@ -126,7 +126,12 @@ impl<'a> NativeCredentialWriter<'a>{
         // Close is cleanup, not old peer consent. Reload current journal under
         // this lease while retaining the original exact identity generation.
         let current=journal::load_scoped(self.database,&self.lease,self.profile)?;
-        let signer=self.active_signer(current.revision(),address)?;check(deadline)?;
+        let identity=current.records().iter().find(|record|record.address()==address).ok_or_else(conflict)?;
+        if address.kind()!=SecretKind::DeviceSigning||identity.material_absent()||
+            !matches!(identity.phase(),Phase::Active|Phase::Revoking)||identity.public_key()!=metadata.host_public_key{return Err(conflict());}
+        // Never route this signer through normal pairing actions: it exists
+        // solely on the close stack and the lease remains held until completion.
+        let signer=load_identity(self.store,&address,identity.public_key())?;check(deadline)?;
         // close() fences locally before remote cancellation/deadline admission.
         invitation.close(relay,&signer,elapsed_now(now,started)?,deadline,cancel)?;
         self.lease.check(self.database,self.profile)?;check(deadline)?;

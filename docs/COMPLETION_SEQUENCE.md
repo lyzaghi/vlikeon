@@ -2,6 +2,11 @@
 
 ## Current sequence — 1–109 outstanding tasks
 
+Item 58 invitation close now accepts the original retained Revoking identity
+only for cleanup, requiring exact generation/pinned host key and non-absent vault
+material under lease. No new pairing authority. Source-only; build/test/crash/
+expired-invite reconciliation and durable identity retention remain due.
+
 Item 58 host close now reloads current scoped journal revision under its lease
 while requiring the original exact Active identity generation and invitation
 signature binding. Unrelated revision advances no longer alone block cleanup;
