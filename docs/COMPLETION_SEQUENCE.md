@@ -2,6 +2,10 @@
 
 ## Current sequence — 1–109 outstanding tasks
 
+Item 58 iOS now authors bounded one-use host begin from retained Active identity,
+matching local key/revision and explicit unregistered reply flags. Setup refuses
+pending host/client flows. Source-only; UI/share/durable recovery/build/test due.
+
 Item 58 Android now authors bounded one-use host begin from retained Active
 identity setup, with exact local-key/revision and unregistered reply admission.
 Setup refuses existing pending host/client flows. Source-only; UI/share/build/test due.

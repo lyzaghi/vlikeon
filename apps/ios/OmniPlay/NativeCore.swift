@@ -486,12 +486,45 @@ final class NativeCore {
             do{
                 let snapshot=try result.get(),identities=snapshot.records.filter{$0.isIdentity&&$0.phase != "retired"}
                 guard owner.active,self.pairingClientDeliveryFence.admits(token),DispatchTime.now()<deadline,
-                      !snapshot.namespaceProvenanceMissing,snapshot.pendingClientTicket==nil,!snapshot.pairingOrigins.isEmpty,
+                      !snapshot.namespaceProvenanceMissing,snapshot.pendingClientTicket==nil,snapshot.pendingHostTicket==nil,!snapshot.pairingOrigins.isEmpty,
                       identities.count==1,let identity=identities.first,identity.phase=="active",!identity.sessionRecoveryRequired else{throw OmniFailure.message("Chưa thể ghép đôi. Kiểm tra danh tính Active, phiên chờ và dịch vụ được cấu hình.")}
                 let setup=NativeClientSetup(core:self,identity:identity,revision:snapshot.revision,origins:snapshot.pairingOrigins,
                     expires:min(deadline,snapshot.expires),current:{[weak self] in owner.active&&self?.pairingClientDeliveryFence.admits(token)==true})
                 completion(.success(setup))
             }catch{completion(.failure(error))}
+        }
+    }
+    @MainActor func beginPairingHost(_ setup:NativeClientSetup,audience:String,label:String,owner:NativeDocumentLifetime,
+        completion:@escaping @MainActor (Result<[String:Any],Error>)->Void){
+        guard owner.active,setup.origin==ObjectIdentifier(self),setup.relayOrigins.contains(audience),!label.isEmpty,label.utf8.count<=120,
+              !label.unicodeScalars.contains(where:{CharacterSet.controlCharacters.contains($0)}),setup.consume() else{completion(.failure(OmniFailure.message("Phiên chuẩn bị host đã kết thúc. Hãy mở lại.")));return}
+        guard pairingClientPermit.wait(timeout:.now()) == .success else{completion(.failure(OmniFailure.message("Thao tác ghép đôi trước đang kết thúc.")));return}
+        guard pairingClientQueuePermit.wait(timeout:.now()) == .success else{pairingClientPermit.signal();completion(.failure(OmniFailure.message("Hàng đợi host đang bận.")));return}
+        let deadline=min(setup.expires,DispatchTime.now()+25)
+        queue.async{
+            defer{self.pairingClientPermit.signal();self.pairingClientQueuePermit.signal()}
+            do{
+                let now=DispatchTime.now()
+                guard now<deadline,self.handle != 0,self.pairingAttached,owner.active,setup.admitted else{throw OmniFailure.message("Phiên chuẩn bị host đã hết hạn.")}
+                let remaining=(deadline.uptimeNanoseconds-now.uptimeNanoseconds)/1_000_000
+                guard remaining>=1000 else{throw OmniFailure.message("Yêu cầu host hết hạn trong hàng đợi.")}
+                var input=try JSONSerialization.data(withJSONObject:["identity":setup.identity,"expected_revision":setup.revision,"audience":audience,"label":label]);defer{input.resetBytes(in:0..<input.count)}
+                guard input.count<=1024 else{throw OmniFailure.message("Yêu cầu host vượt giới hạn.")}
+                let value=try self.unwrap(input.withUnsafeBytes{raw in try self.consume(om_mobile_pairing_host_begin_v1(self.handle,raw.bindMemory(to:UInt8.self).baseAddress,raw.count,UInt32(min(25_000,remaining))))})
+                guard (value["pairing_protocol"] as? NSNumber)?.uint32Value==1,value["host_public_key"] as? String==setup.identityKey,
+                      let revision=value["revision"] as? NSNumber,CFGetTypeID(revision) != CFBooleanGetTypeID(),revision.doubleValue==Double(setup.revision),
+                      let registered=value["registered"] as? NSNumber,CFGetTypeID(registered)==CFBooleanGetTypeID(),!registered.boolValue,
+                      let share=value["share_available"] as? NSNumber,CFGetTypeID(share)==CFBooleanGetTypeID(),!share.boolValue,
+                      let expiry=value["expires_at_ms"] as? NSNumber,CFGetTypeID(expiry) != CFBooleanGetTypeID(),expiry.doubleValue>Date().timeIntervalSince1970*1000,
+                      expiry.doubleValue<=9_007_199_254_740_991,expiry.doubleValue==Double(expiry.uint64Value) else{throw OmniFailure.message("Phản hồi chuẩn bị host không hợp lệ.")}
+                for field in ["ticket","invite_id"]{
+                    guard let text=value[field] as? String,let id=UUID(uuidString:text),id.uuidString.lowercased()==text,id != UUID(uuid:(0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0)) else{throw OmniFailure.message("Ticket lời mời host không hợp lệ.")}
+                }
+                DispatchQueue.main.async{
+                    guard owner.active,setup.admitted,DispatchTime.now()<deadline else{completion(.failure(OmniFailure.message("Kết quả host đã cũ. Hãy đọc lại trạng thái.")));return}
+                    completion(.success(value))
+                }
+            }catch{DispatchQueue.main.async{completion(.failure(error))}}
         }
     }
     /// UI independently pins host and clears its invitation field after call.

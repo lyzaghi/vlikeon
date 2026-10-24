@@ -1840,6 +1840,16 @@ this checkpoint.
 
 ## Remaining implementation and qualification
 
+iOS host begin now consumes the original core/owner/cancel-bound identity setup,
+selects an installed origin and uses shared bounded admission plus the earlier
+setup/operation deadline. Successful replies require exact local identity key/
+revision, canonical nonzero ticket/invite IDs, future integral expiry and actual
+false registered/share flags. Main delivery rechecks owner/setup/deadline and
+owned request Data clears on worker return. Setup refuses both pending roles.
+No automatic register/share or renderer route. No build/test/runtime operation
+ran. Host setup views, sharing, remaining peer/candidate callers and durable
+recovery remain unfinished.
+
 Android native host begin now consumes the retained Active-identity setup once,
 selects an installed origin and uses shared bounded admission plus the earlier
 setup/operation deadline. Successful response must match local identity key and
