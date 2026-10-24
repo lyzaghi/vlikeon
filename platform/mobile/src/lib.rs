@@ -155,6 +155,24 @@ impl Drop for PairingClientBegin{fn drop(&mut self){self.code.zeroize();}}
 struct PairingClientActivation{address:omniplay_streaming::native_credentials::CredentialAddress,expected_revision:u64,reviewed_grant_hash:String}
 #[derive(Deserialize)]#[serde(deny_unknown_fields)]
 struct PairingHostBegin{identity:omniplay_streaming::native_credentials::CredentialAddress,expected_revision:u64,audience:String,label:String}
+#[derive(Deserialize)]#[serde(deny_unknown_fields)]
+struct PairingHostRecovery{invite_id:Uuid,expected_revision:u64}
+/// # Safety
+/// Explicit trusted native cleanup JSON <=256, from exact native status snapshot.
+#[no_mangle]
+pub unsafe extern "C" fn om_mobile_pairing_recover_host_close_v1(handle:u64,data:*const u8,length:usize,budget_ms:u32)->OmniBuffer{result((||{
+    if length>256||!(1000..=25000).contains(&budget_ms){return Err(error(ErrorCode::InvalidRequest,"Native host recovery exceeds bounds"));}
+    let deadline=std::time::Instant::now()+std::time::Duration::from_millis(u64::from(budget_ms));
+    // SAFETY: caller supplies the bounded synchronous readable input above.
+    let request:PairingHostRecovery=serde_json::from_slice(unsafe{input(data,length)?}).map_err(|_|error(ErrorCode::InvalidRequest,"Native host recovery arguments are invalid"))?;
+    if request.invite_id.is_nil(){return Err(error(ErrorCode::InvalidRequest,"Native recovery invite ID is invalid"));}
+    let(host,provider,epoch)=pairing_operation(handle)?;
+    let mut host=host.lock().map_err(|_|error(ErrorCode::Internal,"Mobile profile is unavailable"))?;
+    provider.require_operation_epoch(epoch)?;let cancel=provider.operation_cancellation(epoch)?;
+    let value=host.native_pairing_recover_host_close(provider.as_ref(),request.invite_id,request.expected_revision,deadline,&cancel)?;
+    provider.require_operation_epoch(epoch)?;
+    if cancel.load(Ordering::Acquire)||std::time::Instant::now()>=deadline{return Err(error(ErrorCode::Cancelled,"Host cleanup may have committed; reload native status"));}Ok(value)
+})())}
 /// # Safety
 /// Explicit trusted native share action only, ticket JSON <=128. Returned raw
 /// OPRP1 bytes contain bearer proof; never JSON/log/renderer. Empty means failure.

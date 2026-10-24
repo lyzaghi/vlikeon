@@ -1840,6 +1840,15 @@ this checkpoint.
 
 ## Remaining implementation and qualification
 
+Native status now exposes durable host_invitation_cleanup metadata (invite ID,
+identity generation, audience, signed-document hash, expiry), never proof. Explicit
+LocalHost/mobile recovery close uses exact invite ID/expected journal revision,
+installed retirement origins, actual provider epoch/cancel and original deadline.
+Any matching live invitation is fenced first; confirmed durable completion clears
+that transient owner. No share/peer resume authority is reconstructed. Current
+path refuses expired invitations and still requires foreground provider; native
+mobile callers/views are not wired. No build/test/SQL/HTTP/native operation ran.
+
 restore_for_close now reconstructs only a permanently closed invitation from
 pinned signed public metadata. It verifies current signature/audience/lifetime,
 retains no bearer proof, and restores no peer request/exchange/registration state.

@@ -1,39 +1,142 @@
 {
   "item": 6,
   "task_complete": false,
-  "executor": "antigravity-test-only-codex-reviewed",
-  "windows_executable_sha256": "ef891f1d2a673fbe21e0156d95e95c0ca62d3f5efd04be831bdbde4bc686b907",
-  "crash_diagnosis": {
-    "process": "network.mojom.NetworkService",
-    "sandbox_type": "network",
-    "exception_code": "0xc06d007e",
-    "delay_load_library": "USER32.dll",
-    "delay_load_procedure": "PostThreadMessageW",
-    "windows_last_error": 1114,
-    "site": "CommonSubprocessInit",
-    "triggering_policy_or_initialization_condition": "not_proven"
-  },
-  "startup": {
-    "fresh_profile": "blank_document_reproduced_in_60_second_observation",
-    "explicit_runtime_enable": "did_not_fix_fresh_profile_startup",
-    "subsequent_navigation": "actual_Game_Hub_and_newtab_rewrite_loaded",
-    "same_initialized_profile_restart": "initial_scope_passed",
-    "first_profile_startup_fix": "not_implemented_or_qualified",
-    "harness_stale_endpoint_bug": "corrected_to_wait_for_changed_DevToolsActivePort_before_valid_restart_test"
-  },
-  "native_host": {
-    "missing_manifest_observed": true,
-    "corrective_action": "built_real_frozen_source_broker_and_registered_development_manifest_for_exact_component_origin_only",
-    "broker_sha256": "6cdc00319d59f76c7a4b8a0e233d2e7c17448cb458b9c8045f24262a3bd0493d",
-    "build_frozen": true,
-    "build_exit_code": 0,
-    "existing_registration_replaced": false,
-    "qa_local_appdata_isolated": true,
-    "actual_component_bridge_hello": {"passed": true, "application": "OmniPlay", "protocol_major": 1, "protocol_minor": 0, "version": "0.1.0", "platform": "windows"},
-    "signed_release": false
-  },
-  "ordinary_page": {"chrome_runtime": "undefined", "connect_native": "undefined"},
-  "remaining": ["first-profile startup and network-service initialization fix", "actual private/normal multi-profile isolation and persistence", "tab lifecycle and authority cases", "permission admission and denial coverage", "native bridge lifecycle and failure handling"],
+  "windows_development_acceptance": "passed",
+  "platforms_not_qualified": [
+    "Linux",
+    "macOS"
+  ],
   "release_approval": false,
-  "privacy_note": "Raw dumps, process memory and QA client/device identifiers remain local and are excluded. Advertised capabilities are not module acceptance evidence."
+  "runtime_executor": "Codex via normal supported runner, per owner fallback authorization",
+  "antigravity_role": "test diagnostics and separate artifact audit only; no Antigravity GUI pass claimed",
+  "batch": "runtime-006ah",
+  "started_at": "2026-10-24T11:33:49.488Z",
+  "finished_at": "2026-10-24T11:34:46.973Z",
+  "checks": [
+    {
+      "name": "normal-first actual Game Hub startup"
+    },
+    {
+      "name": "owned real broker termination is observed and next request reconnects"
+    },
+    {
+      "name": "real PlatformBridge hello",
+      "application": "OmniPlay",
+      "protocol_major": 1
+    },
+    {
+      "name": "declared component permissions admitted"
+    },
+    {
+      "name": "undeclared debugger permission rejected"
+    },
+    {
+      "name": "privileged URL schemes rejected by browser bridge"
+    },
+    {
+      "name": "internal page allowlist enforced"
+    },
+    {
+      "name": "real bridge creates, lists, activates and pins tabs"
+    },
+    {
+      "name": "ordinary web page has no native messaging API"
+    },
+    {
+      "name": "actual site settings admit, deny and revoke notification permission"
+    },
+    {
+      "name": "actual off-the-record context isolated and absent from Game Hub tab list"
+    },
+    {
+      "name": "component native privileges unavailable in private context"
+    },
+    {
+      "name": "private data gone after context disposal"
+    },
+    {
+      "name": "real tab closes and leaves target list"
+    },
+    {
+      "name": "missing native host returns actual connection error"
+    },
+    {
+      "name": "independent native port disconnect preserves real bridge availability"
+    },
+    {
+      "name": "second-normal actual Game Hub startup"
+    },
+    {
+      "name": "site permission grant does not leak into second normal profile"
+    },
+    {
+      "name": "second normal profile has independent web and component storage with real broker connection"
+    },
+    {
+      "name": "first-normal-restart actual Game Hub startup"
+    },
+    {
+      "name": "first normal profile storage and tab session persist after restart"
+    },
+    {
+      "name": "real site permission persists after restart and can be revoked"
+    },
+    {
+      "name": "second-normal-restart actual Game Hub startup"
+    },
+    {
+      "name": "second normal profile persistence remains separate after restart"
+    }
+  ],
+  "binary_identity": {
+    "windows_executable_sha256": "ef891f1d2a673fbe21e0156d95e95c0ca62d3f5efd04be831bdbde4bc686b907",
+    "chrome_dll_sha256": "1cd01da86c8d70b9bd6c211784a7b50c7e9010ba88cfc72686e9f69a85d002d8",
+    "content_dll_sha256": "92415c3eaa70ed3ca18e0c617c7df2a33f9e508dffa2f6a624d8c7f51a51fdd1",
+    "broker_sha256": "6cdc00319d59f76c7a4b8a0e233d2e7c17448cb458b9c8045f24262a3bd0493d"
+  },
+  "phases": [
+    {
+      "profile": "Default",
+      "phase": "normal-first",
+      "fatal_or_network_crash": false
+    },
+    {
+      "profile": "Profile 2",
+      "phase": "second-normal",
+      "fatal_or_network_crash": false
+    },
+    {
+      "profile": "Default",
+      "phase": "first-normal-restart",
+      "fatal_or_network_crash": false
+    },
+    {
+      "profile": "Profile 2",
+      "phase": "second-normal-restart",
+      "fatal_or_network_crash": false
+    }
+  ],
+  "raw_result_sha256": "579bb8b881123130837b6aced96316063def0d6ade6af8ced193dbaac697980e",
+  "harness_sha256": "a924086a7e9cc02a5c60cb55288c9cf2f6f9d158286bececedd5de1e3f1368ca",
+  "startup_diagnosis": {
+    "original_windows_runtime_restored": true,
+    "unsuccessful_source_candidates_promoted": false,
+    "normal_desktop": "WinSta0/Default",
+    "antigravity_desktop": "isolated exebox desktop",
+    "failing_windows_call_in_isolated_context": "NtGdiInit2 returned 0; GdiDllInitialize then returned STATUS_UNSUCCESSFUL; USER32 DLL_PROCESS_ATTACH failed; Win32 error 1114",
+    "observed_execution_context_difference": true,
+    "exact_desktop_acl_or_kernel_policy_cause": "not_proven",
+    "global_security_or_desktop_acl_changes": false,
+    "cdp_permission_overrides_used": false
+  },
+  "remaining": [
+    "Actual Linux runtime acceptance after task 4 build",
+    "Actual macOS runtime acceptance after task 5 build"
+  ],
+  "limits": [
+    "Frozen Windows x64 development runtime only, not later parallel source changes",
+    "No signed-release, device capture, OS device consent dialog, arbitrary native module or reproducibility qualification",
+    "Private contexts are real Chromium off-the-record contexts created through CDP; browser data and privileges tested",
+    "Raw dumps, process memory, paths and profile/device identifiers remain private"
+  ]
 }

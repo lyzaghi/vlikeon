@@ -17,8 +17,9 @@ the supplied Linux host and prepare task 5 in parallel, reporting task 4 when
 it is actually accepted. The owner confirmed an Apple Silicon Mac is available;
 its SSH endpoint was subsequently provided and native host inventory completed.
 The owner installed Xcode 16.4 on the external HDD and explicitly authorized
-starting task 5 independently while moving to task 6. Mac batch `005-build-a`
-is running the frozen full build recipe; this does not close either build task
+starting task 5 independently while moving to task 6. Mac batch `005-build-a` completed dependency sync but failed dependency
+verification when a read-only Git diff exceeded its 90-second timeout on HDD;
+no Mac compiler pass is established. This does not close either build task
 or change the separate source fork's item-53/54/55 deferrals.
 
 1. [x] Tích hợp các thay đổi mã nguồn đang nằm ngoài commit thành các phiên bản thống nhất, có thể tái tạo. Bằng chứng và giới hạn: `SOURCE_INTEGRATION.md`.
@@ -26,7 +27,7 @@ or change the separate source fork's item-53/54/55 deferrals.
 3. [x] Build trình duyệt Chromium Vlikeon hoàn chỉnh trên Windows. Bằng chứng build x64 và giới hạn kiểm chứng: `WINDOWS_CHROMIUM_BUILD.md`.
 4. [ ] Build trình duyệt Chromium Vlikeon hoàn chỉnh trên Linux.
 5. [ ] Build trình duyệt Chromium Vlikeon hoàn chỉnh trên macOS.
-6. [ ] Kiểm chứng Game Hub, tab, hồ sơ thường/riêng tư, quyền truy cập và native bridge trong trình duyệt thật.
+6. [ ] Kiểm chứng Game Hub, tab, hồ sơ thường/riêng tư, quyền truy cập và native bridge trong trình duyệt thật. Windows development đã qua 24 kiểm tra thực tế; giữ mở cho Linux/macOS. Bằng chứng và giới hạn: `BROWSER_RUNTIME_QUALIFICATION.md`.
 7. [ ] Kiểm chứng quy trình nâng phiên bản Chromium mà vẫn giữ đúng các bản vá Vlikeon.
 8. [ ] Hoàn thiện giới hạn dung lượng ghi của core, helper, bộ nhớ đệm và hồ sơ trên Windows.
 9. [ ] Hoàn thiện phục hồi và xử lý dữ liệu phiên Windows cũ thiếu bằng chứng sở hữu.

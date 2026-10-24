@@ -2,6 +2,10 @@
 
 ## Current sequence — 1–109 outstanding tasks
 
+Item 58 native status now publishes bounded durable invitation cleanup metadata;
+LocalHost/mobile ABI expose exact invite/revision restart close without resuming
+pairing. Source-only; expired invites, mobile recovery UI and build/test remain due.
+
 Item 58 writer now authors restart cleanup from exact durable invite ID/revision:
 reconstructed invitation is permanently closed with no proof/request/exchange
 state and uses existing bound close/completion. Only unexpired invitations are

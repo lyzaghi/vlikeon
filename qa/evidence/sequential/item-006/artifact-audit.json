@@ -1,0 +1,12 @@
+{
+  "scope": "Artifact audit only; GUI runtime executed separately by Codex using normal supported runner. No independent Antigravity GUI pass claimed.",
+  "passed": true,
+  "checks": 24,
+  "phases": 4,
+  "raw_result_sha256": "579bb8b881123130837b6aced96316063def0d6ade6af8ced193dbaac697980e",
+  "harness_sha256": "a924086a7e9cc02a5c60cb55288c9cf2f6f9d158286bececedd5de1e3f1368ca",
+  "antigravity_desktop": "isolated-exebox",
+  "codex_desktop": "Default",
+  "host_or_sandbox_security_settings_changed": false,
+  "owned_qa_site_permissions_exercised": true
+}

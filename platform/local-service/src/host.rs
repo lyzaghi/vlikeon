@@ -66,7 +66,15 @@ impl LocalHost {
             "local_retired":record.local_retired(),"relay_retired":record.relay_retired(),
             "session_recovery_required":record.signal_session().is_some()
         })).collect();
+        let mut invitation_cleanup=Vec::with_capacity(snapshot.host_invitations().len());
+        for entry in snapshot.host_invitations(){
+            let invite:omniplay_streaming::Invite=omniplay_streaming::inspect(entry.document(),4096)?;
+            invitation_cleanup.push(json!({"invite_id":invite.id,"identity":entry.identity(),"audience":entry.audience(),
+                "invite_hash":omniplay_streaming::document_hash(entry.document())?,"expires_at_ms":invite.expires_at_ms,
+                "expired":invite.expires_at_ms<=observed_at_ms}));
+        }
         Ok(json!({"credential_protocol":1,"profile_id":self.profile_id,"device_id":self.database.device_id,
+            "host_invitation_cleanup":invitation_cleanup,
             "revision":snapshot.revision(),"policy_available":!pairing_origins.is_empty(),"pairing_origins":pairing_origins,"records":records,
             "recovery_protocol":1,"observed_at_ms":observed_at_ms,"recovery":recovery,
             "relay_retirement_available":omniplay_core::stream_signal_authority::installed_retirement_origins().is_ok(),
@@ -187,6 +195,20 @@ impl LocalHost {
         Ok(json!({"credential_protocol":1,"address":review.address,"revision":revision,"phase":"active","approves_remote_peer":false}))
     }
     pub fn native_pairing_cancel_identity_review(&mut self){self.identity_review=None;}
+    /// Explicit native cleanup of exact durable invite, not normal host resume.
+    pub fn native_pairing_recover_host_close(&mut self,store:&dyn omniplay_streaming::native_credentials::PairingSecretStore,
+        invite_id:Uuid,expected:u64,deadline:std::time::Instant,cancel:&std::sync::atomic::AtomicBool)->Result<Value>{
+        self.ensure_open()?;
+        let matching=if let Some(pending)=self.pairing_host.as_mut(){
+            let invite:omniplay_streaming::Invite=omniplay_streaming::inspect(pending.invitation.signed_invite(),4096)?;
+            if invite.id==invite_id{pending.invitation.fence_closed();true}else{false}
+        }else{false};
+        let relay=omniplay_streaming::native_relay::NativePairRelay::new(omniplay_core::stream_signal_authority::installed_retirement_origins()?)?;
+        let writer=omniplay_core::stream_credential_writer::NativeCredentialWriter::open(&self.database,self.profile_id,store)?;
+        writer.recover_host_invitation_close(expected,invite_id,omniplay_core::now_ms(),deadline,&relay,cancel)?;
+        if matching{self.pairing_host=None;}
+        Ok(json!({"recovery_protocol":1,"invite_id":invite_id,"closed":true,"pairs_revoked":false,"reload_required":true}))
+    }
     /// Native-only local host invitation. This performs no remote registration.
     pub fn native_pairing_host_begin(&mut self,store:&dyn omniplay_streaming::native_credentials::PairingSecretStore,
         identity:omniplay_streaming::native_credentials::CredentialAddress,expected:u64,epoch:u64,audience:&str,label:&str,
