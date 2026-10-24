@@ -396,7 +396,39 @@ public final class GameHubController implements AutoCloseable {
                 identityNotice("ok".equals(response.optString("status"))?"Open status and recovery again to inspect the current result and next step.":"The result could not be confirmed. Open status and recovery again before continuing.");
             });
         });
+        if(!snapshot.namespaceProvenanceMissing&&!record.isIdentity()&&"material_ready".equals(record.phase)&&!record.sessionRecoveryRequired){
+            builder.setNeutralButton("Review saved pairing",(dialog,which)->{mIdentityDialog=null;reviewSavedPeer(snapshot,record,owner);});
+        }
         AlertDialog alert=builder.create();mIdentityDialog=alert;alert.setOnCancelListener(dialog->cancelIdentityReview());alert.show();
+    }
+    private void reviewSavedPeer(NativeCore.RecoverySnapshot snapshot,NativeCore.RecoveryRecord record,java.util.concurrent.atomic.AtomicBoolean owner){
+        if(mIdentityFlow!=owner||!owner.get()||!identityUiAvailable()){cancelIdentityReview();return;}
+        mCore.reviewSavedPeer(snapshot,record,owner::get,(review,error)->{
+            if(mIdentityFlow!=owner||!owner.get())return;
+            if(!identityUiAvailable()||review==null){cancelIdentityReview();if(identityUiAvailable())identityNotice(error);return;}
+            if(mIdentityExpiry!=null)mMain.removeCallbacks(mIdentityExpiry);
+            long remaining=review.expires-android.os.SystemClock.elapsedRealtime();
+            if(remaining<=0){cancelIdentityReview();return;}
+            android.widget.LinearLayout checks=new android.widget.LinearLayout(mActivity);checks.setOrientation(android.widget.LinearLayout.VERTICAL);
+            android.widget.CheckBox host=new android.widget.CheckBox(mActivity),permission=new android.widget.CheckBox(mActivity);
+            host.setText("I independently verified this host key again.");
+            permission.setText(review.inputAllowed?"I approve input control for this saved pairing.":"I approve this saved pairing without input control.");checks.addView(host);checks.addView(permission);
+            AlertDialog alert=new AlertDialog.Builder(mActivity).setTitle("Review saved pairing")
+                    .setMessage("Host key:\n"+review.hostPublicKey+"\nFingerprint:\n"+review.hostFingerprint+"\nService: "+review.audience+"\nPair: "+review.pairId+"\nGeneration: "+review.generation+"\nInput control: "+(review.inputAllowed?"Allowed":"Not allowed")+"\nPermission expires: "+java.text.DateFormat.getDateTimeInstance().format(new java.util.Date(review.grantExpiresAt))+"\n\nThe original comparison code is unavailable. Verify this host independently again. Activation checks current service approval and does not start a connection.")
+                    .setView(checks).setNegativeButton("Later",(dialog,which)->cancelIdentityReview()).setPositiveButton("Activate verified pairing",null).create();
+            mIdentityDialog=alert;alert.setOnCancelListener(dialog->cancelIdentityReview());alert.show();
+            android.widget.Button confirm=alert.getButton(AlertDialog.BUTTON_POSITIVE);confirm.setEnabled(false);
+            android.widget.CompoundButton.OnCheckedChangeListener changed=(button,checked)->confirm.setEnabled(host.isChecked()&&permission.isChecked());host.setOnCheckedChangeListener(changed);permission.setOnCheckedChangeListener(changed);
+            confirm.setOnClickListener(button->{
+                if(!host.isChecked()||!permission.isChecked()||mIdentityFlow!=owner||!owner.get()||!identityUiAvailable()||android.os.SystemClock.elapsedRealtime()>=review.expires){cancelIdentityReview();return;}
+                confirm.setEnabled(false);alert.dismiss();mIdentityDialog=null;
+                mCore.activateSavedPeer(review,owner::get,response->{
+                    if(mIdentityFlow!=owner||!owner.get())return;cancelIdentityReview();
+                    if(identityUiAvailable())identityNotice("ok".equals(response.optString("status"))?"Saved pairing activated. No connection was started. Open status to inspect it.":"Activation could not be confirmed. Read status before retrying.");
+                });
+            });
+            mIdentityExpiry=()->{if(mIdentityFlow==owner)cancelIdentityReview();};mMain.postDelayed(mIdentityExpiry,remaining);
+        });
     }
     private void cancelIdentityReview(){
         boolean hadFlow=mIdentityFlow!=null;

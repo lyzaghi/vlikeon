@@ -1840,6 +1840,15 @@ this checkpoint.
 
 ## Remaining implementation and qualification
 
+Android MaterialReady pair details now expose a separate saved-pair review action
+when storage provenance is present and no durable session debt exists. Fresh
+leased review opens a native dialog showing host key/fingerprint, service, pair,
+generation, permission and expiry. It explicitly says the old comparison code
+is unavailable. Separate unchecked independent-host and permission confirmations
+gate one-use activation. Owner/expiry/lifecycle checks remain, and failure directs
+back to status; no connection starts. This is authored UI, not runtime evidence.
+No build/test or native operation ran. iOS saved-pair UI and full qualification due.
+
 Android saved-peer review now requires an exact MaterialReady pair record from
 the provided native status snapshot, valid storage provenance, no session debt
 and a live snapshot deadline. Validated action-6 output becomes an immutable

@@ -2,6 +2,11 @@
 
 ## Current sequence — 1–109 outstanding tasks
 
+Item 58 Android MaterialReady pair details now offer saved-peer rereview and
+explicit one-use activation with fresh host/permission checks and original
+review expiry. Missing old comparison is explicit. Source-only; no build/test;
+iOS resume UI and full qualification remain due.
+
 Item 58 Android now authors immutable saved-peer review snapshots bound to a
 validated status record, original owner/cancel fence and capped monotonic expiry.
 Explicit one-use activation retains exact address/revision/hash without inventing
