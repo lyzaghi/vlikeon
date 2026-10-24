@@ -1840,6 +1840,8 @@ this checkpoint.
 
 ## Remaining implementation and qualification
 
+iOS host creation UI source now calls the existing native setup/begin/ticket APIs. Only installed relay origins are selectable. The host sees its public identity before local creation; registration requires a separate action. Labels are bounded to 64 UTF-8 bytes without control characters. Setup keeps its original deadline, then the created invitation installs an expiry bounded by its original native expiry. Lifecycle ownership checks guard callbacks; closing uses the existing cleanup flow. Uncertain registration requires status/recovery. Host sharing and peer consent/activation UI on iOS are still pending. No build, tests, relay traffic or runtime verification accompanied this checkpoint.
+
 Android host save success can now issue one immutable activation snapshot from
 the consumed peer review. Exact original ticket/client/hello context and returned
 MaterialReady address/revision/hash/permission/expiry are admitted before issue.

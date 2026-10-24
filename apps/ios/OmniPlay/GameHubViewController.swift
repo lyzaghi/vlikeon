@@ -36,7 +36,7 @@ final class GameHubViewController: UIViewController, WKNavigationDelegate, WKUID
         pairingButton.translatesAutoresizingMaskIntoConstraints=false;view.addSubview(pairingButton)
         pairingButtonHeight=pairingButton.heightAnchor.constraint(equalToConstant:44)
         NSLayoutConstraint.activate([pairingButton.leadingAnchor.constraint(equalTo:view.safeAreaLayoutGuide.leadingAnchor,constant:16),pairingButton.trailingAnchor.constraint(equalTo:view.safeAreaLayoutGuide.trailingAnchor,constant:-16),pairingButton.topAnchor.constraint(equalTo:view.safeAreaLayoutGuide.topAnchor),pairingButtonHeight!])
-        pairingButton.menu=UIMenu(children:[UIAction(title:"Thiết lập danh tính"){[weak self]_ in self?.beginPairingIdentity()},UIAction(title:"Trạng thái và phục hồi"){[weak self]_ in self?.beginPairingRecovery()},UIAction(title:"Ghép đôi với host"){[weak self]_ in self?.beginClientPairing()}]);pairingButton.showsMenuAsPrimaryAction=true
+        pairingButton.menu=UIMenu(children:[UIAction(title:"Thiết lập danh tính"){[weak self]_ in self?.beginPairingIdentity()},UIAction(title:"Trạng thái và phục hồi"){[weak self]_ in self?.beginPairingRecovery()},UIAction(title:"Ghép đôi với host"){[weak self]_ in self?.beginClientPairing()},UIAction(title:"Tạo lời mời host"){[weak self]_ in self?.beginHostPairing()}]);pairingButton.showsMenuAsPrimaryAction=true
         status.text="Đang chuẩn bị thư viện…";status.textColor = .white;status.numberOfLines=0;status.textAlignment = .center;status.translatesAutoresizingMaskIntoConstraints=false;view.addSubview(status)
         NSLayoutConstraint.activate([status.leadingAnchor.constraint(equalTo:view.safeAreaLayoutGuide.leadingAnchor,constant:24),status.trailingAnchor.constraint(equalTo:view.safeAreaLayoutGuide.trailingAnchor,constant:-24),status.centerYAnchor.constraint(equalTo:view.centerYAnchor)])
         NotificationCenter.default.addObserver(self,selector:#selector(willResign),name:UIApplication.willResignActiveNotification,object:nil)
@@ -88,6 +88,75 @@ final class GameHubViewController: UIViewController, WKNavigationDelegate, WKUID
     func webView(_ webView:WKWebView,createWebViewWith configuration:WKWebViewConfiguration,for navigationAction:WKNavigationAction,windowFeatures:WKWindowFeatures)->WKWebView?{if let url=navigationAction.request.url,["https","http"].contains(url.scheme?.lowercased() ?? ""){openWebsite?(url)};return nil}
     func webView(_ webView:WKWebView,runJavaScriptAlertPanelWithMessage message:String,initiatedByFrame frame:WKFrameInfo,completionHandler:@escaping()->Void){let alert=UIAlertController(title:"OmniPlay",message:String(message.prefix(2000)),preferredStyle:.alert);alert.addAction(UIAlertAction(title:"OK",style:.default){_ in completionHandler()});present(alert,animated:true)}
     func webView(_ webView:WKWebView,runJavaScriptConfirmPanelWithMessage message:String,initiatedByFrame frame:WKFrameInfo,completionHandler:@escaping(Bool)->Void){let alert=UIAlertController(title:"OmniPlay",message:String(message.prefix(2000)),preferredStyle:.alert);alert.addAction(UIAlertAction(title:"Hủy",style:.cancel){_ in completionHandler(false)});alert.addAction(UIAlertAction(title:"Tiếp tục",style:.default){_ in completionHandler(true)});present(alert,animated:true)}
+    private func beginHostPairing(){
+        guard pairingFlow==nil,presentedViewController==nil,hubVisible,!fullScreenGame,!pendingSuspend,UIApplication.shared.applicationState == .active,UIApplication.shared.isProtectedDataAvailable else{return}
+        let owner=NativeDocumentLifetime();pairingFlow=owner;pairingButton.isEnabled=false
+        core.clientPairingSetup(owner:owner){[weak self] result in
+            guard let self=self,self.pairingFlow === owner,owner.active else{return}
+            guard self.peerReviewAvailable(owner) else{self.cancelPairingIdentity();return}
+            switch result{
+            case .failure(let error):self.cancelPairingIdentity();self.pairingNotice(error.localizedDescription)
+            case .success(let setup):
+                let sheet=UIAlertController(title:"Chọn relay cho host",message:"Chọn dịch vụ được cấu hình trong ứng dụng. Tạo lời mời và đăng ký là hai bước riêng.",preferredStyle:.actionSheet);self.pairingAlert=sheet
+                for origin in setup.relayOrigins{
+                    sheet.addAction(UIAlertAction(title:origin,style:.default){[weak self,weak sheet]_ in sheet?.dismiss(animated:false){[weak self] in self?.showHostLabel(setup,origin:origin,owner:owner)}})
+                }
+                sheet.addAction(UIAlertAction(title:"Đóng",style:.cancel){[weak self]_ in self?.cancelPairingIdentity()})
+                sheet.popoverPresentationController?.sourceView=self.pairingButton;sheet.popoverPresentationController?.sourceRect=self.pairingButton.bounds
+                let expiry=DispatchWorkItem{[weak self] in guard let self=self,self.pairingFlow === owner else{return};self.cancelPairingIdentity()}
+                self.pairingExpiry=expiry;DispatchQueue.main.asyncAfter(deadline:setup.expires,execute:expiry);self.present(sheet,animated:true)
+            }
+        }
+    }
+    private func showHostLabel(_ setup:NativeClientSetup,origin:String,owner:NativeDocumentLifetime){
+        guard peerReviewAvailable(owner),DispatchTime.now()<setup.expires else{cancelPairingIdentity();return}
+        let alert=UIAlertController(title:"Chuẩn bị lời mời host",message:"Relay: \(origin)\nKhóa công khai thiết bị: \(setup.identityKey)\nChia sẻ khóa này qua kênh độc lập để người nhận xác minh.",preferredStyle:.alert);pairingAlert=alert
+        alert.addTextField{[weak self] field in field.delegate=self;field.tag=64;field.placeholder="Nhãn thiết bị host";field.autocorrectionType = .no;field.spellCheckingType = .no}
+        alert.addAction(UIAlertAction(title:"Hủy",style:.cancel){[weak self]_ in self?.cancelPairingIdentity()})
+        alert.addAction(UIAlertAction(title:"Tạo lời mời",style:.default){[weak self,weak alert]_ in
+            guard let self=self,self.pairingFlow === owner,owner.active,DispatchTime.now()<setup.expires else{self?.cancelPairingIdentity();return}
+            let label=alert?.textFields?.first?.text ?? "";alert?.textFields?.forEach{$0.text=nil}
+            guard !label.isEmpty,label.utf8.count<=64,!label.unicodeScalars.contains(where:{CharacterSet.controlCharacters.contains($0)}) else{self.cancelPairingIdentity();self.pairingNotice("Nhãn host cần 1–64 byte và không chứa ký tự điều khiển.");return}
+            alert?.dismiss(animated:false){[weak self] in
+                guard let self=self,self.peerReviewAvailable(owner) else{self?.cancelPairingIdentity();return}
+                self.core.beginPairingHost(setup,audience:origin,label:label,owner:owner){[weak self] result in
+                    guard let self=self,self.pairingFlow === owner,owner.active else{return}
+                    guard self.peerReviewAvailable(owner) else{self.cancelPairingIdentity();return}
+                    do{
+                        let value=try result.get()
+                        guard let ticket=value["ticket"] as? String,let expiry=value["expires_at_ms"] as? NSNumber else{throw OmniFailure.message("Thiếu thông tin lời mời host.")}
+                        let remaining=min(300_000,expiry.doubleValue-Date().timeIntervalSince1970*1000)
+                        guard remaining>0 else{throw OmniFailure.message("Lời mời đã hết hạn.")}
+                        self.pairingExpiry?.cancel()
+                        let expiryWork=DispatchWorkItem{[weak self] in guard let self=self,self.pairingFlow === owner else{return};self.cancelPairingIdentity()}
+                        self.pairingExpiry=expiryWork;DispatchQueue.main.asyncAfter(deadline:.now() + .milliseconds(Int(remaining)),execute:expiryWork)
+                        self.showHostRegistration(ticket:ticket,origin:origin,owner:owner,registered:false)
+                    }catch{self.cancelPairingIdentity();self.pairingNotice("Chưa xác nhận được tạo lời mời. Mở lại trạng thái trước khi thử lại.")}
+                }
+            }
+        })
+        present(alert,animated:true)
+    }
+    private func showHostRegistration(ticket:String,origin:String,owner:NativeDocumentLifetime,registered:Bool){
+        guard peerReviewAvailable(owner) else{cancelPairingIdentity();return}
+        let message=registered ? "Relay đã xác nhận đăng ký. Chưa có peer được chấp thuận. Bạn có thể đóng lời mời tại đây hoặc xem lại trong Trạng thái và phục hồi." : "Lời mời hiện chỉ ở thiết bị. Đăng ký sẽ gửi lời mời đã ký đến relay: \(origin). Bước này chưa chấp thuận peer."
+        let alert=UIAlertController(title:registered ? "Đã đăng ký lời mời" : "Đăng ký lời mời host?",message:message,preferredStyle:.alert);pairingAlert=alert
+        alert.addAction(UIAlertAction(title:"Để sau",style:.cancel){[weak self]_ in self?.cancelPairingIdentity()})
+        alert.addAction(UIAlertAction(title:"Đóng lời mời",style:.destructive){[weak self,weak alert]_ in alert?.dismiss(animated:false){[weak self] in self?.closeHostInvitation(ticket:ticket,owner:owner)}})
+        if !registered{
+            alert.addAction(UIAlertAction(title:"Đăng ký với relay",style:.default){[weak self,weak alert]_ in
+                alert?.dismiss(animated:false){[weak self] in
+                    guard let self=self,self.peerReviewAvailable(owner) else{self?.cancelPairingIdentity();return}
+                    self.core.pairingHostTicket(.register,ticket:ticket,owner:owner){[weak self] result in
+                        guard let self=self,self.pairingFlow === owner,owner.active else{return}
+                        guard self.peerReviewAvailable(owner) else{self.cancelPairingIdentity();return}
+                        switch result{case .success:self.showHostRegistration(ticket:ticket,origin:origin,owner:owner,registered:true);case .failure:self.cancelPairingIdentity();self.pairingNotice("Chưa xác nhận được đăng ký. Kiểm tra trạng thái và cleanup lời mời trước khi tạo mới.")}
+                    }
+                }
+            })
+        }
+        present(alert,animated:true)
+    }
     private func beginClientPairing(){
         guard pairingFlow==nil,presentedViewController==nil,hubVisible,!fullScreenGame,!pendingSuspend,UIApplication.shared.applicationState == .active,UIApplication.shared.isProtectedDataAvailable else{return}
         let owner=NativeDocumentLifetime();pairingFlow=owner;pairingButton.isEnabled=false

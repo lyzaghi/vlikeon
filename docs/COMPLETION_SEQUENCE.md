@@ -2,6 +2,8 @@
 
 ## Current sequence — 1–109 outstanding tasks
 
+Source checkpoint: iOS native host setup now exposes installed relay selection, bounded device label and independently shareable public identity, explicit local invitation creation, explicit relay registration, and invitation close. Setup and invitation retain their original deadlines and foreground ownership. Registration uncertainty directs the user to recovery rather than automatic retry. Host proof sharing, peer review, and activation UI on iOS remain unfinished. No build or test was run at the user's request; this is not runtime qualification.
+
 Item 58 Android host persistence now leads to a separate one-use activation
 snapshot/dialog, exact candidate/revision/grant checks and host JNI activation.
 Only explicit confirmation publishes relay approval; no connection starts.
