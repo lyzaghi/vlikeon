@@ -292,6 +292,48 @@ public final class NativeCore {
             expires=android.os.SystemClock.elapsedRealtime()+Math.min(60_000,remaining);
         }
     }
+    interface SavedPeerReply {void accept(SavedPeerReview review,String error);}
+    static final class SavedPeerReview {
+        final String hostPublicKey,hostFingerprint,pairId,generation,audience;
+        final boolean inputAllowed;final long grantExpiresAt,expires;
+        private final String address,hash;private final long revision;private final Object fence;
+        private final java.util.function.BooleanSupplier owner;
+        private final java.util.concurrent.atomic.AtomicBoolean consumed=new java.util.concurrent.atomic.AtomicBoolean();
+        private SavedPeerReview(JSONObject value,Object fence,java.util.function.BooleanSupplier owner) throws Exception{
+            JSONObject scope=value.getJSONObject("address");address=scope.toString();generation=scope.getString("generation");
+            hostPublicKey=value.getString("host_public_key");hostFingerprint=value.getString("host_fingerprint");pairId=value.getString("pair_id");audience=value.getString("audience");
+            inputAllowed=value.getBoolean("input_allowed");hash=value.getString("grant_hash");revision=value.getLong("revision");this.fence=fence;this.owner=owner;
+            grantExpiresAt=value.getLong("expires_at_ms");long remaining=grantExpiresAt-System.currentTimeMillis();
+            if(remaining<=0)throw new IllegalStateException();expires=android.os.SystemClock.elapsedRealtime()+Math.min(60_000,remaining);
+        }
+    }
+    void reviewSavedPeer(RecoverySnapshot snapshot,RecoveryRecord record,java.util.function.BooleanSupplier alive,SavedPeerReply reply){
+        final Object fence=mPairingClientDeliveryFence.get();
+        if(!alive.getAsBoolean()||snapshot.namespaceProvenanceMissing||!snapshot.records.contains(record)||record.isIdentity()
+                ||!"material_ready".equals(record.phase)||record.sessionRecoveryRequired||android.os.SystemClock.elapsedRealtime()>=snapshot.expires){reply.accept(null,"Reload native status before reviewing this saved pairing.");return;}
+        try{
+            byte[] request=new JSONObject().put("address",record.address()).put("expected_revision",snapshot.revision).toString().getBytes(StandardCharsets.UTF_8);
+            pairingClient(request,6,()->alive.getAsBoolean()&&android.os.SystemClock.elapsedRealtime()<snapshot.expires,response->{
+                SavedPeerReview review;
+                try{
+                    if(!alive.getAsBoolean()||mPairingClientDeliveryFence.get()!=fence||android.os.SystemClock.elapsedRealtime()>=snapshot.expires)throw new IllegalStateException();
+                    review=new SavedPeerReview(pairingResult(response),fence,alive);
+                }catch(Exception error){reply.accept(null,"Saved pairing could not be reviewed. Reload status; no activation was requested.");return;}
+                reply.accept(review,null);
+            });
+        }catch(Exception error){reply.accept(null,"Saved pairing review could not be queued.");}
+    }
+    /** Fresh independent host/permission consent is required; no old comparison code exists. */
+    void activateSavedPeer(SavedPeerReview review,java.util.function.BooleanSupplier alive,Reply reply){
+        if(review==null||!alive.getAsBoolean()||!review.owner.getAsBoolean()||mPairingClientDeliveryFence.get()!=review.fence
+                ||android.os.SystemClock.elapsedRealtime()>=review.expires||!review.consumed.compareAndSet(false,true)){
+            reply.accept(failure("","cancelled","Saved pairing review ended. Review it again."));return;
+        }
+        try{
+            byte[] request=new JSONObject().put("address",new JSONObject(review.address)).put("expected_revision",review.revision).put("reviewed_grant_hash",review.hash).toString().getBytes(StandardCharsets.UTF_8);
+            pairingClient(request,5,()->alive.getAsBoolean()&&review.owner.getAsBoolean()&&mPairingClientDeliveryFence.get()==review.fence&&android.os.SystemClock.elapsedRealtime()<review.expires,reply);
+        }catch(Exception error){reply.accept(failure("","runtime_unavailable","Saved pairing activation could not be queued. Inspect status."));}
+    }
     static final class PeerActivation {
         final PeerApproval peer;final String generation;final long expires;
         private final String address;private final long revision;

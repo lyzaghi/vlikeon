@@ -1840,6 +1840,16 @@ this checkpoint.
 
 ## Remaining implementation and qualification
 
+Android saved-peer review now requires an exact MaterialReady pair record from
+the provided native status snapshot, valid storage provenance, no session debt
+and a live snapshot deadline. Validated action-6 output becomes an immutable
+SavedPeerReview retaining host/pair/input/expiry/audience and private address/
+revision/hash, original owner and cancellation fence. Its separate activation
+helper consumes once and rechecks both owners/fence/monotonic review lifetime
+(at most 60 seconds). UI must obtain fresh independent host and permission consent;
+no old comparison code is available or invented. No build/test/runtime operation
+ran. Native resume dialog and iOS equivalent remain unfinished.
+
 iOS native-only reviewSaved now routes the dedicated saved-client review ABI,
 not generic ticket actions. Request bounds and canonical address/revision checks
 match activation scope. Response checks exact address/pair/revision, MaterialReady,

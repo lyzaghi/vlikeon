@@ -2,6 +2,11 @@
 
 ## Current sequence — 1–109 outstanding tasks
 
+Item 58 Android now authors immutable saved-peer review snapshots bound to a
+validated status record, original owner/cancel fence and capped monotonic expiry.
+Explicit one-use activation retains exact address/revision/hash without inventing
+old comparison data. Source-only; resume dialog/iOS snapshot/build/test due.
+
 Item 58 iOS private lane now routes saved-client review with bounded scope/
 revision request and exact candidate/permission/expiry/hash response admission.
 It requires comparison unavailable and fresh consent flags. Source-only;
