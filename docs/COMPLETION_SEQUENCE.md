@@ -2,6 +2,8 @@
 
 ## Current sequence — 1–109 outstanding tasks
 
+Source checkpoint: keyboard/mouse helper retirement now accepts one original caller deadline across Stop/release observation, graceful exit, forced process containment and I/O reaping. Broker revoke/close expose deadline-bearing paths and retain `CleanupRequired` on late/partial/missing-release results. Repeated cleanup may reap the same owner but cannot replace a missing release receipt with process exit. Build/test remain deferred; this is one component, not full session retirement.
+
 Source checkpoint: Windows video helper retirement now accepts one caller deadline across Stop RPC, process wait and I/O reaping. Raw-frame, owned-capture and viewer-decoder broker wrappers expose `revoke_until`. Missing Stop acknowledgement, expired completion, pending threads or a failed join remain errors; a retry can reap the same owner but cannot manufacture an acknowledgement. This prepares component retirement only, not full session retirement or transport integration. Build/test remain deferred.
 
 Source checkpoint: saved-pair recovery no longer asks mobile users to guess the local role. Native status derives optional host/client metadata from the historically verified signed grant, matching pair ID, document hash and the record's public identity. Android/iOS select only the corresponding re-review path; missing role metadata leaves cleanup readable without enabling resume. This supersedes the earlier manual role selector. Fresh vault/role/grant checks and explicit peer/permission consent remain mandatory. No build/test or transport enablement occurred.

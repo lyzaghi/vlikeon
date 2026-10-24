@@ -1,5 +1,17 @@
 # Owned-game native keyboard/mouse source
 
+Retirement source now exposes worker `stop_confirmed_until` plus broker
+`revoke_until`/`close_until`. Stop RPC, graceful exit and forced process wait
+consume one caller deadline. No new Stop is sent after the owner closes, and
+expired calls still fence/contain with zero intentional wait. Confirmation
+requires the real released-state observation, exited process and joined I/O
+thread before the deadline. A missing receipt, failed join or late completion
+keeps `CleanupRequired`; cancellation/termination requests alone are not proof
+that OS input state was released. Existing default/Drop cleanup uses its own
+best-effort budget and is not a caller-deadline receipt. This confirms neither
+capture/video, signaling, ICE, audio nor virtual-gamepad retirement. Build/test
+and actual OS input/helper fault qualification remain deferred.
+
 Item 55 now authors a private provider-side gamepad ownership module and Linux
 uinput backend in `platform/stream-input`, plus stable standard browser-pad
 sampling. They are not wired into this helper, native grant UI or host policy;

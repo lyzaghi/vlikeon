@@ -65,21 +65,35 @@ impl InputWorker{
     /// A process exit or a successful Stop RPC without a released-state
     /// observation is not proof that tracked keyboard/mouse input was released.
     pub fn stop_confirmed(&mut self)->Result<Observation>{
+        self.stop_confirmed_until(Instant::now()+Duration::from_millis(3750))
+    }
+    /// Stop/release receipt, graceful exit, forced containment and I/O reaping
+    /// consume one original caller budget. Missing release evidence stays debt.
+    pub fn stop_confirmed_until(&mut self,deadline:Instant)->Result<Observation>{
         if !self.closed{
-            let observed=self.call(Action::Stop,Duration::from_millis(750));self.closed=true;self.sender.take();
-            if let Ok(value)=observed{if value.state=="revoked"&&value.reason.as_deref()!=Some("release_failed"){self.stop_observation=Some(value);}}
+            let remaining=deadline.saturating_duration_since(Instant::now());
+            if !remaining.is_zero(){
+                let observed=self.call(Action::Stop,remaining.min(Duration::from_millis(750)));
+                if let Ok(value)=observed{if value.state=="revoked"&&value.reason.as_deref()!=Some("release_failed"){self.stop_observation=Some(value);}}
+            }
+            self.closed=true;self.sender.take();
         }
-        let start=Instant::now();while start.elapsed()<Duration::from_secs(2){if self.shared.process.exited().unwrap_or(false){break;}std::thread::sleep(Duration::from_millis(20));}
+        let graceful=deadline.min(Instant::now()+Duration::from_secs(2));
+        while Instant::now()<graceful{
+            if self.shared.process.exited().unwrap_or(false){break;}
+            std::thread::sleep(graceful.saturating_duration_since(Instant::now()).min(Duration::from_millis(20)));
+        }
         if let Some(thread)=self.thread.as_ref(){
             // Cancellation is only a request. A blocked thread retains Shared
             // and the singleton permit until its actual closure completes.
             unsafe{windows_sys::Win32::System::IO::CancelSynchronousIo(thread.as_raw_handle());}
         }
-        let retired=self.shared.process.stop(1000).is_ok();
+        let remaining=deadline.saturating_duration_since(Instant::now()).as_millis().min(1000)as u32;
+        let retired=self.shared.process.stop(remaining).is_ok();
         if self.thread.as_ref().is_some_and(|thread|thread.is_finished()){
             if let Some(thread)=self.thread.take(){self.join_failed|=thread.join().is_err();}
         }
-        if !retired||self.thread.is_some()||self.join_failed{return Err(failure());}
+        if !retired||self.thread.is_some()||self.join_failed||Instant::now()>=deadline{return Err(failure());}
         // Retain only a real released-state receipt. Retry may reap an already
         // finished I/O thread, but cannot invent a lost helper acknowledgment.
         self.stop_observation.clone().ok_or_else(failure)
@@ -99,5 +113,6 @@ impl InputWorker{
     pub fn status(&mut self)->omniplay_contracts::Result<crate::protocol::Observation>{Err(crate::failure())}
     pub fn release(&mut self)->omniplay_contracts::Result<crate::protocol::Observation>{Err(crate::failure())}
     pub fn stop_confirmed(&mut self)->omniplay_contracts::Result<crate::protocol::Observation>{Err(crate::failure())}
+    pub fn stop_confirmed_until(&mut self,_:std::time::Instant)->omniplay_contracts::Result<crate::protocol::Observation>{Err(crate::failure())}
     pub fn close(&mut self){}
 }

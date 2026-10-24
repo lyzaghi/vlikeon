@@ -3,7 +3,7 @@ use omniplay_core::{Database,installed::InstalledGames};
 use omniplay_stream_input::{InputWorker,protocol::Observation};
 use omniplay_streaming::{SignedDocument,PairGrant,inspect,verify_grant,key_id};
 use serde::Deserialize;
-use std::{fs::File,path::PathBuf};
+use std::{fs::File,path::PathBuf,time::{Duration,Instant}};
 use uuid::Uuid;
 
 #[derive(Deserialize)]#[serde(deny_unknown_fields)]
@@ -154,9 +154,15 @@ impl StreamInputs{
     pub fn frame(&mut self,id:Uuid,session:Uuid,sequence:u64,frame:RemoteInputFrame)->Result<StreamInputStatus>{let active=self.active(id,session)?;frame.validate()?;if matches!(active.status.state,StreamInputState::Revoked|StreamInputState::CleanupRequired){return Ok(active.status.clone());}let result=active.worker.as_mut().ok_or_else(unavailable)?.input(sequence,frame);observe(active,result)}
     pub fn release(&mut self,id:Uuid,session:Uuid)->Result<StreamInputStatus>{let active=self.active(id,session)?;if matches!(active.status.state,StreamInputState::Revoked|StreamInputState::CleanupRequired){return Ok(active.status.clone());}let result=active.worker.as_mut().ok_or_else(unavailable)?.release();observe(active,result)}
     pub fn status(&mut self,id:Uuid,session:Uuid)->Result<StreamInputStatus>{let active=self.active(id,session)?;if matches!(active.status.state,StreamInputState::Revoked|StreamInputState::CleanupRequired){return Ok(active.status.clone());}let result=active.worker.as_mut().ok_or_else(unavailable)?.status();observe(active,result)}
-    pub fn revoke(&mut self,id:Uuid,session:Uuid)->Result<StreamInputStatus>{let active=self.active(id,session)?;stop_active(active);Ok(active.status.clone())}
+    pub fn revoke(&mut self,id:Uuid,session:Uuid)->Result<StreamInputStatus>{self.revoke_until(id,session,Instant::now()+Duration::from_millis(3750))}
+    /// Component retirement only; Revoked requires released input and complete
+    /// helper/I/O retirement within the caller's original session deadline.
+    pub fn revoke_until(&mut self,id:Uuid,session:Uuid,deadline:Instant)->Result<StreamInputStatus>{let active=self.active(id,session)?;stop_active_until(active,deadline);Ok(active.status.clone())}
     pub fn close(&mut self){
-        if let Some(active)=self.active.as_mut(){stop_active(active);}
+        self.close_until(Instant::now()+Duration::from_millis(3750));
+    }
+    pub fn close_until(&mut self,deadline:Instant){
+        if let Some(active)=self.active.as_mut(){stop_active_until(active,deadline);}
         // Retain uncertain worker/artifact/process witnesses while this owner
         // remains alive. A later explicit revoke can reap the same worker.
         if self.active.as_ref().is_some_and(|active|active.status.state==StreamInputState::Revoked&&active.worker.is_none()){self.active.take();}
@@ -165,8 +171,11 @@ impl StreamInputs{
 }
 impl Drop for StreamInputs{fn drop(&mut self){self.close();}}
 fn stop_active(active:&mut Active){
+    stop_active_until(active,Instant::now()+Duration::from_millis(3750));
+}
+fn stop_active_until(active:&mut Active,deadline:Instant){
     if active.status.state==StreamInputState::Revoked&&active.worker.is_none(){return;}
-    let observed=active.worker.as_mut().ok_or_else(unavailable).and_then(|worker|worker.stop_confirmed());
+    let observed=active.worker.as_mut().ok_or_else(unavailable).and_then(|worker|worker.stop_confirmed_until(deadline));
     match observed{
         Ok(value)=>{active.worker.take();active.status.state=StreamInputState::Revoked;active.status.reason=value.reason;},
         Err(_)=>{active.status.state=StreamInputState::CleanupRequired;active.status.reason=Some("helper_disconnected".into());},
