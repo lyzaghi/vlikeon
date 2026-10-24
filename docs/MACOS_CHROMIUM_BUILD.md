@@ -114,11 +114,38 @@ required Xcode license acceptance; no agreement was accepted by this task.
 
 `qa/macos/build-host-preflight.sh` is an authored read-only inventory of OS,
 architecture, RAM, CPU count, build filesystem/free space, selected Xcode and SDK,
-Git and Python. It takes an existing build-parent directory. The helper has not
-been executed or qualified on a Mac; equivalent direct read-only inventory
-commands established the host values above. Only Command Line Tools are selected
-and no full Xcode was found in the checked application locations. The helper
-does not install tools or modify settings.
+Git and Python. It accepts an existing build-parent directory, resolves its
+device with df, then asks diskutil about that device. The native Mac rejected
+diskutil info on the nested work directory; that admission bug was corrected
+without changing any frozen recipe input. Antigravity executed the revised
+preflight on the actual external workspace: remote exit 0, APFS reported,
+SDK 15.5/build 24F74, Git 2.39.5 and Python 3.9.6. Only Command Line Tools are
+selected; xcodebuild reports that full Xcode is required. This is inventory
+success with an incomplete Xcode prerequisite, not full build-host acceptance.
+The helper does not install tools or modify settings.
+
+## Pinned depot bootstrap
+
+Codex provisioned depot_tools on the external workspace at the intended clean
+revision `4be4e4628e093c4ad50210db5dcfa05a88280bda`. A detached supervisor used
+the real CLT interpreter, the sourced external environment, per-stage logs,
+bounded process-group timeouts and exclusive run directories. No global Python
+installation, Xcode installation, license acceptance or frozen source mutation
+was performed. The initial batch failed during filesystem admission before
+creating a depot checkout; its logs/result were retained. Batch
+`005-depot-bootstrap-b` passed git init, exact-revision fetch/checkout and base
+vpython bootstrap. The base vpython invocation selected Python 3.8.10 in the
+external cache; it is not evidence that the depot's Python 3.11 gclient TOML
+environment has been populated or that the Chromium recipe can use that default
+runtime. The recipe supervisor must use an explicitly suitable interpreter.
+
+Antigravity then independently checked the terminal batch, actual clean depot
+HEAD, selected Git executable hash and all 141 transferred source inputs
+(1,362,744 bytes), rejecting unknown files and symlinks. Native JSON reported
+`passed: true` and the remote exit sentinel was 0. These checks establish base
+tool/bootstrap and transfer integrity only. They do not establish dependency
+sync, hooks, GN, compilation, runtime or release approval. See
+`qa/evidence/sequential/item-005/tool-bootstrap-summary.json`.
 
 ## Frozen source and transfer
 
@@ -148,8 +175,9 @@ development core catalog is empty and is not a production core package.
 The archive was transferred directly into the external
 `/Volumes/VlikeonBuild/work/projects` and its SHA-256 matched on the Mac. It was
 extracted into a previously absent `macos-005a` directory there; the extracted
-preparation receipt also matched the SHA-256 above. Full input admission by the
-frozen recipe, dependency bootstrap, hooks and compilation remain pending.
+preparation receipt also matched the SHA-256 above. Independent source inventory
+verification subsequently passed as described above. Admission by the frozen
+build recipe, gclient dependency sync, hooks and compilation remain pending.
 
 ## Execution and acceptance after host qualification
 

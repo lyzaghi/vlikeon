@@ -25,10 +25,10 @@
   "source_transfer": {
     "archive_sha256_on_mac": "d9b7dda20d8a0963e2050e50df8ded5b2a3586efe5340c489b8e9bd4a8b3144e",
     "extracted_preparation_receipt_sha256_on_mac": "dd9776d0bb8300894311d53788d3529b646382408ca75fb6abce5ae2b8f9bbc8",
-    "source_inventory_admission": "pending_frozen_recipe"
+    "source_inventory_admission": "independent_141_file_hash_check_passed_frozen_recipe_admission_pending"
   },
   "full_xcode": "not_configured",
-  "dependency_bootstrap": "not_started",
+  "dependency_bootstrap": "base_depot_vpython_bootstrap_passed_gclient_environment_and_sync_pending",
   "compiler": "not_started",
   "runtime": "not_tested",
   "release_approval": false,

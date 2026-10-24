@@ -14,7 +14,12 @@ sysctl -n hw.memsize
 sysctl -n hw.logicalcpu
 printf '%s\n' '=== build filesystem ==='
 df -kP "$task_build_parent"
-diskutil info "$task_build_parent" | sed -n '/File System Personality:/p; /Type (Bundle):/p; /Volume Free Space:/p; /Container Free Space:/p'
+task_build_device=$(df -kP "$task_build_parent" | awk 'NR == 2 {print $1}')
+case "$task_build_device" in
+  /dev/*) ;;
+  *) printf '%s\n' 'Cannot identify the build volume device' >&2; exit 1 ;;
+esac
+diskutil info "$task_build_device" | sed -n '/File System Personality:/p; /Type (Bundle):/p; /Volume Free Space:/p; /Container Free Space:/p'
 printf '%s\n' '=== developer tools ==='
 if xcode-select -p; then
   xcodebuild -version || true
