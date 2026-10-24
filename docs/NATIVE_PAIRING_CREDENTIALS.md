@@ -1840,6 +1840,13 @@ this checkpoint.
 
 ## Remaining implementation and qualification
 
+Host candidate persistence and host activation now require enabled installed
+hosting policy, installed grant audience and remote-input permission when the
+signed grant includes input_allowed. Refusal occurs before exchange consumption/
+pair vault write in host preparation and before relay approval in activation.
+This does not grant capture/input authority or replace actual native consent.
+Installed policy remains unchanged/disabled. No build/test/runtime operation ran.
+
 iOS MaterialReady pair details now offer saved-pair rereview when provenance
 exists and no session recovery debt is present. A fresh review snapshot feeds
 two native dialogs: independent host-key verification (explicit old comparison

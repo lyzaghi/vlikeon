@@ -127,6 +127,7 @@ impl<'a> NativeCredentialWriter<'a>{
         let metadata:omniplay_streaming::PairGrant=omniplay_streaming::inspect(&document,8192)?;
         let grant=verify_grant(&document,&metadata.audience,elapsed_now(now,started)?)?;
         if grant.host_public_key!=signer.public_key(){return Err(conflict());}
+        crate::stream_signal_authority::require_installed_host_grant(&grant.audience,grant.input_allowed)?;
         check(deadline)?;self.lease.check(self.database,self.profile)?;
         let material=approval.finish_for_persistence(elapsed_now(now,started)?)?;
         check(deadline)?;drop(signer);
@@ -190,6 +191,7 @@ impl<'a> NativeCredentialWriter<'a>{
         let metadata=pair.grant().ok_or_else(conflict)?;
         let grant=verify_grant(metadata.document(),metadata.audience(),elapsed_now(now,started)?)?;
         if (if host{&grant.host_public_key}else{&grant.client_public_key})!=pair.public_key(){return Err(conflict());}
+        if host{crate::stream_signal_authority::require_installed_host_grant(metadata.audience(),grant.input_allowed)?;}
         let identity=snapshot.records().iter().find(|record|record.address().kind()==SecretKind::DeviceSigning&&
             record.phase()==Phase::Active&&record.public_key()==pair.public_key()).ok_or_else(conflict)?;
         let signer=load_identity(self.store,&identity.address(),identity.public_key())?;

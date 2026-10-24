@@ -57,6 +57,13 @@ pub fn installed_retirement_origins()->Result<Vec<String>>{
 pub fn require_installed_pairing_policy()->Result<()>{installed_policy().map(|_|())}
 /// Origins for new pairing/activation, unlike retirement this requires enabled.
 pub fn installed_pairing_origins()->Result<Vec<String>>{installed_policy().map(|policy|policy.relay_origins)}
+/// Native host approval must respect installed hosting/input policy in addition
+/// to actual peer consent. This never authorizes capture or input injection.
+pub fn require_installed_host_grant(audience:&str,input_allowed:bool)->Result<()>{
+    let policy=installed_policy()?;
+    if !policy.allow_browser_host||!policy.relay_origins.iter().any(|origin|origin==audience)||
+        (input_allowed&&!policy.allow_remote_input){return Err(denied());}Ok(())
+}
 /// Real native controller owns all backends for this exact session. Confirmed
 /// means canceled/joined signaling work and confirmed ICE/media/input/gamepad
 /// retirement, including work retained after document close. No default owner.

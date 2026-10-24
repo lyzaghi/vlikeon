@@ -2,6 +2,10 @@
 
 ## Current sequence — 1–109 outstanding tasks
 
+Item 58 host candidate persistence and host activation now enforce installed
+hosting/input policy and configured grant audience, in addition to native consent.
+Source-only; policy remains disabled and no build/test/network operation ran.
+
 Item 58 iOS saved MaterialReady pair details now link fresh leased rereview to
 independent host verification then explicit permission/activation confirmation.
 Original owner/review expiry remains; missing old comparison is explicit.
