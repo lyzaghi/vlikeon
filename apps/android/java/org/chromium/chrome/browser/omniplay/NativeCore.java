@@ -284,6 +284,7 @@ public final class NativeCore {
         final Object fence=mPairingClientDeliveryFence.get();final long deadline=android.os.SystemClock.elapsedRealtime()+25_000;
         try{mIo.execute(()->{
             byte[] input=null,proof=null;
+            boolean transferred=false;
             try{
                 long remaining=deadline-android.os.SystemClock.elapsedRealtime();
                 if(mHandle==0||mFailed||!mPairingAttached||remaining<1000||!alive.getAsBoolean()||mPairingClientDeliveryFence.get()!=fence)throw new IllegalStateException();
@@ -298,11 +299,12 @@ public final class NativeCore {
                     try{
                         if(android.os.SystemClock.elapsedRealtime()>=deadline||!alive.getAsBoolean()||mPairingClientDeliveryFence.get()!=fence)reply.accept(null,"Host share became stale. Inspect status.");
                         else reply.accept(borrowed,null);
-                    }finally{java.util.Arrays.fill(borrowed,(byte)0);}
+                    }finally{java.util.Arrays.fill(borrowed,(byte)0);mWorkPending.decrementAndGet();mPairingClientBusy.set(false);}
                 }))throw new IllegalStateException();
                 proof=null; // main callback now owns clearing, including callback errors.
+                transferred=true; // admission follows the retained proof through delivery.
             }catch(Exception|LinkageError error){mMain.post(()->reply.accept(null,"Host share is unavailable. Inspect status before retrying."));}
-            finally{if(input!=null)java.util.Arrays.fill(input,(byte)0);if(proof!=null)java.util.Arrays.fill(proof,(byte)0);mWorkPending.decrementAndGet();mPairingClientBusy.set(false);}
+            finally{if(input!=null)java.util.Arrays.fill(input,(byte)0);if(proof!=null)java.util.Arrays.fill(proof,(byte)0);if(!transferred){mWorkPending.decrementAndGet();mPairingClientBusy.set(false);}}
         });}catch(java.util.concurrent.RejectedExecutionException error){mWorkPending.decrementAndGet();mPairingClientBusy.set(false);reply.accept(null,"Native share queue is unavailable.");}
     }
     interface IdentityReply { void accept(IdentityReview review,String error); }

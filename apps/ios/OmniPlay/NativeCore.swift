@@ -314,7 +314,8 @@ final class NativeCore {
         guard pairingClientQueuePermit.wait(timeout:.now()) == .success else{pairingClientPermit.signal();completion(nil,"Hàng đợi chia sẻ đang bận.");return}
         let deadline=DispatchTime.now()+25,token=pairingClientDeliveryFence.capture(cancel:false)
         queue.async{
-            defer{self.pairingClientPermit.signal();self.pairingClientQueuePermit.signal()}
+            var transferred=false
+            defer{if !transferred{self.pairingClientPermit.signal();self.pairingClientQueuePermit.signal()}}
             do{
                 let now=DispatchTime.now()
                 guard now<deadline,self.handle != 0,self.pairingAttached,owner.active,self.pairingClientDeliveryFence.admits(token) else{throw OmniFailure.message("Phiên chia sẻ host đã kết thúc.")}
@@ -329,8 +330,9 @@ final class NativeCore {
                     return bytes.dropFirst(6).allSatisfy{(65...90).contains($0)||(97...122).contains($0)||(48...57).contains($0)||$0==45||$0==95}
                 }
                 guard valid,owner.active,DispatchTime.now()<deadline,self.pairingClientDeliveryFence.admits(token) else{proof.clear();throw OmniFailure.message("Mã chia sẻ không khả dụng hoặc đã cũ. Hãy xem trạng thái.")}
+                transferred=true
                 DispatchQueue.main.async{
-                    defer{proof.clear()}
+                    defer{proof.clear();self.pairingClientPermit.signal();self.pairingClientQueuePermit.signal()}
                     guard owner.active,DispatchTime.now()<deadline,self.pairingClientDeliveryFence.admits(token) else{completion(nil,"Mã chia sẻ đã cũ. Hãy xem trạng thái.");return}
                     proof.withBytes{completion($0,nil)}
                 }

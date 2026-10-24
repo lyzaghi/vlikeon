@@ -2,6 +2,10 @@
 
 ## Current sequence — 1–109 outstanding tasks
 
+Item 58 raw host-share admission now stays reserved until the UI callback wipes
+the retained proof, on both mobile platforms. Main-queue proof retention is thus
+covered by operation bounds. Source-only; callback/race/build/test qualification due.
+
 Item 58 host expiry now fences sharing and clears proof/request snapshots on
 native status, capability maintenance and new-host entry. Possibly registered
 public cleanup owner stays retained; never-attempted expired invitations drop.

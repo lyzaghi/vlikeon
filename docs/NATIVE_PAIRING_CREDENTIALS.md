@@ -1840,6 +1840,14 @@ this checkpoint.
 
 ## Remaining implementation and qualification
 
+Raw host share now transfers ordinary-operation admission with its proof buffer
+to main delivery. Android work count/busy flag and iOS operation/queue permits
+release only after proof wiping in callback finally/defer. Worker failures still
+clear/release locally. Thus a stalled UI cannot admit repeated successful share
+allocations after worker completion; close retains its separate bounded path.
+No lock is held during the callback. Callback retention/copy violations remain
+outside the borrow contract. No build/test or runtime race qualification ran.
+
 LocalHost host expiry now fences the invitation and zeroes owned bearer proof/
 clears request snapshots during status, capability maintenance and new-host
 entry. Never-attempted expired invitations can drop locally; possibly registered
