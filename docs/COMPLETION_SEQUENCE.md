@@ -2,6 +2,14 @@
 
 ## Current sequence — 1–109 outstanding tasks
 
+Item 58 now authors iOS native recovery status/list/detail UI and an explicit
+metadata-action caller. Record/plan/address/revision admission and a bounded
+snapshot lifetime prevent automatic plan execution; waiting external cleanup has
+no execution button. Fencing shows its permanent identity/pair effects before
+approval. Streaming policy remains disabled. No UI/ABI/vault/SQL/compiler/build/
+test was executed; Android recovery, external owners and qualification remain
+due. Original item 58 and the full 51–109 objective remain incomplete.
+
 Item 58 now connects LocalHost status to the journal's exact recovery plan and
 authors a native one-step metadata recovery entry with real credential lease,
 revision/generation admission and foreground/deadline checks. Only journal fence

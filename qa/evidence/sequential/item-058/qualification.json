@@ -60,7 +60,9 @@
     "Android current-tab/resumed/unlocked UI admission and atomic review lifetime suppress stale callbacks across pause, disconnect, cancel and expiry; policy remains disabled",
     "LocalHost public status includes recovery protocol, observation time and exact per-generation next step from the same validated journal revision",
     "Native metadata-only recovery entry retains the real credential lease and admits exact generation/revision; only fence or fully receipted finalization can commit",
-    "Mobile recovery ABI bounds input/deadline and rechecks foreground epoch; unobserved external cleanup stays pending and no automatic startup dispatch or fallback owner is provided"
+    "Mobile recovery ABI bounds input/deadline and rechecks foreground epoch; unobserved external cleanup stays pending and no automatic startup dispatch or fallback owner is provided",
+    "iOS native recovery status caller admits bounded exact record/plan mappings and current native profile/device with a monotonic snapshot lifetime",
+    "iOS status/list/detail source displays pending cleanup and permits only explicit journal fence/finalization approval, bound to selected snapshot address/revision and remaining budget"
   ],
   "build_executed": false,
   "tests_executed": false,

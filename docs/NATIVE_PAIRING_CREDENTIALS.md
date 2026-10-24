@@ -987,6 +987,36 @@ App recovery UI/JNI callers, actual retirement owners and startup reconciliation
 remain unfinished. No native endpoint, lock/file/SQL mutation, build or test was
 executed. Source review and whitespace checks are the only verification here.
 
+## iOS native recovery inspection and explicit metadata action
+
+The native identity button now offers separate setup and status/recovery actions.
+Recovery status is read through the dedicated native API even while streaming
+policy is disabled. Swift admits protocol/revision/profile/device, bounded
+records and recovery steps, unique generation addresses and a one-to-one match
+between each nonretired record and its planned action. Retired records have no
+remaining action. Public metadata stays outside WebKit messaging.
+
+A native list opens each record's exact generation, key, human-readable phase
+and next step. External writer/session/relay/vault cleanup is displayed as waiting
+and has no execution button. Only journal fencing or fully receipted finalization
+has a native action. The fence confirmation explicitly states its permanence,
+identity-to-pair effects and that it does not prove connection stop/key deletion.
+Selection of a list row only opens details and never executes recovery.
+
+Swift binds the action to the selected snapshot record/address/phase/step and
+expected revision, with a 30-second monotonic snapshot lifetime established before
+status I/O. The operation budget is capped by the remaining snapshot lifetime and
+the native 25-second limit. Core reselects the actual current step under the real
+lease. Every outcome/error requires a fresh status read; no subsequent cleanup
+step, new key or retry is scheduled automatically.
+
+Recovery uses the same transient UI lifetime cancellation as identity consent,
+including background/protected-data loss and expiry. UI cancellation cannot
+preempt a synchronous in-flight operation or undo a committed fence. Native
+sheet/presentation/accessibility behavior, device lifecycle, ABI/vault/SQL and
+compilation remain unverified. No UI/native call, build or test was executed.
+Android recovery UI and actual external retirement owners remain unfinished.
+
 ## Remaining implementation and qualification
 
 - Journal/executor/lease/writer product integration, authority epochs, actual native owner

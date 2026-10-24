@@ -19,6 +19,14 @@ struct NativeIdentityReview {
     let id:String, publicKey:String, device:String, generation:String
     let expires:DispatchTime
 }
+struct NativeRecoveryRecord {
+    let address:[String:Any],phase:String,publicKey:String,nextStep:String?
+    var generation:String{address["generation"] as? String ?? ""}
+    var isIdentity:Bool{address["kind"] as? String == "device_signing"}
+}
+struct NativeRecoverySnapshot {
+    let revision:UInt64,device:String,records:[NativeRecoveryRecord],expires:DispatchTime
+}
 
 /// Only this native object can call path-bearing authorization APIs. Each profile's
 /// SQLite handle is serialized off the main thread; WebKit never sees its root path.
@@ -160,6 +168,66 @@ final class NativeCore {
     }
     func cancelPairingIdentityReview(){
         queue.async{if self.handle != 0{let value=om_mobile_pairing_cancel_identity_review(self.handle);om_mobile_free(value)}}
+    }
+    /// Read-only native recovery inspection remains available with policy off.
+    func pairingRecoveryStatus(owner:NativeDocumentLifetime,completion:@escaping @MainActor (Result<NativeRecoverySnapshot,Error>)->Void){
+        queue.async{
+            do{
+                guard owner.active,self.handle != 0,self.pairingAttached else{throw OmniFailure.message("Trạng thái Remote Play chưa sẵn sàng.")}
+                let expires=DispatchTime.now()+30
+                let value=try self.unwrap(self.consume(om_mobile_pairing_status(self.handle)))
+                guard owner.active,DispatchTime.now()<expires,(value["credential_protocol"] as? NSNumber)?.uint32Value==1,
+                      (value["recovery_protocol"] as? NSNumber)?.uint32Value==1,value["profile_id"] as? String == self.profileID.uuidString.lowercased(),
+                      let device=value["device_id"] as? String,UUID(uuidString:device)?.uuidString.lowercased()==device,
+                      let revision=value["revision"] as? NSNumber,revision.doubleValue>=0,revision.doubleValue<=10_000_000,revision.doubleValue==Double(revision.uint64Value),
+                      let records=value["records"] as? [[String:Any]],records.count<=128,
+                      let actions=value["recovery"] as? [[String:Any]],actions.count<=128 else{throw OmniFailure.message("Trạng thái phục hồi không hợp lệ.")}
+                let steps:Set<String>=["fence_generation","revalidate_before_use","retire_writer","retire_local_sessions","wait_for_pair_cleanup","revoke_relay","remove_material","finalize_retirement"]
+                var next:[String:([String:Any],String)]=[:]
+                for action in actions{
+                    guard let address=action["address"] as? [String:Any],let generation=address["generation"] as? String,
+                          let step=action["next_step"] as? String,steps.contains(step),next[generation]==nil else{throw OmniFailure.message("Kế hoạch phục hồi không hợp lệ.")}
+                    next[generation]=(address,step)
+                }
+                var parsed:[NativeRecoveryRecord]=[];var seen=Set<String>()
+                for record in records{
+                    guard let address=record["address"] as? [String:Any],address["profile"] as? String == self.profileID.uuidString.lowercased(),address["device"] as? String == device,
+                          let generation=address["generation"] as? String,UUID(uuidString:generation)?.uuidString.lowercased()==generation,seen.insert(generation).inserted,
+                          let item=address["id"] as? String,UUID(uuidString:item)?.uuidString.lowercased()==item,
+                          let kind=address["kind"] as? String,["device_signing","pair_encryption"].contains(kind),(kind != "device_signing" || item==device),
+                          let phase=record["phase"] as? String,["reserved","writing","material_ready","active","revoking","retired"].contains(phase),
+                          let key=record["public_key"] as? String,key.count==43 else{throw OmniFailure.message("Bản ghi phục hồi không hợp lệ.")}
+                    let action=next.removeValue(forKey:generation)
+                    if let action=action{
+                        guard phase != "retired",NSDictionary(dictionary:action.0).isEqual(to:address) else{throw OmniFailure.message("Bản ghi và kế hoạch phục hồi không khớp.")}
+                    }else if phase != "retired"{throw OmniFailure.message("Thiếu kế hoạch phục hồi cho bản ghi hiện tại.")}
+                    parsed.append(NativeRecoveryRecord(address:address,phase:phase,publicKey:key,nextStep:action?.1))
+                }
+                guard next.isEmpty,owner.active,DispatchTime.now()<expires else{throw OmniFailure.message("Trạng thái phục hồi đã hết hạn.")}
+                let snapshot=NativeRecoverySnapshot(revision:revision.uint64Value,device:device,records:parsed,expires:expires)
+                DispatchQueue.main.async{completion(.success(snapshot))}
+            }catch{DispatchQueue.main.async{completion(.failure(error))}}
+        }
+    }
+    /// Only after native approval of the exact record from this snapshot.
+    func advancePairingMetadata(_ record:NativeRecoveryRecord,snapshot:NativeRecoverySnapshot,owner:NativeDocumentLifetime,completion:@escaping @MainActor (Result<String,Error>)->Void){
+        queue.async{
+            do{
+                let started=DispatchTime.now()
+                guard owner.active,started<snapshot.expires,self.handle != 0,self.pairingAttached,
+                      ["fence_generation","finalize_retirement"].contains(record.nextStep ?? ""),
+                      snapshot.records.contains(where:{$0.generation==record.generation&&$0.phase==record.phase&&$0.nextStep==record.nextStep&&NSDictionary(dictionary:$0.address).isEqual(to:record.address)}) else{throw OmniFailure.message("Hãy mở lại trạng thái trước khi phục hồi.")}
+                let remaining=(snapshot.expires.uptimeNanoseconds-started.uptimeNanoseconds)/1_000_000
+                guard remaining>=1_000 else{throw OmniFailure.message("Trạng thái đã hết hạn. Hãy mở lại trước khi phục hồi.")}
+                let budget=UInt32(min(25_000,remaining))
+                let value=try self.unwrap(self.call(["address":record.address,"expected_revision":snapshot.revision]){om_mobile_pairing_advance_metadata_v1(self.handle,$0,$1,budget)})
+                guard owner.active,(value["recovery_protocol"] as? NSNumber)?.uint32Value==1,value["reload_required"] as? Bool == true,
+                      let address=value["address"] as? [String:Any],NSDictionary(dictionary:address).isEqual(to:record.address),
+                      let result=value["result"] as? [String:Any],let outcome=result["outcome"] as? String,
+                      ["committed","pending","revalidation_required","already_retired"].contains(outcome) else{throw OmniFailure.message("Kết quả chưa được xác nhận. Hãy đọc lại trạng thái.")}
+                DispatchQueue.main.async{completion(.success(outcome))}
+            }catch{DispatchQueue.main.async{completion(.failure(error))}}
+        }
     }
     func open(completion: @escaping (Result<Void, Error>) -> Void) {
         queue.async {
