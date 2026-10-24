@@ -118,12 +118,15 @@ impl<'a> NativeCredentialWriter<'a>{
     }
     /// Live Active-identity close path; retain the invitation on uncertain reply.
     /// Does not revoke approved pairs or implement crash/revoking-identity cleanup.
-    pub fn close_host(&self,expected:u64,address:CredentialAddress,invitation:&mut omniplay_streaming::native_pair_exchange::NativeHostInvitation,
+    pub fn close_host(&self,address:CredentialAddress,invitation:&mut omniplay_streaming::native_pair_exchange::NativeHostInvitation,
         relay:&omniplay_streaming::native_relay::NativePairRelay,now:u64,deadline:Instant,cancel:&std::sync::atomic::AtomicBool)->Result<()>{
         let started=begin(deadline)?;
         let metadata:omniplay_streaming::Invite=omniplay_streaming::inspect(invitation.signed_invite(),4096)?;
         if !crate::stream_signal_authority::installed_retirement_origins()?.contains(&metadata.audience){return Err(conflict());}
-        let signer=self.active_signer(expected,address)?;check(deadline)?;
+        // Close is cleanup, not old peer consent. Reload current journal under
+        // this lease while retaining the original exact identity generation.
+        let current=journal::load_scoped(self.database,&self.lease,self.profile)?;
+        let signer=self.active_signer(current.revision(),address)?;check(deadline)?;
         // close() fences locally before remote cancellation/deadline admission.
         invitation.close(relay,&signer,elapsed_now(now,started)?,deadline,cancel)?;
         self.lease.check(self.database,self.profile)?;check(deadline)?;

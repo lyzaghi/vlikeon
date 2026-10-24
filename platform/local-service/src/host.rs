@@ -287,7 +287,7 @@ impl LocalHost {
         }
         let relay=omniplay_streaming::native_relay::NativePairRelay::new(omniplay_core::stream_signal_authority::installed_retirement_origins()?)?;
         let writer=omniplay_core::stream_credential_writer::NativeCredentialWriter::open(&self.database,self.profile_id,store)?;
-        writer.close_host(pending.revision,pending.identity,&mut pending.invitation,&relay,omniplay_core::now_ms(),deadline,cancel)?;
+        writer.close_host(pending.identity,&mut pending.invitation,&relay,omniplay_core::now_ms(),deadline,cancel)?;
         self.pairing_host=None;
         Ok(json!({"pairing_protocol":1,"ticket":ticket,"closed":true,"relay_close_confirmed":true,"pairs_revoked":false}))
     }

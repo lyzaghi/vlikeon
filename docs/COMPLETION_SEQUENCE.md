@@ -2,6 +2,11 @@
 
 ## Current sequence — 1–109 outstanding tasks
 
+Item 58 host close now reloads current scoped journal revision under its lease
+while requiring the original exact Active identity generation and invitation
+signature binding. Unrelated revision advances no longer alone block cleanup;
+peer consent paths remain exact-revision. Source-only; build/test/recovery due.
+
 Item 58 raw host-share admission now stays reserved until the UI callback wipes
 the retained proof, on both mobile platforms. Main-queue proof retention is thus
 covered by operation bounds. Source-only; callback/race/build/test qualification due.

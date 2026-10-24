@@ -1840,6 +1840,15 @@ this checkpoint.
 
 ## Remaining implementation and qualification
 
+Host close no longer treats the invitation's old peer-consent revision as cleanup
+authority. It reloads current journal revision under the already-held scoped lease
+and still requires the original exact Active identity address/generation plus
+invitation host signature binding. Thus unrelated journal advances do not alone
+strand live invitation cleanup. This performs no journal mutation or peer consent
+rebase; poll/prepare/activation retain their exact expected revisions. Revoking
+identity, crash and expired remote cleanup remain unfinished. No build/test or
+runtime operation ran for this source follow-up.
+
 Raw host share now transfers ordinary-operation admission with its proof buffer
 to main delivery. Android work count/busy flag and iOS operation/queue permits
 release only after proof wiping in callback finally/defer. Worker failures still
