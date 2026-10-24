@@ -266,6 +266,15 @@ impl<'a> NativeCredentialWriter<'a>{
         self.activate_consented_pair(address,expected,relay,false,now,deadline,cancel)
     }
     /// Exact already-persisted host candidate only, after actual native consent.
+    pub fn activate_reviewed_host_after_local_consent(&mut self,address:CredentialAddress,expected:u64,reviewed_hash:&str,
+        relay:&omniplay_streaming::native_relay::NativePairRelay,now:u64,deadline:Instant,cancel:&std::sync::atomic::AtomicBool)->Result<u64>{
+        check(deadline)?;
+        let snapshot=journal::load_scoped(self.database,&self.lease,self.profile)?;
+        let pair=snapshot.records().iter().find(|record|record.address()==address).ok_or_else(conflict)?;
+        if snapshot.revision()!=expected||pair.grant_hash()!=Some(reviewed_hash){return Err(conflict());}
+        self.activate_consented_pair(address,expected,relay,true,now,deadline,cancel)
+    }
+    /// Exact already-persisted host candidate only, after actual native consent.
     /// Reuses the retained signed grant for approval/reconciliation, not a new key.
     pub fn activate_host_after_local_consent(&mut self,address:CredentialAddress,expected:u64,
         relay:&omniplay_streaming::native_relay::NativePairRelay,now:u64,deadline:Instant,cancel:&std::sync::atomic::AtomicBool)->Result<u64>{

@@ -2,6 +2,10 @@
 
 ## Current sequence — 1–109 outstanding tasks
 
+Item 58 reviewed host activation now binds exact persisted address/revision/grant
+hash under one writer lease before host-role/policy/vault/relay checks and Active
+publication. Source-only; host review/ABI/UI and build/test remain due.
+
 Item 58 explicit host sharing now connects controller to leased identity reload,
 registered/live invitation and ticket/epoch/deadline/cancel checks. It returns
 Zeroizing text separately from JSON/status. Source-only; actual native sharing

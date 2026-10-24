@@ -1840,6 +1840,15 @@ this checkpoint.
 
 ## Remaining implementation and qualification
 
+Reviewed host activation now has a LocalHost/writer entry requiring exact stored
+candidate address, journal revision and reviewed grant hash. The retained writer
+lease spans hash admission and existing host-role/installed input policy/vault/
+fresh relay approval checks before Active publication. Response binds hash and
+address/revision, requiring status reload. Actual native host peer/input consent
+is still required; no transport authority is created. No ABI/UI caller is wired
+and no build/test/runtime operation ran. Host grant rereview/publication metadata,
+durable recovery and full qualification remain unfinished.
+
 Explicit native host_share now reloads the exact Active identity/revision under
 lease, verifies invitation host binding and installed policy, then asks the
 registered live invitation for share_code. LocalHost checks ticket/epoch and

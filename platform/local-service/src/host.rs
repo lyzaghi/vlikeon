@@ -393,6 +393,17 @@ impl LocalHost {
         Ok(json!({"credential_protocol":1,"address":address,"revision":revision,"phase":"active","grant_hash":reviewed_hash,"reload_required":true}))
     }
     /// Actual native host peer/input consent, exact persisted candidate only.
+    pub fn native_pairing_activate_reviewed_host(&self,store:&dyn omniplay_streaming::native_credentials::PairingSecretStore,
+        address:omniplay_streaming::native_credentials::CredentialAddress,expected:u64,reviewed_hash:&str,deadline:std::time::Instant,
+        cancel:&std::sync::atomic::AtomicBool)->Result<Value>{
+        self.ensure_open()?;
+        if std::time::Instant::now()>=deadline||cancel.load(std::sync::atomic::Ordering::Acquire){return Err(PlatformError::new(ErrorCode::Cancelled,"Native reviewed host activation expired or was cancelled"));}
+        let relay=omniplay_streaming::native_relay::NativePairRelay::new(omniplay_core::stream_signal_authority::installed_pairing_origins()?)?;
+        let mut writer=omniplay_core::stream_credential_writer::NativeCredentialWriter::open(&self.database,self.profile_id,store)?;
+        let revision=writer.activate_reviewed_host_after_local_consent(address,expected,reviewed_hash,&relay,omniplay_core::now_ms(),deadline,cancel)?;
+        Ok(json!({"credential_protocol":1,"address":address,"revision":revision,"phase":"active","grant_hash":reviewed_hash,"reload_required":true}))
+    }
+    /// Actual native host peer/input consent, exact persisted candidate only.
     pub fn native_pairing_activate_host_after_local_consent(&self,store:&dyn omniplay_streaming::native_credentials::PairingSecretStore,
         address:omniplay_streaming::native_credentials::CredentialAddress,expected:u64,deadline:std::time::Instant,
         cancel:&std::sync::atomic::AtomicBool)->Result<Value>{
