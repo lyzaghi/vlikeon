@@ -20,8 +20,12 @@ impl Cost{
 struct StoredSps{version:u64,encoded:Vec<u8>,value:Sps,cost:Cost}
 struct StoredPps{version:u64,sps_version:u64,encoded:Vec<u8>,value:Pps,cost:Cost}
 /// Table-local version binding. Not serializable, not a decoder or media permit.
-#[derive(Clone)]
+#[derive(Clone,Debug)]
 pub struct ParameterBinding{table:Arc<()>,sps:u8,sps_version:u64,pps:u8,pps_version:u64}
+impl PartialEq for ParameterBinding{
+    fn eq(&self,other:&Self)->bool{Arc::ptr_eq(&self.table,&other.table)&&self.sps==other.sps&&self.sps_version==other.sps_version&&self.pps==other.pps&&self.pps_version==other.pps_version}
+}
+impl Eq for ParameterBinding{}
 pub struct ResolvedParameters<'a>{table:&'a Arc<()>,sps:&'a StoredSps,pps:&'a StoredPps}
 impl ResolvedParameters<'_>{
     pub fn sps(&self)->&Sps{&self.sps.value}

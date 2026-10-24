@@ -1,5 +1,10 @@
 # Native ordered RTP to decoder bridge — item 56
 
+Ordinary slice identity-prefix parsing now exists as described in
+`NATIVE_H264_SLICE_PREFIX.md`. It is not complete header/AU/reference validation
+and is not yet called by this bridge; full native bitstream admission remains
+required before decoder submission.
+
 Retained parameter versions now exist as described in
 `NATIVE_H264_PARAMETER_VERSIONS.md`. The actual access-unit/slice consumer,
 parameter-change/IDR recovery, full negotiation checks and decoder bridge
