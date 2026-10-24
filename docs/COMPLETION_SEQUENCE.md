@@ -2,6 +2,10 @@
 
 ## Current sequence — 1–109 outstanding tasks
 
+Item 58 iOS status now retains typed immutable durable invitation cleanup records
+bound to the same snapshot's nonretired signing identity, HTTPS audience and
+integral expiry. Source-only; explicit recovery caller/views and build/test due.
+
 Item 58 Android status now retains typed immutable durable invitation cleanup
 metadata with exact local signing-generation binding, configured-shape HTTPS
 audience and integral expiry admission. No action authority inferred. Source-only;

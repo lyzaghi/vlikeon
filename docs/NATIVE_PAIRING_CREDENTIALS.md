@@ -1840,6 +1840,15 @@ this checkpoint.
 
 ## Remaining implementation and qualification
 
+iOS cleanup status now retains immutable per-invitation metadata instead of a
+count alone. Exact local five-field DeviceSigning address must match a nonretired
+identity in the same snapshot, with canonical nonzero generation. Metadata also
+requires a valid integral safe-range expiry and HTTPS origin shape; existing
+unique invite/hash/boolean checks remain. Count is derived from retained records.
+This grants no cleanup destination authority: native retirement allowlist still
+applies. No compiler/build/test/runtime operation ran. Explicit recovery caller
+and confirmation views remain unfinished.
+
 Android recovery snapshots now retain immutable durable host cleanup records,
 not just a count. Each validates invite/hash, integral bounded expiry, actual
 expiry flag, HTTPS origin shape and exact five-field local DeviceSigning address.

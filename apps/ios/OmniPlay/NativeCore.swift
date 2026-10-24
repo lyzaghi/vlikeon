@@ -132,13 +132,20 @@ struct NativeRecoveryRecord {
     var generation:String{address["generation"] as? String ?? ""}
     var isIdentity:Bool{address["kind"] as? String == "device_signing"}
 }
+/// Public durable cleanup metadata, never a sharing or approval capability.
+struct NativeHostInvitationCleanup {
+    let inviteID:String,inviteHash:String,audience:String,identityGeneration:String
+    let expiresAt:Date,expired:Bool
+    fileprivate let identity:[String:Any]
+}
 struct NativeRecoverySnapshot {
     let revision:UInt64,device:String,records:[NativeRecoveryRecord],expires:DispatchTime
     let relayRetirementAvailable:Bool
     let namespaceProvenanceMissing:Bool
     let pendingClientTicket:String?
     let pendingHostTicket:String?
-    let hostInvitationCleanupCount:Int
+    let hostInvitationCleanup:[NativeHostInvitationCleanup]
+    var hostInvitationCleanupCount:Int{hostInvitationCleanup.count}
     let pairingOrigins:[String]
     var needsAttention:Bool{namespaceProvenanceMissing || pendingHostTicket != nil || hostInvitationCleanupCount>0 || records.contains{$0.sessionRecoveryRequired || ($0.nextStep != nil && $0.nextStep != "revalidate_before_use")}}
 }
@@ -732,13 +739,26 @@ final class NativeCore {
                 }
                 guard let invitations=value["host_invitation_cleanup"] as? [[String:Any]],invitations.count<=8 else{throw OmniFailure.message("Danh sách cleanup lời mời không hợp lệ.")}
                 var invitationIds=Set<String>()
+                var cleanup:[NativeHostInvitationCleanup]=[]
                 for invitation in invitations{
                     guard let text=invitation["invite_id"] as? String,let id=UUID(uuidString:text),id.uuidString.lowercased()==text,
                           id != UUID(uuid:(0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0)),invitationIds.insert(text).inserted,
                           let hash=invitation["invite_hash"] as? String,NativePairingText.fingerprint(hash),
                           let expired=invitation["expired"] as? NSNumber,CFGetTypeID(expired)==CFBooleanGetTypeID() else{throw OmniFailure.message("Metadata cleanup lời mời không hợp lệ.")}
+                    guard let identity=invitation["identity"] as? [String:Any],identity.count==5,
+                          identity["profile"] as? String==self.profileID.uuidString.lowercased(),identity["device"] as? String==device,
+                          identity["id"] as? String==device,identity["kind"] as? String=="device_signing",
+                          let generation=identity["generation"] as? String,let generationID=UUID(uuidString:generation),generationID.uuidString.lowercased()==generation,
+                          generationID != UUID(uuid:(0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0)),
+                          parsed.contains(where:{$0.isIdentity && $0.phase != "retired" && NSDictionary(dictionary:$0.address).isEqual(to:identity)}),
+                          let expiry=invitation["expires_at_ms"] as? NSNumber,CFGetTypeID(expiry) != CFBooleanGetTypeID(),
+                          expiry.doubleValue>=1,expiry.doubleValue<=9_007_199_254_740_991,expiry.doubleValue==Double(expiry.uint64Value),
+                          let audience=invitation["audience"] as? String,let url=URLComponents(string:audience),url.scheme=="https",let host=url.host,!host.isEmpty,
+                          url.user==nil,url.password==nil,url.query==nil,url.fragment==nil,url.path.isEmpty else{throw OmniFailure.message("Lời mời cleanup không khớp danh tính hoặc relay hợp lệ.")}
+                    cleanup.append(NativeHostInvitationCleanup(inviteID:text,inviteHash:hash,audience:audience,identityGeneration:generation,
+                        expiresAt:Date(timeIntervalSince1970:expiry.doubleValue/1000),expired:expired.boolValue,identity:identity))
                 }
-                let snapshot=NativeRecoverySnapshot(revision:revision.uint64Value,device:device,records:parsed,expires:expires,relayRetirementAvailable:relayAvailable,namespaceProvenanceMissing:namespaceMissing,pendingClientTicket:pendingTicket,pendingHostTicket:hostTicket,hostInvitationCleanupCount:invitations.count,pairingOrigins:origins)
+                let snapshot=NativeRecoverySnapshot(revision:revision.uint64Value,device:device,records:parsed,expires:expires,relayRetirementAvailable:relayAvailable,namespaceProvenanceMissing:namespaceMissing,pendingClientTicket:pendingTicket,pendingHostTicket:hostTicket,hostInvitationCleanup:cleanup,pairingOrigins:origins)
                 DispatchQueue.main.async{completion(.success(snapshot))}
             }catch{DispatchQueue.main.async{completion(.failure(error))}}
         }
