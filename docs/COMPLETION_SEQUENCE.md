@@ -2,6 +2,10 @@
 
 ## Current sequence — 1–109 outstanding tasks
 
+Item 58 iOS now mirrors Android's immediate cancel delivery fence, using locked
+object-identity tokens checked before ABI, after response and on main delivery.
+Source-only; build/test and actual consent UI/transcript binding remain due.
+
 Item 58 Android cancel now rotates an in-memory reply fence before native
 invalidation. Earlier queued/in-flight/main-pending ordinary replies fail caller
 admission even if the dialog remains alive. No counter wrap or fence reuse.

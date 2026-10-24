@@ -1840,6 +1840,14 @@ this checkpoint.
 
 ## Remaining implementation and qualification
 
+iOS client pairing now mirrors Android delivery fencing with NSLock-protected
+object-identity tokens. Cancel rotates the token before native invalidation and
+queue admission; ordinary work checks it before ABI, after response and at main
+delivery. No lock is held across ABI or callback execution. Native UI entry
+points must serialize UI transitions on main; concurrent cancellation cannot
+retract a callback already executing. No build/test or runtime race qualification
+ran; this fence neither rolls back persisted candidates nor revokes remote peers.
+
 Android pairing cancel rotates an atomic object-identity delivery fence before
 requesting native invalidation. Ordinary operations capture the fence and check
 it before JNI work, after the reply and on main delivery. A cancel attempt thus

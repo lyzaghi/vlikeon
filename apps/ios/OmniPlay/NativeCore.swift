@@ -21,6 +21,19 @@ struct NativeIdentityReview {
     let expires:DispatchTime
 }
 enum NativeClientPairingAction:UInt32 { case begin=0,join=1,poll=2,persistAfterPeerConsent=3,cancel=4 }
+private final class NativePairingDeliveryFence {
+    final class Token {}
+    private let lock=NSLock()
+    private var token=Token()
+    func capture(cancel:Bool)->Token {
+        lock.lock();defer{lock.unlock()}
+        if cancel{token=Token()}
+        return token
+    }
+    func admits(_ candidate:Token)->Bool {
+        lock.lock();defer{lock.unlock()};return token === candidate
+    }
+}
 private enum NativePairingText {
     static func publicKey(_ text:String)->Bool {
         let bytes=Array(text.utf8)
@@ -80,6 +93,7 @@ final class NativeCore {
     private let mediaPermit=DispatchSemaphore(value:1)
     private let requestPermit=DispatchSemaphore(value:16)
     private let pairingClientPermit=DispatchSemaphore(value:1)
+    private let pairingClientDeliveryFence=NativePairingDeliveryFence()
     private let pairingClientQueuePermit=DispatchSemaphore(value:2)
     private let authorizationPermit=DispatchSemaphore(value:16)
     private let stateLock = NSLock()
@@ -213,6 +227,7 @@ final class NativeCore {
         }
         let maximum=action == .begin ? 16_384:128
         guard !owned.bytes.isEmpty,owned.bytes.count<=maximum else{fail("Yêu cầu ghép đôi vượt giới hạn.");return}
+        let deliveryToken=pairingClientDeliveryFence.capture(cancel:action == .cancel)
         if action == .cancel{
             let current=handle
             guard current != 0,om_mobile_pairing_invalidate_epoch(current)==1 else{fail("Chưa xác nhận được thao tác hủy. Hãy mở lại trạng thái.");return}
@@ -234,7 +249,7 @@ final class NativeCore {
                     expectedTicket=ticket
                 }
                 let now=DispatchTime.now()
-                guard self.handle != 0,now<deadline,(action == .cancel || (owner.active&&self.pairingAttached)) else{throw OmniFailure.message("Phiên ghép đôi đã kết thúc. Hãy mở lại trạng thái.")}
+                guard self.handle != 0,now<deadline,(action == .cancel || (self.pairingClientDeliveryFence.admits(deliveryToken)&&owner.active&&self.pairingAttached)) else{throw OmniFailure.message("Phiên ghép đôi đã kết thúc. Hãy mở lại trạng thái.")}
                 let remaining=(deadline.uptimeNanoseconds-now.uptimeNanoseconds)/1_000_000
                 guard remaining>=1000 else{throw OmniFailure.message("Yêu cầu ghép đôi đã hết hạn trong hàng đợi.")}
                 let budget=UInt32(min(25_000,remaining))
@@ -261,7 +276,7 @@ final class NativeCore {
                           let id=UUID(uuidString:ticket),id.uuidString.lowercased()==ticket,
                           id != UUID(uuid:(0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0)),expectedTicket==nil || expectedTicket==ticket else{throw OmniFailure.message("Kết quả không khớp ticket ghép đôi.")}
                 }
-                guard DispatchTime.now()<deadline,(action == .cancel || owner.active) else{throw OmniFailure.message("Kết quả ghép đôi đã cũ. Hãy mở lại trạng thái trước khi tiếp tục.")}
+                guard DispatchTime.now()<deadline,(action == .cancel || (self.pairingClientDeliveryFence.admits(deliveryToken)&&owner.active)) else{throw OmniFailure.message("Kết quả ghép đôi đã cũ. Hãy mở lại trạng thái trước khi tiếp tục.")}
                 func exactBool(_ object:Any?,_ expected:Bool)->Bool{
                     guard let number=object as? NSNumber,CFGetTypeID(number)==CFBooleanGetTypeID() else{return false}
                     return number.boolValue==expected
@@ -294,7 +309,7 @@ final class NativeCore {
                     guard exactBool(value["cancelled"],true),exactBool(value["remote_revoked"],false) else{throw OmniFailure.message("Kết quả hủy local không hợp lệ.")}
                 }
                 DispatchQueue.main.async{
-                    guard DispatchTime.now()<deadline,(action == .cancel || owner.active) else{completion(.failure(OmniFailure.message("Kết quả ghép đôi đã cũ. Hãy mở lại trạng thái.")));return}
+                    guard DispatchTime.now()<deadline,(action == .cancel || (self.pairingClientDeliveryFence.admits(deliveryToken)&&owner.active)) else{completion(.failure(OmniFailure.message("Kết quả ghép đôi đã cũ. Hãy mở lại trạng thái.")));return}
                     completion(.success(value))
                 }
             }catch{DispatchQueue.main.async{completion(.failure(error))}}
