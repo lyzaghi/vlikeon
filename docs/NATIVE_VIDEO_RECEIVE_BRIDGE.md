@@ -1,5 +1,17 @@
 # Native ordered RTP to decoder bridge — item 56
 
+The private Windows client now creates an opaque DecodedPictureReceipt only
+after output matches an accepted input's timestamp/profile/original receipt.
+Receiver moves accepted inputs/proofs to an in-flight queue, correlates output
+with that exact owner/timestamp/original receipt, then consumes the proof through
+the required admission/backend `decoded` callback. Pending plus in-flight stays
+within four compressed units; errors/retirement clear both. Input S_OK and
+S_FALSE do not invoke completion. Existing decoder v3 remains one-input/one-output
+FIFO and does not qualify general B-frame reorder behavior. Backend code still
+must connect this callback to the staged POC/DPB owner and implement negotiated
+codec/colour/coverage checks. No new wire assertion or renderer receipt exists.
+Build/test and real decoder correlation/device qualification remain deferred.
+
 `FrameDecodeState` now coordinates progressive POC, per-slice pre-marking
 reference lists and post-decode reference marking in one staged plan. Retry
 rechecks are read-only. Joint commit preflights both components and every list

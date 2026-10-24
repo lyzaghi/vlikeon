@@ -40,8 +40,19 @@ impl DecoderReceipt{
         self.tick<=tick&&tick-self.tick<=100&&self.local.elapsed()<=Duration::from_millis(100)
     }
 }
-pub struct DecodedVideoFrame{pub width:u32,pub height:u32,pub stride:u32,pub timestamp_100ns:i64,pub nv12:Vec<u8>,receipt:DecoderReceipt}
-impl DecodedVideoFrame{pub fn within_receive_age(&self)->bool{self.receipt.live()}}
+/// Created only after the private decoder output matches an accepted input's
+/// timestamp/profile/original receipt. Not constructible from renderer data.
+pub struct DecodedPictureReceipt{owner:VideoOwner,timestamp:i64,receipt:DecoderReceipt}
+impl DecodedPictureReceipt{
+    pub fn matches(&self,owner:VideoOwner,timestamp:i64,received:Instant)->bool{
+        self.owner==owner&&self.timestamp==timestamp&&self.receipt.local==received&&self.receipt.live()
+    }
+}
+pub struct DecodedVideoFrame{pub width:u32,pub height:u32,pub stride:u32,pub timestamp_100ns:i64,pub nv12:Vec<u8>,receipt:DecoderReceipt,completion:DecodedPictureReceipt}
+impl DecodedVideoFrame{
+    pub fn within_receive_age(&self)->bool{self.receipt.live()}
+    pub fn completed_picture(&self)->&DecodedPictureReceipt{&self.completion}
+}
 struct Queued{packet:VideoPacket,deadline:Instant}
 struct Packets{queue:VecDeque<Queued>,bytes:usize}
 struct Lease{sequence:u64,deadline:Instant}
@@ -351,7 +362,8 @@ fn io_loop(mut input:File,mut output:File,shared:Arc<Shared>,receiver:mpsc::Rece
                     let(expected,receipt)=compressed.pop_front().ok_or_else(failure)?;
                     if decoded_profile!=Some((width,height))||stride!=width||pts!=expected||tick!=receipt.tick||!receipt.live()||
                         length!=(width as usize)*(height as usize)*3/2||bytes.len()!=32+length{return Err(failure());}
-                    let frame=DecodedVideoFrame{width,height,stride,timestamp_100ns:pts,nv12:bytes[32..].to_vec(),receipt};
+                    let completion=DecodedPictureReceipt{owner:shared.owner,timestamp:pts,receipt};
+                    let frame=DecodedVideoFrame{width,height,stride,timestamp_100ns:pts,nv12:bytes[32..].to_vec(),receipt,completion};
                     let mut frames=shared.frames.lock().map_err(|_|failure())?;
                     if !shared.authority_live()||!frame.within_receive_age()||frames.len()>=2{return Err(failure());}
                     frames.push_back(frame);

@@ -2,7 +2,7 @@
 //! current network/service caller, SRTP implementation or default codec admission.
 use crate::stream_video::{WindowsVideoDecoder,UnpresentedVideoFrame};
 use omniplay_contracts::{ErrorCode,PlatformError,Result};
-use omniplay_stream_input::video_client::{DecoderReceipt,VideoOwner};
+use omniplay_stream_input::video_client::{DecoderReceipt,DecodedPictureReceipt,VideoOwner};
 use omniplay_streaming::{native_h264_receive::ReceivedAccessUnit,native_rtp_reorder::OrderedReceiver};
 use std::{collections::VecDeque,time::{Duration,Instant}};
 use omniplay_streaming::{native_h264_rtp::{AccessUnit,Framing},native_h264_parameters::{ParameterSets,ParameterBinding,ResolvedParameters},native_h264_picture::PrimaryPictureHeaders};
@@ -22,6 +22,9 @@ pub trait NativeH264Admission{
     /// again, renew receive age or turn stale parameters into a fresh proof.
     /// No default-success implementation: caller supplies actual native state.
     fn recheck(&mut self,owner:VideoOwner,frame:&ReceivedAccessUnit,proof:&Self::Proof)->Result<()>;
+    /// Consumes the one admitted proof only after matched decoder output. Input
+    /// acceptance/S_FALSE cannot call this or commit POC/reference transitions.
+    fn decoded(&mut self,owner:VideoOwner,frame:&ReceivedAccessUnit,proof:Self::Proof,completion:&DecodedPictureReceipt)->Result<()>;
 }
 /// Installed codec/native backend supplies the remaining negotiated profile,
 /// colour, DPB/reference and current-owner checks. Syntax parsing is handled by
@@ -30,6 +33,7 @@ pub trait NativePictureBackend{
     type Proof;
     fn prepare(&mut self,owner:VideoOwner,frame:&ReceivedAccessUnit,picture:&PrimaryPictureHeaders,parameters:&ResolvedParameters<'_>)->Result<Self::Proof>;
     fn recheck(&mut self,owner:VideoOwner,frame:&ReceivedAccessUnit,parameters:&ResolvedParameters<'_>,proof:&Self::Proof)->Result<()>;
+    fn decoded(&mut self,owner:VideoOwner,frame:&ReceivedAccessUnit,parameters:&ResolvedParameters<'_>,proof:Self::Proof,completion:&DecodedPictureReceipt)->Result<()>;
 }
 pub struct ParameterAdmission<B:NativePictureBackend>{owner:VideoOwner,parameters:ParameterSets,backend:B,closed:bool}
 pub struct ParameterAdmissionProof<P>{binding:ParameterBinding,backend:P,hash:[u8;32],timestamp:u32,received:Instant,idr:bool}
@@ -72,6 +76,13 @@ impl<B:NativePictureBackend> NativeH264Admission for ParameterAdmission<B>{
             self.backend.recheck(owner,frame,&parameters,&proof.backend)
         })();if result.is_err(){self.fence();}result
     }
+    fn decoded(&mut self,owner:VideoOwner,frame:&ReceivedAccessUnit,proof:Self::Proof,completion:&DecodedPictureReceipt)->Result<()>{
+        let result=(||{
+            self.recheck(owner,frame,&proof)?;
+            let parameters=self.parameters.check(&proof.binding)?;
+            self.backend.decoded(owner,frame,&parameters,proof.backend,completion)
+        })();if result.is_err(){self.fence();}result
+    }
 }
 fn unavailable()->PlatformError{PlatformError::new(ErrorCode::RuntimeUnavailable,"The native receive generation is unavailable or requires recovery")}
 #[derive(Default)]
@@ -91,11 +102,11 @@ struct Pending<P>{frame:ReceivedAccessUnit,proof:P,timestamp:i64,receipt:Decoder
 pub enum ReceiveState{Active,Revoked,CleanupRequired}
 pub struct NativeVideoReceiver<A:NativeH264Admission>{
     ordered:OrderedReceiver<DecoderReceipt>,decoder:WindowsVideoDecoder,admission:A,
-    owner:VideoOwner,pending:VecDeque<Pending<A::Proof>>,timeline:Timeline,state:ReceiveState,
+    owner:VideoOwner,pending:VecDeque<Pending<A::Proof>>,in_flight:VecDeque<Pending<A::Proof>>,timeline:Timeline,state:ReceiveState,
 }
 impl<A:NativeH264Admission> NativeVideoReceiver<A>{
     pub fn new(ordered:OrderedReceiver<DecoderReceipt>,decoder:WindowsVideoDecoder,admission:A)->Self{
-        let owner=decoder.owner();Self{ordered,decoder,admission,owner,pending:VecDeque::new(),timeline:Timeline::default(),state:ReceiveState::Active}
+        let owner=decoder.owner();Self{ordered,decoder,admission,owner,pending:VecDeque::new(),in_flight:VecDeque::new(),timeline:Timeline::default(),state:ReceiveState::Active}
     }
     pub fn state(&self)->ReceiveState{self.state}
     /// Native ingress captures receipt BEFORE authentication/reorder. The caller
@@ -107,7 +118,7 @@ impl<A:NativeH264Admission> NativeVideoReceiver<A>{
             if !receipt.within_receive_age(){return Err(unavailable());}
             let frames=self.ordered.push_stamped(bytes,receipt.local_received_at(),receipt)?;
             for value in frames{
-                if self.pending.len()>=4||value.frame.received_at!=value.metadata.local_received_at()||!value.metadata.within_receive_age(){return Err(unavailable());}
+                if self.pending.len()+self.in_flight.len()>=4||value.frame.received_at!=value.metadata.local_received_at()||!value.metadata.within_receive_age(){return Err(unavailable());}
                 let proof=self.admission.admit(self.owner,&value.frame)?;
                 // Slow parameter-set/native checks do not start a new age budget.
                 if !value.metadata.within_receive_age(){return Err(unavailable());}
@@ -119,6 +130,7 @@ impl<A:NativeH264Admission> NativeVideoReceiver<A>{
     }
     fn pump_inner(&mut self)->Result<()>{
         self.decoder.check_authority()?;self.ordered.tick()?;
+        if self.in_flight.front().is_some_and(|frame|!frame.receipt.within_receive_age()){return Err(unavailable());}
         while let Some(frame)=self.pending.front(){
             if !frame.receipt.within_receive_age(){return Err(unavailable());}
             self.admission.recheck(self.owner,&frame.frame,&frame.proof)?;
@@ -127,7 +139,8 @@ impl<A:NativeH264Admission> NativeVideoReceiver<A>{
             if !frame.receipt.within_receive_age(){return Err(unavailable());}
             self.decoder.check_authority()?;
             if !self.decoder.submit_admitted_borrowed(&frame.frame.annex_b,frame.timestamp,frame.receipt)?{break;}
-            self.pending.pop_front();
+            let accepted=self.pending.pop_front().ok_or_else(unavailable)?;
+            self.in_flight.push_back(accepted);
         }Ok(())
     }
     /// Run even when no new packets arrive. S_FALSE keeps compressed bytes for
@@ -136,10 +149,16 @@ impl<A:NativeH264Admission> NativeVideoReceiver<A>{
         if self.state!=ReceiveState::Active{return Err(unavailable());}let result=self.pump_inner();if result.is_err(){self.retire();}result
     }
     pub fn take_unpresented(&mut self)->Result<Option<UnpresentedVideoFrame>>{
-        self.tick()?;let result=self.decoder.take_unpresented();
-        if result.as_ref().is_ok_and(|value|value.as_ref().is_some_and(|frame|frame.owner!=self.owner||!frame.frame.within_receive_age())){
-            self.retire();return Err(unavailable());
-        }
+        self.tick()?;
+        let result=(||{
+            let Some(output)=self.decoder.take_unpresented()?else{return Ok(None)};
+            let accepted=self.in_flight.pop_front().ok_or_else(unavailable)?;
+            if output.owner!=self.owner||!output.frame.within_receive_age()||
+                !output.frame.completed_picture().matches(self.owner,accepted.timestamp,accepted.frame.received_at){return Err(unavailable());}
+            self.admission.decoded(self.owner,&accepted.frame,accepted.proof,output.frame.completed_picture())?;
+            if !output.frame.within_receive_age(){return Err(unavailable());}
+            self.decoder.check_authority()?;Ok(Some(output))
+        })();
         if result.is_err(){self.retire();}result
     }
     fn retire(&mut self){
@@ -152,7 +171,7 @@ impl<A:NativeH264Admission> NativeVideoReceiver<A>{
         if self.state==ReceiveState::Revoked{return Ok(());}
         // Fence first. EOF/timeout/forced process retirement may close delivery
         // without a native Stop receipt; retain that uncertainty for the caller.
-        self.state=ReceiveState::CleanupRequired;self.ordered.close();self.pending.clear();
+        self.state=ReceiveState::CleanupRequired;self.ordered.close();self.pending.clear();self.in_flight.clear();
         self.decoder.revoke_until(deadline)?;
         // A backend must not turn a late completion into a timely receipt.
         if Instant::now()>=deadline{return Err(unavailable());}
