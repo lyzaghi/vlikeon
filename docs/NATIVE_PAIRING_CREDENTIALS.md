@@ -1723,6 +1723,30 @@ renderer commands and no UI dialog/OS attestation is implied by calling them.
 No native/vault/crypto/SQL/network call, compiler, build or test ran. Mobile/host
 controller completion and full recovery/qualification scope remain unfinished.
 
+## Mobile pending client ABI
+
+Dedicated native-only C entries now connect pending-client begin and ticket-based
+join/poll/consented candidate persistence/cancel to LocalHost. Begin bounds JSON
+to 16 KiB and keeps its copied input and parsed bearer-code owner zeroizing. The
+caller must clear original input/clipboard/share copies; parser-internal partial
+allocations are not covered. Host-key confirmation remains the native UI's task.
+
+Ticket actions accept at most 128 bytes, derive epoch and cooperative cancellation
+from the actual attached foreground provider and retain original bounded deadlines
+including mutex wait. No supplied epoch, replacement transcript or remote consent
+assertion is accepted. Persist requires actual native peer/comparison/input approval
+and returns MaterialReady only. The ABI itself does not attest a dialog was shown.
+
+Cancel is available after backgrounding and requires the exact ticket; the native
+caller first invalidates epoch outside the I/O lane, then queues local cancellation.
+It does not revoke an approved remote pair. Native status exposes pending ticket,
+revision/expiry metadata for reconciliation if begin's response was lost or stale,
+without exporting proof/key/transcript. Late errors may follow committed candidates.
+
+No ABI invocation, vault/crypto/SQL/network call, compiler, build or test ran.
+Swift/JNI UI callers, peer confirmation, host controller, activation orchestration
+and full recovery/qualification remain unfinished. Current policy stays disabled.
+
 ## Remaining implementation and qualification
 
 - Journal/executor/lease/writer product integration, authority epochs, actual native owner

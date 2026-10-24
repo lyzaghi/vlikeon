@@ -2,6 +2,13 @@
 
 ## Current sequence — 1–109 outstanding tasks
 
+Item 58 now connects dedicated mobile client begin/ticket-action ABI to the
+LocalHost controller with native-derived epoch/cancellation, bounded proof input
+and exact-ticket local cancellation. Native status exposes pending ticket metadata
+for lost-response reconciliation. No ABI/native/vault/crypto/SQL/HTTP/compiler/
+build/test ran. Actual Swift/JNI consent callers and host/recovery qualification
+remain due; full original scope stays incomplete.
+
 Item 58 now authors LocalHost-owned single pending client ticket bound to exact
 identity/revision/native epoch, scoped signer reload for begin/join/poll and
 consume-on-consent candidate publication. Cancel/detach/close discard transient

@@ -64,6 +64,21 @@ OmniBuffer om_mobile_pairing_scope(uint64_t handle);
  */
 uint8_t om_mobile_pairing_invalidate_epoch(uint64_t handle);
 OmniBuffer om_mobile_attach_pairing_credentials_v1(uint64_t handle,OmniPairingCredentialCallbacks callbacks);
+/* Native UI only, never renderer dispatch. begin JSON <=16384 bytes contains
+ * identity (exact status address), expected_revision, code (bearer proof),
+ * host_public_key (independently confirmed), audience and label. Caller clears
+ * its input/share/clipboard copies; native parsing cannot guarantee clearing
+ * parser-internal allocations. Budget 1000..25000 ms includes mutex wait.
+ * action JSON <=128 bytes: {"ticket":"UUID"}; action 1 join, 2 poll,
+ * 3 persist AFTER explicit native peer/comparison/input consent, 4 cancel.
+ * Epoch is sourced from attached foreground host, never supplied by caller.
+ * Cancel first calls invalidate_epoch to signal in-flight work, then queues
+ * action 4; cancel is local only and does not revoke relay-approved pairs.
+ * Errors may follow candidate commit or retained pending state: inspect/reconcile
+ * before retry. Action 3 yields MaterialReady only; no activation/session grant.
+ */
+OmniBuffer om_mobile_pairing_client_begin_v1(uint64_t handle,const uint8_t* data,size_t length,uint32_t budget_ms);
+OmniBuffer om_mobile_pairing_client_action_v1(uint64_t handle,const uint8_t* data,size_t length,uint32_t action,uint32_t budget_ms);
 /* Trusted native controller only, never renderer commands. Status returns
  * bounded public lifecycle metadata. Preparation requires foreground, attached
  * scoped provider, current journal revision, budget 1000..25000 ms and enabled

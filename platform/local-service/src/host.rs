@@ -64,7 +64,10 @@ impl LocalHost {
             "revision":snapshot.revision(),"policy_available":omniplay_core::stream_signal_authority::require_installed_pairing_policy().is_ok(),"records":records,
             "recovery_protocol":1,"observed_at_ms":observed_at_ms,"recovery":recovery,
             "relay_retirement_available":omniplay_core::stream_signal_authority::installed_retirement_origins().is_ok(),
-            "namespace_provenance_missing":snapshot.namespace_provenance_missing()}))
+            "namespace_provenance_missing":snapshot.namespace_provenance_missing(),
+            "pending_client":self.pairing_client.as_ref().map(|pending|json!({"ticket":pending.id,
+                "revision":pending.revision,"expires_at_ms":pending.pairing.expires_at_ms(),
+                "expired":std::time::Instant::now()>=pending.pairing.native_deadline()}))}))
     }
     /// Explicit native recovery dispatch, not automatic startup cleanup. May
     /// permanently fence a candidate; caller must not use this as a status read.
