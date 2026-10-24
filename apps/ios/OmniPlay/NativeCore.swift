@@ -223,13 +223,14 @@ final class NativeCore {
             do{
                 let started=DispatchTime.now()
                 guard owner.active,started<snapshot.expires,self.handle != 0,self.pairingAttached,!snapshot.namespaceProvenanceMissing,
-                      ["fence_generation","finalize_retirement","remove_material","revoke_relay"].contains(record.nextStep ?? ""),
+                      (record.phase=="active" || ["fence_generation","finalize_retirement","remove_material","revoke_relay"].contains(record.nextStep ?? "")),
                       (record.nextStep != "revoke_relay" || snapshot.relayRetirementAvailable),
                       snapshot.records.contains(where:{$0.generation==record.generation&&$0.phase==record.phase&&$0.nextStep==record.nextStep&&NSDictionary(dictionary:$0.address).isEqual(to:record.address)}) else{throw OmniFailure.message("Hãy mở lại trạng thái trước khi phục hồi.")}
                 let remaining=(snapshot.expires.uptimeNanoseconds-started.uptimeNanoseconds)/1_000_000
                 guard remaining>=1_000 else{throw OmniFailure.message("Trạng thái đã hết hạn. Hãy mở lại trước khi phục hồi.")}
                 let budget=UInt32(min(25_000,remaining))
                 let value=try self.unwrap(self.call(["address":record.address,"expected_revision":snapshot.revision]){data,length in
+                    if record.phase=="active"{return om_mobile_pairing_revoke_active_v1(self.handle,data,length,budget)}
                     if record.nextStep=="remove_material"{return om_mobile_pairing_remove_material_v1(self.handle,data,length,budget)}
                     if record.nextStep=="revoke_relay"{return om_mobile_pairing_revoke_relay_v1(self.handle,data,length,budget)}
                     return om_mobile_pairing_advance_metadata_v1(self.handle,data,length,budget)

@@ -83,6 +83,17 @@ impl LocalHost {
         };
         Ok(json!({"recovery_protocol":1,"address":address,"result":value,"reload_required":true}))
     }
+    /// Explicit native approval of active-generation revocation. Independent
+    /// of policy enablement; never implies that backends or relay have stopped.
+    pub fn native_pairing_revoke_active(&mut self,address:omniplay_streaming::native_credentials::CredentialAddress,
+        expected:u64,deadline:std::time::Instant)->Result<Value>{
+        self.ensure_open()?;
+        if std::time::Instant::now()>=deadline{return Err(PlatformError::new(ErrorCode::DeadlineExceeded,"Native revocation expired before lease admission"));}
+        let lease=omniplay_core::stream_credential_lease::CredentialLease::acquire(&self.database,self.profile_id)?;
+        self.identity_review=None;
+        let updated=omniplay_core::stream_credential_recovery::revoke_active(&self.database,&lease,self.profile_id,address,expected,deadline)?;
+        Ok(json!({"recovery_protocol":1,"address":address,"result":{"outcome":"committed","revision":updated.revision()},"reload_required":true}))
+    }
     /// Authenticated relay retirement with the retained native identity. No
     /// caller URL or positive receipt inferred from network errors/local expiry.
     pub fn native_pairing_revoke_relay(&mut self,address:omniplay_streaming::native_credentials::CredentialAddress,

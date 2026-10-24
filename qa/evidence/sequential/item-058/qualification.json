@@ -85,7 +85,9 @@
     "Android candidate writes refuse retirement-file presence; reads reject corrupt or partial cleanup rather than decrypting or reporting missing; no OS-service retirement proof is inferred",
     "Explicit Android cleanup retry may append only the missing bytes of an exact interrupted public marker prefix under the record lease; no truncation, unlink or corrupt-prefix overwrite",
     "Desktop generic keyring provider retains exact public retirement markers in a separate service and refuses marked generation reads/writes with remaining material",
-    "Desktop cleanup requires marker read-back before deletion, explicit secret absence and marker read-back afterward; generic backend late-write containment and WriterRetired proof remain unfinished"
+    "Desktop cleanup requires marker read-back before deletion, explicit secret absence and marker read-back afterward; generic backend late-write containment and WriterRetired proof remain unfinished",
+    "Explicit Active-generation native revocation admits exact revision/namespace/lease and retains session/backend/relay/key cleanup debt instead of treating RevalidateBeforeUse as abandonment",
+    "Android/iOS native detail approval routes active records through the dedicated revocation entry and explains permanent identity-to-pair fencing; no actual UI/native/SQL operation was executed"
   ],
   "build_executed": false,
   "tests_executed": false,

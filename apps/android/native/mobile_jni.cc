@@ -192,12 +192,13 @@ Java_org_chromium_chrome_browser_omniplay_NativeCore_nativeAttachPairing(JNIEnv*
 }
 extern "C" JNIEXPORT jbyteArray JNICALL
 Java_org_chromium_chrome_browser_omniplay_NativeCore_nativePairingRecoveryV2(JNIEnv* env,jclass,jlong handle,jbyteArray input,jint budget,jint action){
-  if(handle<=0||!input||budget<1000||budget>25000||action<0||action>2)return nullptr;
+  if(handle<=0||!input||budget<1000||budget>25000||action<0||action>3)return nullptr;
   const auto length=env->GetArrayLength(input);if(exception(env)||length<=0||length>1024)return nullptr;
   uint8_t bytes[1024]{};
   env->GetByteArrayRegion(input,0,length,reinterpret_cast<jbyte*>(bytes));if(exception(env))return nullptr;
   if(action==1)return response_bytes(env,om_mobile_pairing_remove_material_v1(static_cast<uint64_t>(handle),bytes,static_cast<size_t>(length),static_cast<uint32_t>(budget)));
   if(action==2)return response_bytes(env,om_mobile_pairing_revoke_relay_v1(static_cast<uint64_t>(handle),bytes,static_cast<size_t>(length),static_cast<uint32_t>(budget)));
+  if(action==3)return response_bytes(env,om_mobile_pairing_revoke_active_v1(static_cast<uint64_t>(handle),bytes,static_cast<size_t>(length),static_cast<uint32_t>(budget)));
   return response_bytes(env,om_mobile_pairing_advance_metadata_v1(static_cast<uint64_t>(handle),bytes,static_cast<size_t>(length),static_cast<uint32_t>(budget)));
 }
 

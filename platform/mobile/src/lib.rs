@@ -167,6 +167,25 @@ pub unsafe extern "C" fn om_mobile_pairing_advance_metadata_v1(handle:u64,data:*
 
 /// # Safety
 /// Same borrowed recovery request contract as advance_metadata_v1. Native user
+/// explicitly approves revocation of an Active identity/pair. No cleanup flags
+/// are accepted; durable session/backend debt survives the generation fence.
+#[no_mangle]
+pub unsafe extern "C" fn om_mobile_pairing_revoke_active_v1(handle:u64,data:*const u8,length:usize,budget_ms:u32)->OmniBuffer{result((||{
+    if !(1000..=25000).contains(&budget_ms)||length>1024{return Err(error(ErrorCode::InvalidRequest,"Native revocation arguments exceed their bounds"));}
+    let deadline=std::time::Instant::now()+std::time::Duration::from_millis(u64::from(budget_ms));
+    // SAFETY: caller supplies the bounded synchronous input borrow above.
+    let request:PairingMetadataRecovery=serde_json::from_slice(unsafe{input(data,length)?}).map_err(|_|error(ErrorCode::InvalidRequest,"Native revocation arguments are invalid"))?;
+    let(host,provider,epoch)=pairing_operation(handle)?;
+    let mut host=host.lock().map_err(|_|error(ErrorCode::Internal,"Mobile profile is unavailable"))?;
+    provider.require_operation_epoch(epoch)?;
+    let value=host.native_pairing_revoke_active(request.address,request.expected_revision,deadline)?;
+    provider.require_operation_epoch(epoch)?;
+    if std::time::Instant::now()>=deadline{return Err(error(ErrorCode::DeadlineExceeded,"Native revocation completed late; reload journal state"));}
+    Ok(value)
+})())}
+
+/// # Safety
+/// Same borrowed recovery request contract as advance_metadata_v1. Native user
 /// approval selects exact-generation key removal, only after all retirement
 /// receipts already exist. No flags/secret bytes or replacement key are accepted.
 #[no_mangle]

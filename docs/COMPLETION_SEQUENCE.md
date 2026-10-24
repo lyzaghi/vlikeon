@@ -2,6 +2,13 @@
 
 ## Current sequence — 1–109 outstanding tasks
 
+Item 58 now authors explicit native revocation of Active identity/pair generations,
+separate from advisory recovery plan execution. Android/iOS detail approval routes
+through exact address/revision/namespace/foreground/deadline admission to the
+existing journal fence. Identity-to-pair effects are shown; session/backend/relay/
+key cleanup debt remains. No UI/native/SQL/compiler/build/test was executed.
+Producer retirement and runtime qualification remain due; full scope stays open.
+
 Item 58 now authors separate desktop vault retirement markers, exact marker
 admission/read-back around cleanup and candidate-write refusal around generic
 keyring set operations. Marked generations with remaining material stay errors.

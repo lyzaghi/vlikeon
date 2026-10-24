@@ -78,6 +78,19 @@ pub fn advance_metadata(database:&Database,lease:&CredentialLease,profile:Uuid,a
 #[derive(Deserialize)]#[serde(deny_unknown_fields)]
 struct RelayRetirement{revoked:bool,retirement_protocol:u32,pair_id:Uuid,grant_hash:String,reason:String}
 
+/// Explicit native user revocation, separate from the advisory recovery plan.
+/// Active is not an abandoned candidate. Fence first and retain every producer/
+/// session/relay/material debt for the subsequent actual cleanup owners.
+pub fn revoke_active(database:&Database,lease:&CredentialLease,profile:Uuid,address:CredentialAddress,
+    expected:u64,deadline:Instant)->Result<Journal>{
+    let started=Instant::now();check_deadline(deadline)?;
+    if deadline.saturating_duration_since(started)>Duration::from_secs(30){return Err(conflict());}
+    let snapshot=journal::load_scoped(database,lease,profile)?;check_deadline(deadline)?;
+    if snapshot.revision()!=expected||!snapshot.records().iter().any(|record|record.address()==address&&record.phase()==Phase::Active){return Err(conflict());}
+    let updated=journal::revoke(database,lease,profile,expected,address)?;
+    check_deadline(deadline)?;lease.check(database,profile)?;Ok(updated)
+}
+
 /// Actual vault removal only after the journal admits RemoveMaterial. Existing
 /// writer/local/relay receipts and identity-child ordering are prerequisites;
 /// this function does not manufacture any of them. Hold the real lease through

@@ -1333,6 +1333,29 @@ Desktop-specific late-operation containment and marker retention/repair remain d
 No vault/OS operation, compiler, build or test was executed. Only source review
 and whitespace checks were performed; item 58 and all original scope remain open.
 
+## Explicit revocation of active generations
+
+Native recovery detail views now offer explicit revocation for an Active identity
+or pair, rather than exposing only its RevalidateBeforeUse advisory plan. The new
+native entry is separate from metadata plan execution: it requires the exact
+active generation, expected revision, scoped namespace/lease, foreground epoch
+and original bounded deadline. It accepts no cleanup receipts, URL or secret.
+Installed streaming enablement and vault availability are not prerequisites to
+this journal-only fence (the scoped native provider must still be attached).
+
+The existing journal revoke transaction fences the selected pair or identity and
+its pairs. It retains session ownership and outstanding cleanup observations;
+the operation does not claim backend stop, relay acknowledgment or key deletion.
+Both native detail dialogs explain permanence and identity-to-pair effects before
+the approval action. Expired-but-still-Active records also use this explicit path.
+Java/Swift retain exact snapshot address/revision/lifetime binding, and Android
+JNI's bounded action selector now accepts the new explicit revocation action.
+
+All responses/errors require status reload; a late epoch/deadline failure may
+follow a committed fence. No automatic retry, replacement or session release is
+introduced. No native/UI/SQL/lease/vault operation, compiler, build or test ran.
+Actual producer retirement and interrupted-session recovery remain unfinished.
+
 ## Remaining implementation and qualification
 
 - Journal/executor/lease/writer product integration, authority epochs, actual native owner

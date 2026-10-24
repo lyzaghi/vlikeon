@@ -191,7 +191,7 @@ public final class NativeCore {
             if(action!=null&&(!matchesAddress(action.getJSONObject("address"))||!java.util.Arrays.asList("fence_generation","revalidate_before_use","retire_writer","retire_local_sessions","wait_for_pair_cleanup","revoke_relay","remove_material","finalize_retirement").contains(nextStep)))throw new IllegalStateException();
         }
         boolean isIdentity(){return "device_signing".equals(kind);}
-        boolean canAdvance(){return "fence_generation".equals(nextStep)||"finalize_retirement".equals(nextStep)||"remove_material".equals(nextStep)||"revoke_relay".equals(nextStep);}
+        boolean canAdvance(){return "active".equals(phase)||"fence_generation".equals(nextStep)||"finalize_retirement".equals(nextStep)||"remove_material".equals(nextStep)||"revoke_relay".equals(nextStep);}
         private boolean matchesAddress(JSONObject value) throws Exception {
             return value.length()==5&&profile.equals(value.getString("profile"))&&device.equals(value.getString("device"))&&kind.equals(value.getString("kind"))&&item.equals(value.getString("id"))&&generation.equals(value.getString("generation"));
         }
@@ -242,7 +242,7 @@ public final class NativeCore {
             if(!alive.getAsBoolean()||!mPairingAttached||remaining<1_000||snapshot.namespaceProvenanceMissing||!snapshot.records.contains(record)||!record.canAdvance()||("revoke_relay".equals(record.nextStep)&&!snapshot.relayRetirementAvailable))throw new IllegalStateException();
             byte[] input=new JSONObject().put("address",record.address()).put("expected_revision",snapshot.revision).toString().getBytes(StandardCharsets.UTF_8);
             JSONObject response;
-            int action="revoke_relay".equals(record.nextStep)?2:("remove_material".equals(record.nextStep)?1:0);
+            int action="active".equals(record.phase)?3:("revoke_relay".equals(record.nextStep)?2:("remove_material".equals(record.nextStep)?1:0));
             try{response=pairingResponse(nativePairingRecoveryV2(mHandle,input,(int)Math.min(25_000,remaining),action));}finally{java.util.Arrays.fill(input,(byte)0);}
             JSONObject value=pairingResult(response);String outcome=value.getJSONObject("result").getString("outcome");
             if(!alive.getAsBoolean()||value.getInt("recovery_protocol")!=1||!value.getBoolean("reload_required")||!record.matchesAddress(value.getJSONObject("address"))

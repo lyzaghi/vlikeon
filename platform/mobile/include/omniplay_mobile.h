@@ -83,6 +83,13 @@ OmniBuffer om_mobile_pairing_status(uint64_t handle);
  * error, which may follow a durable commit. This does not stop native backends.
  */
 OmniBuffer om_mobile_pairing_advance_metadata_v1(uint64_t handle,const uint8_t* data,size_t length,uint32_t budget_ms);
+/* Explicit native user approval of revoking an Active generation. Same bounded
+ * address/revision request and budget as metadata recovery. Identity revocation
+ * also fences its pairs. Requires current revision/namespace, but no enabled
+ * streaming policy or accessible vault. Does not stop backends, revoke remotely
+ * or delete keys; all cleanup/session debt remains. Reload after success/error.
+ */
+OmniBuffer om_mobile_pairing_revoke_active_v1(uint64_t handle,const uint8_t* data,size_t length,uint32_t budget_ms);
 /* Same request/budget contract, but explicit native approval of permanent
  * exact-generation vault removal. Current plan MUST be RemoveMaterial, after
  * durable writer/local/relay retirement and identity-child cleanup. Performs
