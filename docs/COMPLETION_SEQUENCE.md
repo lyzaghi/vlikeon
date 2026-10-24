@@ -2,6 +2,11 @@
 
 ## Current sequence — 1–109 outstanding tasks
 
+Item 58 iOS private client lane now calls reviewed activation ABI with 1024-byte
+request bound, exact address/grant/revision response checks and existing owner/
+deadline/cancel admission. Source-only; no build/test. Typed activation snapshot
+and explicit iOS activation UI remain due.
+
 Item 58 Android now authors one-use activation snapshots from exact successful
 peer persistence replies and an explicit activation dialog. It retains reviewed
 host/pair/input/expiry, candidate address/revision/hash and original review fence.

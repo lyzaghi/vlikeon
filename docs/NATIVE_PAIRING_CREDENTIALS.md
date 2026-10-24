@@ -1840,6 +1840,15 @@ this checkpoint.
 
 ## Remaining implementation and qualification
 
+iOS native-only client lane now dispatches typed action activate to the separate
+reviewed activation ABI, not generic ticket actions. Input <=1024 requires exact
+profile/pair-kind canonical address IDs, bounded integral revision and canonical
+reviewed hash. Response admission checks exact address/hash, Active phase, true
+reload flag and advancing bounded integral revision. It shares existing owned
+Data cleanup and queue-inclusive deadline/owner/cancel/snapshot predicates.
+No build/test or ABI/vault/crypto/network operation ran. One-use iOS activation
+snapshot/UI and full product qualification remain unfinished.
+
 Android successful peer persistence now creates at most one immutable activation
 snapshot from the consumed peer review. Factory checks exact ticket/pair/profile,
 candidate generation, MaterialReady phase and bounded revision; the snapshot

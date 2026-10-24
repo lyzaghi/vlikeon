@@ -20,7 +20,7 @@ struct NativeIdentityReview {
     let id:String, publicKey:String, device:String, generation:String
     let expires:DispatchTime
 }
-enum NativeClientPairingAction:UInt32 { case begin=0,join=1,poll=2,persistAfterPeerConsent=3,cancel=4 }
+enum NativeClientPairingAction:UInt32 { case begin=0,join=1,poll=2,persistAfterPeerConsent=3,cancel=4,activate=5 }
 /// Immutable approved-poll metadata for a trusted native confirmation view.
 final class NativePeerApproval {
     let pairID:String,inputAllowed:Bool,expires:DispatchTime
@@ -266,7 +266,7 @@ final class NativeCore {
         let fail:(String)->Void={message in
             owned.clear();DispatchQueue.main.async{completion(.failure(OmniFailure.message(message)))}
         }
-        let maximum=action == .begin ? 16_384:(action == .persistAfterPeerConsent ? 256:128)
+        let maximum=action == .begin ? 16_384:(action == .activate ? 1024:(action == .persistAfterPeerConsent ? 256:128))
         guard !owned.bytes.isEmpty,owned.bytes.count<=maximum else{fail("Yêu cầu ghép đôi vượt giới hạn.");return}
         let deliveryToken=pairingClientDeliveryFence.capture(cancel:action == .cancel)
         if action == .cancel{
@@ -283,7 +283,18 @@ final class NativeCore {
             defer{owned.clear();self.pairingClientQueuePermit.signal();if reservesOperation{self.pairingClientPermit.signal()}}
             do{
                 var expectedTicket:String?
-                if action != .begin{
+                var activation:[String:Any]?
+                if action == .activate{
+                    guard let request=try JSONSerialization.jsonObject(with:owned.bytes) as? [String:Any],request.count==3,
+                          let address=request["address"] as? [String:Any],address.count==5,address["profile"] as? String==self.profileID.uuidString.lowercased(),address["kind"] as? String=="pair_encryption",
+                          let hash=request["reviewed_grant_hash"] as? String,NativePairingText.fingerprint(hash),
+                          let revision=request["expected_revision"] as? NSNumber,CFGetTypeID(revision) != CFBooleanGetTypeID(),revision.doubleValue>=1,revision.doubleValue<10_000_000,revision.doubleValue==Double(revision.uint64Value) else{throw OmniFailure.message("Yêu cầu kích hoạt không hợp lệ.")}
+                    for field in ["device","id","generation"]{
+                        guard let text=address[field] as? String,let id=UUID(uuidString:text),id.uuidString.lowercased()==text,
+                              id != UUID(uuid:(0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0)) else{throw OmniFailure.message("Địa chỉ kích hoạt không hợp lệ.")}
+                    }
+                    activation=request
+                }else if action != .begin{
                     guard let request=try JSONSerialization.jsonObject(with:owned.bytes) as? [String:Any],request.count==(action == .persistAfterPeerConsent ? 2:1),
                           let ticket=request["ticket"] as? String,let id=UUID(uuidString:ticket),id.uuidString.lowercased()==ticket,
                           id != UUID(uuid:(0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0)) else{throw OmniFailure.message("Ticket ghép đôi không hợp lệ.")}
@@ -299,11 +310,19 @@ final class NativeCore {
                 let budget=UInt32(min(25_000,remaining))
                 let value=try self.unwrap(owned.bytes.withUnsafeBytes{raw in
                     let pointer=raw.bindMemory(to:UInt8.self).baseAddress
+                    if action == .activate{return try self.consume(om_mobile_pairing_activate_client_v1(self.handle,pointer,raw.count,budget))}
                     return try self.consume(action == .begin
                         ? om_mobile_pairing_client_begin_v1(self.handle,pointer,raw.count,budget)
                         : om_mobile_pairing_client_action_v1(self.handle,pointer,raw.count,action.rawValue,budget))
                 })
-                if action == .persistAfterPeerConsent{
+                if action == .activate{
+                    guard let request=activation,let expected=request["address"] as? [String:Any],let address=value["address"] as? [String:Any],address.count==5,
+                          NSDictionary(dictionary:expected).isEqual(to:address),value["grant_hash"] as? String==request["reviewed_grant_hash"] as? String,
+                          (value["credential_protocol"] as? NSNumber)?.uint32Value==1,value["phase"] as? String=="active",
+                          let reload=value["reload_required"] as? NSNumber,CFGetTypeID(reload)==CFBooleanGetTypeID(),reload.boolValue,
+                          let previous=request["expected_revision"] as? NSNumber,let revision=value["revision"] as? NSNumber,CFGetTypeID(revision) != CFBooleanGetTypeID(),
+                          revision.doubleValue>previous.doubleValue,revision.doubleValue<=10_000_000,revision.doubleValue==Double(revision.uint64Value) else{throw OmniFailure.message("Kết quả kích hoạt không khớp candidate đã duyệt. Hãy đọc lại trạng thái.")}
+                }else if action == .persistAfterPeerConsent{
                     guard let ticket=value["pairing_ticket"] as? String,ticket==expectedTicket else{throw OmniFailure.message("Candidate không khớp ticket ghép đôi.")}
                     guard (value["credential_protocol"] as? NSNumber)?.uint32Value==1,value["phase"] as? String=="material_ready",
                           let address=value["address"] as? [String:Any],address["profile"] as? String==self.profileID.uuidString.lowercased(),
