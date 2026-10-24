@@ -2,6 +2,13 @@
 
 ## Current sequence — 1–109 outstanding tasks
 
+Item 58 relay review now authors transactionally retained closed-invite fences
+so old registration retries cannot resurrect a still-valid closed invite. Same-
+host close retry receives the bound stored receipt; quota never evicts live
+fences and expiry remains original. No SQL/server/deployment/compiler/build/test
+ran. Upgrade/expiry/race qualification and native durable recovery remain due;
+full original scope remains incomplete.
+
 Item 58 now authors iOS typed client ABI calls with consumed Data input, bounded
 ordinary/cancel admission and queue-inclusive original deadline. Immediate native
 epoch invalidation precedes queued cancel; owned buffers are best-effort cleared.

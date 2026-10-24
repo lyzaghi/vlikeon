@@ -17,6 +17,8 @@ impl Store {
           CREATE TABLE IF NOT EXISTS schema_info(version INTEGER NOT NULL);INSERT INTO schema_info SELECT 1 WHERE NOT EXISTS(SELECT 1 FROM schema_info);
           CREATE TABLE IF NOT EXISTS invites(id TEXT PRIMARY KEY,host TEXT NOT NULL,expires INTEGER NOT NULL,document TEXT NOT NULL,secret_hash TEXT NOT NULL);
           CREATE INDEX IF NOT EXISTS invites_expiry ON invites(expires);
+          CREATE TABLE IF NOT EXISTS closed_invites(id TEXT PRIMARY KEY,host TEXT NOT NULL,invite_hash TEXT NOT NULL,expires INTEGER NOT NULL);
+          CREATE INDEX IF NOT EXISTS closed_invites_expiry ON closed_invites(expires);
           CREATE TABLE IF NOT EXISTS joins(invite TEXT NOT NULL REFERENCES invites(id) ON DELETE CASCADE,client TEXT NOT NULL,hello TEXT NOT NULL,state TEXT NOT NULL,PRIMARY KEY(invite,client));
           CREATE TABLE IF NOT EXISTS pairs(id TEXT PRIMARY KEY,host TEXT NOT NULL,client TEXT NOT NULL,invite TEXT NOT NULL,expires INTEGER NOT NULL,grant_hash TEXT NOT NULL,document TEXT NOT NULL,revoked INTEGER NOT NULL DEFAULT 0,host_seq INTEGER NOT NULL DEFAULT 0,client_seq INTEGER NOT NULL DEFAULT 0);
           CREATE INDEX IF NOT EXISTS pairs_endpoints ON pairs(host,client);
@@ -34,6 +36,7 @@ impl Store {
         tx.execute("DELETE FROM nonces WHERE expires<=?1",[now]).map_err(sql)?;
         tx.execute("DELETE FROM messages WHERE expires<=?1",[now]).map_err(sql)?;
         tx.execute("DELETE FROM invites WHERE expires<=?1",[now]).map_err(sql)?;
+        tx.execute("DELETE FROM closed_invites WHERE expires<=?1",[now]).map_err(sql)?;
         tx.execute("DELETE FROM pairs WHERE expires<=?1",[now]).map_err(sql)?;
         let nonce_count:u64=tx.query_row("SELECT count(*) FROM nonces",[],|r|r.get(0)).map_err(sql)?;if nonce_count>=20000{return Err(ApiError::quota());}
         if tx.execute("INSERT INTO nonces(signer,nonce,expires) VALUES(?1,?2,?3)",params![sender,request.nonce.to_string(),now+240000]).is_err(){return Err(ApiError::unauthorized());}
@@ -43,6 +46,8 @@ impl Store {
         match operation {
             RelayOperation::CreateInvite{invite:document}=>{
                 let invite:Invite=verify(sender,INVITE_DOMAIN,&document,4096).map_err(|_|ApiError::unauthorized())?;invite.validate(audience,now).map_err(|_|ApiError::invalid())?;if invite.host_public_key!=sender{return Err(ApiError::unauthorized());}
+                let closed:bool=tx.query_row("SELECT EXISTS(SELECT 1 FROM closed_invites WHERE id=?1)",[invite.id.to_string()],|row|row.get(0)).map_err(sql)?;
+                if closed{return Err(ApiError::conflict());}
                 let receipt=json!({"created":true,"invite_protocol":1,"invite_id":invite.id,"host_public_key":sender,"invite_hash":document_hash(&document).map_err(|_|ApiError::invalid())?,"expires_at_ms":invite.expires_at_ms});
                 let existing:Option<String>=tx.query_row("SELECT document FROM invites WHERE id=?1",[invite.id.to_string()],|row|row.get(0)).optional().map_err(sql)?;
                 if let Some(existing)=existing{if existing!=text(&document)?{return Err(ApiError::conflict());}return Ok(receipt);}
@@ -103,11 +108,23 @@ impl Store {
                 Ok(json!({"declined":true,"decline_protocol":1,"invite_id":invite_id,"client_public_key":client_public_key,"hello_hash":document_hash(&hello).map_err(|_|ApiError::invalid())?}))
             }
             RelayOperation::CloseInvite{invite_id}=>{
+                let closed:Option<(String,String)>=tx.query_row("SELECT host,invite_hash FROM closed_invites WHERE id=?1",[invite_id.to_string()],|row|Ok((row.get(0)?,row.get(1)?))).optional().map_err(sql)?;
+                if let Some((host,hash))=closed{
+                    if host!=sender{return Err(ApiError::unauthorized());}
+                    return Ok(json!({"closed":true,"close_protocol":1,"invite_id":invite_id,"host_public_key":sender,"invite_hash":hash}));
+                }
                 invite_row(tx,&invite_id.to_string(),Some(sender))?;
-                let document:String=tx.query_row("SELECT document FROM invites WHERE id=?1",[invite_id.to_string()],|row|row.get(0)).map_err(sql)?;
+                let (document,expires):(String,u64)=tx.query_row("SELECT document,expires FROM invites WHERE id=?1",[invite_id.to_string()],|row|Ok((row.get(0)?,row.get(1)?))).map_err(sql)?;
                 let document:SignedDocument=serde_json::from_str(&document).map_err(sql)?;
+                let hash=document_hash(&document).map_err(|_|ApiError::invalid())?;
+                // Reserve the durable fence before deleting the live invite.
+                // Quota failure leaves it live; never evict an unexpired fence.
+                let total:u64=tx.query_row("SELECT count(*) FROM closed_invites",[],|row|row.get(0)).map_err(sql)?;
+                let owned:u64=tx.query_row("SELECT count(*) FROM closed_invites WHERE host=?1",[sender],|row|row.get(0)).map_err(sql)?;
+                if total>=4096||owned>=32{return Err(ApiError::quota());}
+                tx.execute("INSERT INTO closed_invites(id,host,invite_hash,expires) VALUES(?1,?2,?3,?4)",params![invite_id.to_string(),sender,hash,expires]).map_err(sql)?;
                 if tx.execute("DELETE FROM invites WHERE id=?1",[invite_id.to_string()]).map_err(sql)?!=1{return Err(ApiError::conflict());}
-                Ok(json!({"closed":true,"close_protocol":1,"invite_id":invite_id,"host_public_key":sender,"invite_hash":document_hash(&document).map_err(|_|ApiError::invalid())?}))
+                Ok(json!({"closed":true,"close_protocol":1,"invite_id":invite_id,"host_public_key":sender,"invite_hash":hash}))
             }
             RelayOperation::Send{grant:document,message_id,session_id,sequence,expires_at_ms,iv,ciphertext}=>{
                 let grant=pair(tx,sender,&document,audience,now)?;let pair_id=grant.id.to_string();

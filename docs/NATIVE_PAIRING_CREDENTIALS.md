@@ -1795,6 +1795,32 @@ prove that consent occurred. No UI flow calls this method yet; scan/paste/share
 handling and typed public response models remain due. No Swift compiler, native
 ABI/vault/crypto/SQL/HTTP operation, build or test ran. Current policy remains off.
 
+## Relay closed-invite replay fence
+
+Server review found an identical CreateInvite retry could recreate an invite
+after CloseInvite deleted it. The server now authors a public closed-invite table
+binding invite ID, original host, signed-invite hash and original expiry. Close
+inserts that fence and deletes the live invite in the same Immediate transaction.
+CreateInvite checks the retained fence before idempotent registration or quota
+admission, refusing a still-valid closed ID instead of resurrecting it.
+
+The same authenticated host can retry close and receive the exact stored receipt;
+another signer is refused. Missing state without a fence remains NotFound. Fences
+expire only at the original invitation expiry, when the original signed invite
+can no longer pass registration validation. No proof secret is retained. Existing
+pair rows remain unaffected. This is an additive schema-1 table/index, not a
+destructive migration or claim that older deployments already enforce the rule.
+
+Fence storage is bounded to 4096 total and 32 per host. If reservation cannot be
+made, close fails with quota and leaves the live invite unchanged; unexpired
+fences are never evicted to make room. Expiry cleanup runs in the existing request
+transaction. Pre-upgrade closed invites without a receipt cannot be reconstructed
+from absence and still require conservative handling.
+
+No SQL/server/network operation, deployment, compiler, build or test ran. Source
+review and whitespace inspection only. Race/retry/quota/expiry/schema qualification
+and native durable post-crash reconciliation remain open with the original scope.
+
 ## Remaining implementation and qualification
 
 - Journal/executor/lease/writer product integration, authority epochs, actual native owner

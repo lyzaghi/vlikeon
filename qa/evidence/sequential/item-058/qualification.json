@@ -119,6 +119,7 @@
   "mobile_client_abi_source": "Dedicated bounded begin/ticket actions derive native foreground epoch/cancellation; consented persistence remains MaterialReady; native status exposes pending ticket for reconciliation; no ABI/UI/runtime qualification",
   "android_client_jni_source": "Private versioned bounded byte-buffer dispatch and serialized owned-input caller with one normal client operation, total work bound and original queue-inclusive deadline; actual consent UI caller remains absent",
   "ios_client_caller_source": "Typed native ABI actions consume inout Data with best-effort wipe, one ordinary operation plus bounded cancel admission and original queue-inclusive deadline; actual peer UI and typed reply admission remain absent",
+  "relay_closed_invite_source": "Additive bounded closed-invite table binds host/hash/original expiry; close fence and live deletion commit together; create retry refuses closed IDs and same-host close retry returns stored receipt; SQL/deployment unexecuted",
   "build_executed": false,
   "tests_executed": false,
   "vault_api_executed": false,
