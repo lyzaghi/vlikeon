@@ -2,6 +2,8 @@
 
 ## Current sequence — 1–109 outstanding tasks
 
+Source checkpoint: concrete Windows receive binding now validates the ICE-selected socket's local unicast address and interface index with GetUnicastIpAddressEntry, retains local/peer/socket/LUID identity and fences ownership changes. SelectedWinsockDatagrams assembles binding, active software timestamp source and atomic recvmsg adapter. Actual native ICE candidate issuer, DTLS/SRTP engine and product negotiation wiring remain unfinished. Build/test stay deferred.
+
 Source checkpoint: Winsock now requires packet-info ancillary interface identity alongside each original ingress timestamp, converts the received interface index to LUID and matches the native binding. IPv4/IPv6 packet-info options are configured, with IPv4 additionally enabled for dual-stack sockets. Missing/duplicate/mismatched interface metadata fences ingress. Native binding issuer and crypto/product wiring remain open; build/test are deferred.
 
 Source checkpoint: Windows interface timestamp source now queries active driver capabilities, rejects hardware/missing software timestamps, pins socket/LUID and permanently fences changed bindings. The native exclusive receive-interface binding implementation and ICE/DTLS/SRTP engine remain unfinished. Build/test remain deferred; this checkpoint is not runtime qualification.

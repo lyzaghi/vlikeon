@@ -56,7 +56,7 @@ fn denied()->PlatformError{PlatformError::new(ErrorCode::PermissionDenied,"The a
 
 /// Native OS receive adapter must return each datagram's actual ingress receipt
 /// (including kernel queue residence), not capture a new clock after dequeue.
-/// Windows ancillary timestamp/correlation implementation is still required.
+/// Windows implements this through the packet-info/software-QPC Winsock adapter.
 pub trait NativeDatagramReceipt{
     /// One nonblocking recvmsg operation supplies BOTH bytes and ancillary
     /// receipt. None means WouldBlock. Reject truncation/missing timestamps;

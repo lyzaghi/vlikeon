@@ -3,9 +3,9 @@
 use crate::stream_video_ingress::NativeDatagramReceipt;
 use omniplay_contracts::{ErrorCode,PlatformError,Result};
 use omniplay_stream_input::video_client::DecoderReceipt;
-use std::{net::UdpSocket,os::windows::io::AsRawSocket,mem::{size_of,size_of_val,zeroed}};
+use std::{net::{SocketAddr,UdpSocket},os::windows::io::AsRawSocket,mem::{size_of,size_of_val,zeroed}};
 use windows_sys::Win32::Networking::WinSock::*;
-use windows_sys::Win32::NetworkManagement::{IpHelper::{ConvertInterfaceIndexToLuid,GetInterfaceActiveTimestampCapabilities,INTERFACE_TIMESTAMP_CAPABILITIES},Ndis::NET_LUID_LH};
+use windows_sys::Win32::NetworkManagement::{IpHelper::{ConvertInterfaceIndexToLuid,GetInterfaceActiveTimestampCapabilities,GetUnicastIpAddressEntry,INTERFACE_TIMESTAMP_CAPABILITIES,MIB_UNICASTIPADDRESS_ROW},Ndis::NET_LUID_LH};
 
 fn denied()->PlatformError{PlatformError::new(ErrorCode::UnsupportedCapability,"Native Winsock software ingress timestamp is unavailable")}
 /// Native route/interface owner must recheck active SOFTWARE timestamp source,
@@ -21,6 +21,57 @@ pub trait SoftwareTimestampSource{
 /// a rebind requires a fresh socket and timestamp adapter.
 pub trait NativeReceiveInterface{
     fn current_receive_luid(&mut self,socket:&UdpSocket)->Result<u64>;
+}
+/// Binding for the concrete local unicast address selected by native ICE. The
+/// supplied candidate interface is verified against Windows' address ownership;
+/// every datagram additionally has to identify this same interface via pktinfo.
+pub struct BoundReceiveInterface{socket:usize,local:SocketAddr,peer:SocketAddr,index:u32,luid:u64,closed:bool}
+impl BoundReceiveInterface{
+    pub fn from_selected_socket(socket:&UdpSocket,index:u32)->Result<Self>{
+        let local=socket.local_addr().map_err(|_|denied())?;
+        let peer=socket.peer_addr().map_err(|_|denied())?;
+        if index==0||local.port()==0||local.ip().is_unspecified()||local.ip().is_multicast()
+            ||peer.port()==0||peer.ip().is_unspecified()||peer.ip().is_multicast(){return Err(denied());}
+        let luid=Self::address_luid(local,index)?;
+        Ok(Self{socket:socket.as_raw_socket()as usize,local,peer,index,luid,closed:false})
+    }
+    fn address_luid(local:SocketAddr,index:u32)->Result<u64>{
+        let mut row:MIB_UNICASTIPADDRESS_ROW=unsafe{zeroed()};row.InterfaceIndex=index;
+        match local{
+            SocketAddr::V4(address)=>{
+                let mut v4:SOCKADDR_IN=unsafe{zeroed()};v4.sin_family=AF_INET;
+                v4.sin_addr.S_un.S_addr=u32::from_ne_bytes(address.ip().octets());
+                row.Address.Ipv4=v4;
+            },
+            SocketAddr::V6(address)=>{
+                // An IPv4-mapped local bind must use a native IPv4 candidate so
+                // address ownership is never looked up in the wrong family.
+                if address.ip().to_ipv4_mapped().is_some(){return Err(denied());}
+                let mut v6:SOCKADDR_IN6=unsafe{zeroed()};v6.sin6_family=AF_INET6;
+                v6.sin6_addr.u.Byte=address.ip().octets();row.Address.Ipv6=v6;
+            }
+        }
+        if unsafe{GetUnicastIpAddressEntry(&mut row)}!=0||row.InterfaceIndex!=index||row.ValidLifetime==0{return Err(denied());}
+        let luid=unsafe{row.InterfaceLuid.Value};if luid==0{return Err(denied());}Ok(luid)
+    }
+}
+impl NativeReceiveInterface for BoundReceiveInterface{
+    fn current_receive_luid(&mut self,socket:&UdpSocket)->Result<u64>{
+        let result=(||{
+            if self.closed||socket.as_raw_socket()as usize!=self.socket
+                ||socket.local_addr().map_err(|_|denied())?!=self.local
+                ||socket.peer_addr().map_err(|_|denied())?!=self.peer
+                ||Self::address_luid(self.local,self.index)?!=self.luid{return Err(denied());}
+            Ok(self.luid)
+        })();if result.is_err(){self.closed=true;}result
+    }
+}
+pub type SelectedWinsockDatagrams=WinsockDatagrams<InterfaceSoftwareTimestamp<BoundReceiveInterface>>;
+impl WinsockDatagrams<InterfaceSoftwareTimestamp<BoundReceiveInterface>>{
+    pub fn from_selected_socket(socket:&UdpSocket,index:u32)->Result<Self>{
+        let binding=BoundReceiveInterface::from_selected_socket(socket,index)?;
+        Self::configure(socket,InterfaceSoftwareTimestamp::from_native_binding(socket,binding)?)
+    }
 }
 /// Reads active driver configuration on every receive boundary. Supported-but-
 /// disabled software timestamps and any enabled hardware timestamps are rejected.
