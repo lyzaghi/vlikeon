@@ -726,6 +726,38 @@ No attachment, scope query, foreground/close callback, vault/native operation,
 build or test was executed. Mobile core lease, startup recovery, app-side glue
 and actual lifecycle/race/ABI/device qualification remain required.
 
+## Android native attachment caller source
+
+`NativeCore.java` now calls dedicated native scope/attach symbols after its
+profile host opens, on the existing serialized I/O lane. It admits the scope
+reply size/status, exact canonical profile and nonzero canonical device UUID,
+constructs the separate pairing provider, then checks attachment ABI/status.
+Temporary scope/attachment response arrays are wiped. The local attached flag
+does not advertise Remote Play or authorize any pair/session. Attachment failure
+leaves that feature unavailable and does not fail local play or fall back to
+save-sync credentials. No automatic same-context retry is introduced after an
+ambiguous result; native close/recovery must reconcile retained attachment.
+
+`mobile_jni.cc` now adapts the dedicated table to its Java provider methods.
+It encodes four UUID arrays plus big-endian u32 kind explicitly, with a C ABI
+size assertion; it never copies the C struct's native integer byte order into
+Java. Read/write buffers are exactly 137 bytes, accepted read counts are exact
+or known negative statuses, callback exceptions become failures, and temporary
+Java secret arrays are wiped on every path. Local references use synchronous
+JNI frames; a retained global provider reference is transferred to Rust only
+after method resolution succeeds. Rust consumes it on every attachment return,
+and the common native release callback drops it when its final owner retires.
+JVM shutdown/attach failure still requires platform qualification; no guarantee
+is made that a VM already unavailable can execute cleanup callbacks.
+
+ProGuard now retains both native method signatures. These are private native
+entry points, not JavaScript interfaces. Actual pairing/key operations are not
+called by attach, and LocalHost still has no pairing controller that consumes
+the attached store. The existing native foreground/close bridge gates access
+once attached. Actual JNI/Keystore/classloader/exception/release/build/device
+qualification, mobile core lease and iOS attachment caller remain due. No Java
+startup, JNI/native callback, vault, crypto, build or test was executed.
+
 ## Remaining implementation and qualification
 
 - Journal/executor/lease/writer product integration, authority epochs, actual native owner
@@ -736,7 +768,7 @@ and actual lifecycle/race/ABI/device qualification remain required.
   compatible with the current signed protocol; no secret IPC export.
 - Broker operations and document-scoped native capabilities, with explicit
   native opt-in and locking/background/expiry behavior.
-- Android candidate JNI/bridge wiring, iOS candidate target/bridge/protected-data wiring,
+- Android attachment device qualification, iOS candidate target/bridge/protected-data wiring,
   scoped callback consumption and mobile lease/product lifecycle. Existing
   save-sync callbacks are not reused as pairing storage.
 - Device-lock, protected-data, backup/restore/reinstall, profile deletion,

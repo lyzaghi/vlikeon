@@ -2,6 +2,13 @@
 
 ## Current sequence — 1–109 outstanding tasks
 
+Item 58 now connects Android host-open source to dedicated native scope/provider
+attachment, with canonical native profile/device checks and separate failure
+state. JNI authors explicit UUID/kind byte encoding, exact bounded secret arrays,
+callback exception handling and retained-provider ownership transfer. No startup,
+JNI/vault/build/test was executed; LocalHost pairing consumption, mobile lease,
+iOS attachment and all runtime qualification remain due. Original scope is open.
+
 Item 58 now authors native mobile scope/provider attachment tied to the actual
 open host profile/device, with duplicate/closing rejection and consumed callback
 ownership. Foreground/terminal-close provider gates use transition epochs to

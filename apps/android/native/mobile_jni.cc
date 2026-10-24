@@ -8,6 +8,7 @@
 
 namespace {
 constexpr size_t kCredentialBytes=4096;
+static_assert(sizeof(OmniPairingAddress)==68,"pairing address ABI size changed");
 struct WipeBytes{std::vector<uint8_t>& bytes;~WipeBytes(){volatile uint8_t* value=bytes.data();for(size_t i=0;i<bytes.size();++i)value[i]=0;}};
 struct ReleaseBuffer{OmniBuffer value;~ReleaseBuffer(){om_mobile_free(value);}};
 bool exception(JNIEnv* env){if(!env->ExceptionCheck())return false;env->ExceptionClear();return true;}
@@ -45,6 +46,46 @@ void release_credentials(void* opaque){
 jbyteArray java_profile(JNIEnv* env,const uint8_t* profile){
   auto value=env->NewByteArray(16);if(exception(env)||!value)return nullptr;
   env->SetByteArrayRegion(value,0,16,reinterpret_cast<const jbyte*>(profile));return exception(env)?nullptr:value;
+}
+// Dedicated pairing ABI: four UUIDs followed by network-order u32 kind.
+// Never memcpy the C struct's platform-endian integer/padding into Java.
+jbyteArray java_pairing_address(JNIEnv* env,const OmniPairingAddress* address){
+  if(!address||(address->kind!=1&&address->kind!=2))return nullptr;
+  std::array<jbyte,68> encoded{};
+  for(size_t i=0;i<16;++i){encoded[i]=static_cast<jbyte>(address->profile[i]);encoded[16+i]=static_cast<jbyte>(address->device[i]);
+    encoded[32+i]=static_cast<jbyte>(address->item[i]);encoded[48+i]=static_cast<jbyte>(address->generation[i]);}
+  for(size_t i=0;i<4;++i)encoded[64+i]=static_cast<jbyte>((address->kind>>(24-8*i))&0xff);
+  auto value=env->NewByteArray(68);if(exception(env)||!value)return nullptr;
+  env->SetByteArrayRegion(value,0,68,encoded.data());return exception(env)?nullptr:value;
+}
+int32_t check_pairing(void* opaque,const OmniPairingAddress* address){
+  if(!opaque||!address)return -3;auto& context=*static_cast<CredentialContext*>(opaque);
+  JavaAccess access(context.vm);auto* env=access.env;if(!env)return -3;
+  auto identity=java_pairing_address(env,address);if(!identity)return -3;
+  const jint status=env->CallIntMethod(context.provider,context.check,identity);return exception(env)?-3:status;
+}
+int64_t read_pairing(void* opaque,const OmniPairingAddress* address,uint8_t* output,size_t capacity){
+  if(!opaque||!address||!output||capacity!=137)return -3;auto& context=*static_cast<CredentialContext*>(opaque);
+  JavaAccess access(context.vm);auto* env=access.env;if(!env)return -3;
+  auto identity=java_pairing_address(env,address);if(!identity)return -3;
+  auto bytes=env->NewByteArray(137);if(exception(env)||!bytes)return -3;WipeJavaBytes wipe{env,bytes,137};
+  const jint count=env->CallIntMethod(context.provider,context.read,identity,bytes);if(exception(env))return -3;
+  if(count==-1||count==-2||count==-3)return count;if(count!=137)return -3;
+  env->GetByteArrayRegion(bytes,0,137,reinterpret_cast<jbyte*>(output));return exception(env)?-3:137;
+}
+int32_t write_pairing(void* opaque,const OmniPairingAddress* address,const uint8_t* secret,size_t length){
+  if(!opaque||!address||!secret||length!=137)return -3;auto& context=*static_cast<CredentialContext*>(opaque);
+  JavaAccess access(context.vm);auto* env=access.env;if(!env)return -3;
+  auto identity=java_pairing_address(env,address);if(!identity)return -3;
+  auto bytes=env->NewByteArray(137);if(exception(env)||!bytes)return -3;WipeJavaBytes wipe{env,bytes,137};
+  env->SetByteArrayRegion(bytes,0,137,reinterpret_cast<const jbyte*>(secret));if(exception(env))return -3;
+  const jint status=env->CallIntMethod(context.provider,context.write,identity,bytes);return exception(env)?-3:status;
+}
+int32_t remove_pairing(void* opaque,const OmniPairingAddress* address){
+  if(!opaque||!address)return -3;auto& context=*static_cast<CredentialContext*>(opaque);
+  JavaAccess access(context.vm);auto* env=access.env;if(!env)return -3;
+  auto identity=java_pairing_address(env,address);if(!identity)return -3;
+  const jint status=env->CallIntMethod(context.provider,context.remove,identity);return exception(env)?-3:status;
 }
 int32_t open_media(void* opaque,const uint8_t* profile,const uint8_t* relative,size_t length,OmniMediaStream* stream){
   if(!opaque||!profile||!relative||!stream||length==0||length>2048)return -3;
@@ -105,6 +146,25 @@ jbyteArray response_bytes(JNIEnv* env,OmniBuffer response){
 
 extern "C" JNIEXPORT void JNICALL
 Java_org_chromium_chrome_browser_omniplay_NativeCore_nativeSetForeground(JNIEnv*,jclass,jlong handle,jboolean foreground){om_mobile_set_foreground(static_cast<uint64_t>(handle),foreground?1:0);}
+
+extern "C" JNIEXPORT jbyteArray JNICALL
+Java_org_chromium_chrome_browser_omniplay_NativeCore_nativePairingScope(JNIEnv* env,jclass,jlong handle){
+  return response_bytes(env,om_mobile_pairing_scope(static_cast<uint64_t>(handle)));
+}
+extern "C" JNIEXPORT jbyteArray JNICALL
+Java_org_chromium_chrome_browser_omniplay_NativeCore_nativeAttachPairing(JNIEnv* env,jclass,jlong handle,jobject provider){
+  if(!provider)return nullptr;auto context=std::make_unique<CredentialContext>();if(env->GetJavaVM(&context->vm)!=JNI_OK)return nullptr;
+  const auto type=env->GetObjectClass(provider);if(exception(env)||!type)return nullptr;
+  context->read=env->GetMethodID(type,"read","([B[B)I");if(exception(env)||!context->read)return nullptr;
+  context->write=env->GetMethodID(type,"write","([B[B)I");if(exception(env)||!context->write)return nullptr;
+  context->remove=env->GetMethodID(type,"remove","([B)I");if(exception(env)||!context->remove)return nullptr;
+  context->check=env->GetMethodID(type,"check","([B)I");if(exception(env)||!context->check)return nullptr;
+  env->DeleteLocalRef(type);context->provider=env->NewGlobalRef(provider);if(exception(env)||!context->provider)return nullptr;
+  OmniPairingCredentialCallbacks callbacks{1,context.release(),read_pairing,write_pairing,remove_pairing,check_pairing,release_credentials};
+  // Rust consumes this retained object on every attach return. No retry with
+  // the same native context; no Java object/secret appears in renderer protocol.
+  return response_bytes(env,om_mobile_attach_pairing_credentials_v1(static_cast<uint64_t>(handle),callbacks));
+}
 
 extern "C" JNIEXPORT jbyteArray JNICALL
 Java_org_chromium_chrome_browser_omniplay_NativeCore_nativeOpen(JNIEnv* env,jclass,jbyteArray input,jobject provider){

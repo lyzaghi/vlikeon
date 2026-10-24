@@ -49,6 +49,7 @@ public final class NativeCore {
     private String mProfile;
     private File mRoot;
     private boolean mFailed;
+    private boolean mPairingAttached;
 
     public static synchronized NativeCore get(Context context) {
         if (sInstance == null) sInstance = new NativeCore(context.getApplicationContext());
@@ -84,6 +85,11 @@ public final class NativeCore {
                 } finally { java.util.Arrays.fill(openRequest, (byte) 0); if (openReply != null) java.util.Arrays.fill(openReply, (byte) 0); }
                 mHandle = opened.getJSONObject("result").getLong("handle");
                 if (!"ok".equals(opened.optString("status")) || mHandle == 0) throw new IllegalStateException();
+                // Native attachment alone creates/reads no key and enables no
+                // streaming capability. Failure must not disable local play or
+                // silently substitute the save-sync credential provider.
+                try { mPairingAttached = attachPairingCredentials(); }
+                catch (Exception | LinkageError unavailable) { mPairingAttached = false; }
                 refreshLifecycle();
                 try { refreshBackgroundSchedule(); } catch (Exception ignored) { /* Scheduling can be restricted without making local play unavailable. */ }
             } catch (Exception | LinkageError error) { mFailed = true; }
@@ -91,6 +97,29 @@ public final class NativeCore {
     }
     private static native byte[] nativeCall(int operation, long handle, byte[] input);
     private static native byte[] nativeOpen(byte[] input, SecureCredentials provider);
+    private static native byte[] nativePairingScope(long handle);
+    private static native byte[] nativeAttachPairing(long handle, PairingCredentials provider);
+    private boolean attachPairingCredentials() throws Exception {
+        byte[] scopeBytes = null, attachedBytes = null;
+        try {
+            scopeBytes = nativePairingScope(mHandle);
+            if (scopeBytes == null || scopeBytes.length > 4096) return false;
+            JSONObject scopeReply = new JSONObject(new String(scopeBytes, StandardCharsets.UTF_8));
+            if (!"ok".equals(scopeReply.optString("status"))) return false;
+            JSONObject scope = scopeReply.getJSONObject("result");
+            if (!mProfile.equals(scope.getString("profile_id"))) return false;
+            String deviceText = scope.getString("device_id"); UUID device = UUID.fromString(deviceText);
+            if (!device.toString().equals(deviceText) || device.equals(new UUID(0, 0))) return false;
+            attachedBytes = nativeAttachPairing(mHandle, new PairingCredentials(mContext, UUID.fromString(mProfile), device));
+            if (attachedBytes == null || attachedBytes.length > 4096) return false;
+            JSONObject reply = new JSONObject(new String(attachedBytes, StandardCharsets.UTF_8));
+            return "ok".equals(reply.optString("status")) && reply.getJSONObject("result").optBoolean("attached", false)
+                    && reply.getJSONObject("result").optInt("credential_abi", 0) == 1;
+        } finally {
+            if (scopeBytes != null) java.util.Arrays.fill(scopeBytes, (byte) 0);
+            if (attachedBytes != null) java.util.Arrays.fill(attachedBytes, (byte) 0);
+        }
+    }
     private static native byte[] nativeAuthorizeMedia(long handle, byte[] input, SelectedDiscTree provider);
     private static native void nativeSetForeground(long handle, boolean foreground);
     private static native byte[] nativeBackgroundStart(long handle, int budget);
