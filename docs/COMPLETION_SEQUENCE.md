@@ -2,6 +2,13 @@
 
 ## Current sequence — 1–109 outstanding tasks
 
+Item 58 now authors native host invitation/share proof, signed peer review and
+exact consented grant/exchange preparation, bounded to eight distinct client
+attempts and original invite expiry. Host writer reloads its Active pinned key
+and persists MaterialReady/grant metadata before future relay approval. No
+RNG/crypto/native/vault/SQL/compiler/build/test ran. Host relay dispatch/native UI/
+activation/recovery and qualification remain due; full original scope stays open.
+
 Item 58 now authors client candidate activation with scoped pinned identity/pair
 reload and fresh exact ConfirmPair relay receipt before journal Active. Server
 confirmation uses the live unrevoked pair row independently of expired invites,

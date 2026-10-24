@@ -8,7 +8,81 @@ use ring::{agreement,hkdf,rand::SystemRandom};
 use sha2::{Digest,Sha256};
 use std::time::{Duration,Instant};
 use zeroize::{Zeroize,Zeroizing};
-use serde::Deserialize;
+use serde::{Deserialize,Serialize};
+
+/// Native host invitation. Share code deliberately contains bearer proof:
+/// present only through an explicit native share action, never diagnostics.
+pub struct NativeHostInvitation{document:SignedDocument,secret:Zeroizing<String>,host:String,audience:String,deadline:Instant,attempted:std::collections::BTreeSet<String>}
+pub struct NativeHostPeerReview{pub client_public_key:String,pub label:String,pub comparison_code:String}
+/// Locally consented host transcript, NOT relay approval. Persist material
+/// before dispatching its public signed grant to ApprovePair.
+pub struct NativeHostApproval{exchange:NativePairExchange,invite:SignedDocument,hello:SignedDocument,grant:SignedDocument,client:String,audience:String,deadline:Instant}
+impl NativeHostInvitation{
+    pub fn create(identity:&crate::native_credentials::NativeSigningIdentity,audience:&str,label:&str,now:u64)->Result<Self>{
+        let started=Instant::now();validate_audience(audience)?;
+        if label.is_empty()||label.len()>120||label.chars().any(char::is_control)||now>9_007_199_254_440_991{return Err(invalid());}
+        let mut raw=Zeroizing::new([0u8;32]);getrandom::getrandom(&mut raw[..]).map_err(|_|unavailable())?;
+        let invite=Invite{schema_version:1,id:uuid::Uuid::new_v4(),audience:audience.into(),host_public_key:identity.public_key(),label:label.into(),
+            secret_hash:omniplay_contracts::ContentHash(format!("{:x}",Sha256::digest(&raw[..]))),created_at_ms:now,expires_at_ms:now+300_000};
+        invite.validate(audience,now)?;
+        let document=identity.sign(crate::native_credentials::SigningDomain::Invite,&serde_json::to_vec(&invite).map_err(|_|invalid())?)?;
+        let deadline=started.checked_add(MAX_EXCHANGE_AGE).ok_or_else(invalid)?;
+        if Instant::now()>=deadline{return Err(unauthorized());}
+        Ok(Self{document,secret:Zeroizing::new(URL_SAFE_NO_PAD.encode(&raw[..])),host:identity.public_key(),audience:audience.into(),deadline,attempted:std::collections::BTreeSet::new()})
+    }
+    pub fn signed_invite(&self)->&SignedDocument{&self.document}
+    pub fn share_code(&self,now:u64)->Result<Zeroizing<String>>{
+        self.live(now)?;
+        #[derive(Serialize)]struct Share<'a>{invite:&'a SignedDocument,secret:&'a str}
+        let bytes=Zeroizing::new(serde_json::to_vec(&Share{invite:&self.document,secret:self.secret.as_str()}).map_err(|_|invalid())?);
+        let mut code=Zeroizing::new(String::from("OPRP1."));URL_SAFE_NO_PAD.encode_string(&bytes[..],&mut code);
+        if Instant::now()>=self.deadline{return Err(unauthorized());}Ok(code)
+    }
+    fn live(&self,now:u64)->Result<Invite>{
+        if Instant::now()>=self.deadline{return Err(unauthorized());}
+        let invite:Invite=verify(&self.host,INVITE_DOMAIN,&self.document,4096)?;invite.validate(&self.audience,now)?;Ok(invite)
+    }
+    pub fn review_client(&self,hello:&SignedDocument,expected_client:&str,now:u64)->Result<NativeHostPeerReview>{
+        let started=Instant::now();let invite=self.live(now)?;key(expected_client)?;
+        if expected_client==self.host{return Err(unauthorized());}
+        let peer:ClientHello=verify(expected_client,HELLO_DOMAIN,hello,4096)?;peer.validate(invite.id,now)?;
+        if peer.client_public_key!=expected_client||peer.created_at_ms<invite.created_at_ms.saturating_sub(30_000)||peer.created_at_ms>=invite.expires_at_ms{return Err(unauthorized());}
+        let comparison=comparison_code(&self.document,hello)?;let _=self.live(elapsed_now(now,started)?)?;
+        Ok(NativeHostPeerReview{client_public_key:peer.client_public_key,label:peer.label,comparison_code:comparison})
+    }
+    /// Real native peer/comparison/input-permission consent must precede this.
+    /// One attempt per client key, at most eight; retain returned approval for
+    /// persistence/retry, never regenerate a competing grant after uncertainty.
+    pub fn prepare_approval_after_local_consent(&mut self,identity:&crate::native_credentials::NativeSigningIdentity,
+        hello:&SignedDocument,expected_client:&str,input_allowed:bool,lifetime_ms:u64,now:u64)->Result<NativeHostApproval>{
+        let started=Instant::now();let invite=self.live(now)?;let _=self.review_client(hello,expected_client,now)?;
+        if identity.public_key()!=self.host||lifetime_ms==0||lifetime_ms>crate::MAX_PAIR_LIFETIME||now.checked_add(lifetime_ms).is_none_or(|expiry|expiry>9_007_199_254_740_991)||self.attempted.len()>=8||self.attempted.contains(expected_client){return Err(unauthorized());}
+        self.attempted.insert(expected_client.into());
+        let peer:ClientHello=verify(expected_client,HELLO_DOMAIN,hello,4096)?;
+        let exchange=NativePairExchange::new(&self.host)?;
+        let grant=crate::PairGrant{schema_version:1,id:uuid::Uuid::new_v4(),invite_id:invite.id,audience:self.audience.clone(),host_public_key:self.host.clone(),client_public_key:expected_client.into(),
+            client_hello_hash:omniplay_contracts::ContentHash(document_hash(hello)?),client_ecdh:peer.client_ecdh,host_ecdh:exchange.public_key().into(),client_nonce:peer.client_nonce,host_nonce:exchange.nonce().into(),
+            input_allowed,created_at_ms:now,expires_at_ms:now+lifetime_ms};
+        grant.validate(&self.audience,now)?;
+        let document=identity.sign(crate::native_credentials::SigningDomain::Grant,&serde_json::to_vec(&grant).map_err(|_|invalid())?)?;
+        let _=self.live(elapsed_now(now,started)?)?;
+        grant.validate(&self.audience,elapsed_now(now,started)?)?;
+        Ok(NativeHostApproval{exchange,invite:self.document.clone(),hello:hello.clone(),grant:document,client:expected_client.into(),audience:self.audience.clone(),deadline:self.deadline})
+    }
+}
+impl NativeHostApproval{
+    pub fn signed_grant(&self)->&SignedDocument{&self.grant}
+    pub fn native_deadline(&self)->Instant{self.deadline}
+    pub fn finish_for_persistence(self,now:u64)->Result<NativePairKey>{
+        if Instant::now()>=self.deadline{return Err(unauthorized());}
+        let material=self.exchange.finish_host(&self.client,&self.invite,&self.hello,&self.grant,&self.audience,now)?;
+        if Instant::now()>=self.deadline{return Err(unauthorized());}Ok(material)
+    }
+}
+fn comparison_code(invite:&SignedDocument,hello:&SignedDocument)->Result<String>{
+    let transcript=serde_json::to_vec(&["omniplay.streaming.pair-code.v1",invite.payload.as_str(),hello.payload.as_str()]).map_err(|_|invalid())?;
+    let hash=Sha256::digest(&transcript);let number=u32::from_be_bytes([hash[0],hash[1],hash[2],hash[3]])%1_000_000;Ok(format!("{number:06}"))
+}
 
 #[derive(Deserialize)]#[serde(deny_unknown_fields)]
 struct InvitationCode{invite:SignedDocument,secret:String}
@@ -53,10 +127,7 @@ impl NativeClientPairing{
             client_ecdh:exchange.public_key().into(),client_nonce:exchange.nonce().into(),label:label.into(),created_at_ms:now};
         body.validate(invite.id,now)?;
         let hello=identity.sign(crate::native_credentials::SigningDomain::Hello,&serde_json::to_vec(&body).map_err(|_|invalid())?)?;
-        let transcript=serde_json::to_vec(&["omniplay.streaming.pair-code.v1",invitation.invite.payload.as_str(),hello.payload.as_str()]).map_err(|_|invalid())?;
-        let hash=Sha256::digest(&transcript);
-        let number=u32::from_be_bytes([hash[0],hash[1],hash[2],hash[3]])%1_000_000;
-        let comparison=format!("{number:06}");
+        let comparison=comparison_code(&invitation.invite,&hello)?;
         let current=elapsed_now(now,started)?;invite.validate(audience,current)?;
         if started.elapsed()>=MAX_EXCHANGE_AGE||Instant::now()>=deadline{return Err(unauthorized());}
         // Retain opaque proof for future native relay submission. Never expose

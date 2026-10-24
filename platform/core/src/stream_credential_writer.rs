@@ -85,6 +85,26 @@ impl<'a> NativeCredentialWriter<'a>{
         drop(identity);
         self.prepare_pair(expected,identity_address,&document,&grant.audience,&material,elapsed_now(now,started)?,deadline)
     }
+    /// Persists a locally consented host approval BEFORE any ApprovePair request.
+    /// The immutable signed grant goes into journal recovery metadata; no relay
+    /// acknowledgment or Active transition is implied by MaterialReady.
+    pub fn prepare_host_after_local_consent(&mut self,expected:u64,identity_address:CredentialAddress,
+        approval:omniplay_streaming::native_pair_exchange::NativeHostApproval,now:u64,deadline:Instant)->Result<Candidate>{
+        let started=begin(deadline)?;let deadline=deadline.min(approval.native_deadline());check(deadline)?;
+        let snapshot=journal::load_scoped(self.database,&self.lease,self.profile)?;check(deadline)?;
+        if snapshot.revision()!=expected{return Err(conflict());}
+        let identity=snapshot.records().iter().find(|record|record.address()==identity_address).ok_or_else(conflict)?;
+        if identity_address.kind()!=SecretKind::DeviceSigning||identity.phase()!=Phase::Active{return Err(conflict());}
+        let signer=load_identity(self.store,&identity_address,identity.public_key())?;
+        let document=approval.signed_grant().clone();
+        let metadata:omniplay_streaming::PairGrant=omniplay_streaming::inspect(&document,8192)?;
+        let grant=verify_grant(&document,&metadata.audience,elapsed_now(now,started)?)?;
+        if grant.host_public_key!=signer.public_key(){return Err(conflict());}
+        check(deadline)?;self.lease.check(self.database,self.profile)?;
+        let material=approval.finish_for_persistence(elapsed_now(now,started)?)?;
+        check(deadline)?;drop(signer);
+        self.prepare_pair(expected,identity_address,&document,&grant.audience,&material,elapsed_now(now,started)?,deadline)
+    }
     /// Explicit native client consent only. Reload exact stored material and
     /// obtain fresh bound relay approval before publishing Active. No replacement
     /// generation, generic boolean receipt or transport/session grant is created.

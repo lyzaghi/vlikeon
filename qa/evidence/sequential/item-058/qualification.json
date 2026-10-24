@@ -104,7 +104,10 @@
     "Native LocalHost client preparation gates installed policy and retains the original invite deadline through vault publication; product pending/consent caller remains unintegrated",
     "Client candidate activation source reloads Active pinned identity and exact pair material under the same scoped lease, obtains fresh exact pair/grant/expiry relay confirmation and commits Active with revision/deadline/cancellation checks",
     "ConfirmPair server source admits the current live unrevoked pair independently of invite/join expiry and allocates no ICE credentials; no deployment/network/SQL/runtime was executed",
-    "LocalHost activation uses enabled installed pairing origins, never disabled-policy retirement origins; mobile foreground/peer-consent UI integration and actual qualification remain unfinished"
+    "LocalHost activation uses enabled installed pairing origins, never disabled-policy retirement origins; mobile foreground/peer-consent UI integration and actual qualification remain unfinished",
+    "Native host invitation source owns random bearer proof and signed five-minute invite, explicit zeroizing share code and pinned-client hello/comparison review",
+    "Native host approval binds consented input/lifetime to exact hello and fresh exchange, with one attempt per client and at most eight attempts per invite",
+    "Retained-lease host writer reloads Active pinned identity and persists exact grant/material as MaterialReady before any relay approval; host dispatch/UI/activation/runtime remain unfinished"
   ],
   "build_executed": false,
   "tests_executed": false,

@@ -1575,6 +1575,38 @@ No relay deployment, network/native/vault/SQL operation, compiler, build or test
 was executed. Protocol deployment/interoperability, activation races, owner/crash
 recovery and the full original scope remain unqualified and incomplete.
 
+## Native host invitation and persist-before-approval transcript
+
+NativeHostInvitation now authors a signed five-minute invite with fresh UUID and
+32-byte OS-random secret. The hash enters the signed invite; proof remains in a
+zeroizing owner. Explicit share_code returns a zeroizing OPRP1 bearer code for
+the native share UI, not diagnostics/renderer storage. The share's borrowed
+serialization uses a zeroizing buffer; caller/OS sharing copies still need their
+own handling. The host object has no Clone/Debug/Serialize implementation.
+
+Native peer review verifies the hello using the separately approved client key,
+checks invite/time bounds and produces label/key/comparison metadata. Host and
+client use the same checked-in browser-layout comparison function. After actual
+native comparison/input-permission consent, approval preparation creates a fresh
+P-256 exchange/nonce and signed grant bound to that exact hello. Pair lifetime
+must be explicitly supplied within protocol bounds; input permission has no
+automatic opt-in. Each invite allows at most eight distinct attempted client keys,
+one grant attempt per client. Uncertain persistence must retain the returned
+approval/candidate, not generate a competing grant from the same invite object.
+
+NativeHostApproval owns the exact invite/hello/grant/exchange until consumed.
+The retained-lease writer reloads the Active pinned host identity before deriving
+material, then uses existing reserve/write-intent/vault read-back publication.
+It preserves the original invite deadline through MaterialReady. The signed grant
+is retained in journal recovery metadata before any future ApprovePair request.
+MaterialReady does not mean relay acknowledgment or Active host authority.
+
+Relay invite registration/poll/approval dispatch, LocalHost/native share/peer UI,
+host activation and durable retry orchestration remain unfinished. No RNG/signing/
+ECDH/parser/vault/SQL/native operation, compiler, build or test was executed.
+Cross-browser vectors, consent/persistence races, crash recovery and the complete
+original scope remain unqualified and open.
+
 ## Remaining implementation and qualification
 
 - Journal/executor/lease/writer product integration, authority epochs, actual native owner
