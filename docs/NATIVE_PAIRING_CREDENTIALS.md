@@ -1840,6 +1840,15 @@ this checkpoint.
 
 ## Remaining implementation and qualification
 
+Client poll replies now carry the original independently pinned host key,
+its native-derived fingerprint and the retained invite/hello comparison code.
+These come from the same pending exchange as the approved grant, not mutable
+UI input. Android/iOS approved-poll snapshots retain this metadata immutably
+alongside pair/input permissions so the eventual view can display the exact
+peer/comparison context. Text format validation does not itself prove user
+comparison or consent. Actual view wiring and build/runtime tests remain due;
+none ran for this source checkpoint.
+
 iOS now mirrors the approved-poll snapshot/confirmation helper using immutable
 public metadata, private ticket/hash, original core identity, owner/cancel fence,
 monotonic lifetime capped at 60 seconds and a locked one-use consume operation.

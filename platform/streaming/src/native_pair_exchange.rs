@@ -203,6 +203,7 @@ impl NativeClientPairing{
     pub fn signed_invite(&self)->&SignedDocument{&self.invite}
     pub fn signed_hello(&self)->&SignedDocument{&self.hello}
     pub fn comparison_code(&self)->&str{&self.comparison}
+    pub fn host_public_key(&self)->&str{&self.expected_host}
     pub fn expires_at_ms(&self)->u64{self.expires}
     /// Native writer must retain this original bound through vault publication,
     /// not restart the invitation lifetime after ECDH or network completion.

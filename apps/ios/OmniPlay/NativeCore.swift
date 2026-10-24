@@ -24,13 +24,15 @@ enum NativeClientPairingAction:UInt32 { case begin=0,join=1,poll=2,persistAfterP
 /// Immutable approved-poll metadata for a trusted native confirmation view.
 final class NativePeerApproval {
     let pairID:String,inputAllowed:Bool,expires:DispatchTime
+    let hostPublicKey:String,hostFingerprint:String,comparisonCode:String
     fileprivate let ticket:String,grantHash:String
     fileprivate let origin:ObjectIdentifier
     private let lock=NSLock()
     private var consumed=false
     private let current:()->Bool
-    fileprivate init(origin:NativeCore,ticket:String,hash:String,pair:String,input:Bool,expires:DispatchTime,current:@escaping ()->Bool){
+    fileprivate init(origin:NativeCore,ticket:String,hash:String,pair:String,host:String,fingerprint:String,comparison:String,input:Bool,expires:DispatchTime,current:@escaping ()->Bool){
         self.origin=ObjectIdentifier(origin)
+        hostPublicKey=host;hostFingerprint=fingerprint;comparisonCode=comparison
         self.ticket=ticket;grantHash=hash;pairID=pair;inputAllowed=input;self.expires=expires;self.current=current
     }
     fileprivate func consume()->Bool{
@@ -317,6 +319,9 @@ final class NativeCore {
                           revision.doubleValue>=1,revision.doubleValue<=10_000_000,revision.doubleValue==Double(revision.uint64Value) else{throw OmniFailure.message("Thông tin bắt đầu ghép đôi không hợp lệ.")}
                 }
                 if action == .poll{
+                    guard let host=value["host_public_key"] as? String,NativePairingText.publicKey(host),
+                          let fingerprint=value["host_fingerprint"] as? String,NativePairingText.fingerprint(fingerprint),
+                          let comparison=value["comparison_code"] as? String,NativePairingText.comparison(comparison) else{throw OmniFailure.message("Thiếu thông tin host và mã đối chiếu.")}
                     guard exactBool(value["local_consent_required"],true),let status=value["status"] as? [String:Any],let state=status["state"] as? String else{throw OmniFailure.message("Trạng thái ghép đôi không hợp lệ.")}
                     if state == "approved"{
                         guard let hash=value["grant_hash"] as? String,NativePairingText.fingerprint(hash) else{throw OmniFailure.message("Thiếu mã ràng buộc grant được host duyệt.")}
@@ -350,10 +355,11 @@ final class NativeCore {
                     guard owner.active,self.pairingClientDeliveryFence.admits(token),let status=value["status"] as? [String:Any],
                           status["state"] as? String == "approved",let pair=status["pair_id"] as? String,
                           let allowed=status["input_allowed"] as? Bool,let hash=value["grant_hash"] as? String,
+                          let host=value["host_public_key"] as? String,let fingerprint=value["host_fingerprint"] as? String,let comparison=value["comparison_code"] as? String,
                           let expiry=status["expires_at_ms"] as? NSNumber else{throw OmniFailure.message("Chưa có grant hiện tại để xác nhận.")}
                     let remaining=expiry.doubleValue-Date().timeIntervalSince1970*1000
                     guard remaining>0 else{throw OmniFailure.message("Grant đã hết hạn. Hãy đọc lại trạng thái.")}
-                    let review=NativePeerApproval(origin:self,ticket:ticket,hash:hash,pair:pair,input:allowed,
+                    let review=NativePeerApproval(origin:self,ticket:ticket,hash:hash,pair:pair,host:host,fingerprint:fingerprint,comparison:comparison,input:allowed,
                         expires:DispatchTime.now() + .milliseconds(Int(min(60_000,remaining))),current:{[weak self] in
                             owner.active && self?.pairingClientDeliveryFence.admits(token)==true
                         })

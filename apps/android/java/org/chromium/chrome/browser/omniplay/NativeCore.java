@@ -166,6 +166,8 @@ public final class NativeCore {
                     if(action==1&&(!"pending".equals(value.getString("state"))||!Boolean.FALSE.equals(value.get("approves_peer"))))throw new IllegalStateException();
                     if(action==2){
                         if(!Boolean.TRUE.equals(value.get("local_consent_required")))throw new IllegalStateException();
+                        if(!value.getString("host_public_key").matches("[A-Za-z0-9_-]{42}[AEIMQUYcgkosw048]")
+                                ||!value.getString("host_fingerprint").matches("[0-9a-f]{64}")||!value.getString("comparison_code").matches("[0-9]{6}"))throw new IllegalStateException();
                         JSONObject status=value.getJSONObject("status");String state=status.getString("state");
                         if("approved".equals(state)){
                             if(!value.getString("grant_hash").matches("[0-9a-f]{64}"))throw new IllegalStateException();
@@ -194,13 +196,14 @@ public final class NativeCore {
     interface PeerApprovalReply { void accept(PeerApproval review,String error); }
     /** Immutable approved-poll snapshot owned by trusted native UI only. */
     static final class PeerApproval {
-        final String pairId,grantHash;final boolean inputAllowed;final long expires;
+        final String pairId,grantHash,hostPublicKey,hostFingerprint,comparisonCode;final boolean inputAllowed;final long expires;
         private final String ticket;private final Object deliveryFence;
         private final java.util.concurrent.atomic.AtomicBoolean consumed=new java.util.concurrent.atomic.AtomicBoolean();
         private PeerApproval(JSONObject value,Object fence) throws Exception {
             JSONObject status=value.getJSONObject("status");
             if(!"approved".equals(status.getString("state")))throw new IllegalStateException();
             ticket=value.getString("ticket");pairId=status.getString("pair_id");grantHash=value.getString("grant_hash");
+            hostPublicKey=value.getString("host_public_key");hostFingerprint=value.getString("host_fingerprint");comparisonCode=value.getString("comparison_code");
             inputAllowed=status.getBoolean("input_allowed");deliveryFence=fence;
             long remaining=status.getLong("expires_at_ms")-System.currentTimeMillis();
             if(remaining<=0)throw new IllegalStateException();

@@ -210,7 +210,9 @@ impl LocalHost {
         let status=match status{NativeClientPairingStatus::Pending=>json!({"state":"pending"}),NativeClientPairingStatus::Declined=>json!({"state":"declined"}),
             NativeClientPairingStatus::Approved{pair_id,input_allowed,expires_at_ms}=>json!({"state":"approved","pair_id":pair_id,"input_allowed":input_allowed,"expires_at_ms":expires_at_ms})};
         let grant_hash=pending.pairing.approved_grant().map(omniplay_streaming::document_hash).transpose()?;
-        Ok(json!({"pairing_protocol":1,"ticket":ticket,"status":status,"grant_hash":grant_hash,"local_consent_required":true}))
+        Ok(json!({"pairing_protocol":1,"ticket":ticket,"status":status,"grant_hash":grant_hash,"local_consent_required":true,
+            "host_public_key":pending.pairing.host_public_key(),"host_fingerprint":omniplay_streaming::key_id(pending.pairing.host_public_key())?,
+            "comparison_code":pending.pairing.comparison_code()}))
     }
     pub fn native_pairing_client_cancel(&mut self,ticket:Uuid)->Result<()>{
         self.ensure_open()?;

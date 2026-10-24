@@ -2,6 +2,11 @@
 
 ## Current sequence — 1–109 outstanding tasks
 
+Item 58 approved-poll review snapshots now retain the transcript's pinned host
+key, derived fingerprint and comparison code alongside pair/input metadata.
+LocalHost sources these from the retained native exchange, and both mobile
+callers validate text formats. Source-only; consent view wiring/build/test due.
+
 Item 58 iOS now has immutable approved-poll peer snapshots, core/owner/cancel
 binding, capped monotonic review lifetime and one-use confirmation. Requests
 retain exact reviewed ticket/grant hash. Source-only; build/test, actual consent
