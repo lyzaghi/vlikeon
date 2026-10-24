@@ -1,5 +1,18 @@
 # Item 55 — virtual gamepad ownership source
 
+Deadline retirement source checkpoint: `GamepadClient::stop_until`, required
+`ParentChannel::stop_until`, and supervisor `revoke_until` now accept the original
+session deadline. Stop exchange and process wait consume remaining time; actual
+thread completion/join and a timely return remain mandatory for transport stop.
+The supervisor seals admission and retains durable ownership before attempting
+further cleanup. No new SQL mutation is started after an observed expired budget;
+commits or arbitration writes already in progress can finish late and yield an
+error requiring reload. SQLite/OS scheduling is not claimed hard real-time.
+Transport exit never proves provider device neutralization/removal or releases
+slots: exact journal and provider reconciliation remain required. Default/Drop
+cleanup retains its separate best-effort semantics. Build/test, helper/driver
+execution and aggregate session retirement qualification remain outstanding.
+
 Status: open; source authoring only. The owner deferred build/test execution
 and moved this fork from item 54 to item 55. No compiler, test, driver install,
 device operation, Linux build or Antigravity batch was executed for this work.

@@ -39,6 +39,9 @@ pub trait ParentChannel{
     /// serialize all pipe writes, including these, through one private writer.
     fn heartbeat(&mut self,binding:Binding)->Result<u64>;
     fn stop(&mut self)->Result<()>;
+    /// Same stop/containment operation within an original caller deadline.
+    /// Never implement by invoking stop() with a fresh internal wait budget.
+    fn stop_until(&mut self,deadline:Instant)->Result<()>;
 }
 
 /// A native authority observation freshly validated by the broker, independent
@@ -111,8 +114,13 @@ impl<T:ParentChannel> GamepadSupervisor<T>{
         Ok(())
     }
     fn retain_cleanup(&mut self,database:&mut Database,reply:Option<&Reply>)->Result<()>{
+        self.retain_cleanup_inner(database,reply,None)
+    }
+    fn retain_cleanup_inner(&mut self,database:&mut Database,reply:Option<&Reply>,deadline:Option<Instant>)->Result<()>{
         self.sealed=true;self.active=false;
-        let Some(snapshot)=self.journal.as_ref()else{let _=self.channel.stop();return Err(stopped());};
+        let stop=match deadline{Some(end)=>self.channel.stop_until(end),None=>self.channel.stop()};
+        if deadline.is_some_and(|end|Instant::now()>=end){return Err(stopped());}
+        let Some(snapshot)=self.journal.as_ref()else{return Err(stopped());};
         let(state,pending)=match reply{
             Some(reply)if reply.phase=="revoked"=>(CleanupState::Revoked,reply.identities.as_deref()),
             Some(reply)if reply.phase=="cleanup_required"=>(CleanupState::CleanupRequired,reply.identities.as_deref()),
@@ -121,12 +129,13 @@ impl<T:ParentChannel> GamepadSupervisor<T>{
         let pending=pending.map(ids);
         // Stop before SQLite can block on another writer or disk fault. The
         // existing durable row still blocks reassignment throughout shutdown.
-        let _=self.channel.stop();
         let updated=journal::record_cleanup(database,snapshot,journal_owner(self.owner),self.helper,state,pending.as_deref());
         // An uncertain commit remains authoritative
         // on disk; subsequent recovery must reload instead of trusting memory.
         self.journal=Some(updated?);
-        self.arbitration.mirror(database,self.journal.as_ref().ok_or_else(stopped)?)?;Ok(())
+        if deadline.is_some_and(|end|Instant::now()>=end){return Err(stopped());}
+        self.arbitration.mirror(database,self.journal.as_ref().ok_or_else(stopped)?)?;
+        if deadline.is_some_and(|end|Instant::now()>=end||stop.is_err()){return Err(stopped());}Ok(())
     }
     pub fn activate(&mut self,database:&mut Database,authority:&Authority)->Result<()>{
         if !self.permitted(authority)||self.active{let _=self.retain_cleanup(database,None);return Err(stopped());}
@@ -200,13 +209,20 @@ impl<T:ParentChannel> GamepadSupervisor<T>{
         if result.is_err()&&!self.sealed{let _=self.retain_cleanup(database,None);}result
     }
     pub fn revoke(&mut self,database:&mut Database)->Result<()>{
-        if self.sealed{let _=self.channel.stop();return if self.journal.is_none(){Ok(())}else{Err(stopped())};}
+        self.revoke_until(database,Instant::now()+Duration::from_millis(1750))
+    }
+    /// Records cleanup debt, not aggregate device/session retirement. Storage
+    /// can complete late: reload/reconcile; no late success or owner deletion.
+    pub fn revoke_until(&mut self,database:&mut Database,deadline:Instant)->Result<()>{
+        if self.sealed{let contained=self.channel.stop_until(deadline);return if self.journal.is_none()&&Instant::now()<deadline{contained}else{Err(stopped())};}
         let result=(||{
-            let(id,reply)=self.exchange(Action::Stop,Duration::from_millis(750))?;self.validate(&reply,id)?;
+            let remaining=deadline.saturating_duration_since(Instant::now());
+            if remaining.is_zero(){return Err(stopped());}
+            let(id,reply)=self.exchange(Action::Stop,remaining.min(Duration::from_millis(750)))?;self.validate(&reply,id)?;
             if !matches!(reply.phase.as_str(),"cleanup_required"|"revoked"){return Err(invalid());}
-            self.retain_cleanup(database,Some(&reply))
+            self.retain_cleanup_inner(database,Some(&reply),Some(deadline))
         })();
-        if result.is_err(){let _=self.retain_cleanup(database,None);}result
+        if result.is_err()&&!self.sealed{let _=self.retain_cleanup_inner(database,None,Some(deadline));}result
     }
     /// Uses the authoritative database row after every uncertain commit/pipe
     /// failure. Recovery may retain debt indefinitely; no force-clear or TTL.
@@ -266,6 +282,7 @@ impl ParentChannel for WindowsParentChannel{
         self.client.heartbeat()
     }
     fn stop(&mut self)->Result<()>{self.client.stop()}
+    fn stop_until(&mut self,deadline:Instant)->Result<()>{self.client.stop_until(deadline)}
 }
 
 /// Live-parent recovery from the actual launch handle plus native provider

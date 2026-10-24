@@ -185,14 +185,21 @@ impl GamepadClient{
         })();if result.is_err(){self.shared.close();}result
     }
     pub fn stop(&mut self)->Result<()>{
-        self.shared.close();self.commands.take();let result=self.shared.process.stop(1000);
+        self.stop_until(Instant::now()+Duration::from_millis(1000))
+    }
+    /// Transport/process retirement only. Device neutralization/removal still
+    /// requires the durable provider inventory/reconciliation path.
+    pub fn stop_until(&mut self,deadline:Instant)->Result<()>{
+        self.shared.close();self.commands.take();
+        let remaining=deadline.saturating_duration_since(Instant::now()).as_millis().min(1000)as u32;
+        let result=self.shared.process.stop(remaining);
         // Never block forever joining an I/O thread whose cancellation is not
         // acknowledged. Shared permit remains held until every thread retires,
         // preventing repeated launches from accumulating abandoned threads.
         let mut retained=Vec::new();
         for thread in self.threads.drain(..){if thread.is_finished(){self.join_failed|=thread.join().is_err();}else{retained.push(thread);}}
         self.threads=retained;
-        if !self.threads.is_empty()||self.join_failed{return Err(failure());}result
+        if !self.threads.is_empty()||self.join_failed||Instant::now()>=deadline{return Err(failure());}result
     }
 }
 impl Drop for GamepadClient{fn drop(&mut self){let _=self.stop();}}

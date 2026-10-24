@@ -2,6 +2,8 @@
 
 ## Current sequence — 1–109 outstanding tasks
 
+Source checkpoint: gamepad parent transport now exposes deadline-bearing stop and supervisor revoke paths. Stop exchange, helper termination and I/O reaping share the original deadline; late/failed containment remains an error. Journal/arbitration writes are checked before/after and may still finish late, requiring reload/reconciliation rather than a success receipt. No slot/device ownership is released merely because the helper exits. Build/test and actual driver/device qualification remain deferred.
+
 Source checkpoint: keyboard/mouse helper retirement now accepts one original caller deadline across Stop/release observation, graceful exit, forced process containment and I/O reaping. Broker revoke/close expose deadline-bearing paths and retain `CleanupRequired` on late/partial/missing-release results. Repeated cleanup may reap the same owner but cannot replace a missing release receipt with process exit. Build/test remain deferred; this is one component, not full session retirement.
 
 Source checkpoint: Windows video helper retirement now accepts one caller deadline across Stop RPC, process wait and I/O reaping. Raw-frame, owned-capture and viewer-decoder broker wrappers expose `revoke_until`. Missing Stop acknowledgement, expired completion, pending threads or a failed join remain errors; a retry can reap the same owner but cannot manufacture an acknowledgement. This prepares component retirement only, not full session retirement or transport integration. Build/test remain deferred.
