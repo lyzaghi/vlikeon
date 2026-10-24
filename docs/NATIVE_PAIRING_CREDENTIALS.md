@@ -1840,6 +1840,15 @@ this checkpoint.
 
 ## Remaining implementation and qualification
 
+Android pairing cancel rotates an atomic object-identity delivery fence before
+requesting native invalidation. Ordinary operations capture the fence and check
+it before JNI work, after the reply and on main delivery. A cancel attempt thus
+invalidates already-produced replies even if native acknowledgment or queue
+admission fails. This is delivery admission only, not rollback or remote revoke.
+Actual UI calls must serialize on the main thread for UI transition atomicity;
+an arbitrary concurrent cancel can race a callback already executing. iOS
+equivalent fencing and runtime qualification remain due; no build/test ran.
+
 Mobile begin replies now receive comparison-code, host key/fingerprint format,
 future safe-range integral expiry and bounded revision checks. These format
 checks do not independently pin the host or verify fingerprint derivation;

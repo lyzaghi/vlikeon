@@ -2,6 +2,11 @@
 
 ## Current sequence — 1–109 outstanding tasks
 
+Item 58 Android cancel now rotates an in-memory reply fence before native
+invalidation. Earlier queued/in-flight/main-pending ordinary replies fail caller
+admission even if the dialog remains alive. No counter wrap or fence reuse.
+Source-only: build/test and matching iOS delivery fencing remain due.
+
 Item 58 begin-response metadata now checks comparison code, host key/fingerprint
 format, future safe-range integral expiry and bounded journal revision in mobile
 callers. Source-only; build/test and native consent UI remain due.

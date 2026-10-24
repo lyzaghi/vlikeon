@@ -102,6 +102,7 @@ public final class NativeCore {
     private static native byte[] nativePairingScope(long handle);
     private static native byte[] nativePairingClientV1(long handle,byte[] input,int action,int budget);
     private final java.util.concurrent.atomic.AtomicBoolean mPairingClientBusy=new java.util.concurrent.atomic.AtomicBoolean();
+    private final java.util.concurrent.atomic.AtomicReference<Object> mPairingClientDeliveryFence=new java.util.concurrent.atomic.AtomicReference<>(new Object());
     /** Dedicated trusted UI lane; consumes and clears the supplied byte array
      * on every path. UI must independently pin host and confirm peer/input.
      * action 0 is begin, 1 join, 2 poll, 3 consented persistence, 4 local cancel.
@@ -112,6 +113,9 @@ public final class NativeCore {
         if(ownedInput==null||ownedInput.length==0||ownedInput.length>maximum||action<0||action>4){
             if(ownedInput!=null)java.util.Arrays.fill(ownedInput,(byte)0);reply.accept(failure("","invalid_request","Native pairing request is invalid."));return;
         }
+        final Object deliveryFence=action==4?new Object():mPairingClientDeliveryFence.get();
+        // Fence already-produced replies even if native invalidation/queueing fails.
+        if(action==4)mPairingClientDeliveryFence.set(deliveryFence);
         // Cancel signals native in-flight work before waiting for serialized I/O.
         if(action==4)try{
             long current=mHandle;
@@ -134,7 +138,7 @@ public final class NativeCore {
                     if(request.length()!=1||!canonicalPairingId(expectedTicket))throw new IllegalStateException();
                 }
                 long remaining=expires-android.os.SystemClock.elapsedRealtime();
-                if(mHandle==0||mFailed||remaining<1000||(action!=4&&(!alive.getAsBoolean()||!mPairingAttached)))throw new IllegalStateException();
+                if(mHandle==0||mFailed||remaining<1000||(action!=4&&(mPairingClientDeliveryFence.get()!=deliveryFence||!alive.getAsBoolean()||!mPairingAttached)))throw new IllegalStateException();
                 response=pairingResponse(nativePairingClientV1(mHandle,ownedInput,action,(int)Math.min(25_000,remaining)));
                 if("ok".equals(response.optString("status"))){
                     JSONObject value=response.getJSONObject("result");
@@ -171,13 +175,13 @@ public final class NativeCore {
                     }
                     if(action==4&&(!Boolean.TRUE.equals(value.get("cancelled"))||!Boolean.FALSE.equals(value.get("remote_revoked"))))throw new IllegalStateException();
                 }
-                if(action!=4&&!alive.getAsBoolean())response=failure("","cancelled","Pairing response became stale. Inspect native status before continuing.");
+                if(action!=4&&(mPairingClientDeliveryFence.get()!=deliveryFence||!alive.getAsBoolean()))response=failure("","cancelled","Pairing response became stale. Inspect native status before continuing.");
             }catch(Exception|LinkageError error){response=failure("","runtime_unavailable","Pairing result is uncertain. Inspect native status before continuing.");}
             finally{java.util.Arrays.fill(ownedInput,(byte)0);mWorkPending.decrementAndGet();if(reserved)mPairingClientBusy.set(false);}
             final JSONObject completed=response;mMain.post(()->{
                 // Queue-to-main delay is part of the original operation. Never
                 // deliver an old success into a replaced native dialog.
-                if(android.os.SystemClock.elapsedRealtime()>=expires||(action!=4&&!alive.getAsBoolean()))reply.accept(failure("","cancelled","Pairing result became stale. Inspect native status before continuing."));
+                if(android.os.SystemClock.elapsedRealtime()>=expires||(action!=4&&(mPairingClientDeliveryFence.get()!=deliveryFence||!alive.getAsBoolean())))reply.accept(failure("","cancelled","Pairing result became stale. Inspect native status before continuing."));
                 else reply.accept(completed);
             });
         });}catch(java.util.concurrent.RejectedExecutionException rejected){java.util.Arrays.fill(ownedInput,(byte)0);mWorkPending.decrementAndGet();if(reserved)mPairingClientBusy.set(false);reply.accept(failure("","busy","Native pairing lane is unavailable."));}
