@@ -275,6 +275,36 @@ public final class NativeCore {
             });
         });}catch(java.util.concurrent.RejectedExecutionException error){mWorkPending.decrementAndGet();if(reserved)mPairingClientBusy.set(false);reply.accept(failure("","busy","Native host queue is unavailable."));}
     }
+    /** Explicit native cleanup from one exact durable status entry. */
+    void recoverHostInvitation(RecoverySnapshot snapshot,HostInvitationCleanup invitation,java.util.function.BooleanSupplier alive,Reply reply){
+        final long deadline=Math.min(snapshot.expires,android.os.SystemClock.elapsedRealtime()+25_000);
+        if(!alive.getAsBoolean()||snapshot.namespaceProvenanceMissing||!snapshot.relayRetirementAvailable||!snapshot.hostInvitationCleanup.contains(invitation)
+                ||invitation.expired||invitation.expiresAt<=System.currentTimeMillis()||android.os.SystemClock.elapsedRealtime()>=deadline){reply.accept(failure("","conflict","Reload host cleanup status. Expired invitations need separate reconciliation."));return;}
+        final Object fence=new Object();mPairingClientDeliveryFence.set(fence);
+        try{if(mHandle==0||!nativePairingInvalidateEpoch(mHandle)){reply.accept(failure("","runtime_unavailable","Cleanup invalidation was not acknowledged. Inspect status."));return;}}
+        catch(LinkageError error){reply.accept(failure("","unsupported_capability","Native cleanup is unavailable."));return;}
+        // Cleanup has separate queue admission so it can fence an ordinary share.
+        if(mWorkPending.incrementAndGet()>32){mWorkPending.decrementAndGet();reply.accept(failure("","busy","Native cleanup queue is full."));return;}
+        try{mIo.execute(()->{
+            JSONObject response;byte[] input=null;
+            try{
+                long remaining=deadline-android.os.SystemClock.elapsedRealtime();
+                if(mHandle==0||mFailed||!mPairingAttached||remaining<1000||!alive.getAsBoolean()||mPairingClientDeliveryFence.get()!=fence)throw new IllegalStateException();
+                input=new JSONObject().put("invite_id",invitation.inviteId).put("expected_revision",snapshot.revision).toString().getBytes(StandardCharsets.UTF_8);
+                response=pairingResponse(nativePairingHostV1(mHandle,input,8,(int)Math.min(25_000,remaining)));
+                if("ok".equals(response.optString("status"))){
+                    JSONObject value=pairingResult(response);
+                    if(value.getInt("recovery_protocol")!=1||!invitation.inviteId.equals(value.getString("invite_id"))||!Boolean.TRUE.equals(value.get("closed"))
+                            ||!Boolean.FALSE.equals(value.get("pairs_revoked"))||!Boolean.TRUE.equals(value.get("reload_required")))throw new IllegalStateException();
+                }
+            }catch(Exception|LinkageError error){response=failure("","runtime_unavailable","Host cleanup result is uncertain. Reload native status.");}
+            finally{if(input!=null)java.util.Arrays.fill(input,(byte)0);mWorkPending.decrementAndGet();}
+            final JSONObject completed=response;mMain.post(()->{
+                if(android.os.SystemClock.elapsedRealtime()>=deadline||!alive.getAsBoolean()||mPairingClientDeliveryFence.get()!=fence)reply.accept(failure("","cancelled","Cleanup result became stale. Reload status."));
+                else reply.accept(completed);
+            });
+        });}catch(java.util.concurrent.RejectedExecutionException error){mWorkPending.decrementAndGet();reply.accept(failure("","busy","Native cleanup queue is unavailable."));}
+    }
     /** bytes are borrowed only during callback; never retain/log/forward them. */
     interface HostShareReply {void accept(byte[] bytes,String error);}
     void sharePairingHost(String ticket,java.util.function.BooleanSupplier alive,HostShareReply reply){

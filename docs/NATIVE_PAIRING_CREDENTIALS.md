@@ -1840,6 +1840,18 @@ this checkpoint.
 
 ## Remaining implementation and qualification
 
+Android native status now lists each durable invitation cleanup record and shows
+invite ID, signer generation, service and expiry in a separate confirmation.
+Unexpired records with valid provenance/configured retirement service can invoke
+JNI host action 8, mapped to the dedicated recovery ABI. Caller requires exact
+record membership/revision, original status deadline, live owner and immediate
+native invalidation acknowledgment; bounded cleanup queue remains available
+while an ordinary share is finishing. Reply must bind exact invite ID and actual
+closed/nonrevocation/reload flags. Main delivery rechecks owner/fence/deadline.
+Expired records remain visible but nonactionable pending expiry reconciliation.
+No build/test/UI render/network operation ran. iOS equivalent and full runtime
+qualification remain unfinished.
+
 iOS cleanup status now retains immutable per-invitation metadata instead of a
 count alone. Exact local five-field DeviceSigning address must match a nonretired
 identity in the same snapshot, with canonical nonzero generation. Metadata also

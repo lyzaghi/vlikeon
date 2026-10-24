@@ -2,6 +2,11 @@
 
 ## Current sequence — 1–109 outstanding tasks
 
+Item 58 Android now connects durable invitation cleanup entries to explicit
+native confirmation and bounded JNI restart-close calls. Exact snapshot entry/
+revision/receipt admission and immediate delivery invalidation apply. Expired
+records remain visible without false completion. Source-only; no build/test ran.
+
 Item 58 iOS status now retains typed immutable durable invitation cleanup records
 bound to the same snapshot's nonretired signing identity, HTTPS audience and
 integral expiry. Source-only; explicit recovery caller/views and build/test due.

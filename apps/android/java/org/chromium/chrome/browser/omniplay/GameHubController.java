@@ -280,14 +280,17 @@ public final class GameHubController implements AutoCloseable {
             long remaining=snapshot.expires-android.os.SystemClock.elapsedRealtime();
             if(remaining<=0){cancelIdentityReview();identityNotice("Recovery status expired. Open it again.");return;}
             if(snapshot.records.isEmpty()&&snapshot.pendingClientTicket==null&&snapshot.pendingHostTicket==null){cancelIdentityReview();identityNotice("This device has no Remote Play identity or pair records.");return;}
-            String[] titles=new String[snapshot.records.size()+(snapshot.pendingClientTicket==null?0:2)+(snapshot.pendingHostTicket==null?0:1)];
+            final int cleanupStart=snapshot.records.size()+(snapshot.pendingClientTicket==null?0:2)+(snapshot.pendingHostTicket==null?0:1);
+            String[] titles=new String[cleanupStart+snapshot.hostInvitationCleanup.size()];
             for(int i=0;i<snapshot.records.size();i++){NativeCore.RecoveryRecord record=snapshot.records.get(i);titles[i]=(record.isIdentity()?"Identity · ":"Device pair · ")+record.generation;}
             if(snapshot.pendingClientTicket!=null){titles[snapshot.records.size()]="Review pending host approval";titles[snapshot.records.size()+1]="Cancel pending pairing locally";}
-            if(snapshot.pendingHostTicket!=null)titles[titles.length-1]="Close this device's host invitation";
+            if(snapshot.pendingHostTicket!=null)titles[cleanupStart-1]="Close this device's host invitation";
+            for(int i=0;i<snapshot.hostInvitationCleanup.size();i++)titles[cleanupStart+i]="Invitation cleanup · "+snapshot.hostInvitationCleanup.get(i).inviteId;
             AlertDialog list=new AlertDialog.Builder(mActivity).setTitle("Remote Play status")
                     .setItems(titles,(dialog,index)->{
                         mIdentityDialog=null;
-                        if(index<snapshot.records.size())showPairingRecovery(snapshot,snapshot.records.get(index),owner);
+                        if(index>=cleanupStart)showDurableInvitationCleanup(snapshot,snapshot.hostInvitationCleanup.get(index-cleanupStart),owner);
+                        else if(index<snapshot.records.size())showPairingRecovery(snapshot,snapshot.records.get(index),owner);
                         else if(snapshot.pendingClientTicket!=null&&index==snapshot.records.size())showPeerApproval(snapshot.pendingClientTicket,owner);
                         else if(snapshot.pendingClientTicket!=null&&index==snapshot.records.size()+1)cancelPendingPeer(snapshot.pendingClientTicket,owner);
                         else closeHostInvitation(snapshot.pendingHostTicket,owner);
@@ -296,6 +299,22 @@ public final class GameHubController implements AutoCloseable {
             mIdentityDialog=list;list.setOnCancelListener(dialog->cancelIdentityReview());
             mIdentityExpiry=()->{if(mIdentityFlow==owner)cancelIdentityReview();};mMain.postDelayed(mIdentityExpiry,remaining);list.show();
         });
+    }
+    private void showDurableInvitationCleanup(NativeCore.RecoverySnapshot snapshot,NativeCore.HostInvitationCleanup invitation,java.util.concurrent.atomic.AtomicBoolean owner){
+        if(mIdentityFlow!=owner||!owner.get()||!identityUiAvailable()||android.os.SystemClock.elapsedRealtime()>=snapshot.expires){cancelIdentityReview();return;}
+        boolean expired=invitation.expired||invitation.expiresAt<=System.currentTimeMillis();
+        AlertDialog.Builder builder=new AlertDialog.Builder(mActivity).setTitle("Recover host invitation cleanup")
+                .setMessage("Invitation: "+invitation.inviteId+"\nSigning generation: "+invitation.identityGeneration+"\nService: "+invitation.audience+"\nExpires: "+java.text.DateFormat.getDateTimeInstance().format(new java.util.Date(invitation.expiresAt))+"\n\nClose this exact invitation on the service and clear its retained cleanup record. Existing pairs are not revoked."+(expired?"\n\nThis invitation has expired. Expiry reconciliation is not available in this version; its record remains retained.":""))
+                .setNegativeButton("Later",(dialog,which)->cancelIdentityReview());
+        if(!expired&&!snapshot.namespaceProvenanceMissing&&snapshot.relayRetirementAvailable)builder.setPositiveButton("Close and finish cleanup",(dialog,which)->{
+            mIdentityDialog=null;
+            if(mIdentityFlow!=owner||!owner.get()||!identityUiAvailable()){cancelIdentityReview();return;}
+            mCore.recoverHostInvitation(snapshot,invitation,owner::get,response->{
+                if(mIdentityFlow!=owner||!owner.get())return;cancelIdentityReview();
+                if(identityUiAvailable())identityNotice("ok".equals(response.optString("status"))?"Invitation cleanup completed. Reload status to inspect remaining work.":"Cleanup could not be confirmed. Reload status before retrying.");
+            });
+        });
+        AlertDialog alert=builder.create();mIdentityDialog=alert;alert.setOnCancelListener(dialog->cancelIdentityReview());alert.show();
     }
     private void closeHostInvitation(String ticket,java.util.concurrent.atomic.AtomicBoolean owner){
         if(mIdentityFlow!=owner||!owner.get()||!identityUiAvailable()){cancelIdentityReview();return;}
