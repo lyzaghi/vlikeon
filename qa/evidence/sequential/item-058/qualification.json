@@ -72,7 +72,9 @@
     "Native status/UI gates remote retirement on configured origin availability; Android expanded action selector uses private versioned JNI entry; current empty allowlist refuses network work",
     "Acknowledged native epoch invalidation bypasses LocalHost request mutex; invalid/unissued handles refuse and handle allocation cannot wrap",
     "iOS weak provider contexts close vault access through observed protected-data transition invalidation and publish unlock only after same-transition native acknowledgments",
-    "Android/iOS explicit dialog cancellation invalidates native epoch/token before queued review cleanup; cooperative cancellation and uncertain commits still require reconciliation"
+    "Android/iOS explicit dialog cancellation invalidates native epoch/token before queued review cleanup; cooperative cancellation and uncertain commits still require reconciliation",
+    "Native public status preserves retained session-ownership debt as a boolean; typed mobile records and native details do not infer release from restart or age",
+    "Game Hub startup inspection source reads status with its own cancellation lifetime and presents native attention/uninspected indicators without executing cleanup or querying vault/network"
   ],
   "build_executed": false,
   "tests_executed": false,

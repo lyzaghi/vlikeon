@@ -51,6 +51,8 @@ public final class GameHubController implements AutoCloseable {
     private java.util.concurrent.atomic.AtomicBoolean mIdentityFlow;
     private AlertDialog mIdentityDialog;
     private Runnable mIdentityExpiry;
+    private boolean mPairingStartupChecked;
+    private java.util.concurrent.atomic.AtomicBoolean mPairingStartupOwner;
     private final Runnable mPauseFallback;
     private final TabObserver mTabObserver=new TabObserver(){
         @Override public void onShown(Tab tab,int type){resume();}
@@ -62,7 +64,7 @@ public final class GameHubController implements AutoCloseable {
     public boolean isClosed(){return mClosed;}
     public void onActivityPause(){mActivityResumed=false;suspend();}
     public void onActivityResume(){mActivityResumed=true;resume();}
-    public void resume(){if(!mClosed&&mActivityResumed&&mTab!=null&&mActivity.getActivityTab()==mTab&&!mTab.isIncognito()&&!mActivity.isFinishing()){mMain.removeCallbacks(mPauseFallback);mSuspension=null;mCore.setForeground(true);}}
+    public void resume(){if(!mClosed&&mActivityResumed&&mTab!=null&&mActivity.getActivityTab()==mTab&&!mTab.isIncognito()&&!mActivity.isFinishing()){mMain.removeCallbacks(mPauseFallback);mSuspension=null;mCore.setForeground(true);inspectPairingStartup();}}
     public void open(){
         Tab current=mActivity.getActivityTab();
         if(mClosed||mOpening||mActivity.getTabModelSelector().isIncognitoSelected()||current!=null&&current.isIncognito())return;
@@ -152,6 +154,16 @@ public final class GameHubController implements AutoCloseable {
                 &&mActivity.getActivityTab()==mTab&&!mTab.isIncognito()&&mChannel!=null&&owns(mChannel)
                 &&keyguard!=null&&!keyguard.isDeviceLocked()&&user!=null&&user.isUserUnlocked();
     }
+    private void inspectPairingStartup(){
+        if(mPairingStartupChecked||mPairingStartupOwner!=null||mIdentityFlow!=null||mIdentityDialog!=null||!identityUiAvailable())return;
+        mPairingStartupChecked=true;java.util.concurrent.atomic.AtomicBoolean owner=new java.util.concurrent.atomic.AtomicBoolean(true);mPairingStartupOwner=owner;
+        mCore.pairingRecoveryStatus(owner::get,(snapshot,error)->{
+            if(mPairingStartupOwner!=owner||!owner.get())return;mPairingStartupOwner=null;owner.set(false);
+            if(!identityUiAvailable()||mIdentityFlow!=null||mIdentityDialog!=null)return;
+            if(snapshot==null||android.os.SystemClock.elapsedRealtime()>=snapshot.expires)identityNotice("Remote Play status could not be inspected. Reopen the Game Hub menu and choose status and recovery. Local play remains available.");
+            else if(snapshot.needsAttention())identityNotice("Remote Play setup or cleanup needs attention. Reopen the Game Hub menu and choose status and recovery.");
+        });
+    }
     /** Reachable only by reopening the native Chrome Game Hub menu item. */
     private void showNativeHubActions(){
         if(!identityUiAvailable()||mIdentityDialog!=null||mIdentityFlow!=null)return;
@@ -228,6 +240,7 @@ public final class GameHubController implements AutoCloseable {
         if("fence_generation".equals(record.nextStep))message+="\n\nDisabling this generation is permanent. Disabling an identity also disables its pairs. This does not confirm that connections stopped or keys were deleted.";
         if("remove_material".equals(record.nextStep))message+="\n\nPermanently delete only this generation's key from the device vault. This action cannot restore it. Removal is allowed only after all stop/revocation confirmations already exist.";
         if("revoke_relay".equals(record.nextStep))message+=snapshot.relayRetirementAvailable?"\n\nRequest revocation of this pair from the configured connection service. Only the exact pair acknowledgment completes this step; device keys are not deleted.":"\n\nThis version has no configured connection service for completing revocation.";
+        if(record.sessionRecoveryRequired)message+="\n\nAn earlier connection has not been confirmed stopped. Complete recovery before starting another session. Restarting alone does not clear it.";
         AlertDialog.Builder builder=new AlertDialog.Builder(mActivity).setTitle("Remote Play record").setMessage(message)
                 .setNegativeButton(android.R.string.cancel,(dialog,which)->cancelIdentityReview());
         String actionTitle="revoke_relay".equals(record.nextStep)?"Revoke on service":("remove_material".equals(record.nextStep)?"Delete this generation's key":("fence_generation".equals(record.nextStep)?"Disable this generation":"Finish cleanup"));
@@ -255,6 +268,7 @@ public final class GameHubController implements AutoCloseable {
         mIdentityDialog=alert;alert.setOnDismissListener(dialog->{if(mIdentityDialog==alert)mIdentityDialog=null;});alert.show();
     }
     public void suspend(){
+        if(mPairingStartupOwner!=null){mPairingStartupOwner.set(false);mPairingStartupOwner=null;mPairingStartupChecked=false;}
         cancelIdentityReview();
         if(mClosed)return;
         mCore.setForeground(false);
@@ -266,6 +280,7 @@ public final class GameHubController implements AutoCloseable {
         }else mCore.suspend();
     }
     private void disconnect(){
+        if(mPairingStartupOwner!=null){mPairingStartupOwner.set(false);mPairingStartupOwner=null;mPairingStartupChecked=false;}
         cancelIdentityReview();
         mCore.setForeground(false);
         ++mHandshake;

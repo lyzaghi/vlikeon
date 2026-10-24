@@ -178,10 +178,12 @@ public final class NativeCore {
     interface RecoveryReply { void accept(RecoverySnapshot snapshot,String error); }
     static final class RecoveryRecord {
         final String profile,device,kind,item,generation,phase,key,nextStep;
+        final boolean sessionRecoveryRequired;
         private RecoveryRecord(JSONObject record,String expectedProfile,String expectedDevice,JSONObject action) throws Exception {
             JSONObject address=record.getJSONObject("address");profile=address.getString("profile");device=address.getString("device");
             kind=address.getString("kind");item=address.getString("id");generation=address.getString("generation");phase=record.getString("phase");key=record.getString("public_key");
             nextStep=action==null?null:action.getString("next_step");
+            sessionRecoveryRequired=record.getBoolean("session_recovery_required");
             if(!profile.equals(expectedProfile)||!device.equals(expectedDevice)||!canonicalPairingId(profile)||!canonicalPairingId(device)||!canonicalPairingId(item)||!canonicalPairingId(generation)
                     ||!("device_signing".equals(kind)||"pair_encryption".equals(kind))||("device_signing".equals(kind)&&!item.equals(device))
                     ||!java.util.Arrays.asList("reserved","writing","material_ready","active","revoking","retired").contains(phase)||!key.matches("[A-Za-z0-9_-]{43}")
@@ -198,6 +200,7 @@ public final class NativeCore {
     static final class RecoverySnapshot {
         final long revision,expires;final java.util.List<RecoveryRecord> records;
         final boolean relayRetirementAvailable;
+        boolean needsAttention(){for(RecoveryRecord record:records)if(record.sessionRecoveryRequired||(record.nextStep!=null&&!"revalidate_before_use".equals(record.nextStep)))return true;return false;}
         private RecoverySnapshot(JSONObject status,String profile,long deadline) throws Exception {
             if(status.getInt("credential_protocol")!=1||status.getInt("recovery_protocol")!=1||!profile.equals(status.getString("profile_id"))||!canonicalPairingId(status.getString("device_id")))throw new IllegalStateException();
             revision=status.getLong("revision");expires=deadline;

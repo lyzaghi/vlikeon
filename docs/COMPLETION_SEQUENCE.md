@@ -2,6 +2,14 @@
 
 ## Current sequence — 1–109 outstanding tasks
 
+Item 58 now authors read-only Game Hub startup inspection and native attention
+indicators/notices, with separate cancellation lifetimes. Status exposes retained
+session-ownership debt so active records are not misclassified as ready for a new
+receiver after restart. No automatic cleanup, activation, key replacement or
+ownership reclamation is performed. No startup/UI/native/SQL/compiler/build/test
+was executed. Actual reconciliation owners and qualification remain due; item 58
+and the complete original 51–109 scope remain open.
+
 Item 58 now authors acknowledged native epoch invalidation independent of the
 request mutex. iOS closes protected-data access until live provider handles have
 been invalidated, preserving transition ordering across HTTP waits; explicit

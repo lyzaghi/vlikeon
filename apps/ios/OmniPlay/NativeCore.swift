@@ -21,12 +21,14 @@ struct NativeIdentityReview {
 }
 struct NativeRecoveryRecord {
     let address:[String:Any],phase:String,publicKey:String,nextStep:String?
+    let sessionRecoveryRequired:Bool
     var generation:String{address["generation"] as? String ?? ""}
     var isIdentity:Bool{address["kind"] as? String == "device_signing"}
 }
 struct NativeRecoverySnapshot {
     let revision:UInt64,device:String,records:[NativeRecoveryRecord],expires:DispatchTime
     let relayRetirementAvailable:Bool
+    var needsAttention:Bool{records.contains{$0.sessionRecoveryRequired || ($0.nextStep != nil && $0.nextStep != "revalidate_before_use")}}
 }
 
 /// Only this native object can call path-bearing authorization APIs. Each profile's
@@ -199,12 +201,13 @@ final class NativeCore {
                           let item=address["id"] as? String,UUID(uuidString:item)?.uuidString.lowercased()==item,
                           let kind=address["kind"] as? String,["device_signing","pair_encryption"].contains(kind),(kind != "device_signing" || item==device),
                           let phase=record["phase"] as? String,["reserved","writing","material_ready","active","revoking","retired"].contains(phase),
-                          let key=record["public_key"] as? String,key.count==43 else{throw OmniFailure.message("Bản ghi phục hồi không hợp lệ.")}
+                          let key=record["public_key"] as? String,key.count==43,
+                          let sessionRecoveryRequired=record["session_recovery_required"] as? Bool else{throw OmniFailure.message("Bản ghi phục hồi không hợp lệ.")}
                     let action=next.removeValue(forKey:generation)
                     if let action=action{
                         guard phase != "retired",NSDictionary(dictionary:action.0).isEqual(to:address) else{throw OmniFailure.message("Bản ghi và kế hoạch phục hồi không khớp.")}
                     }else if phase != "retired"{throw OmniFailure.message("Thiếu kế hoạch phục hồi cho bản ghi hiện tại.")}
-                    parsed.append(NativeRecoveryRecord(address:address,phase:phase,publicKey:key,nextStep:action?.1))
+                    parsed.append(NativeRecoveryRecord(address:address,phase:phase,publicKey:key,nextStep:action?.1,sessionRecoveryRequired:sessionRecoveryRequired))
                 }
                 guard next.isEmpty,owner.active,DispatchTime.now()<expires else{throw OmniFailure.message("Trạng thái phục hồi đã hết hạn.")}
                 let snapshot=NativeRecoverySnapshot(revision:revision.uint64Value,device:device,records:parsed,expires:expires,relayRetirementAvailable:relayAvailable)

@@ -1155,6 +1155,34 @@ was executed. Event ordering, blocked registry/request lanes, rapid lock/unlock,
 late results, context release and cancellation races remain device-qualification
 requirements. All earlier incomplete scope remains open.
 
+## Startup inspection and retained session debt
+
+Native status now exposes only a boolean indicating retained journal session
+ownership, without exporting a session capability. Typed Android/iOS recovery
+records preserve it. An active record with a RevalidateBeforeUse plan can still
+carry abandoned ownership; absence of another cleanup action must not hide that
+debt or imply that a new receiver can replace it. Native detail dialogs explain
+the unresolved earlier connection and do not clear ownership by restart/age.
+
+Each Game Hub controller authors one read-only startup inspection after its
+trusted foreground UI/channel is ready. iOS marks the native identity menu as
+needing attention or not yet inspected; opening status again refreshes that
+indicator. Android presents a native notice pointing to status/recovery when
+attention is needed or status cannot be inspected. Plain active records without
+retained ownership and retired history alone do not trigger cleanup attention.
+Incomplete candidate setup does trigger review, not automatic abandonment.
+
+Startup inspection has its own transient lifetime, cancelled on suspension or
+disconnect, so it cannot deliver a stale notice into another document/activity.
+It does not run a recovery step, activate a candidate, replace a key, contact a
+relay, query the vault or synthesize a producer-retired receipt. Foreground
+admission failures remain "not inspected" rather than "clean". Actual startup
+reconciliation/retirement dispatch still requires the missing native owners.
+
+No startup callback, dialog, native/SQL read, compiler, build or test was executed.
+Foreground scheduling, interruption, corrupt/locked journals, retained session
+recovery and real device presentation remain qualification requirements.
+
 ## Remaining implementation and qualification
 
 - Journal/executor/lease/writer product integration, authority epochs, actual native owner

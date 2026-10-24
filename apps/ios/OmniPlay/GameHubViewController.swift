@@ -22,6 +22,8 @@ final class GameHubViewController: UIViewController, WKNavigationDelegate, WKUID
     private var pairingFlow:NativeDocumentLifetime?
     private weak var pairingAlert:UIAlertController?
     private var pairingExpiry:DispatchWorkItem?
+    private var pairingStartupChecked=false
+    private var pairingStartupOwner:NativeDocumentLifetime?
     override var prefersStatusBarHidden:Bool{fullScreenGame}
     override var prefersHomeIndicatorAutoHidden:Bool{fullScreenGame}
     var openWebsite: ((URL)->Void)?
@@ -126,6 +128,7 @@ final class GameHubViewController: UIViewController, WKNavigationDelegate, WKUID
             case .failure(let error):self.cancelPairingIdentity();self.pairingNotice(error.localizedDescription)
             case .success(let snapshot):
                 guard DispatchTime.now()<snapshot.expires else{self.cancelPairingIdentity();return}
+                self.applyPairingStatusBadge(snapshot)
                 if snapshot.records.isEmpty{self.cancelPairingIdentity();self.pairingNotice("Thiết bị này chưa có danh tính hoặc cặp Remote Play.");return}
                 let sheet=UIAlertController(title:"Trạng thái Remote Play",message:"Chọn bản ghi để xem chi tiết. Đọc trạng thái không làm thay đổi khóa hoặc kết nối.",preferredStyle:.actionSheet)
                 self.pairingAlert=sheet
@@ -152,6 +155,7 @@ final class GameHubViewController: UIViewController, WKNavigationDelegate, WKUID
         if record.nextStep=="fence_generation"{message += "\n\nVô hiệu hóa là vĩnh viễn đối với thế hệ này. Danh tính bị vô hiệu hóa sẽ vô hiệu hóa các cặp của nó; thao tác này chưa xác nhận kết nối đã dừng hoặc khóa đã được xóa."}
         if record.nextStep=="remove_material"{message += "\n\nXóa vĩnh viễn khóa của đúng thế hệ này khỏi kho khóa thiết bị. Không thể khôi phục bằng thao tác này; hệ thống chỉ cho phép xóa sau khi đã có đủ xác nhận dừng và thu hồi."}
         if record.nextStep=="revoke_relay"{message += snapshot.relayRetirementAvailable ? "\n\nGửi yêu cầu thu hồi cặp này đến dịch vụ kết nối đã cấu hình. Chỉ hoàn tất khi nhận đúng xác nhận của cặp; bước này chưa xóa khóa thiết bị.":"\n\nPhiên bản này chưa cấu hình dịch vụ kết nối để hoàn tất thu hồi."}
+        if record.sessionRecoveryRequired{message += "\n\nPhiên kết nối cũ chưa được xác nhận đã dừng. Cần hoàn tất phục hồi trước khi tạo phiên mới; khởi động lại không tự giải phóng phiên cũ."}
         let alert=UIAlertController(title:"Chi tiết Remote Play",message:message,preferredStyle:.alert);pairingAlert=alert
         alert.addAction(UIAlertAction(title:"Đóng",style:.cancel){[weak self]_ in self?.cancelPairingIdentity()})
         if canAdvance{
@@ -178,9 +182,30 @@ final class GameHubViewController: UIViewController, WKNavigationDelegate, WKUID
     }
     @objc private func willResign(){suspend()}
     @objc private func didBackground(){suspend()}
-    @objc private func didActivate(){if !pendingSuspend&&hubVisible&&UIApplication.shared.applicationState == .active&&webView?.isHidden != true{core.setForeground(true)}}
+    @objc private func didActivate(){if !pendingSuspend&&hubVisible&&UIApplication.shared.applicationState == .active&&webView?.isHidden != true{core.setForeground(true);inspectPairingStartup()}}
+    private func inspectPairingStartup(){
+        guard !pairingStartupChecked,pairingStartupOwner==nil,pairingFlow==nil,status.isHidden,UIApplication.shared.isProtectedDataAvailable else{return}
+        pairingStartupChecked=true;let owner=NativeDocumentLifetime();pairingStartupOwner=owner
+        core.pairingRecoveryStatus(owner:owner){[weak self] result in
+            guard let self=self,self.pairingStartupOwner === owner,owner.active else{return}
+            self.pairingStartupOwner=nil;owner.invalidate()
+            guard self.hubVisible,UIApplication.shared.applicationState == .active else{return}
+            switch result{
+            case .success(let snapshot):
+                self.applyPairingStatusBadge(snapshot)
+            case .failure:
+                self.pairingButton.setTitle("Remote Play · Chưa kiểm tra được",for:.normal);self.pairingButton.accessibilityLabel="Chưa kiểm tra được Remote Play. Mở Trạng thái và phục hồi."
+            }
+        }
+    }
+    private func applyPairingStatusBadge(_ snapshot:NativeRecoverySnapshot){
+        guard DispatchTime.now()<snapshot.expires else{pairingButton.setTitle("Remote Play · Chưa kiểm tra được",for:.normal);pairingButton.accessibilityLabel="Trạng thái Remote Play đã hết hạn. Mở Trạng thái và phục hồi.";return}
+        pairingButton.setTitle(snapshot.needsAttention ? "Remote Play · Cần kiểm tra":"Danh tính Remote Play",for:.normal)
+        pairingButton.accessibilityLabel=snapshot.needsAttention ? "Remote Play cần kiểm tra. Mở Trạng thái và phục hồi.":"Danh tính Remote Play. Mở thiết lập hoặc trạng thái và phục hồi."
+    }
     override func viewDidAppear(_ animated:Bool){super.viewDidAppear(animated);hubVisible=true;didActivate()}
     func suspend(completion:@escaping()->Void = {}){
+        if let owner=pairingStartupOwner{owner.invalidate();pairingStartupOwner=nil;pairingStartupChecked=false}
         cancelPairingIdentity()
         core.setForeground(false)
         if pendingSuspend{suspendWaiters.append(completion);return}

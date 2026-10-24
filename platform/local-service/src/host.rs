@@ -54,7 +54,8 @@ impl LocalHost {
         let records:Vec<_>=snapshot.records().iter().map(|record|json!({
             "address":record.address(),"phase":record.phase(),"public_key":record.public_key(),
             "writer_retired":record.writer_retired(),"material_absent":record.material_absent(),
-            "local_retired":record.local_retired(),"relay_retired":record.relay_retired()
+            "local_retired":record.local_retired(),"relay_retired":record.relay_retired(),
+            "session_recovery_required":record.signal_session().is_some()
         })).collect();
         Ok(json!({"credential_protocol":1,"profile_id":self.profile_id,"device_id":self.database.device_id,
             "revision":snapshot.revision(),"policy_available":omniplay_core::stream_signal_authority::require_installed_pairing_policy().is_ok(),"records":records,
