@@ -1,5 +1,30 @@
 # Task 6 — actual browser runtime qualification in progress
 
+On the owner's explicit quota recheck, normal approval and Antigravity execution
+worked again. No usage percentage was available. Codex compiled a further local
+candidate that initializes the network utility's MTA COM infrastructure before
+LowerToken, retaining all sandbox policies and the preceding cosmetic-call
+guard. Antigravity's strict fresh-profile test failed: OLE32 initialization
+still crashed, now on the main thread before LowerToken. This rejects a simple
+delayed-lockdown timing explanation as sufficient and does not qualify the
+candidate. It was not promoted to the product patch queue. Further loader
+diagnostics are required; task 6 remains open.
+
+Latest local candidate evidence: a compiled startup-recovery hook did not fix
+fresh-profile startup and was reverted. A subsequent network-only candidate
+skips the cosmetic USER32 startup cursor calls without changing sandbox policy.
+Its fresh-profile Game Hub rendered, but Network Service still crashed loading
+OLE32.dll for CoInitializeEx on a shared COM worker. Offline dump analysis
+confirmed error 1114 again; the underlying initialization cause is unproven.
+Antigravity's attribution of that error to lockdown policy is an inference,
+not established by the dump, and is not accepted as a root-cause finding.
+
+Neither candidate is promoted to the product patch queue. The second test's
+ordinary target remained about:blank, so its API-absence check is insufficient.
+A stricter local harness now requires the exact controlled data-page title,
+body, URL and completed load, and rejects fatal/network-service log entries.
+That revised harness is authored but has not executed. Task 6 remains open.
+
 The owner authorized starting task 6 while the full Linux and Mac build attempts
 continue independently. This task covers actual Game Hub, tabs, normal/private
 profiles, permission boundaries and the native bridge. It remains unchecked.
