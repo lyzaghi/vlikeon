@@ -1,5 +1,13 @@
 # Windows decoder v3 parent source — item 56
 
+Retirement source now exposes broker `revoke_until` and worker
+`stop_confirmed_until`/`close_until`, preserving one supplied caller budget across
+Stop delivery, process wait and thread reaping. Stop acknowledgement plus process
+exit and joined I/O threads are required; a late or partial result stays
+unconfirmed. Cleanup retries do not resend Stop after the original revocation.
+This does not qualify end-to-end session retirement, producer shutdown, or runtime
+timing; build/test remain deferred.
+
 Source only. No compiler, helper/decoder/media process, pipe, clock, device or
 test was executed. No current service/UI/receiver transport calls this candidate.
 

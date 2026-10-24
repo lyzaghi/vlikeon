@@ -265,21 +265,40 @@ impl VideoWorker{
         if !(1..=10_000_000).contains(&fence){self.shared.close();return Err(failure());}Ok(fence)
     }
     pub fn stop_confirmed(&mut self)->Result<()>{
-        if self.stop_acknowledged{return self.close();}
-        if self.shared.revoking.load(Ordering::Acquire){return Err(failure());}
-        *self.shared.stop_deadline.lock().map_err(|_|failure())?=Some(Instant::now()+Duration::from_millis(1000));
+        self.stop_confirmed_until(Instant::now()+Duration::from_millis(1000))
+    }
+    /// A session owner supplies its original retirement deadline. Stop RPC,
+    /// process wait and I/O reaping share that budget; retries never invent an ack.
+    pub fn stop_confirmed_until(&mut self,deadline:Instant)->Result<()>{
+        if self.stop_acknowledged{return self.close_until(deadline);}
+        if self.shared.revoking.load(Ordering::Acquire){let _=self.close_until(deadline);return Err(failure());}
+        let stop_deadline=deadline.min(Instant::now()+Duration::from_millis(1000));
+        *self.shared.stop_deadline.lock().map_err(|_|failure())?=Some(stop_deadline);
         self.shared.revoking.store(true,Ordering::Release);
         if let Ok(mut packets)=self.shared.packets.lock(){packets.queue.clear();packets.bytes=0;}
         if let Ok(mut frames)=self.shared.frames.lock(){frames.clear();}
-        let receipt=self.call(STOP,Vec::new(),Duration::from_millis(750));
-        self.stop_acknowledged=receipt.as_ref().is_ok_and(|bytes|bytes.as_slice()==[0,0,0,0]);
-        let retired=self.close();
+        // call() reserves another 50 ms for local reply delivery. Do not turn
+        // that allowance into a deadline extension or send with no time left.
+        if let Some(budget)=stop_deadline.saturating_duration_since(Instant::now()).checked_sub(Duration::from_millis(50)){
+            if !budget.is_zero(){
+                let receipt=self.call(STOP,Vec::new(),budget.min(Duration::from_millis(750)));
+                self.stop_acknowledged=receipt.as_ref().is_ok_and(|bytes|bytes.as_slice()==[0,0,0,0]);
+            }
+        }
+        let retired=self.close_until(stop_deadline);
         if !self.stop_acknowledged{return Err(failure());}retired
     }
     pub fn close(&mut self)->Result<()>{
-        self.shared.close();self.sender.take();let result=self.shared.process.stop(1000);
+        self.close_until(Instant::now()+Duration::from_millis(1000))
+    }
+    /// Fence even an expired request, but do not claim timely retirement from
+    /// timeout, an unjoined thread, or a process termination request alone.
+    pub fn close_until(&mut self,deadline:Instant)->Result<()>{
+        self.shared.close();self.sender.take();
+        let remaining=deadline.saturating_duration_since(Instant::now()).as_millis().min(1000)as u32;
+        let result=self.shared.process.stop(remaining);
         let mut retained=Vec::new();for thread in self.threads.drain(..){if thread.is_finished(){self.join_failed|=thread.join().is_err();}else{retained.push(thread);}}self.threads=retained;
-        if !self.threads.is_empty()||self.join_failed{return Err(failure());}result
+        if !self.threads.is_empty()||self.join_failed||Instant::now()>=deadline{return Err(failure());}result
     }
 }
 impl Drop for VideoWorker{fn drop(&mut self){let _=self.close();}}

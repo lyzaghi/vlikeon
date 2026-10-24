@@ -3,7 +3,7 @@
 use omniplay_contracts::{ErrorCode,PlatformError,Result};
 use omniplay_stream_input::video_client::{VideoOwner,VideoPacket,VideoProfile,VideoWorker};
 use omniplay_streaming::{native_video::{Binding,FrameMailbox,PixelFormat,Profile},native_video_colour::tight_nv12};
-use std::{sync::Arc,time::Duration};
+use std::{sync::Arc,time::{Duration,Instant}};
 
 pub enum PumpResult{NoFrame,Accepted,DroppedRaw}
 /// This type deliberately does not promise negotiated/RTP-ready output. The
@@ -56,7 +56,10 @@ impl WindowsVideoFrames{
         }
     }
     pub fn revoke(&mut self)->Result<()>{
-        self.closed=true;let mailbox=self.mailbox.close();let stopped=self.worker.stop_confirmed();mailbox?;stopped
+        self.revoke_until(Instant::now()+Duration::from_millis(1000))
+    }
+    pub fn revoke_until(&mut self,deadline:Instant)->Result<()>{
+        self.closed=true;let mailbox=self.mailbox.close();let stopped=self.worker.stop_confirmed_until(deadline);mailbox?;stopped
     }
 }
 impl Drop for WindowsVideoFrames{fn drop(&mut self){let _=self.mailbox.close();let _=self.worker.close();}}
@@ -82,7 +85,10 @@ impl WindowsOwnedVideo{
         }
     }
     pub fn revoke(&mut self)->Result<()>{
-        self.closed=true;self.worker.stop_confirmed()
+        self.revoke_until(Instant::now()+Duration::from_millis(1000))
+    }
+    pub fn revoke_until(&mut self,deadline:Instant)->Result<()>{
+        self.closed=true;self.worker.stop_confirmed_until(deadline)
     }
 }
 impl Drop for WindowsOwnedVideo{fn drop(&mut self){let _=self.worker.close();}}
@@ -116,7 +122,10 @@ impl WindowsVideoDecoder{
         }
     }
     pub fn revoke(&mut self)->Result<()>{
-        self.closed=true;self.worker.stop_confirmed()
+        self.revoke_until(Instant::now()+Duration::from_millis(1000))
+    }
+    pub fn revoke_until(&mut self,deadline:Instant)->Result<()>{
+        self.closed=true;self.worker.stop_confirmed_until(deadline)
     }
 }
 impl Drop for WindowsVideoDecoder{fn drop(&mut self){let _=self.worker.close();}}

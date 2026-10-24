@@ -3,6 +3,17 @@
 Status: initial source primitives, not an implemented or qualified end-to-end
 service. Build and test remain deferred by the owner. Streaming remains disabled.
 
+The Windows video worker now has deadline-bearing Stop/close methods, exposed by
+all three private broker video adapters. One supplied deadline bounds intentional
+RPC/process waits, including the local reply allowance; late completion cannot
+produce a successful retirement result. Original Stop acknowledgement, process
+exit and finished/joined I/O threads are all required. Uncertain owners remain
+unconfirmed; explicit retries may reap them without resending Stop or inventing
+an acknowledgement. This does not confirm external capture producers, signaling,
+ICE, audio, input or gamepad retirement. Default/Drop cleanup remains best effort
+and is not a caller-deadline receipt. No timing/runtime/build/test verification
+was performed; full service integration remains open.
+
 `platform/streaming/src/native_video.rs` supplies private Rust primitives for
 native adapters. It does not deserialize renderer or remote commands. Its codec
 selection accepts bounded backend capability records and receiver codec records,

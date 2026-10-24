@@ -2,6 +2,8 @@
 
 ## Current sequence — 1–109 outstanding tasks
 
+Source checkpoint: Windows video helper retirement now accepts one caller deadline across Stop RPC, process wait and I/O reaping. Raw-frame, owned-capture and viewer-decoder broker wrappers expose `revoke_until`. Missing Stop acknowledgement, expired completion, pending threads or a failed join remain errors; a retry can reap the same owner but cannot manufacture an acknowledgement. This prepares component retirement only, not full session retirement or transport integration. Build/test remain deferred.
+
 Source checkpoint: saved-pair recovery no longer asks mobile users to guess the local role. Native status derives optional host/client metadata from the historically verified signed grant, matching pair ID, document hash and the record's public identity. Android/iOS select only the corresponding re-review path; missing role metadata leaves cleanup readable without enabling resume. This supersedes the earlier manual role selector. Fresh vault/role/grant checks and explicit peer/permission consent remain mandatory. No build/test or transport enablement occurred.
 
 Source checkpoint: Android saved-pair recovery now offers explicit host/client role selection. Host review/activation uses existing JNI actions 6/7 with bounded queue admission and original status/review deadlines, validates the exact record/address/revision and native role, and displays the receiving peer key/fingerprint for renewed independent verification. Permission confirmation remains required and activation consumes the typed review once. Client review now explicitly checks client role. No build/test, relay request, device qualification or release enablement was performed.
