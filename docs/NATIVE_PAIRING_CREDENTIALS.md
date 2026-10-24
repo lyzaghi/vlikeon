@@ -1840,6 +1840,17 @@ this checkpoint.
 
 ## Remaining implementation and qualification
 
+Writer registration now invokes transactional retain_host_invitation before
+network admission while holding the same credential lease and original deadline.
+After intent commit it rechecks lease/deadline/cancellation, then sends register.
+Confirmed success returns committed journal revision to LocalHost. Any later
+error leaves cleanup intent durable, including failures before actual HTTP; no
+false remote acknowledgment is inferred. The old controller revision may then
+need explicit reconciliation before retry. No secret/proof is persisted. Durable
+intent completion after close and restart recovery are not wired yet, so signer
+cleanup can remain blocked until those are implemented. No build/test/SQL/HTTP
+or native runtime operation ran for this source checkpoint.
+
 Credential journal now authors up to eight host invitation cleanup intents,
 containing original identity generation, signed invitation and audience only.
 Validation binds exact retained Active/Revoking identity, signature/audience and

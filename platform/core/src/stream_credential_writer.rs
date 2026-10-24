@@ -68,15 +68,19 @@ impl<'a> NativeCredentialWriter<'a>{
     }
     /// Caller retains the invitation even on uncertain registration outcomes.
     pub fn register_host(&self,expected:u64,address:CredentialAddress,invitation:&mut omniplay_streaming::native_pair_exchange::NativeHostInvitation,
-        relay:&omniplay_streaming::native_relay::NativePairRelay,now:u64,deadline:Instant,cancel:&std::sync::atomic::AtomicBool)->Result<()>{
+        relay:&omniplay_streaming::native_relay::NativePairRelay,now:u64,deadline:Instant,cancel:&std::sync::atomic::AtomicBool)->Result<u64>{
         let started=begin(deadline)?;
         let metadata:omniplay_streaming::Invite=omniplay_streaming::inspect(invitation.signed_invite(),4096)?;
         crate::stream_signal_authority::require_installed_host_grant(&metadata.audience,false)?;
         if cancel.load(std::sync::atomic::Ordering::Acquire){return Err(conflict());}
         let signer=self.active_signer(expected,address)?;check(deadline)?;
+        let retained=journal::retain_host_invitation(self.database,&self.lease,self.profile,expected,address,invitation.signed_invite(),&metadata.audience)?;
+        // The intent must commit before any registration request can leave.
+        self.lease.check(self.database,self.profile)?;check(deadline)?;
+        if cancel.load(std::sync::atomic::Ordering::Acquire){return Err(conflict());}
         invitation.register(relay,&signer,elapsed_now(now,started)?,deadline,cancel)?;
         self.lease.check(self.database,self.profile)?;check(deadline)?;
-        if cancel.load(std::sync::atomic::Ordering::Acquire){return Err(conflict());}Ok(())
+        if cancel.load(std::sync::atomic::Ordering::Acquire){return Err(conflict());}Ok(retained.revision())
     }
     /// Explicit native share action only; returned bearer proof must not enter logs.
     pub fn share_host(&self,expected:u64,address:CredentialAddress,invitation:&omniplay_streaming::native_pair_exchange::NativeHostInvitation,

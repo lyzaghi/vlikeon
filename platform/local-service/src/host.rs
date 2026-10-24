@@ -214,8 +214,9 @@ impl LocalHost {
         let writer=omniplay_core::stream_credential_writer::NativeCredentialWriter::open(&self.database,self.profile_id,store)?;
         // Set before entering a path that can send HTTP; any failure is uncertain.
         pending.registration_attempted=true;
-        writer.register_host(pending.revision,pending.identity,&mut pending.invitation,&relay,omniplay_core::now_ms(),deadline,cancel)?;
-        Ok(json!({"pairing_protocol":1,"ticket":ticket,"registered":true,"share_available":true,"approves_peer":false}))
+        let revision=writer.register_host(pending.revision,pending.identity,&mut pending.invitation,&relay,omniplay_core::now_ms(),deadline,cancel)?;
+        pending.revision=revision;
+        Ok(json!({"pairing_protocol":1,"ticket":ticket,"revision":revision,"registered":true,"share_available":true,"approves_peer":false}))
     }
     /// Explicit trusted native share only. Never renderer JSON, status or logs.
     pub fn native_pairing_host_share(&self,store:&dyn omniplay_streaming::native_credentials::PairingSecretStore,

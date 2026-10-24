@@ -2,6 +2,11 @@
 
 ## Current sequence — 1–109 outstanding tasks
 
+Item 58 host registration now commits signed invitation cleanup intent under the
+same scoped lease before any HTTP and returns the committed revision to its
+controller. Failure retains durable intent; source-only, no build/test. Intent
+completion/restart cleanup/retry reconciliation remain unfinished.
+
 Item 58 credential journal now authors bounded signed host invitation cleanup
 metadata and transactional retain intent, with exact identity/signature/hash and
 namespace validation. Identity recovery waits for retained invitation cleanup.
