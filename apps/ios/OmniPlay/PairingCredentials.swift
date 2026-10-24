@@ -9,17 +9,38 @@ final class PairingCredentials {
     private static let accessLock = NSLock()
     private static var protectedDataAvailable = false
     private static var accessEpoch: UInt64 = 1
+    private static var accessClosed = false
+    private final class WeakProvider {
+        weak var value:PairingCredentials?
+        init(_ value:PairingCredentials){self.value=value}
+    }
+    private static var providers:[WeakProvider]=[]
     private static let nilID = UUID(uuidString: "00000000-0000-0000-0000-000000000000")!
     private let profile: UUID
     private let device: UUID
+    private let nativeHandle:UInt64
     private let lock = NSLock()
     private static let recordBytes = 137
 
-    init(profile: UUID, device: UUID) { self.profile = profile; self.device = device }
+    init(profile: UUID, device: UUID, nativeHandle:UInt64) {
+        self.profile=profile;self.device=device;self.nativeHandle=nativeHandle
+        Self.accessLock.lock();Self.providers.removeAll{$0.value==nil};Self.providers.append(WeakProvider(self));Self.accessLock.unlock()
+    }
     static func setProtectedDataAvailable(_ value: Bool) {
-        accessLock.lock(); defer { accessLock.unlock() }
-        guard accessEpoch < UInt64.max else { protectedDataAvailable=false; return }
-        accessEpoch += 1; protectedDataAvailable = value
+        accessLock.lock()
+        // Close access before invalidating Rust. In particular, unlock must not
+        // publish availability while an older HTTP/consent epoch is still live.
+        protectedDataAvailable=false
+        let exhausted=accessEpoch==UInt64.max
+        if exhausted{accessClosed=true}
+        if !exhausted{accessEpoch += 1};let epoch=accessEpoch
+        providers.removeAll{$0.value==nil};let handles=providers.compactMap{$0.value?.nativeHandle}
+        accessLock.unlock()
+        // Never hold the Swift access lock through Rust registry admission or
+        // queue behind NativeCore's potentially blocked synchronous vault/HTTP.
+        let acknowledgments=handles.map{om_mobile_pairing_invalidate_epoch($0)}
+        accessLock.lock();defer{accessLock.unlock()}
+        if accessEpoch==epoch{protectedDataAvailable=value && !accessClosed && acknowledgments.allSatisfy{$0==1}}
     }
     private static func unlocked() -> Bool {
         accessLock.lock(); defer { accessLock.unlock() }; return protectedDataAvailable
@@ -106,8 +127,8 @@ final class PairingCredentials {
         return Self.permits(epoch) ? status(reply) : -2
     }
     /// Native-only factory. Rust consumes retained context even on rejection.
-    static func callbacks(profile: UUID, device: UUID) -> OmniPairingCredentialCallbacks {
-        let context = Unmanaged.passRetained(PairingCredentials(profile: profile, device: device)).toOpaque()
+    static func callbacks(profile: UUID, device: UUID, nativeHandle:UInt64) -> OmniPairingCredentialCallbacks {
+        let context = Unmanaged.passRetained(PairingCredentials(profile: profile, device: device,nativeHandle:nativeHandle)).toOpaque()
         return OmniPairingCredentialCallbacks(abi_version: 1, context: context, read: { context, address, output, capacity in
             guard let context = context else { return -3 }
             return Unmanaged<PairingCredentials>.fromOpaque(context).takeUnretainedValue().read(address, output: output, capacity: capacity)

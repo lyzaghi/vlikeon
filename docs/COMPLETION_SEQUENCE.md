@@ -2,6 +2,14 @@
 
 ## Current sequence — 1–109 outstanding tasks
 
+Item 58 now authors acknowledged native epoch invalidation independent of the
+request mutex. iOS closes protected-data access until live provider handles have
+been invalidated, preserving transition ordering across HTTP waits; explicit
+Android/iOS cancellation also invalidates before queued review cleanup. Mobile
+handle allocation no longer wraps. No UI/notification/JNI/native/vault/HTTP,
+compiler/build/test was executed. Lifecycle races, producer owners, startup and
+all qualification remain due; full original scope stays unfinished.
+
 Item 58 now connects explicit native relay retirement through LocalHost/mobile
 to pinned-key signed revocation and exact pair/grant receipts. Only validated
 installed origins are used; empty current configuration refuses network work.

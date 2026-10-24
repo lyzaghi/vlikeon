@@ -111,7 +111,7 @@ final class NativeCore {
         // Construct the retained table only inside the consuming call. Rust
         // owns/retires its context on every result, including rejection.
         let result=try unwrap(consume(om_mobile_attach_pairing_credentials_v1(handle,
-            PairingCredentials.callbacks(profile:profileID,device:device))))
+            PairingCredentials.callbacks(profile:profileID,device:device,nativeHandle:handle))))
         return result["attached"] as? Bool == true && (result["credential_abi"] as? NSNumber)?.uint32Value == 1
     }
     /// Native UI only. Existing/uncertain identities require explicit recovery;
@@ -168,6 +168,7 @@ final class NativeCore {
         }
     }
     func cancelPairingIdentityReview(){
+        let owned=handle;if owned != 0{_ = om_mobile_pairing_invalidate_epoch(owned)}
         queue.async{if self.handle != 0{let value=om_mobile_pairing_cancel_identity_review(self.handle);om_mobile_free(value)}}
     }
     /// Read-only native recovery inspection remains available with policy off.

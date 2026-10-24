@@ -100,6 +100,7 @@ public final class NativeCore {
     private static native byte[] nativeCall(int operation, long handle, byte[] input);
     private static native byte[] nativeOpen(byte[] input, SecureCredentials provider);
     private static native byte[] nativePairingScope(long handle);
+    private static native boolean nativePairingInvalidateEpoch(long handle);
     private static native byte[] nativePairingIdentity(int operation,long handle,long revision,byte[] input);
     interface IdentityReply { void accept(IdentityReview review,String error); }
     static final class IdentityReview {
@@ -167,7 +168,12 @@ public final class NativeCore {
             return response;
         },reply);
     }
-    void cancelPairingIdentityReview(){mIo.execute(()->{if(mHandle!=0)try{pairingResponse(nativePairingIdentity(4,mHandle,0,null));}catch(Exception|LinkageError ignored){/* Review remains bounded by epoch/expiry. */}});}
+    void cancelPairingIdentityReview(){
+        // Native epoch/token invalidation bypasses the serialized lane, which
+        // may currently be blocked inside synchronous relay/vault work.
+        try{if(mHandle!=0)nativePairingInvalidateEpoch(mHandle);}catch(LinkageError unavailable){/* UI lifetime is already cancelled; native artifact needs qualification. */}
+        mIo.execute(()->{if(mHandle!=0)try{pairingResponse(nativePairingIdentity(4,mHandle,0,null));}catch(Exception|LinkageError ignored){/* Review remains bounded by epoch/expiry. */}});
+    }
     private static native byte[] nativePairingRecoveryV2(long handle,byte[] input,int budget,int action);
     interface RecoveryReply { void accept(RecoverySnapshot snapshot,String error); }
     static final class RecoveryRecord {

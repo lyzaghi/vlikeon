@@ -56,6 +56,13 @@ typedef struct {
  * Attached is not a pairing/streaming capability and does not unlock the vault.
  */
 OmniBuffer om_mobile_pairing_scope(uint64_t handle);
+/* Trusted native lock/protected-data/cancel transition only. Invalidates the current
+ * provider epoch and permanently cancels its old network token, without waiting
+ * for LocalHost I/O or enabling foreground. Returns 1 for observed invalidation,
+ * unattached or terminally removed handle; 0 for invalid/unavailable registry.
+ * No key/OS callback is made. This is not a backend-stop or rollback receipt.
+ */
+uint8_t om_mobile_pairing_invalidate_epoch(uint64_t handle);
 OmniBuffer om_mobile_attach_pairing_credentials_v1(uint64_t handle,OmniPairingCredentialCallbacks callbacks);
 /* Trusted native controller only, never renderer commands. Status returns
  * bounded public lifecycle metadata. Preparation requires foreground, attached

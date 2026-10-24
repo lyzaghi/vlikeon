@@ -146,6 +146,10 @@ jbyteArray response_bytes(JNIEnv* env,OmniBuffer response){
 
 extern "C" JNIEXPORT void JNICALL
 Java_org_chromium_chrome_browser_omniplay_NativeCore_nativeSetForeground(JNIEnv*,jclass,jlong handle,jboolean foreground){om_mobile_set_foreground(static_cast<uint64_t>(handle),foreground?1:0);}
+extern "C" JNIEXPORT jboolean JNICALL
+Java_org_chromium_chrome_browser_omniplay_NativeCore_nativePairingInvalidateEpoch(JNIEnv*,jclass,jlong handle){
+  return handle>0&&om_mobile_pairing_invalidate_epoch(static_cast<uint64_t>(handle))==1?JNI_TRUE:JNI_FALSE;
+}
 
 extern "C" JNIEXPORT jbyteArray JNICALL
 Java_org_chromium_chrome_browser_omniplay_NativeCore_nativePairingScope(JNIEnv* env,jclass,jlong handle){

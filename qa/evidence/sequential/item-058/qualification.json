@@ -69,7 +69,10 @@
     "Mobile removal ABI observes provider access/foreground epoch; Android/iOS dialogs require explicit permanent-key-removal approval and route only the exact selected admitted generation",
     "LocalHost/mobile relay retirement product path constructs HTTPS transport only from validated installed origins and uses pinned identity, prior writer/local receipts and exact pair/grant acknowledgment",
     "Each mobile availability epoch owns a separate cooperative cancellation token; background/resume and close never uncancel older relay work",
-    "Native status/UI gates remote retirement on configured origin availability; Android expanded action selector uses private versioned JNI entry; current empty allowlist refuses network work"
+    "Native status/UI gates remote retirement on configured origin availability; Android expanded action selector uses private versioned JNI entry; current empty allowlist refuses network work",
+    "Acknowledged native epoch invalidation bypasses LocalHost request mutex; invalid/unissued handles refuse and handle allocation cannot wrap",
+    "iOS weak provider contexts close vault access through observed protected-data transition invalidation and publish unlock only after same-transition native acknowledgments",
+    "Android/iOS explicit dialog cancellation invalidates native epoch/token before queued review cleanup; cooperative cancellation and uncertain commits still require reconciliation"
   ],
   "build_executed": false,
   "tests_executed": false,

@@ -1119,6 +1119,42 @@ No compiler, UI/JNI/native/provider/lease/SQL operation, HTTP request, deploymen
 build or test was executed. Actual writer/session retirement owners, startup
 reconciliation, relay deployment and device/failure qualification remain due.
 
+## Protected-data and explicit-cancel epoch bridge
+
+An acknowledged native epoch invalidation entry now bypasses the LocalHost
+request mutex, making it usable while synchronous relay/vault work is pending.
+It rotates only the scoped provider's existing availability epoch, permanently
+cancels the old token and preserves the host's current foreground setting.
+Registry failure, zero or never-issued handles are not acknowledged. An already
+closed/removed issued handle is terminal; an unattached provider has no in-flight
+pairing work. Mobile handle allocation now refuses overflow permanently instead
+of wrapping and potentially reusing a handle.
+
+iOS provider contexts retain their actual native handle and register weakly for
+protected-data notifications already wired by BackgroundSync. A transition first
+closes Swift vault access, then invalidates every live context's native epoch
+without holding the Swift access lock. Unlock publishes availability only after
+all invalidations are acknowledged and the same Swift transition is still
+current. A later notification cannot be overwritten by an earlier completion;
+epoch exhaustion terminally closes access. This binds observed lock/unlock
+cycles across HTTP waits, not just across individual Keychain calls.
+
+Native Android/iOS dialog cancellation now also invalidates the epoch before
+queuing transient LocalHost review cleanup. Android has a separate private,
+shrinker-retained JNI invalidation call. Waiting behind the request mutex cannot
+delay the cancellation token until after that request has returned. Registry
+contention may still delay the bridge; it is not a hard real-time OS hook.
+
+These changes do not prove an unobserved OS event, preempt synchronous native
+work, stop backends or roll back commits. Revocation may have reached the relay
+or a journal commit may already exist when UI cancellation suppresses its reply.
+Reload/reconcile the same generation; no retirement receipt is manufactured.
+
+No notification/UI/JNI/native/keychain/relay operation, compiler, build or test
+was executed. Event ordering, blocked registry/request lanes, rapid lock/unlock,
+late results, context release and cancellation races remain device-qualification
+requirements. All earlier incomplete scope remains open.
+
 ## Remaining implementation and qualification
 
 - Journal/executor/lease/writer product integration, authority epochs, actual native owner

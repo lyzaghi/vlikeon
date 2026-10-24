@@ -63,7 +63,7 @@ fn open_profile(raw:&[u8],credentials:Option<Arc<credentials::NativeCredentialSt
         let mut registry=hosts().lock().map_err(|_|error(ErrorCode::Internal,"Mobile registry is unavailable"))?;
         if registry.len()>=4||registry.values().any(|entry|entry.profile_id==request.profile_id){return Err(error(ErrorCode::Busy,"This profile is already open, finishing synchronization, or the mobile profile limit was reached"));}
         let value=match credentials{Some(provider)=>LocalHost::open_with_credentials(&request.data_root,request.profile_id,provider)?,None=>LocalHost::open(&request.data_root,request.profile_id)?};
-        let handle=NEXT.fetch_add(1,Ordering::Relaxed);if handle==0{return Err(error(ErrorCode::ResourceLimit,"Mobile handle limit reached"));}
+        let handle=NEXT.fetch_update(Ordering::Relaxed,Ordering::Relaxed,|next|next.checked_add(1)).map_err(|_|error(ErrorCode::ResourceLimit,"Mobile handle limit reached"))?;
         let device_id=value.native_device_id();let lifecycle=value.sync_lifecycle();let ranges=value.asset_ranges();registry.insert(handle,HostEntry{profile_id:request.profile_id,device_id,host:Arc::new(Mutex::new(value)),lifecycle,ranges,background:None,pairing:None,foreground:false,closing:false});Ok(json!({"handle":handle,"profile_id":request.profile_id}))
 }
 
@@ -104,6 +104,23 @@ fn pairing_operation(handle:u64)->Result<(Arc<Mutex<LocalHost>>,Arc<pairing_cred
     let entry=registry.get(&handle).filter(|entry|!entry.closing&&entry.foreground).ok_or_else(||error(ErrorCode::PermissionDenied,"Native pairing requires a live foreground host"))?;
     let provider=entry.pairing.clone().ok_or_else(||error(ErrorCode::UnsupportedCapability,"Native pairing provider is not attached"))?;
     let epoch=provider.operation_epoch()?;Ok((entry.host.clone(),provider,epoch))
+}
+/// Trusted native OS lifecycle/cancel event, independent of LocalHost's request mutex.
+/// Acknowledges epoch invalidation (or an already retired handle), never stop of
+/// a backend or rollback of committed work. Does not enable foreground itself.
+#[no_mangle]
+pub extern "C" fn om_mobile_pairing_invalidate_epoch(handle:u64)->u8{
+    if handle==0{return 0;}
+    let Ok(registry)=hosts().lock()else{return 0;};
+    if handle>=NEXT.load(Ordering::Relaxed){return 0;}
+    if let Some(entry)=registry.get(&handle){
+        if let Some(provider)=&entry.pairing{
+            if entry.closing{provider.close();}else{provider.set_available(entry.foreground);}
+        }
+    }
+    // Not-yet-attached providers have no in-flight pairing calls; removed
+    // entries were terminally closed before registry removal. Handles are unique.
+    1
 }
 /// Native metadata only; intentionally absent from the renderer Command enum.
 #[no_mangle]
