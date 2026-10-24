@@ -2,6 +2,13 @@
 
 ## Current sequence — 1–109 outstanding tasks
 
+Item 58 now authors private versioned Android JNI client pairing dispatch and
+an owned-byte-array serialized caller with size/admission/queue/deadline bounds.
+Cancellation invalidates native epoch before queued cleanup; proof bytes are
+cleared on all caller/native vector paths. No Java/C++/JNI/native/HTTP/build/test
+ran. Actual Android consent UI and iOS client/host wiring remain due; original
+scope is still incomplete.
+
 Item 58 now connects dedicated mobile client begin/ticket-action ABI to the
 LocalHost controller with native-derived epoch/cancellation, bounded proof input
 and exact-ticket local cancellation. Native status exposes pending ticket metadata

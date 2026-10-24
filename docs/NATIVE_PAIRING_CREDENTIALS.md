@@ -1747,6 +1747,32 @@ No ABI invocation, vault/crypto/SQL/network call, compiler, build or test ran.
 Swift/JNI UI callers, peer confirmation, host controller, activation orchestration
 and full recovery/qualification remain unfinished. Current policy stays disabled.
 
+## Android client JNI and serialized caller
+
+A dedicated private versioned JNI entry now bridges native client begin and
+ticket actions. It bounds begin to 16 KiB and actions to 128 bytes, checks the
+action/budget, copies proof into an RAII-wiped native byte vector and never
+converts it to a Java string. Its exact signature is retained by shrinking rules.
+The entry is separate from renderer nativeCall and does not create UI consent.
+
+NativeCore's package-local caller consumes the supplied owned byte array and
+clears it on validation, admission, queue failure, native failure and normal
+completion. Only one normal client operation is admitted at a time, alongside
+the existing total native work bound. Cancel invalidates epoch before queueing
+and can enter while another client operation is pending, subject to that bound.
+The original 25-second caller budget starts before queueing and passes only
+remaining time into Rust; a queued request cannot renew its budget.
+
+The eventual native UI must own/clear its original input and independently verify
+host/comparison/input consent, parse bounded public replies, suppress stale UI
+callbacks and reconcile lost begin tickets through native status. Caller-owned
+aliases of the byte array, UI strings and library copies are outside the wipe
+guarantee. The package-local caller must never be exposed via renderer messaging.
+
+No Java/C++ compiler, JNI/native/crypto/vault/network operation, build or test ran.
+There is no product UI caller yet. Android peer/share UI, iOS client caller and
+host controller/recovery/qualification remain unfinished.
+
 ## Remaining implementation and qualification
 
 - Journal/executor/lease/writer product integration, authority epochs, actual native owner
