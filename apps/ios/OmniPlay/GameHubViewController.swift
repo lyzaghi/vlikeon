@@ -21,6 +21,7 @@ final class GameHubViewController: UIViewController, WKNavigationDelegate, WKUID
     private var pairingButtonHeight:NSLayoutConstraint?
     private var pairingFlow:NativeDocumentLifetime?
     private weak var pairingAlert:UIAlertController?
+    private weak var hostShareView:HostInvitationViewController?
     private var pairingExpiry:DispatchWorkItem?
     private var pairingStartupChecked=false
     private var pairingStartupOwner:NativeDocumentLifetime?
@@ -143,6 +144,11 @@ final class GameHubViewController: UIViewController, WKNavigationDelegate, WKUID
         let alert=UIAlertController(title:registered ? "Đã đăng ký lời mời" : "Đăng ký lời mời host?",message:message,preferredStyle:.alert);pairingAlert=alert
         alert.addAction(UIAlertAction(title:"Để sau",style:.cancel){[weak self]_ in self?.cancelPairingIdentity()})
         alert.addAction(UIAlertAction(title:"Đóng lời mời",style:.destructive){[weak self,weak alert]_ in alert?.dismiss(animated:false){[weak self] in self?.closeHostInvitation(ticket:ticket,owner:owner)}})
+        if registered{
+            alert.addAction(UIAlertAction(title:"Hiện mã mời",style:.default){[weak self,weak alert]_ in
+                alert?.dismiss(animated:false){[weak self] in self?.revealHostInvitation(ticket:ticket,origin:origin,owner:owner)}
+            })
+        }
         if !registered{
             alert.addAction(UIAlertAction(title:"Đăng ký với relay",style:.default){[weak self,weak alert]_ in
                 alert?.dismiss(animated:false){[weak self] in
@@ -156,6 +162,25 @@ final class GameHubViewController: UIViewController, WKNavigationDelegate, WKUID
             })
         }
         present(alert,animated:true)
+    }
+    private func revealHostInvitation(ticket:String,origin:String,owner:NativeDocumentLifetime){
+        guard peerReviewAvailable(owner),!UIScreen.main.isCaptured else{cancelPairingIdentity();return}
+        core.sharePairingHost(ticket:ticket,owner:owner){[weak self] bytes,error in
+            guard let self=self,self.pairingFlow === owner,owner.active else{return}
+            guard self.peerReviewAvailable(owner),!UIScreen.main.isCaptured else{self.cancelPairingIdentity();return}
+            guard let bytes=bytes else{self.cancelPairingIdentity();self.pairingNotice(error ?? "Mã mời không khả dụng.");return}
+            // Rust bytes are borrowed only here. UIKit/String copies cannot be guaranteed wiped.
+            let screen=HostInvitationViewController()
+            screen.loadViewIfNeeded();screen.setInvitation(String(decoding:bytes,as:UTF8.self))
+            screen.finished={[weak self,weak screen] in
+                screen?.clearInvitation()
+                screen?.dismiss(animated:false){[weak self] in
+                    guard let self=self,self.pairingFlow === owner,owner.active else{return}
+                    self.hostShareView=nil;self.showHostRegistration(ticket:ticket,origin:origin,owner:owner,registered:true)
+                }
+            }
+            screen.modalPresentationStyle = .overFullScreen;self.hostShareView=screen;self.present(screen,animated:true)
+        }
     }
     private func beginClientPairing(){
         guard pairingFlow==nil,presentedViewController==nil,hubVisible,!fullScreenGame,!pendingSuspend,UIApplication.shared.applicationState == .active,UIApplication.shared.isProtectedDataAvailable else{return}
@@ -500,6 +525,7 @@ final class GameHubViewController: UIViewController, WKNavigationDelegate, WKUID
     @objc private func cancelPairingIdentity(){
         guard let owner=pairingFlow else{return};owner.invalidate();pairingFlow=nil
         pairingExpiry?.cancel();pairingExpiry=nil;pairingButton.isEnabled=true
+        hostShareView?.clearInvitation();hostShareView?.dismiss(animated:false);hostShareView=nil
         pairingAlert?.textFields?.forEach{$0.text=nil};pairingAlert?.dismiss(animated:false);pairingAlert=nil;core.cancelPairingIdentityReview()
     }
     private func pairingNotice(_ message:String){
@@ -556,4 +582,34 @@ final class GameHubViewController: UIViewController, WKNavigationDelegate, WKUID
         core.suspend{[weak self]in waiters.forEach{$0()};self?.didActivate()}
     }
     override func viewWillDisappear(_ animated:Bool){super.viewWillDisappear(animated);hubVisible=false;suspend()}
+}
+
+/// Native-only proof surface. Clearing UI removes visible text, not all UIKit/OS aliases.
+@MainActor
+private final class HostInvitationViewController:UIViewController {
+    private let code=UITextView()
+    var finished:(()->Void)?
+    override func viewDidLoad(){
+        super.viewDidLoad();view.backgroundColor = .systemBackground
+        let explanation=UILabel();explanation.numberOfLines=0
+        explanation.text="Mã mời host — chỉ gửi cho người bạn muốn ghép đôi. Người nhận vẫn cần xác minh khóa host qua kênh độc lập. Sao chép hoặc chụp màn hình có thể giữ mã ngoài ứng dụng."
+        code.isEditable=false;code.isSelectable=true;code.font = .monospacedSystemFont(ofSize:15,weight:.regular)
+        code.autocorrectionType = .no;code.spellCheckingType = .no;code.dataDetectorTypes=[]
+        code.accessibilityLabel="Mã mời host";code.textContentType=nil
+        let hide=UIButton(type:.system);hide.setTitle("Ẩn mã mời",for:.normal)
+        hide.addAction(UIAction{[weak self]_ in self?.clearInvitation();self?.finished?()},for:.touchUpInside)
+        for item in [explanation,code,hide] as [UIView]{item.translatesAutoresizingMaskIntoConstraints=false;view.addSubview(item)}
+        let safe=view.safeAreaLayoutGuide
+        NSLayoutConstraint.activate([
+            explanation.topAnchor.constraint(equalTo:safe.topAnchor,constant:20),explanation.leadingAnchor.constraint(equalTo:safe.leadingAnchor,constant:20),explanation.trailingAnchor.constraint(equalTo:safe.trailingAnchor,constant:-20),
+            hide.leadingAnchor.constraint(equalTo:safe.leadingAnchor,constant:20),hide.trailingAnchor.constraint(equalTo:safe.trailingAnchor,constant:-20),hide.bottomAnchor.constraint(equalTo:safe.bottomAnchor,constant:-12),hide.heightAnchor.constraint(greaterThanOrEqualToConstant:44),
+            code.topAnchor.constraint(equalTo:explanation.bottomAnchor,constant:16),code.bottomAnchor.constraint(equalTo:hide.topAnchor,constant:-12),code.leadingAnchor.constraint(equalTo:safe.leadingAnchor,constant:16),code.trailingAnchor.constraint(equalTo:safe.trailingAnchor,constant:-16)
+        ])
+        NotificationCenter.default.addObserver(self,selector:#selector(captureChanged),name:UIScreen.capturedDidChangeNotification,object:nil)
+    }
+    func setInvitation(_ value:String){code.text=value}
+    func clearInvitation(){code.selectedRange=NSRange(location:0,length:0);code.text=nil}
+    @objc private func captureChanged(){if UIScreen.main.isCaptured{clearInvitation();finished?()}}
+    override func viewWillDisappear(_ animated:Bool){clearInvitation();super.viewWillDisappear(animated)}
+    deinit{NotificationCenter.default.removeObserver(self)}
 }

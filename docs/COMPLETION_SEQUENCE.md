@@ -2,6 +2,8 @@
 
 ## Current sequence — 1–109 outstanding tasks
 
+Source checkpoint: iOS registered host invitations now offer explicit reveal through the borrowed native share API. A separate native text surface clears visible content on hide, invitation expiry, lifecycle cancellation, disappearance, and capture-state notification; it refuses initial reveal while screen capture is reported active. UIKit selection can copy the code; screenshots, clipboard history and immutable string aliases are outside wipe guarantees. No WebKit delivery or automatic pasteboard write was added. iOS host peer consent/activation UI remains unfinished. Build/test and device lifecycle qualification remain deferred.
+
 Source checkpoint: iOS native host setup now exposes installed relay selection, bounded device label and independently shareable public identity, explicit local invitation creation, explicit relay registration, and invitation close. Setup and invitation retain their original deadlines and foreground ownership. Registration uncertainty directs the user to recovery rather than automatic retry. Host proof sharing, peer review, and activation UI on iOS remain unfinished. No build or test was run at the user's request; this is not runtime qualification.
 
 Item 58 Android host persistence now leads to a separate one-use activation
