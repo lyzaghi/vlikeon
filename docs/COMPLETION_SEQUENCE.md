@@ -2,6 +2,12 @@
 
 ## Current sequence — 1–109 outstanding tasks
 
+Item 58 native status now exposes enabled installed pairing origins. Android has
+a read-only setup helper selecting one Active identity from validated native
+status, immutable relay choices and a one-use bounded begin helper. Disabled
+policy refuses; no identity replacement or policy enablement. Source-only;
+actual setup UI, iOS equivalent, join/activation and build/test remain due.
+
 Item 58 LocalHost now drops expired transient client exchange/proof on native
 status reads and before join/poll/consented persistence admission. Status remains
 read-only for durable journal/vault/relay state. No timer/background cleanup or

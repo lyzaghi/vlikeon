@@ -1840,6 +1840,17 @@ this checkpoint.
 
 ## Remaining implementation and qualification
 
+Native status now returns enabled installed pairing_origins, empty when policy
+is disabled/invalid. Android's native-only ClientSetup helper validates status,
+requires exactly one nonretired Active identity, refuses missing storage
+provenance or another live pending flow, and retains immutable configured relay
+choices plus original identity/revision/fence and a 30-second deadline. It never
+creates/replaces identity. Its one-use begin helper builds the request from that
+retained identity and selected installed origin; UI must independently pin host
+and clear the code field. Immutable Java/JSON/UI string copies cannot be wiped
+reliably; owned ABI bytes retain the existing clear-on-return behavior. No build,
+test, crypto/vault/network operation ran. Setup UI, iOS helper and full flow due.
+
 LocalHost now drops a pending client exchange once its original monotonic
 deadline has expired when native status is read or join/poll/persistence is
 attempted. This releases the retained zeroizing invitation proof and exchange

@@ -53,6 +53,7 @@ impl LocalHost {
         self.expire_native_pairing_client();
         let snapshot=omniplay_core::stream_credentials::load(&self.database,self.profile_id)?;
         let observed_at_ms=omniplay_core::now_ms();
+        let pairing_origins=omniplay_core::stream_signal_authority::installed_pairing_origins().unwrap_or_default();
         let recovery:Vec<_>=snapshot.recovery_plan(observed_at_ms)?.iter().map(|action|
             json!({"address":action.address(),"next_step":action.step()})).collect();
         let records:Vec<_>=snapshot.records().iter().map(|record|json!({
@@ -62,7 +63,7 @@ impl LocalHost {
             "session_recovery_required":record.signal_session().is_some()
         })).collect();
         Ok(json!({"credential_protocol":1,"profile_id":self.profile_id,"device_id":self.database.device_id,
-            "revision":snapshot.revision(),"policy_available":omniplay_core::stream_signal_authority::require_installed_pairing_policy().is_ok(),"records":records,
+            "revision":snapshot.revision(),"policy_available":!pairing_origins.is_empty(),"pairing_origins":pairing_origins,"records":records,
             "recovery_protocol":1,"observed_at_ms":observed_at_ms,"recovery":recovery,
             "relay_retirement_available":omniplay_core::stream_signal_authority::installed_retirement_origins().is_ok(),
             "namespace_provenance_missing":snapshot.namespace_provenance_missing(),

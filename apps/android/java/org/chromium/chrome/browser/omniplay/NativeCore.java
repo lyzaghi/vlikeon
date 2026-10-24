@@ -194,6 +194,59 @@ public final class NativeCore {
     private static native byte[] nativePairingIdentity(int operation,long handle,long revision,byte[] input);
     interface IdentityReply { void accept(IdentityReview review,String error); }
     interface PeerApprovalReply { void accept(PeerApproval review,String error); }
+    interface ClientSetupReply { void accept(ClientSetup setup,String error); }
+    static final class ClientSetup {
+        final java.util.List<String> relayOrigins;final String identityKey;final long expires;
+        private final RecoveryRecord identity;private final long revision;private final Object fence;
+        private final java.util.concurrent.atomic.AtomicBoolean consumed=new java.util.concurrent.atomic.AtomicBoolean();
+        private ClientSetup(RecoveryRecord identity,long revision,java.util.List<String> origins,long expires,Object fence){
+            this.identity=identity;this.revision=revision;this.relayOrigins=java.util.Collections.unmodifiableList(origins);
+            identityKey=identity.key;this.expires=expires;this.fence=fence;
+        }
+    }
+    /** Read-only trusted native setup: never creates/replaces an identity. */
+    void clientPairingSetup(java.util.function.BooleanSupplier alive,ClientSetupReply reply){
+        final long deadline=android.os.SystemClock.elapsedRealtime()+30_000;
+        final Object fence=mPairingClientDeliveryFence.get();
+        java.util.concurrent.atomic.AtomicReference<ClientSetup> prepared=new java.util.concurrent.atomic.AtomicReference<>();
+        work(()->{
+            if(!alive.getAsBoolean()||!mPairingAttached||mPairingClientDeliveryFence.get()!=fence)throw new IllegalStateException();
+            JSONObject response=pairingResponse(nativePairingIdentity(0,mHandle,0,null)),value=pairingResult(response);
+            if(!Boolean.TRUE.equals(value.get("policy_available")))return failure("","unsupported_capability","Remote Play pairing is not enabled in this version.");
+            RecoverySnapshot snapshot=new RecoverySnapshot(value,mProfile,deadline);
+            if(snapshot.namespaceProvenanceMissing||snapshot.pendingClientTicket!=null)throw new IllegalStateException();
+            RecoveryRecord identity=null;
+            for(RecoveryRecord record:snapshot.records)if(record.isIdentity()&&!"retired".equals(record.phase)){
+                if(identity!=null||!"active".equals(record.phase)||record.sessionRecoveryRequired)throw new IllegalStateException();identity=record;
+            }
+            if(identity==null)throw new IllegalStateException();
+            org.json.JSONArray configured=value.getJSONArray("pairing_origins");java.util.ArrayList<String> origins=new java.util.ArrayList<>();
+            if(configured.length()<1||configured.length()>8)throw new IllegalStateException();
+            for(int i=0;i<configured.length();i++){
+                String origin=configured.getString(i);java.net.URI uri=new java.net.URI(origin);
+                if(!"https".equals(uri.getScheme())||uri.getHost()==null||uri.getRawUserInfo()!=null||uri.getRawQuery()!=null||uri.getRawFragment()!=null||!uri.getRawPath().isEmpty()||origins.contains(origin))throw new IllegalStateException();
+                origins.add(origin);
+            }
+            prepared.set(new ClientSetup(identity,snapshot.revision,origins,deadline,fence));return response;
+        },response->{
+            ClientSetup setup=prepared.get();
+            if(setup!=null&&alive.getAsBoolean()&&mPairingClientDeliveryFence.get()==fence&&android.os.SystemClock.elapsedRealtime()<deadline)reply.accept(setup,null);
+            else reply.accept(null,"Pairing setup is unavailable. Enable the configured service and inspect identity/status before continuing.");
+        });
+    }
+    /** Native UI independently pins host. UI must clear its code field after call;
+     * immutable Java/UI string copies cannot be reliably wiped here. */
+    void beginPairingClient(ClientSetup setup,String code,String host,String audience,String label,java.util.function.BooleanSupplier alive,Reply reply){
+        if(setup==null||!alive.getAsBoolean()||mPairingClientDeliveryFence.get()!=setup.fence||android.os.SystemClock.elapsedRealtime()>=setup.expires
+                ||!setup.relayOrigins.contains(audience)||code==null||code.length()>8192||!setup.consumed.compareAndSet(false,true)){
+            reply.accept(failure("","cancelled","Pairing setup ended. Open setup again."));return;
+        }
+        try{
+            byte[] request=new JSONObject().put("identity",setup.identity.address()).put("expected_revision",setup.revision)
+                    .put("code",code).put("host_public_key",host).put("audience",audience).put("label",label).toString().getBytes(StandardCharsets.UTF_8);
+            pairingClient(request,0,()->alive.getAsBoolean()&&mPairingClientDeliveryFence.get()==setup.fence&&android.os.SystemClock.elapsedRealtime()<setup.expires,reply);
+        }catch(Exception error){reply.accept(failure("","invalid_request","Pairing could not be prepared. Reopen setup."));}
+    }
     /** Immutable approved-poll snapshot owned by trusted native UI only. */
     static final class PeerApproval {
         final String pairId,grantHash,hostPublicKey,hostFingerprint,comparisonCode;final boolean inputAllowed;final long expires,grantExpiresAt;
