@@ -2,6 +2,16 @@
 
 ## Current sequence — 1–109 outstanding tasks
 
+Item 58 now authors an Android exact-generation public retirement barrier,
+durably created/read back before wrapped-material deletion and retained after
+cleanup. Candidate writes refuse the marker and reads do not classify partial
+cleanup as missing. This does not prove AndroidKeyStore service retirement or
+stop a session. No file/Keystore/native/compiler/build/test was executed.
+An explicit cleanup retry can append only a matching interrupted public marker
+prefix; corrupt bytes are never overwritten. Owner integration, corrupt-marker
+recovery and qualification remain due; full
+original scope and item 58 stay incomplete.
+
 Item 58 writer-retirement review keeps unresolved OS-service work as recovery
 debt. iOS cleanup now authors an exact public retirement marker retained in the
 same Keychain account, add/update without a delete/add gap and exact read-back;

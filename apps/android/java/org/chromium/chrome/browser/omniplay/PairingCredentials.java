@@ -36,8 +36,10 @@ import javax.crypto.spec.GCMParameterSpec;
 final class PairingCredentials {
     private static final int SECRET_BYTES = 137;
     private static final int RECORD_BYTES = 8 + 12 + SECRET_BYTES + 16;
+    private static final int RETIREMENT_BYTES = 8 + 68;
     private static final byte[] MAGIC = "VLKRPW01".getBytes(StandardCharsets.US_ASCII);
     private static final byte[] SECRET_MAGIC = "VLKRP001".getBytes(StandardCharsets.US_ASCII);
+    private static final byte[] RETIREMENT_MAGIC = "VLKRPF01".getBytes(StandardCharsets.US_ASCII);
     private static final byte[] DOMAIN = "vlikeon.remote-play.wrap.v1\0".getBytes(StandardCharsets.US_ASCII);
     private final Context mContext;
     private final File mNoBackup;
@@ -104,6 +106,8 @@ final class PairingCredentials {
         return out.toString();
     }
     private File record(String token) { return new File(mDirectory, token + ".pairing"); }
+    private File retirement(String token) { return new File(mDirectory, token + ".retired"); }
+    private static byte[] retirementBytes(byte[] address) { return ByteBuffer.allocate(RETIREMENT_BYTES).put(RETIREMENT_MAGIC).put(address).array(); }
     private static String alias(String token) { return "org.vlikeon.remote-play.wrap.v1." + token; }
     private static KeyStore keys() throws Exception { KeyStore store = KeyStore.getInstance("AndroidKeyStore"); store.load(null); return store; }
     private static SecretKey existing(KeyStore store, String alias) throws Exception {
@@ -140,13 +144,43 @@ final class PairingCredentials {
     }
     private Lease lease(String token) throws Exception { return new Lease(new File(mDirectory, token + ".lease")); }
     private static byte[] readRecord(File path) throws Exception {
-        ordinary(path, false); byte[] bytes = new byte[RECORD_BYTES + 1];
+        return readExact(path,RECORD_BYTES);
+    }
+    private static byte[] readExact(File path,int expected) throws Exception {
+        if(expected!=RECORD_BYTES&&expected!=RETIREMENT_BYTES)throw new IllegalArgumentException();
+        ordinary(path, false); byte[] bytes = new byte[expected + 1];
         try (FileChannel channel = FileChannel.open(path.toPath(), StandardOpenOption.READ, LinkOption.NOFOLLOW_LINKS)) {
-            if (channel.size() != RECORD_BYTES) throw new IllegalStateException();
+            if (channel.size() != expected) throw new IllegalStateException();
             ByteBuffer target = ByteBuffer.wrap(bytes); while (target.hasRemaining()) { int n = channel.read(target); if (n < 0) break; if (n == 0) throw new IllegalStateException(); }
-            if (target.position() != RECORD_BYTES || channel.size() != RECORD_BYTES) throw new IllegalStateException();
-            return Arrays.copyOf(bytes, RECORD_BYTES);
+            if (target.position() != expected || channel.size() != expected) throw new IllegalStateException();
+            return Arrays.copyOf(bytes, expected);
         } finally { Arrays.fill(bytes, (byte) 0); }
+    }
+    private static void verifyRetirement(File path,byte[] address) throws Exception {
+        byte[] observed=readExact(path,RETIREMENT_BYTES);
+        try{if(!MessageDigest.isEqual(observed,retirementBytes(address)))throw new IllegalStateException();}
+        finally{Arrays.fill(observed,(byte)0);}
+    }
+    /** Retain the marker permanently. Explicit cleanup may finish a matching
+     * public prefix after a crash; wrong bytes are never overwritten. Holds Lease. */
+    private void sealRetirement(String token,byte[] address) throws Exception {
+        File path=retirement(token);FileChannel opened;
+        try{opened=FileChannel.open(path.toPath(),StandardOpenOption.READ,StandardOpenOption.WRITE,StandardOpenOption.CREATE_NEW,LinkOption.NOFOLLOW_LINKS);}
+        catch(java.nio.file.FileAlreadyExistsException exists){ordinary(path,false);opened=FileChannel.open(path.toPath(),StandardOpenOption.READ,StandardOpenOption.WRITE,LinkOption.NOFOLLOW_LINKS);}
+        try(FileChannel channel=opened){
+            ordinary(path,false);Os.chmod(path.getAbsolutePath(),0600);long length=channel.size();
+            if(length<0||length>RETIREMENT_BYTES)throw new IllegalStateException();
+            byte[] intended=retirementBytes(address),prefix=new byte[(int)length];ByteBuffer input=ByteBuffer.wrap(prefix);
+            while(input.hasRemaining())if(channel.read(input)<=0)throw new IllegalStateException();
+            if(channel.size()!=length)throw new IllegalStateException();
+            for(int i=0;i<prefix.length;i++)if(prefix[i]!=intended[i])throw new IllegalStateException();
+            // Append only: no truncate/unlink window where a candidate could
+            // mistake this generation for reusable. Empty interrupted create is
+            // a valid public prefix; unrelated/corrupt bytes remain refused.
+            channel.position(length);ByteBuffer tail=ByteBuffer.wrap(intended,(int)length,RETIREMENT_BYTES-(int)length);
+            while(tail.hasRemaining())if(channel.write(tail)<=0)throw new IllegalStateException();channel.force(true);
+        }
+        verifyRetirement(path,address);syncDirectory(mDirectory);verifyRetirement(path,address);
     }
     public int check(byte[] address) {
         if (!owns(address)) return -3;
@@ -158,8 +192,12 @@ final class PairingCredentials {
         try {
             if (!unlocked()) return -2; directory(); String token = token(address);
             try (Lease owned = lease(token)) {
+                boolean retired=present(retirement(token));if(retired)verifyRetirement(retirement(token),address);
                 directory(); File path = record(token); KeyStore store = keys(); boolean hasFile = present(path), hasKey = store.containsAlias(alias(token));
                 if (!hasFile && !hasKey) return unlocked() ? -1 : -2;
+                // A barrier with remaining ciphertext/alias is incomplete
+                // cleanup, not permission to decrypt or report missing.
+                if(retired)return -3;
                 if (!hasFile || !hasKey) return -3;
                 raw = readRecord(path); for (int i = 0; i < 8; ++i) if (raw[i] != MAGIC[i]) return -3;
                 Cipher cipher = Cipher.getInstance("AES/GCM/NoPadding");
@@ -178,6 +216,7 @@ final class PairingCredentials {
         try {
             if (!unlocked()) return -2; directory(); String token = token(address);
             try (Lease owned = lease(token)) {
+                if(present(retirement(token)))return -3;
                 directory(); File path = record(token); KeyStore store = keys();
                 // Missing-key ciphertext and orphan aliases require explicit
                 // generation cleanup, never replacement or overwriting here.
@@ -187,6 +226,7 @@ final class PairingCredentials {
                 byte[] iv = cipher.getIV(); if (iv == null || iv.length != 12) return -3;
                 ciphertext = cipher.doFinal(secret); if (ciphertext.length != SECRET_BYTES + 16) return -3;
                 raw = ByteBuffer.allocate(RECORD_BYTES).put(MAGIC).put(iv).put(ciphertext).array(); if (!unlocked()) return -2;
+                if(present(retirement(token)))return -3;
                 try (FileChannel channel = FileChannel.open(path.toPath(), StandardOpenOption.WRITE, StandardOpenOption.CREATE_NEW, LinkOption.NOFOLLOW_LINKS)) {
                     Os.chmod(path.getAbsolutePath(), 0600); ByteBuffer input = ByteBuffer.wrap(raw);
                     while (input.hasRemaining()) if (channel.write(input) <= 0) throw new IllegalStateException(); channel.force(true);
@@ -202,6 +242,9 @@ final class PairingCredentials {
         try {
             if (!unlocked()) return -2; directory(); String token = token(address);
             try (Lease owned = lease(token)) {
+                // Persist/read back the no-reuse barrier before deleting any
+                // wrapped material. Never remove this public marker on retry.
+                sealRetirement(token,address);if(!unlocked())return -2;
                 directory(); KeyStore store = keys(); File path = record(token);
                 if (present(path)) ordinary(path, false);
                 if (store.containsAlias(alias(token))) store.deleteEntry(alias(token));
@@ -209,7 +252,7 @@ final class PairingCredentials {
                 if (present(path) || store.containsAlias(alias(token))) return -3;
                 // Keep the zero-byte lock file named: unlinking it while another
                 // process opened it would split the exclusion namespace.
-                syncDirectory(mDirectory); return unlocked() ? 0 : -2;
+                syncDirectory(mDirectory);verifyRetirement(retirement(token),address);return unlocked() ? 0 : -2;
             }
         } catch (Exception failure) { return -3; }
     }

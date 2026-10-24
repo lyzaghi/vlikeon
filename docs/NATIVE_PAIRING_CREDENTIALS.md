@@ -1276,6 +1276,36 @@ No Swift compiler, Keychain call, OS operation, build or test was executed.
 Android/desktop late-write containment and all producer retirement proof remain
 open; item 58 is not complete.
 
+## Android retained retirement barrier
+
+Android cleanup now creates a separate public `.retired` record for the exact
+generation under the existing per-record lease. Its fixed 76 bytes are
+`VLKRPF01` followed by the dedicated JNI address (four UUIDs and big-endian kind).
+It contains no seed/key/grant. Creation is exclusive/no-follow, file contents are
+forced, the private directory is synchronized and exact contents are read back
+before any alias/ciphertext deletion. Cleanup never unlinks this marker.
+
+Candidate writes reject any retirement-file presence before Keystore creation
+and again before ciphertext creation. Reads validate a present marker first;
+remaining ciphertext or alias is incomplete cleanup and cannot be decrypted or
+reported missing. Only observed absence of both secret artifacts reports missing.
+Cleanup verifies the retained marker again after deleting and synchronizing.
+Reads treat partial, corrupt, wrong-address and oversized markers as errors.
+An explicit cleanup retry under the retained record lease may complete only an
+exact public prefix of the expected marker, including an interrupted empty
+create. It appends the missing bytes without truncating, unlinking or overwriting
+the existing prefix, forces and reads back the full marker before secret deletion.
+Wrong-prefix or oversized content remains refused and requires reviewed repair.
+
+This contains cooperating provider candidate writes, not arbitrary external
+writers or future AndroidKeyStore service work. A late alias or ambiguous OS
+result remains unresolved; the marker is not a WriterRetired/session receipt.
+Actual owner/fence integration, corrupt-marker repair/retention policy, crash
+ordering, lock/unlock and desktop containment remain unfinished.
+
+No Android file/Keystore call, native callback, compilation, build or test was
+executed. Only source review and whitespace inspection were performed.
+
 ## Remaining implementation and qualification
 
 - Journal/executor/lease/writer product integration, authority epochs, actual native owner

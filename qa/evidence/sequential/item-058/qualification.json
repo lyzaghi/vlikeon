@@ -80,7 +80,10 @@
     "Scoped loads cover native writer, recovery, key removal, relay retirement, signal/ICE operations and session registration; copied or legacy history is not silently rebound",
     "Legacy unbound histories remain native-inspectable and mobile UI surfaces missing provenance while withholding mutating recovery actions; explicit migration remains unfinished",
     "iOS cleanup source retains an exact public device-only nonsync retirement marker via add/update/read-back; normal secret writes remain add-only and malformed markers remain errors",
-    "Generic provider absence means no secret material, allowing retained public tombstones; no writer/session retirement proof or runtime late-add containment is claimed"
+    "Generic provider absence means no secret material, allowing retained public tombstones; no writer/session retirement proof or runtime late-add containment is claimed",
+    "Android cleanup source creates/forces/synchronizes/exactly reads a public generation-bound retirement barrier before alias/ciphertext deletion and retains it afterward",
+    "Android candidate writes refuse retirement-file presence; reads reject corrupt or partial cleanup rather than decrypting or reporting missing; no OS-service retirement proof is inferred",
+    "Explicit Android cleanup retry may append only the missing bytes of an exact interrupted public marker prefix under the record lease; no truncation, unlink or corrupt-prefix overwrite"
   ],
   "build_executed": false,
   "tests_executed": false,
