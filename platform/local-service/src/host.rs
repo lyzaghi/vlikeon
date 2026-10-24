@@ -212,6 +212,16 @@ impl LocalHost {
         writer.register_host(pending.revision,pending.identity,&mut pending.invitation,&relay,omniplay_core::now_ms(),deadline,cancel)?;
         Ok(json!({"pairing_protocol":1,"ticket":ticket,"registered":true,"share_available":true,"approves_peer":false}))
     }
+    /// Explicit trusted native share only. Never renderer JSON, status or logs.
+    pub fn native_pairing_host_share(&self,store:&dyn omniplay_streaming::native_credentials::PairingSecretStore,
+        ticket:Uuid,epoch:u64,deadline:std::time::Instant,cancel:&std::sync::atomic::AtomicBool)->Result<zeroize::Zeroizing<String>>{
+        self.ensure_open()?;
+        let pending=self.pairing_host.as_ref().ok_or_else(||PlatformError::new(ErrorCode::NotFound,"Native host invitation is absent"))?;
+        if pending.id!=ticket||epoch==0||pending.epoch!=epoch||std::time::Instant::now()>=deadline.min(pending.invitation.native_deadline())||cancel.load(std::sync::atomic::Ordering::Acquire){return Err(PlatformError::new(ErrorCode::Cancelled,"Native host sharing expired or changed lifecycle"));}
+        let writer=omniplay_core::stream_credential_writer::NativeCredentialWriter::open(&self.database,self.profile_id,store)?;
+        let code=writer.share_host(pending.revision,pending.identity,&pending.invitation,omniplay_core::now_ms(),deadline,cancel)?;
+        if std::time::Instant::now()>=deadline.min(pending.invitation.native_deadline())||cancel.load(std::sync::atomic::Ordering::Acquire){return Err(PlatformError::new(ErrorCode::Cancelled,"Native host share became stale"));}Ok(code)
+    }
     /// Explicit bounded poll only; returned labels/keys do not prove consent.
     pub fn native_pairing_host_poll(&mut self,store:&dyn omniplay_streaming::native_credentials::PairingSecretStore,
         ticket:Uuid,epoch:u64,deadline:std::time::Instant,cancel:&std::sync::atomic::AtomicBool)->Result<Value>{

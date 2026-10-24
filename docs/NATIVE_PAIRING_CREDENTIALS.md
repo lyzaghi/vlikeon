@@ -1840,6 +1840,15 @@ this checkpoint.
 
 ## Remaining implementation and qualification
 
+Explicit native host_share now reloads the exact Active identity/revision under
+lease, verifies invitation host binding and installed policy, then asks the
+registered live invitation for share_code. LocalHost checks ticket/epoch and
+original lifetime/cancellation before and after. Return type remains Zeroizing
+String, outside public JSON/status/diagnostics. This only clears owned Rust
+allocations; future OS share/clipboard/UI copies require separate lifecycle
+handling and cannot inherit that guarantee. No ABI/share UI is wired and no
+build/test, vault/crypto/network operation ran for this source checkpoint.
+
 Host controller now records registration_attempted before entering the writer's
 potential HTTP registration path. It remains sticky on every later error. A
 never-attempted invitation can be locally fenced/dropped without provider/relay

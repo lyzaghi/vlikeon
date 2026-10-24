@@ -78,6 +78,19 @@ impl<'a> NativeCredentialWriter<'a>{
         self.lease.check(self.database,self.profile)?;check(deadline)?;
         if cancel.load(std::sync::atomic::Ordering::Acquire){return Err(conflict());}Ok(())
     }
+    /// Explicit native share action only; returned bearer proof must not enter logs.
+    pub fn share_host(&self,expected:u64,address:CredentialAddress,invitation:&omniplay_streaming::native_pair_exchange::NativeHostInvitation,
+        now:u64,deadline:Instant,cancel:&std::sync::atomic::AtomicBool)->Result<zeroize::Zeroizing<String>>{
+        let started=begin(deadline)?;
+        let metadata:omniplay_streaming::Invite=omniplay_streaming::inspect(invitation.signed_invite(),4096)?;
+        crate::stream_signal_authority::require_installed_host_grant(&metadata.audience,false)?;
+        if cancel.load(std::sync::atomic::Ordering::Acquire){return Err(conflict());}
+        let signer=self.active_signer(expected,address)?;
+        if signer.public_key()!=metadata.host_public_key{return Err(conflict());}
+        let code=invitation.share_code(elapsed_now(now,started)?)?;
+        drop(signer);self.lease.check(self.database,self.profile)?;check(deadline)?;
+        if cancel.load(std::sync::atomic::Ordering::Acquire){return Err(conflict());}Ok(code)
+    }
     /// Explicit bounded host poll; peer keys/labels are not user-approved here.
     pub fn poll_host(&self,expected:u64,address:CredentialAddress,invitation:&mut omniplay_streaming::native_pair_exchange::NativeHostInvitation,
         relay:&omniplay_streaming::native_relay::NativePairRelay,now:u64,deadline:Instant,cancel:&std::sync::atomic::AtomicBool)

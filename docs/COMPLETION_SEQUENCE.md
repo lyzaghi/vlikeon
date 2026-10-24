@@ -2,6 +2,11 @@
 
 ## Current sequence — 1–109 outstanding tasks
 
+Item 58 explicit host sharing now connects controller to leased identity reload,
+registered/live invitation and ticket/epoch/deadline/cancel checks. It returns
+Zeroizing text separately from JSON/status. Source-only; actual native sharing
+UI/ABI and copy-lifetime qualification remain due. No build/test ran.
+
 Item 58 host controller now distinguishes never-attempted registration from any
 possibly-sent attempt. Never-registered invitations close locally without false
 relay acknowledgment; attempted ones retain exact remote cleanup requirement.
