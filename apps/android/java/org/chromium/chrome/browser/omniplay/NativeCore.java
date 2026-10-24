@@ -288,6 +288,14 @@ public final class NativeCore {
     }
     interface HostPeersReply {void accept(java.util.List<HostPeerReview> peers,String error);}
     void declineHostPeer(HostPeerReview peer,java.util.function.BooleanSupplier alive,Reply reply){
+        decideHostPeer(peer,false,false,0,alive,reply);
+    }
+    /** Actual peer/comparison/permission consent must precede persistence. */
+    void persistHostPeer(HostPeerReview peer,boolean inputAllowed,long lifetimeMs,java.util.function.BooleanSupplier alive,Reply reply){
+        if(lifetimeMs<1||lifetimeMs>7_776_000_000L){reply.accept(failure("","invalid_request","Invalid pairing lifetime."));return;}
+        decideHostPeer(peer,true,inputAllowed,lifetimeMs,alive,reply);
+    }
+    private void decideHostPeer(HostPeerReview peer,boolean persist,boolean inputAllowed,long lifetimeMs,java.util.function.BooleanSupplier alive,Reply reply){
         if(peer==null||!peer.current()||!alive.getAsBoolean()||mPairingClientDeliveryFence.get()!=peer.fence||!peer.decided.compareAndSet(false,true)){
             reply.accept(failure("","cancelled","Peer review ended or was used. Check requests again."));return;
         }
@@ -299,15 +307,27 @@ public final class NativeCore {
             try{
                 long remaining=deadline-android.os.SystemClock.elapsedRealtime();
                 if(mHandle==0||mFailed||!mPairingAttached||remaining<1000||!alive.getAsBoolean()||!peer.current()||mPairingClientDeliveryFence.get()!=peer.fence)throw new IllegalStateException();
-                input=new JSONObject().put("ticket",peer.ticket).put("client_public_key",peer.clientPublicKey).put("reviewed_hello_hash",peer.helloHash).toString().getBytes(StandardCharsets.UTF_8);
+                JSONObject request=new JSONObject().put("ticket",peer.ticket).put("client_public_key",peer.clientPublicKey).put("reviewed_hello_hash",peer.helloHash);
+                if(persist)request.put("input_allowed",inputAllowed).put("lifetime_ms",lifetimeMs);
+                input=request.toString().getBytes(StandardCharsets.UTF_8);
                 if(input.length>1024)throw new IllegalStateException();
-                response=pairingResponse(nativePairingHostV1(mHandle,input,5,(int)Math.min(25_000,remaining)));
+                response=pairingResponse(nativePairingHostV1(mHandle,input,persist?4:5,(int)Math.min(25_000,remaining)));
                 if("ok".equals(response.optString("status"))){
                     JSONObject value=pairingResult(response);
-                    if(value.getInt("pairing_protocol")!=1||!peer.ticket.equals(value.getString("ticket"))||!peer.clientPublicKey.equals(value.getString("client_public_key"))
+                    if(persist){
+                        JSONObject address=value.getJSONObject("address");Object revision=value.get("revision"),expiry=value.get("expires_at_ms");
+                        if(value.getInt("credential_protocol")!=1||!peer.ticket.equals(value.getString("pairing_ticket"))||!peer.clientPublicKey.equals(value.getString("client_public_key"))
+                                ||!peer.helloHash.equals(value.getString("reviewed_hello_hash"))||!"material_ready".equals(value.getString("phase"))||!Boolean.FALSE.equals(value.get("relay_approved"))
+                                ||!Boolean.TRUE.equals(value.get("reload_required"))||!Boolean.valueOf(inputAllowed).equals(value.get("input_allowed"))
+                                ||!value.getString("grant_hash").matches("[0-9a-f]{64}")||!value.getString("public_key").matches("[A-Za-z0-9_-]{42}[AEIMQUYcgkosw048]")
+                                ||address.length()!=5||!mProfile.equals(address.getString("profile"))||!"pair_encryption".equals(address.getString("kind"))
+                                ||!canonicalPairingId(address.getString("device"))||!canonicalPairingId(address.getString("id"))||!canonicalPairingId(address.getString("generation"))
+                                ||!(revision instanceof Number)||((Number)revision).doubleValue()!=((Number)revision).longValue()||((Number)revision).longValue()<1||((Number)revision).longValue()>10_000_000
+                                ||!(expiry instanceof Number)||((Number)expiry).doubleValue()!=((Number)expiry).longValue()||((Number)expiry).longValue()<=System.currentTimeMillis()||((Number)expiry).longValue()>9_007_199_254_740_991L)throw new IllegalStateException();
+                    }else if(value.getInt("pairing_protocol")!=1||!peer.ticket.equals(value.getString("ticket"))||!peer.clientPublicKey.equals(value.getString("client_public_key"))
                             ||!peer.helloHash.equals(value.getString("hello_hash"))||!Boolean.TRUE.equals(value.get("declined"))||!Boolean.FALSE.equals(value.get("pairs_revoked")))throw new IllegalStateException();
                 }
-            }catch(Exception|LinkageError error){response=failure("","runtime_unavailable","Decline result is uncertain. Check current host requests and status.");}
+            }catch(Exception|LinkageError error){response=failure("","runtime_unavailable","Peer decision may have committed. Check current host requests and status.");}
             finally{if(input!=null)java.util.Arrays.fill(input,(byte)0);mWorkPending.decrementAndGet();mPairingClientBusy.set(false);}
             final JSONObject completed=response;mMain.post(()->{
                 if(android.os.SystemClock.elapsedRealtime()>=deadline||!alive.getAsBoolean()||!peer.current()||mPairingClientDeliveryFence.get()!=peer.fence)reply.accept(failure("","cancelled","Decline result became stale. Inspect status."));

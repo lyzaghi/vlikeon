@@ -263,13 +263,36 @@ public final class GameHubController implements AutoCloseable {
                         if(mIdentityFlow!=owner||!owner.get()||!identityUiAvailable()||!peer.current()){cancelIdentityReview();return;}
                         AlertDialog detail=new AlertDialog.Builder(mActivity).setTitle("Compare peer identity")
                                 .setMessage("Unverified label: "+peer.label+"\nClient public key:\n"+peer.clientPublicKey+"\nComparison code: "+peer.comparisonCode+"\n\nVerify the intended peer independently and compare this code on both devices. This view does not approve the peer or input control.")
-                                .setPositiveButton("Back to invitation",(view,which)->{mIdentityDialog=null;showHostShareAction(ticket,owner);})
+                                .setPositiveButton("Review permissions",(view,which)->{mIdentityDialog=null;showHostPeerPermissions(peer,owner);})
                                 .setNeutralButton("Decline this request",(view,which)->{mIdentityDialog=null;confirmHostPeerDecline(ticket,peer,owner);})
                                 .setNegativeButton("Close invitation",(view,which)->{mIdentityDialog=null;closeHostInvitation(ticket,owner);}).create();
                         mIdentityDialog=detail;detail.setOnCancelListener(view->cancelIdentityReview());detail.show();
                         mMain.postDelayed(()->{if(mIdentityDialog==detail&&!peer.current()){detail.dismiss();mIdentityDialog=null;showHostShareAction(ticket,owner);}},Math.max(0,peer.expires-android.os.SystemClock.elapsedRealtime()));
                     }).setNegativeButton("Back",(dialog,which)->{mIdentityDialog=null;showHostShareAction(ticket,owner);}).create();
             mIdentityDialog=list;list.setOnCancelListener(dialog->cancelIdentityReview());list.show();
+        });
+    }
+    private void showHostPeerPermissions(NativeCore.HostPeerReview peer,java.util.concurrent.atomic.AtomicBoolean owner){
+        if(mIdentityFlow!=owner||!owner.get()||!identityUiAvailable()||!peer.current()){cancelIdentityReview();return;}
+        android.widget.LinearLayout form=new android.widget.LinearLayout(mActivity);form.setOrientation(android.widget.LinearLayout.VERTICAL);
+        android.widget.CheckBox verified=new android.widget.CheckBox(mActivity),input=new android.widget.CheckBox(mActivity);
+        verified.setText("I independently verified this peer and matched the comparison code on both devices.");input.setText("Allow this peer to control input");
+        android.widget.Spinner lifetime=new android.widget.Spinner(mActivity);
+        lifetime.setAdapter(new android.widget.ArrayAdapter<>(mActivity,android.R.layout.simple_spinner_dropdown_item,new String[]{"Permission lifetime: 1 hour","Permission lifetime: 24 hours","Permission lifetime: 7 days"}));
+        form.addView(verified);form.addView(input);form.addView(lifetime);
+        AlertDialog alert=new AlertDialog.Builder(mActivity).setTitle("Confirm host pairing permissions")
+                .setMessage("Client key:\n"+peer.clientPublicKey+"\nComparison code: "+peer.comparisonCode+"\n\nSave this pairing with the selected permissions. Relay approval and activation require a separate step.")
+                .setView(form).setNegativeButton("Later",(dialog,which)->cancelIdentityReview()).setPositiveButton("Save verified pairing",null).create();
+        mIdentityDialog=alert;alert.setOnCancelListener(dialog->cancelIdentityReview());alert.show();
+        android.widget.Button confirm=alert.getButton(AlertDialog.BUTTON_POSITIVE);confirm.setEnabled(false);verified.setOnCheckedChangeListener((button,checked)->confirm.setEnabled(checked));
+        confirm.setOnClickListener(button->{
+            if(!verified.isChecked()||mIdentityFlow!=owner||!owner.get()||!identityUiAvailable()||!peer.current()){cancelIdentityReview();return;}
+            long[] durations={3_600_000L,86_400_000L,604_800_000L};long duration=durations[lifetime.getSelectedItemPosition()];boolean allowed=input.isChecked();
+            confirm.setEnabled(false);alert.dismiss();mIdentityDialog=null;
+            mCore.persistHostPeer(peer,allowed,duration,owner::get,response->{
+                if(mIdentityFlow!=owner||!owner.get())return;cancelIdentityReview();
+                if(identityUiAvailable())identityNotice("ok".equals(response.optString("status"))?"Host pairing saved pending activation. No relay approval or connection was started. Open status to inspect it.":"Pairing result could not be confirmed. Inspect status before creating another grant.");
+            });
         });
     }
     private void confirmHostPeerDecline(String ticket,NativeCore.HostPeerReview peer,java.util.concurrent.atomic.AtomicBoolean owner){

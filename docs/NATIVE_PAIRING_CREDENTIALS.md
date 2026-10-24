@@ -1840,6 +1840,17 @@ this checkpoint.
 
 ## Remaining implementation and qualification
 
+Android host peer permissions now require an unchecked independent-peer/code
+verification box, default-off input choice and explicit displayed lifetime (one
+hour, one day or seven days). Save consumes the same one-use decision snapshot
+as decline and constructs retained ticket/client/hello hash plus chosen permission/
+lifetime. The bounded caller validates exact reviewed context, MaterialReady scope,
+grant hash, permission, expiry and nonapproval flags. LocalHost reloads the saved
+host candidate under the existing lease before returning its grant metadata;
+failure can follow commit and requires status reconciliation. No relay approval
+or connection starts here. No build/test/UI render/native operation ran. Host
+activation UI, iOS product flow and end-to-end qualification remain unfinished.
+
 Android peer details now lead to a separate decline confirmation showing retained
 client key/comparison context. The native caller consumes a one-use decision
 flag, constructs only retained ticket/client/hello hash, and uses bounded ordinary

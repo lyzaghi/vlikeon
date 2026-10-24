@@ -282,7 +282,10 @@ impl LocalHost {
         // Advance only from an actual committed candidate; never guess revision
         // after an uncertain failure. Other durable mutations require rereview.
         pending.revision=candidate.revision();
+        let review=writer.review_host_candidate(candidate.address(),candidate.revision(),omniplay_core::now_ms(),deadline)?;
+        if cancel.load(std::sync::atomic::Ordering::Acquire){return Err(PlatformError::new(ErrorCode::Cancelled,"Host candidate may have committed; reload native pairing state"));}
         Ok(json!({"credential_protocol":1,"pairing_ticket":ticket,"address":candidate.address(),"public_key":candidate.public_key(),
+            "grant_hash":review["grant_hash"],"input_allowed":review["input_allowed"],"expires_at_ms":review["expires_at_ms"],
             "revision":candidate.revision(),"phase":"material_ready","reviewed_hello_hash":reviewed_hello_hash,
             "client_public_key":client,"relay_approved":false,"reload_required":true}))
     }

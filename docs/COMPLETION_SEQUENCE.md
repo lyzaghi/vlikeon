@@ -2,6 +2,11 @@
 
 ## Current sequence — 1–109 outstanding tasks
 
+Item 58 Android host peer review now leads to explicit comparison consent,
+default-off input choice and selected permission lifetime before one-use candidate
+persistence. Native replies bind reviewed hello/client and retained grant hash.
+Source-only; activation UI/iOS host flow and build/test remain due.
+
 Item 58 Android host peer details now offer explicit exact-request decline,
 consuming the review snapshot once and checking bound receipt metadata. Queue,
 owner/cancel/deadline fences remain. Source-only; host approval/activation UI,
