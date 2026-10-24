@@ -275,6 +275,30 @@ public final class NativeCore {
             });
         });}catch(java.util.concurrent.RejectedExecutionException error){mWorkPending.decrementAndGet();if(reserved)mPairingClientBusy.set(false);reply.accept(failure("","busy","Native host queue is unavailable."));}
     }
+    static final class HostPeerReview {
+        final String clientPublicKey,label,comparisonCode;final long expires;
+        private final String ticket,helloHash;private final Object fence;
+        private final java.util.function.BooleanSupplier owner;
+        private HostPeerReview(String ticket,JSONObject peer,Object fence,java.util.function.BooleanSupplier owner,long expires) throws Exception{
+            this.ticket=ticket;clientPublicKey=peer.getString("client_public_key");label=peer.getString("label");comparisonCode=peer.getString("comparison_code");
+            helloHash=peer.getString("hello_hash");this.fence=fence;this.owner=owner;this.expires=expires;
+        }
+        boolean current(){return owner.getAsBoolean()&&android.os.SystemClock.elapsedRealtime()<expires;}
+    }
+    interface HostPeersReply {void accept(java.util.List<HostPeerReview> peers,String error);}
+    void reviewHostPeers(String ticket,java.util.function.BooleanSupplier alive,HostPeersReply reply){
+        final Object fence=mPairingClientDeliveryFence.get();final long expires=android.os.SystemClock.elapsedRealtime()+30_000;
+        pairingHostTicket(ticket,2,alive,response->{
+            java.util.ArrayList<HostPeerReview> reviews=new java.util.ArrayList<>();
+            try{
+                if(!alive.getAsBoolean()||mPairingClientDeliveryFence.get()!=fence||android.os.SystemClock.elapsedRealtime()>=expires)throw new IllegalStateException();
+                org.json.JSONArray peers=pairingResult(response).getJSONArray("peers");
+                for(int i=0;i<peers.length();i++)reviews.add(new HostPeerReview(ticket,peers.getJSONObject(i),fence,
+                    ()->alive.getAsBoolean()&&mPairingClientDeliveryFence.get()==fence,expires));
+            }catch(Exception error){reply.accept(null,"Host request list is unavailable. Inspect status before retrying.");return;}
+            reply.accept(java.util.Collections.unmodifiableList(reviews),null);
+        });
+    }
     /** Explicit native cleanup from one exact durable status entry. */
     void recoverHostInvitation(RecoverySnapshot snapshot,HostInvitationCleanup invitation,java.util.function.BooleanSupplier alive,Reply reply){
         final long deadline=Math.min(snapshot.expires,android.os.SystemClock.elapsedRealtime()+25_000);

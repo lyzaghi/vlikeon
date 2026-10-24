@@ -2,6 +2,11 @@
 
 ## Current sequence — 1–109 outstanding tasks
 
+Item 58 Android host UI now exposes manual peer polling and bounded immutable
+request snapshots tied to ticket/hello hash/owner/fence/30-second review lifetime.
+Unverified labels, keys and comparison are displayed without automatic consent.
+Source-only; host approval actions/iOS views and build/test remain due.
+
 Item 58 Android native menu now authors host label/relay setup, explicit local
 creation, separate registration and explicit invitation-code reveal. Proof view
 uses FLAG_SECURE, no state saving and text clearing on dismissal. Source-only;

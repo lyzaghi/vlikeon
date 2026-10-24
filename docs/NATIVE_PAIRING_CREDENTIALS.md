@@ -1840,6 +1840,16 @@ this checkpoint.
 
 ## Remaining implementation and qualification
 
+Android host invitation screen now offers explicit peer-request checks. Validated
+poll output becomes immutable per-peer metadata retaining private ticket/hello
+hash and original owner/cancel fence with a queue-inclusive 30-second lifetime.
+The bounded list labels peer names unverified; details display exact client key
+and comparison code for independent verification. Selecting a stale snapshot
+refuses and details expire back to the invitation screen. No automatic polling,
+peer approval/input permission or new relay action is added by browsing. No
+build/test/UI render/native operation ran. Host consent/persistence/activation
+UI and corresponding iOS product flow remain unfinished.
+
 Android host invitation setup is now reachable from the native menu. Active
 identity setup supplies relay choices; user creates locally then separately
 registers. Only another explicit action fetches/reveals proof. The selectable

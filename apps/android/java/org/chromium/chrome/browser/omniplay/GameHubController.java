@@ -224,6 +224,7 @@ public final class GameHubController implements AutoCloseable {
         if(mIdentityFlow!=owner||!owner.get()||!identityUiAvailable()){cancelIdentityReview();return;}
         AlertDialog alert=new AlertDialog.Builder(mActivity).setTitle("Host invitation registered")
                 .setMessage("Reveal the invitation code only to the intended peer. Verify the host public key independently, then compare codes before approving. Viewing the code does not approve a peer.")
+                .setNeutralButton("Check peer requests",(dialog,which)->{mIdentityDialog=null;showHostPeers(ticket,owner);})
                 .setNegativeButton("Close invitation",(dialog,which)->{mIdentityDialog=null;closeHostInvitation(ticket,owner);})
                 .setPositiveButton("Reveal invitation code",(dialog,which)->{
                     mIdentityDialog=null;
@@ -242,6 +243,33 @@ public final class GameHubController implements AutoCloseable {
                     });
                 }).create();
         mIdentityDialog=alert;alert.setOnCancelListener(dialog->cancelIdentityReview());alert.show();
+    }
+    private void showHostPeers(String ticket,java.util.concurrent.atomic.AtomicBoolean owner){
+        if(mIdentityFlow!=owner||!owner.get()||!identityUiAvailable()){cancelIdentityReview();return;}
+        mCore.reviewHostPeers(ticket,owner::get,(peers,error)->{
+            if(mIdentityFlow!=owner||!owner.get())return;
+            if(!identityUiAvailable()||peers==null){cancelIdentityReview();if(identityUiAvailable())identityNotice(error);return;}
+            if(peers.isEmpty()){
+                AlertDialog empty=new AlertDialog.Builder(mActivity).setTitle("No pending peer requests")
+                        .setMessage("No request was returned by this check. Checks run only when you request them.")
+                        .setPositiveButton("Back",(dialog,which)->{mIdentityDialog=null;showHostShareAction(ticket,owner);})
+                        .setNegativeButton("Close invitation",(dialog,which)->{mIdentityDialog=null;closeHostInvitation(ticket,owner);}).create();
+                mIdentityDialog=empty;empty.setOnCancelListener(dialog->cancelIdentityReview());empty.show();return;
+            }
+            String[] titles=new String[peers.size()];for(int i=0;i<titles.length;i++)titles[i]=peers.get(i).label+" · "+peers.get(i).comparisonCode;
+            AlertDialog list=new AlertDialog.Builder(mActivity).setTitle("Peer requests · labels unverified")
+                    .setItems(titles,(dialog,index)->{
+                        mIdentityDialog=null;NativeCore.HostPeerReview peer=peers.get(index);
+                        if(mIdentityFlow!=owner||!owner.get()||!identityUiAvailable()||!peer.current()){cancelIdentityReview();return;}
+                        AlertDialog detail=new AlertDialog.Builder(mActivity).setTitle("Compare peer identity")
+                                .setMessage("Unverified label: "+peer.label+"\nClient public key:\n"+peer.clientPublicKey+"\nComparison code: "+peer.comparisonCode+"\n\nVerify the intended peer independently and compare this code on both devices. This view does not approve the peer or input control.")
+                                .setPositiveButton("Back to invitation",(view,which)->{mIdentityDialog=null;showHostShareAction(ticket,owner);})
+                                .setNegativeButton("Close invitation",(view,which)->{mIdentityDialog=null;closeHostInvitation(ticket,owner);}).create();
+                        mIdentityDialog=detail;detail.setOnCancelListener(view->cancelIdentityReview());detail.show();
+                        mMain.postDelayed(()->{if(mIdentityDialog==detail&&!peer.current()){detail.dismiss();mIdentityDialog=null;showHostShareAction(ticket,owner);}},Math.max(0,peer.expires-android.os.SystemClock.elapsedRealtime()));
+                    }).setNegativeButton("Back",(dialog,which)->{mIdentityDialog=null;showHostShareAction(ticket,owner);}).create();
+            mIdentityDialog=list;list.setOnCancelListener(dialog->cancelIdentityReview());list.show();
+        });
     }
     private void beginClientPairing(){
         if(!identityUiAvailable()||mIdentityFlow!=null)return;
