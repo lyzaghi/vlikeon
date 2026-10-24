@@ -331,8 +331,9 @@ native observation binds exact credential generation, session and original epoch
 and must be authorized, nonfuture and at most 100 ms old at admission. The real
 provider must observe the live native document/session/pair and installed relay
 policy. A journal Active bit, loaded key or fabricated timestamp is not such a
-provider. Current code supplies the interface/admission checks but no actual
-product registry/observer implementation. Epoch changes reject in-flight results.
+provider. The lifecycle registry below now supplies a concrete source observer,
+but the real host document/session hooks and consent controller are not wired.
+Epoch changes reject in-flight results.
 
 These outputs are not indefinite capabilities: the relay owner must recheck
 authority/deadline before every network attempt, and queued/delayed receive
@@ -537,6 +538,53 @@ build or test was executed. Native authority/controller, WebRTC configuration,
 background/refresh/stop behavior, mobile integration, actual URI/credential fault
 qualification and item-59 TURN deployment remain unfinished. Streaming stays
 disabled and original 51–109 completion scope remains open.
+
+## Native document/session authority source
+
+`stream_signal_authority.rs` now implements `NativeSignalAuthority` using a
+bounded native registry, document lifetime guard, revocable session permit and
+current journal ownership. Guards have no deserializer or Clone; close/drop
+permanently flips their atomic liveness fence. Registry entries retain only weak
+references. Native host code must create the document guard after actual
+document/profile admission and close it on the real document event; the guard
+constructor itself is not an origin attestation or a native consent dialog.
+
+Registration admits only the fixed installed streaming policy and its canonical
+relay origins, exact active credential generation/profile/device and original
+pair certificate. Installed policy remains disabled, so registration currently
+refuses instead of enabling streaming. The signaling gate does not grant capture,
+host or remote input permission. At most 16 in-memory sessions are retained.
+
+Under the credential file lease, registration now durably reserves one native
+session owner per pair. Epoch is that committed journal revision, so subsequent
+registration consumes a later durable revision rather than resetting an in-memory
+counter. Session/epoch fields are required and validated; missing fields do not
+silently create an owner. All send/receive/poll/ICE operation paths check those
+exact persistent session/epoch fields in addition to their native observation.
+The maximum journal revision still bounds the epoch; profile rollback/clone
+admission remains an outstanding separate requirement.
+
+Observation checks actual guard liveness, monotonic session deadline, installed
+relay policy and freshly loaded Active generation/current session/epoch/certificate.
+It keeps the original timestamp from before SQL/policy work; operation admission
+rejects a slow observation older than 100 ms. Closing a document/permit while
+HTTP is running causes post-network observation to refuse publication. These
+observations do not promise atomicity with a later OS/network effect.
+
+`release` closes the permit before attempting the nonblocking credential lease.
+Acquiring that lease excludes participating per-operation vault/HTTP/commit lanes;
+only a matching durable session/epoch can be cleared. Busy/error/unknown commit
+keeps debt and the permit stays closed. Releasing ownership does not itself
+acknowledge input/capture/ICE allocation stop; real backend retirement remains
+required. Existing journal LocalRetired cleanup also clears the session binding
+only after its trusted native owner has confirmed retirement.
+
+Expired/closed in-memory entries can be pruned, but pruning/drop/time never clears
+their journal owner. Crash or a late reservation result leaves ownership for
+reviewed native release/recovery, not automatic takeover or epoch reuse. There
+is no current native startup/controller hookup, origin admission callback,
+consent UI, backend-stop integration or mobile provider for this registry. No
+registration, guard event, SQL/OS/network operation, build or test was executed.
 
 ## Remaining implementation and qualification
 

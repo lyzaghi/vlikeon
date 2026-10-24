@@ -34,7 +34,9 @@
     "Signaling relay source returns exact pair/grant-hash retirement protocol receipts for matching revocation or transaction-verified expired absence; absent live/conflicting grants are refused",
     "Native concrete relay cleanup branch reloads retained Active/Revoking identity and commits only exact bound acknowledgment after prior writer/local retirement",
     "Pair/grant-bound ICE response protocol source, shared bounded TURN URI validator and native temporary credential/fingerprint/URL-policy admission",
-    "Signed native ICE request orchestration retains the lease and rechecks session/epoch/deadline, with no relay-only downgrade or ICE allocation"
+    "Signed native ICE request orchestration retains the lease and rechecks session/epoch/deadline, with no relay-only downgrade or ICE allocation",
+    "Concrete native document/session authority registry source uses atomic lifetime guards, installed disabled policy, fresh journal admission and original observation timestamps",
+    "One durable native session owner per pair and epoch from committed journal revision; all signal/ICE paths enforce the exact persisted session/epoch and crash ownership is not reclaimed by age"
   ],
   "build_executed": false,
   "tests_executed": false,
@@ -45,7 +47,7 @@
   "durable_lifecycle_integrated": false,
   "remaining": [
     "Journal/executor/lease/writer product integration, native consent/session owner, copied-profile coordination, startup dispatch and authenticated relay approval/revocation",
-    "Native consent/invitation-secret/approval controller, real session authority/receiver ownership, unknown-session recovery, ICE adapter refresh/stop and retirement dispatch, upgraded relay deployment and WebCrypto/native interoperability",
+    "Native origin/document/session hook and consent/invitation-secret/approval controller integration, abandoned receiver ownership recovery, ICE/backend refresh/stop and retirement dispatch, upgraded relay deployment and WebCrypto/native interoperability",
     "Native broker authority and document/session capability integration",
     "Separate Android/iOS credential provider ABI and app integration",
     "Lock, restore, rotation, profile/device deletion and explicit browser-to-native re-pairing",

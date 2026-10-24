@@ -2,6 +2,14 @@
 
 ## Current sequence — 1–109 outstanding tasks
 
+Item 58 now authors a concrete native document/session authority registry using
+revocable lifetime guards, fixed installed policy and current journal state.
+Session ownership is durably exclusive per pair and epoch comes from committed
+journal revision; all native signaling/ICE paths check it. Drop/prune/crash/time
+never silently clears that owner. Installed policy stays disabled and real host
+hooks/consent/startup/backend/mobile wiring remain due. No runtime, SQL/OS/network,
+build or test was executed; item 58 and original objective remain incomplete.
+
 Item 58 now authors exact pair/grant-bound ICE responses, shared canonical TURN
 URI admission and temporary-credential/fingerprint/allowlist validation. Native
 ICE request source connects retained lease/vault signing, post-network authority

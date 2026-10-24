@@ -43,6 +43,7 @@ pub struct Record{
     receive_sequence:u64,
     receive_cursor:u64,
     seen_messages:Vec<Uuid>,
+    signal_epoch:u64,signal_session:Option<Uuid>,
     phase:Phase,writer_retired:bool,material_absent:bool,local_retired:bool,relay_retired:bool,
 }
 impl Record{
@@ -56,6 +57,8 @@ impl Record{
     pub fn send_sequence(&self)->u64{self.send_sequence}
     pub fn receive_sequence(&self)->u64{self.receive_sequence}
     pub fn receive_cursor(&self)->u64{self.receive_cursor}
+    pub fn signal_epoch(&self)->u64{self.signal_epoch}
+    pub fn signal_session(&self)->Option<Uuid>{self.signal_session}
     pub fn writer_retired(&self)->bool{self.writer_retired}
     pub fn material_absent(&self)->bool{self.material_absent}
     pub fn local_retired(&self)->bool{self.local_retired}
@@ -92,6 +95,9 @@ impl Journal{
         let mut generations=BTreeSet::new();let mut live=BTreeSet::new();
         for record in &self.records{
             let address=record.address;address.validate()?;key(&record.public_key)?;
+            if record.signal_epoch>self.revision||record.signal_epoch>MAX_REVISION||
+                (record.signal_epoch==0)!=record.signal_session.is_none()||record.signal_session.is_some_and(|id|id.is_nil()){return Err(invalid());}
+            if record.signal_epoch!=0&&(record.local_retired||!matches!(record.phase,Phase::Active|Phase::Revoking)){return Err(invalid());}
             if record.send_sequence>1_000_000||record.receive_sequence>1_000_000||record.receive_cursor>9_007_199_254_740_991||
                 record.seen_messages.len()>256||record.seen_messages.iter().any(Uuid::is_nil)||
                 record.seen_messages.iter().copied().collect::<BTreeSet<_>>().len()!=record.seen_messages.len()||
@@ -100,7 +106,7 @@ impl Journal{
             let kind=match address.kind(){SecretKind::DeviceSigning=>0u8,SecretKind::PairEncryption=>1};
             if record.phase!=Phase::Retired&&!live.insert((kind,address.id())){return Err(invalid());}
             match address.kind(){
-                SecretKind::DeviceSigning=>if record.grant_hash.is_some()||record.expires_at_ms.is_some()||record.grant.is_some()||record.send_sequence!=0||record.receive_sequence!=0||record.receive_cursor!=0||!record.seen_messages.is_empty(){return Err(invalid());},
+                SecretKind::DeviceSigning=>if record.grant_hash.is_some()||record.expires_at_ms.is_some()||record.grant.is_some()||record.send_sequence!=0||record.receive_sequence!=0||record.receive_cursor!=0||!record.seen_messages.is_empty()||record.signal_epoch!=0||record.signal_session.is_some(){return Err(invalid());},
                 SecretKind::PairEncryption=>{
                     let metadata=record.grant.as_ref().ok_or_else(invalid)?;
                     let grant=metadata.historical_grant()?;
@@ -178,6 +184,7 @@ fn add(journal:&mut Journal,address:CredentialAddress,public_key:String,grant_ha
     if journal.records.iter().any(|record|record.address.generation()==address.generation()||record.address.kind()==address.kind()&&record.address.id()==address.id()&&record.phase!=Phase::Retired){return Err(conflict());}
     journal.records.push(Record{address,public_key,grant_hash,expires_at_ms,grant,phase:Phase::Reserved,
         send_sequence:0,receive_sequence:0,receive_cursor:0,seen_messages:Vec::new(),
+        signal_epoch:0,signal_session:None,
         writer_retired:true,material_absent:false,local_retired:false,relay_retired:false});Ok(())
 }
 pub fn reserve_identity(database:&Database,lease:&CredentialLease,profile:Uuid,expected:u64,address:CredentialAddress,public_key:String)->Result<Journal>{
@@ -249,7 +256,7 @@ pub fn observe_cleanup(database:&Database,lease:&CredentialLease,profile:Uuid,ex
         match observation{
             CleanupObservation::WriterRetired=>record.writer_retired=true,
             CleanupObservation::MaterialAbsent=>{if !record.writer_retired{return Err(conflict());}record.material_absent=true;},
-            CleanupObservation::LocalRetired=>record.local_retired=true,
+            CleanupObservation::LocalRetired=>{record.local_retired=true;record.signal_epoch=0;record.signal_session=None;},
             CleanupObservation::RelayRetired=>record.relay_retired=true,
         }
         let complete=record.writer_retired&&record.material_absent&&record.local_retired&&record.relay_retired;
@@ -296,5 +303,28 @@ pub fn accept_signal(database:&Database,lease:&CredentialLease,profile:Uuid,expe
         record.receive_sequence=metadata.sequence;record.receive_cursor=cursor;
         if record.seen_messages.len()==256{record.seen_messages.remove(0);}
         record.seen_messages.push(metadata.message_id);Ok(())
+    })
+}
+
+/// Exclusive native session ownership, not a clock-expiring receiver lease.
+/// Crash leaves debt: never reclaim by age or invent proof the old owner exited.
+pub fn reserve_signal_session(database:&Database,lease:&CredentialLease,profile:Uuid,expected:u64,address:CredentialAddress,session:Uuid,now:u64)->Result<Journal>{
+    let started=Instant::now();
+    if session.is_nil(){return Err(invalid());}
+    update(database,lease,profile,expected,|journal|{
+        let record=selected(journal,address)?;let current=after_wait(now,started)?;
+        if record.address.kind()!=SecretKind::PairEncryption||record.phase!=Phase::Active||record.signal_session.is_some()||
+            record.expires_at_ms.is_none_or(|expiry|expiry<=current){return Err(conflict());}
+        record.signal_session=Some(session);record.signal_epoch=expected.checked_add(1).ok_or_else(invalid)?;Ok(())
+    })
+}
+/// Caller must first close its native authority and retire all scoped operations.
+/// The retained file lease prevents another participating operation from being
+/// in its vault/HTTP/commit lane while this ownership is released.
+pub fn release_signal_session(database:&Database,lease:&CredentialLease,profile:Uuid,expected:u64,address:CredentialAddress,session:Uuid,epoch:u64)->Result<Journal>{
+    update(database,lease,profile,expected,|journal|{
+        let record=selected(journal,address)?;
+        if record.signal_session!=Some(session)||record.signal_epoch!=epoch{return Err(conflict());}
+        record.signal_session=None;record.signal_epoch=0;Ok(())
     })
 }

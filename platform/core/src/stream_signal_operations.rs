@@ -117,6 +117,9 @@ fn active(snapshot:&Journal,address:CredentialAddress,expected:u64,now:u64)->Res
     let record=snapshot.records().iter().find(|record|record.address()==address).ok_or_else(denied)?;
     if record.phase()!=Phase::Active||record.expires_at_ms().is_none_or(|expiry|expiry<=now){return Err(denied());}Ok(record)
 }
+fn owned(record:&Record,session:Uuid,epoch:u64)->Result<()>{
+    if session.is_nil()||epoch==0||record.signal_session()!=Some(session)||record.signal_epoch()!=epoch{return Err(denied());}Ok(())
+}
 fn cipher(store:&dyn PairingSecretStore,record:&Record,clock:&Clock)->Result<NativeSignalCipher>{
     let grant=record.grant().ok_or_else(denied)?;
     let material=load_pair(store,&record.address(),grant.document(),grant.audience(),record.public_key(),clock.current()?)?;
@@ -128,7 +131,7 @@ pub fn prepare_send(database:&Database,profile:Uuid,address:CredentialAddress,se
     let clock=Clock::new(now,deadline)?;
     if body.is_empty()||body.len()>MAX_PACKET_BYTES-16{return Err(denied());}
     let lease=CredentialLease::acquire(database,profile)?;clock.authority(owner,address,session,epoch)?;
-    let snapshot=journal::load(database,profile)?;active(&snapshot,address,expected,clock.current()?)?;
+    let snapshot=journal::load(database,profile)?;owned(active(&snapshot,address,expected,clock.current()?)?,session,epoch)?;
     // Reservation commits before key loading/encryption. Any later error burns
     // the sequence and leaves its committed revision for explicit reload.
     let(reserved,sequence)=journal::reserve_signal_sequence(database,&lease,profile,expected,address,clock.current()?)?;
@@ -152,6 +155,7 @@ pub fn accept_received(database:&Database,profile:Uuid,address:CredentialAddress
     if metadata.session_id!=session{return Err(denied());}
     let lease=CredentialLease::acquire(database,profile)?;clock.authority(owner,address,session,epoch)?;
     let snapshot=journal::load(database,profile)?;let record=active(&snapshot,address,expected,clock.current()?)?;
+    owned(record,session,epoch)?;
     if cursor<=record.receive_cursor()||metadata.sequence<=record.receive_sequence(){return Err(denied());}
     let cipher=cipher(store,record,&clock)?;
     let body=cipher.open_uncommitted(sender,metadata,encrypted,clock.current()?)?;
@@ -175,6 +179,7 @@ pub fn send_prepared(database:&Database,profile:Uuid,prepared:&OutgoingSignal,ex
     let session=prepared.metadata.session_id;let epoch=prepared.epoch;
     let lease=CredentialLease::acquire(database,profile)?;clock.authority(owner,address,session,epoch)?;
     let snapshot=journal::load(database,profile)?;let record=active(&snapshot,address,expected,clock.current()?)?;
+    owned(record,session,epoch)?;
     let grant=record.grant().ok_or_else(denied)?;
     if prepared.revision>expected||prepared.metadata.sequence==0||prepared.metadata.sequence>record.send_sequence()||
         prepared.sender!=record.public_key()||prepared.audience!=grant.audience()||
@@ -201,6 +206,7 @@ pub fn poll_received(database:&Database,profile:Uuid,address:CredentialAddress,s
     let clock=Clock::new(now,deadline)?;
     let lease=CredentialLease::acquire(database,profile)?;clock.authority(owner,address,session,epoch)?;
     let snapshot=journal::load(database,profile)?;let record=active(&snapshot,address,expected,clock.current()?)?;
+    owned(record,session,epoch)?;
     let metadata=record.grant().ok_or_else(denied)?;
     let grant=verify_grant(metadata.document(),metadata.audience(),clock.current()?)?;
     let peer=if record.public_key()==grant.host_public_key{&grant.client_public_key}else{&grant.host_public_key};
@@ -236,6 +242,7 @@ pub fn request_ice(database:&Database,profile:Uuid,address:CredentialAddress,ses
     for url in allowed_turn_urls{native_ice::validate_turn_uri(url)?;}
     let lease=CredentialLease::acquire(database,profile)?;clock.authority(owner,address,session,epoch)?;
     let snapshot=journal::load(database,profile)?;let record=active(&snapshot,address,expected,clock.current()?)?;
+    owned(record,session,epoch)?;
     let grant=record.grant().ok_or_else(denied)?;
     let identity_record=snapshot.records().iter().find(|identity|identity.address().kind()==SecretKind::DeviceSigning&&identity.phase()==Phase::Active&&identity.public_key()==record.public_key()).ok_or_else(denied)?;
     let identity=load_identity(store,&identity_record.address(),identity_record.public_key())?;
