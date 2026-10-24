@@ -26,11 +26,11 @@ def verify_dependency_inventory(workspace, git):
         raise ValueError('Invalid gclient entry inventory')
     environment = {**os.environ, 'GIT_NO_LAZY_FETCH': '1', 'GIT_TERMINAL_PROMPT': '0'}
 
-    def capture(directory, *arguments):
+    def capture(directory, *arguments, timeout=90):
         return subprocess.run(
             [str(git), '--no-optional-locks', '-c', 'core.autocrlf=false',
              '-C', str(directory), *arguments], env=environment,
-            capture_output=True, text=True, timeout=90)
+            capture_output=True, text=True, timeout=timeout)
 
     checked = []
     for name, url in sorted(entries.items()):
@@ -57,8 +57,11 @@ def verify_dependency_inventory(workspace, git):
         head = capture(directory, 'rev-parse', '--verify', 'HEAD')
         if head.returncode or head.stdout.strip() != expected:
             raise ValueError('Git dependency HEAD differs from its pin: ' + name)
+        # A cold tracked-source scan on an external HDD can exceed 90 seconds.
+        # Keep HEAD queries short; allow a bounded 30 minutes for the full diff.
         difference = capture(directory, 'diff', '--quiet', '--no-ext-diff',
-                             '--no-textconv', '--ignore-submodules=all', expected, '--')
+                             '--no-textconv', '--ignore-submodules=all', expected, '--',
+                             timeout=1800)
         if difference.returncode:
             raise ValueError('Git dependency tracked source is incomplete or changed: ' + name)
         checked.append({'path': name, 'revision': expected})

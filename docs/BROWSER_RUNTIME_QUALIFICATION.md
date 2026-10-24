@@ -77,8 +77,10 @@ available. Linux build task 4 is still compiling. Mac build task 5 stopped after
 dependency sync because a read-only dependency Git diff exceeded the recipe's
 90-second timeout on the external HDD; that failure is not a compiler result.
 The exact comparison later passed in 71.10 seconds; a separate batch
-`005-build-b` now resumes the unchanged frozen recipe. The failed batch logs
-remain intact. No Mac compiler success or runtime acceptance is inferred.
+`005-build-b` then reproduced the timeout on Dawn. A separately frozen batch
+`005-build-c` now resumes with a 1800-second full-diff bound and unchanged pin
+and clean-source checks. The failed batch logs remain intact. No Mac compiler
+success or runtime acceptance is inferred.
 
 This acceptance does not establish a signed release, every native module,
 device capture/OS consent dialogs, reproducibility or later unbuilt source.

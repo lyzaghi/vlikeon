@@ -255,3 +255,22 @@ and the same Xcode. Its supervisor admits the prior failed result, unchanged
 preparation inventory and successful comparison receipt before calling the
 original recipe. The original batch is not relabeled as passing. Full build
 and subsequent ARM64 acceptance remain pending.
+
+## HDD admission timeout amendment: batch 005-build-c
+
+Batch b subsequently reproduced the same 90-second timeout on the Dawn
+dependency and exited 1. Warming only wasm_corpus was insufficient. Codex
+changed only the full tracked-source Git diff timeout to 1800 seconds; HEAD
+queries remain bounded to 90 seconds and all pin/clean-source checks remain
+required. A real Git fixture passed clean input, rejected modified tracked
+input, and verified the distinct timeout bounds.
+
+After confirming the failed processes and build lock were gone, a separate
+project macos-005c was frozen with the amended admission module. All original
+source/receipts and failed run logs remain intact. Its preparation SHA-256 is
+`0c3955502c40f189853c84e994e572b5bbe98ee723888511fbe520a7762e31ed`. The same-volume
+workspace rename preserves dependency bytes. A provenance record binds the
+old/new recipe and preparation hashes and the prior synced journal; it does
+not relabel a failed build as successful. Batch 005-build-c resumes from synced
+dependencies with two jobs and independent durable logs. Full compilation and
+subsequent runtime qualification remain pending.
