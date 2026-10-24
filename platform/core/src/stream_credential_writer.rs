@@ -149,6 +149,19 @@ impl<'a> NativeCredentialWriter<'a>{
         }
         let entry=selected.ok_or_else(conflict)?;
         let identity=snapshot.records().iter().find(|record|record.address()==entry.identity()).ok_or_else(conflict)?;
+        let metadata:omniplay_streaming::Invite=omniplay_streaming::inspect(entry.document(),4096)?;
+        if metadata.expires_at_ms<=elapsed_now(now,started)?{
+            if !crate::stream_signal_authority::installed_retirement_origins()?.iter().any(|origin|origin==entry.audience())||
+                entry.identity().kind()!=SecretKind::DeviceSigning||identity.material_absent()||!matches!(identity.phase(),Phase::Active|Phase::Revoking){return Err(conflict());}
+            let signer=load_identity(self.store,&entry.identity(),identity.public_key())?;
+            check(deadline)?;self.lease.check(self.database,self.profile)?;
+            relay.reconcile_expired_invitation(&signer,entry.audience(),entry.document(),elapsed_now(now,started)?,deadline,cancel)?;
+            check(deadline)?;self.lease.check(self.database,self.profile)?;
+            if cancel.load(std::sync::atomic::Ordering::Acquire){return Err(conflict());}
+            journal::complete_host_invitation(self.database,&self.lease,self.profile,expected,entry.identity(),entry.document(),entry.audience())?;
+            check(deadline)?;self.lease.check(self.database,self.profile)?;
+            if cancel.load(std::sync::atomic::Ordering::Acquire){return Err(conflict());}return Ok(());
+        }
         let mut invitation=omniplay_streaming::native_pair_exchange::NativeHostInvitation::restore_for_close(entry.document(),identity.public_key(),entry.audience(),elapsed_now(now,started)?)?;
         self.close_host(entry.identity(),&mut invitation,relay,elapsed_now(now,started)?,deadline,cancel)
     }

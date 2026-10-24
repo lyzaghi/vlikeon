@@ -1840,6 +1840,17 @@ this checkpoint.
 
 ## Remaining implementation and qualification
 
+Native relay cleanup now verifies the original expired host-signed invitation
+and requires an exact expired_absent receipt binding protocol, invite ID/hash,
+host, original expiry and pairs_revoked:false. Network/status/shape mismatch is
+never accepted as absence. Durable restart-close writer selects this branch for
+expired intents, requires installed retirement audience and exact retained
+Active/Revoking signer, and holds its scoped lease through HTTP and transactional
+completion. Original deadlines/cancellation surround each side effect. Failure
+retains intent; postcommit failure requires reload. UI still blocks expired
+records pending follow-up wiring. No compiler/build/test/SQL/network operation or
+deployment ran; actual server/client compatibility qualification remains due.
+
 RelayOperation ReconcileExpiredInvite now accepts the original host-signed public
 invitation. Server verifies it against authenticated request sender and installed
 audience at historical creation, then requires expiry by server time and no live

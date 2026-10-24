@@ -2,6 +2,11 @@
 
 ## Current sequence — 1–109 outstanding tasks
 
+Item 58 durable restart cleanup now authors expired-invitation receipt validation
+and exact intent completion under the same lease, after authenticated relay
+absence confirmation. Native UI expiry guards remain to update. Source-only;
+no build/test/network/SQL ran and relay changes are not deployed.
+
 Item 58 relay source now authors authenticated expired-invitation reconciliation:
 original host-signed invite, server expiry and transaction-verified live absence
 produce an exact bound receipt without revoking pairs. Native receipt consumer

@@ -192,6 +192,22 @@ impl NativePairRelay{
         if receipt.decline_protocol!=1||!receipt.declined||receipt.invite_id!=invite.id||receipt.client_public_key!=client||receipt.hello_hash!=crate::document_hash(hello)?{return Err(denied());}
         let _=pending.relay_material(identity,elapsed_now(now,started)?)?;check(deadline,cancel)?;Ok(())
     }
+    /// Cleanup-only expired invitation reconciliation; no local expiry receipt.
+    pub fn reconcile_expired_invitation(&self,identity:&NativeSigningIdentity,audience:&str,document:&SignedDocument,
+        now:u64,deadline:Instant,cancel:&AtomicBool)->Result<()>{
+        let started=Instant::now();check(deadline,cancel)?;
+        let invite:crate::Invite=crate::verify(&identity.public_key(),crate::INVITE_DOMAIN,document,4096)?;
+        invite.validate(audience,invite.created_at_ms)?;
+        if invite.id.is_nil()||invite.host_public_key!=identity.public_key()||invite.expires_at_ms>now{return Err(denied());}
+        let response=self.signed_control(identity,audience,RelayOperation::ReconcileExpiredInvite{invite:document.clone()},now,deadline,cancel)?;
+        #[derive(serde::Deserialize)]#[serde(deny_unknown_fields)]
+        struct Receipt{expired_invite_protocol:u32,closed:bool,reason:String,invite_id:Uuid,host_public_key:String,invite_hash:String,expires_at_ms:u64,pairs_revoked:bool}
+        let receipt:Receipt=serde_json::from_value(response).map_err(|_|network())?;
+        if receipt.expired_invite_protocol!=1||!receipt.closed||receipt.reason!="expired_absent"||receipt.invite_id!=invite.id||
+            receipt.host_public_key!=identity.public_key()||receipt.invite_hash!=crate::document_hash(document)?||receipt.expires_at_ms!=invite.expires_at_ms||receipt.pairs_revoked{return Err(denied());}
+        if invite.expires_at_ms>elapsed_now(now,started)?{return Err(denied());}
+        check(deadline,cancel)?;Ok(())
+    }
     pub(crate) fn close_invitation(&self,identity:&NativeSigningIdentity,pending:&crate::native_pair_exchange::NativeHostInvitation,
         now:u64,deadline:Instant,cancel:&AtomicBool)->Result<()>{
         let(audience,document,invite)=pending.close_material(identity,now)?;
