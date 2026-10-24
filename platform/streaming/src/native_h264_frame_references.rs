@@ -155,9 +155,13 @@ impl FrameReferences{
     /// Native decode owner commits the same staged transition at its chosen
     /// confirmed decode boundary. This does not acknowledge decoder completion.
     pub fn commit(&mut self,update:FrameReferenceUpdate,parameters:&ParameterSets)->Result<()>{
+        self.recheck(&update,parameters)?;
+        self.state=update.next;self.version+=1;Ok(())
+    }
+    pub(crate) fn recheck(&self,update:&FrameReferenceUpdate,parameters:&ParameterSets)->Result<()>{
         if self.closed||!Arc::ptr_eq(&self.identity,&update.identity)||self.version!=update.expected||self.version>=10_000_000{return Err(invalid());}
         parameters.check(&update.binding)?;
-        self.state=update.next;self.version+=1;Ok(())
+        Ok(())
     }
 }
 fn long_allowed(state:&State,index:u8)->Result<()>{if state.maximum_long.is_none_or(|maximum|index>maximum){Err(invalid())}else{Ok(())}}

@@ -1,5 +1,15 @@
 # Native ordered RTP to decoder bridge — item 56
 
+`FrameDecodeState` now coordinates progressive POC, per-slice pre-marking
+reference lists and post-decode reference marking in one staged plan. Retry
+rechecks are read-only. Joint commit preflights both components and every list
+against their owner/version/parameter bindings before mutation under exclusive
+access; an unexpected partial failure closes both components. Native decoder
+completion still must be observed for the exact picture before calling commit;
+the API itself is not a completion receipt. Actual decoder correlation/caller,
+fields/gaps/output and full negotiated admission remain unfinished. Build/test
+remain deferred.
+
 The frame-reference component now consumes `PictureOrderUpdate` directly for the
 exact same parsed picture and parameter pair. Retained serials store the derived
 post-MMCO5 POC; B-list construction uses the current staged pre-reset POC and

@@ -98,8 +98,12 @@ impl PictureOrderState{
         Ok(PictureOrderUpdate{identity:self.identity.clone(),expected:self.version,binding:identity.parameters().clone(),next,decoded,retained,reset})
     }
     pub fn commit(&mut self,update:PictureOrderUpdate,parameters:&ParameterSets)->Result<()>{
+        self.recheck(&update,parameters)?;
+        self.state=update.next;self.version+=1;Ok(())
+    }
+    pub(crate) fn recheck(&self,update:&PictureOrderUpdate,parameters:&ParameterSets)->Result<()>{
         if self.closed||!Arc::ptr_eq(&self.identity,&update.identity)||self.version!=update.expected||self.version>=10_000_000{return Err(invalid());}
-        parameters.check(&update.binding)?;self.state=update.next;self.version+=1;Ok(())
+        parameters.check(&update.binding)?;Ok(())
     }
 }
 fn number(value:i128)->Result<i64>{

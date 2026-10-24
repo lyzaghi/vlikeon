@@ -14,6 +14,7 @@ pub mod native_h264_picture;
 pub mod native_h264_auxiliary;
 pub mod native_h264_frame_references;
 pub mod native_h264_poc;
+pub mod native_h264_decode_state;
 pub mod native_rtp_reorder;
 pub mod native_credentials;
 pub mod native_pair_exchange;

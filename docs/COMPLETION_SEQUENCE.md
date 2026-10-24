@@ -2,6 +2,8 @@
 
 ## Current sequence — 1–109 outstanding tasks
 
+Source checkpoint: one staged progressive decode plan now joins POC, all slice reference lists and reference marking, with read-only retry checks and joint preflight/commit. Native exact-picture decode completion/correlation and receiver/backend caller still need integration. Build/test stay deferred.
+
 Source checkpoint: progressive reference marking/list construction now directly consumes exact-picture staged POC, stores normalized reference POC and uses actual derived current POC for B lists. The external POC-mapping input is removed. Joint decode commit coordination and full backend integration remain open; build/test stay deferred.
 
 Source checkpoint: H.264 POC types 0/1/2 now have staged derivation for wrap/frame offsets, cycles/nonreferences, field counts and MMCO5 resets, with owner/version/parameter-bound commit and bounded arithmetic. Reference serial/POC integration, fields/gaps/output and backend decode completion remain open. Build/test remain deferred.
