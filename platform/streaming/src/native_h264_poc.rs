@@ -18,6 +18,10 @@ struct State{configuration:Option<Configuration>,previous_frame:u32,frame_offset
 pub struct PictureOrderState{identity:Arc<()>,version:u64,state:State,closed:bool}
 pub struct PictureOrderUpdate{identity:Arc<()>,expected:u64,binding:ParameterBinding,next:State,decoded:PictureCounts,retained:PictureCounts,reset:bool}
 impl PictureOrderUpdate{
+    pub(crate) fn for_picture(&self,picture:&PictureIdentity,parameters:&ParameterSets)->Result<(PictureCounts,PictureCounts)>{
+        if self.next.last.as_ref()!=Some(picture){return Err(invalid());}
+        parameters.check(&self.binding)?;Ok((self.decoded,self.retained))
+    }
     /// Before MMCO5 normalization, for current-picture reference-list formation.
     pub fn decoded(&self)->PictureCounts{self.decoded}
     /// After MMCO5 normalization, for retaining the newly decoded reference.

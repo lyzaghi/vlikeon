@@ -1,16 +1,17 @@
 //! Frame-picture reference marking metadata. Field/MBAFF, POC derivation,
 //! output buffering and actual decode completion remain separate integrations.
 use crate::{invalid,native_h264_parameters::{ParameterSets,ParameterBinding},native_h264_picture::PrimaryPictureHeaders,
-    native_h264_slice::{PictureIdentity,SliceKind},native_h264_slice_header::{ReferenceMarking,MemoryEdit,SliceHeader,ListEdit}};
+    native_h264_poc::PictureOrderUpdate,native_h264_slice::{PictureIdentity,SliceKind},native_h264_slice_header::{ReferenceMarking,MemoryEdit,SliceHeader,ListEdit}};
 use omniplay_contracts::Result;
 use std::sync::Arc;
 
 #[derive(Clone,Debug)]
-pub struct FrameReference{serial:u64,frame_num:u32,long_term:Option<u8>}
+pub struct FrameReference{serial:u64,frame_num:u32,long_term:Option<u8>,picture_order:i64}
 impl FrameReference{
     pub fn serial(&self)->u64{self.serial}
     pub fn frame_num(&self)->u32{self.frame_num}
     pub fn long_term_index(&self)->Option<u8>{self.long_term}
+    pub fn picture_order(&self)->i64{self.picture_order}
     pub fn picture_number(&self,current:u32,maximum:u32)->i64{
         if self.frame_num>current{i64::from(self.frame_num)-i64::from(maximum)}else{i64::from(self.frame_num)}
     }
@@ -23,9 +24,6 @@ pub struct FrameReferences{identity:Arc<()>,version:u64,state:State,closed:bool}
 /// A staged, table-local transition. Dropping it leaves retained references
 /// unchanged. It cannot be replayed after another successful commit.
 pub struct FrameReferenceUpdate{identity:Arc<()>,expected:u64,binding:ParameterBinding,next:State}
-/// Actual derived picture orders from the native POC owner, keyed by retained
-/// serials, not remote timestamps. This type does not calculate or verify POC.
-pub struct FramePictureOrders{pub current:i64,pub references:Vec<(u64,i64)>}
 pub struct FramePredictionLists{identity:Arc<()>,version:u64,binding:ParameterBinding,list0:Vec<u64>,list1:Vec<u64>}
 impl FramePredictionLists{
     pub fn list0(&self)->&[u64]{&self.list0}
@@ -38,9 +36,10 @@ impl FrameReferences{
     pub fn entries(&self)->&[FrameReference]{&self.state.entries}
     /// Build lists from PRE-marking reference state. B pictures require actual
     /// picture orders; arrival/RTP timestamps must never stand in for POC.
-    pub fn prediction_lists(&self,header:&SliceHeader,parameters:&ParameterSets,orders:Option<&FramePictureOrders>)->Result<FramePredictionLists>{
+    pub fn prediction_lists(&self,header:&SliceHeader,parameters:&ParameterSets,order:&PictureOrderUpdate)->Result<FramePredictionLists>{
         if self.closed{return Err(invalid());}
         let picture=header.prefix.picture();let resolved=parameters.check(picture.parameters())?;let sps=resolved.sps();
+        let current_order=order.for_picture(picture,parameters)?.0.picture()?;
         if !sps.frame_only||picture.field().is_some()||picture.colour_plane().is_some()||picture.redundant()!=0{return Err(invalid());}
         let kind=header.prefix.kind();let mut list0=Vec::new();let mut list1=Vec::new();
         if !matches!(kind,SliceKind::I|SliceKind::Si){
@@ -51,21 +50,13 @@ impl FrameReferences{
             let mut long:Vec<_>=self.state.entries.iter().filter(|entry|entry.long_term.is_some()).collect();
             long.sort_by_key(|entry|entry.long_term);
             if kind==SliceKind::B{
-                let orders=orders.ok_or_else(invalid)?;
-                if orders.references.len()!=self.state.entries.len(){return Err(invalid());}
-                let mut seen=std::collections::BTreeSet::new();
-                for (serial,_) in &orders.references{
-                    if !seen.insert(*serial)||!self.state.entries.iter().any(|entry|entry.serial==*serial){return Err(invalid());}
-                }
-                let by_serial:std::collections::BTreeMap<_,_>=orders.references.iter().copied().collect();
-                // Exact membership was checked above for every retained serial.
-                let order=|entry:&FrameReference|by_serial[&entry.serial];
+                let order=|entry:&FrameReference|entry.picture_order;
                 short.sort_by_key(|entry|order(entry));
-                let before:Vec<_>=short.iter().filter(|entry|order(entry)<orders.current).rev().map(|entry|entry.serial).collect();
-                let after:Vec<_>=short.iter().filter(|entry|order(entry)>=orders.current).map(|entry|entry.serial).collect();
+                let before:Vec<_>=short.iter().filter(|entry|order(entry)<current_order).rev().map(|entry|entry.serial).collect();
+                let after:Vec<_>=short.iter().filter(|entry|order(entry)>=current_order).map(|entry|entry.serial).collect();
                 list0.extend_from_slice(&before);list0.extend_from_slice(&after);
-                list1.extend(short.iter().filter(|entry|order(entry)>orders.current).map(|entry|entry.serial));
-                list1.extend(short.iter().filter(|entry|order(entry)<=orders.current).rev().map(|entry|entry.serial));
+                list1.extend(short.iter().filter(|entry|order(entry)>current_order).map(|entry|entry.serial));
+                list1.extend(short.iter().filter(|entry|order(entry)<=current_order).rev().map(|entry|entry.serial));
                 list0.extend(long.iter().map(|entry|entry.serial));list1.extend(long.iter().map(|entry|entry.serial));
                 if list0==list1&&list1.len()>1{list1.swap(0,1);}
             }else{
@@ -86,9 +77,10 @@ impl FrameReferences{
     /// decode validity. Header parsing alone does not establish that prerequisite.
     /// This component handles complete progressive frame pictures only; field
     /// and MBAFF pictures need the complementary-field reference coordinator.
-    pub fn prepare(&self,picture:&PrimaryPictureHeaders,parameters:&ParameterSets)->Result<FrameReferenceUpdate>{
+    pub fn prepare(&self,picture:&PrimaryPictureHeaders,parameters:&ParameterSets,order:&PictureOrderUpdate)->Result<FrameReferenceUpdate>{
         if self.closed||self.version>=10_000_000{return Err(invalid());}
         let identity=picture.identity();let resolved=parameters.check(identity.parameters())?;let sps=resolved.sps();
+        let retained_order=order.for_picture(identity,parameters)?.1.picture()?;
         if !sps.frame_only||identity.field().is_some()||identity.colour_plane().is_some()||identity.redundant()!=0{return Err(invalid());}
         let config=Configuration{frame_num_bits:sps.frame_num_bits,references:sps.reference_frames,width:sps.coded_width,height:sps.coded_height};
         let header=picture.headers().first().ok_or_else(invalid)?;
@@ -155,7 +147,7 @@ impl FrameReferences{
             if next.entries.len()>=capacity{return Err(invalid());}
             let frame_num=if reset{0}else{current};
             if current_long.is_none()&&next.entries.iter().any(|entry|entry.long_term.is_none()&&entry.frame_num==frame_num){return Err(invalid());}
-            next.entries.push(FrameReference{serial:self.version+1,frame_num,long_term:current_long});
+            next.entries.push(FrameReference{serial:self.version+1,frame_num,long_term:current_long,picture_order:retained_order});
         }
         next.last=Some(identity.clone());
         Ok(FrameReferenceUpdate{identity:self.identity.clone(),expected:self.version,binding:identity.parameters().clone(),next})

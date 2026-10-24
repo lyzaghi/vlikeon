@@ -1,5 +1,13 @@
 # Native ordered RTP to decoder bridge — item 56
 
+The frame-reference component now consumes `PictureOrderUpdate` directly for the
+exact same parsed picture and parameter pair. Retained serials store the derived
+post-MMCO5 POC; B-list construction uses the current staged pre-reset POC and
+those stored values. The earlier external serial/POC mapping input is removed.
+This connects POC derivation and progressive reference lists/marking; a joint
+native owner still needs to coordinate both commits with actual decode results.
+Build/test and field/gap/output/backend completion remain outstanding.
+
 Native POC derivation now has source implementation in `native_h264_poc.rs` for
 types 0/1/2: reference-LSB/MSB wrap, frame-number offsets, cycle offsets and
 nonreference adjustments, top/bottom field counts and MMCO5 normalization. A
