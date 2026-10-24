@@ -2,6 +2,11 @@
 
 ## Current sequence — 1–109 outstanding tasks
 
+Item 58 writer now authors restart cleanup from exact durable invite ID/revision:
+reconstructed invitation is permanently closed with no proof/request/exchange
+state and uses existing bound close/completion. Only unexpired invitations are
+supported yet. Source-only; controller/ABI/UI and build/test remain due.
+
 Item 58 confirmed host close now removes only its exact durable invitation
 intent under the retained scoped lease, after bound relay acknowledgment and
 deadline/cancel checks. Uncertain results retain recovery debt. Source-only;

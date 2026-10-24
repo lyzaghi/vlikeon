@@ -1840,6 +1840,16 @@ this checkpoint.
 
 ## Remaining implementation and qualification
 
+restore_for_close now reconstructs only a permanently closed invitation from
+pinned signed public metadata. It verifies current signature/audience/lifetime,
+retains no bearer proof, and restores no peer request/exchange/registration state.
+All normal share/approval/register paths remain refused by closed admission.
+Writer recover_host_invitation_close selects exact durable invite ID and expected
+revision under lease, then follows existing exact signer/relay close and intent
+completion. Only unexpired invitations are supported; expired remote cleanup
+still needs separate protocol reconciliation. No controller/ABI/UI or build/test/
+crypto/vault/network operation ran. Durable recovery integration remains due.
+
 Confirmed live host close now matches identity/audience/exact signed invitation
 hash against current durable intents and completes only that entry transactionally
 under the same lease/revision after native relay acknowledgment. No caller boolean

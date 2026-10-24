@@ -18,6 +18,18 @@ pub struct NativeHostPeerReview{pub client_public_key:String,pub label:String,pu
 /// before dispatching its public signed grant to ApprovePair.
 pub struct NativeHostApproval{exchange:NativePairExchange,invite:SignedDocument,hello:SignedDocument,grant:SignedDocument,client:String,audience:String,deadline:Instant}
 impl NativeHostInvitation{
+    /// Restore cleanup only from a pinned signed public invitation. No proof,
+    /// exchange or request state is reconstructed; every normal action refuses.
+    pub fn restore_for_close(document:&SignedDocument,host:&str,audience:&str,now:u64)->Result<Self>{
+        let started=Instant::now();
+        let invite:Invite=verify(host,INVITE_DOMAIN,document,4096)?;invite.validate(audience,now)?;
+        if invite.host_public_key!=host||invite.id.is_nil(){return Err(unauthorized());}
+        let remaining=invite.expires_at_ms.checked_sub(now).ok_or_else(unauthorized)?;
+        let deadline=started.checked_add(Duration::from_millis(remaining).min(MAX_EXCHANGE_AGE)).ok_or_else(invalid)?;
+        Ok(Self{document:document.clone(),secret:Zeroizing::new(String::new()),host:host.into(),audience:audience.into(),deadline,
+            attempted:std::collections::BTreeSet::new(),registered:false,requests:std::collections::BTreeMap::new(),
+            declined:std::collections::BTreeSet::new(),closed:true,close_confirmed:false})
+    }
     pub fn create(identity:&crate::native_credentials::NativeSigningIdentity,audience:&str,label:&str,now:u64)->Result<Self>{
         let started=Instant::now();validate_audience(audience)?;
         if label.is_empty()||label.len()>120||label.chars().any(char::is_control)||now>9_007_199_254_440_991{return Err(invalid());}

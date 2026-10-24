@@ -121,6 +121,23 @@ impl<'a> NativeCredentialWriter<'a>{
         if cancel.load(std::sync::atomic::Ordering::Acquire){return Err(conflict());}Ok(())
     }
     /// Cleanup-only retained Active/Revoking identity; uncertain reply retains owner.
+    pub fn recover_host_invitation_close(&self,expected:u64,invite_id:Uuid,now:u64,deadline:Instant,
+        relay:&omniplay_streaming::native_relay::NativePairRelay,cancel:&std::sync::atomic::AtomicBool)->Result<()>{
+        let started=begin(deadline)?;
+        if invite_id.is_nil()||cancel.load(std::sync::atomic::Ordering::Acquire){return Err(conflict());}
+        let snapshot=journal::load_scoped(self.database,&self.lease,self.profile)?;
+        if snapshot.revision()!=expected{return Err(conflict());}
+        let mut selected=None;
+        for entry in snapshot.host_invitations(){
+            let invite:omniplay_streaming::Invite=omniplay_streaming::inspect(entry.document(),4096)?;
+            if invite.id==invite_id{selected=Some(entry.clone());break;}
+        }
+        let entry=selected.ok_or_else(conflict)?;
+        let identity=snapshot.records().iter().find(|record|record.address()==entry.identity()).ok_or_else(conflict)?;
+        let mut invitation=omniplay_streaming::native_pair_exchange::NativeHostInvitation::restore_for_close(entry.document(),identity.public_key(),entry.audience(),elapsed_now(now,started)?)?;
+        self.close_host(entry.identity(),&mut invitation,relay,elapsed_now(now,started)?,deadline,cancel)
+    }
+    /// Cleanup-only retained Active/Revoking identity; uncertain reply retains owner.
     /// Does not revoke approved pairs or implement crash/expired-invite recovery.
     pub fn close_host(&self,address:CredentialAddress,invitation:&mut omniplay_streaming::native_pair_exchange::NativeHostInvitation,
         relay:&omniplay_streaming::native_relay::NativePairRelay,now:u64,deadline:Instant,cancel:&std::sync::atomic::AtomicBool)->Result<()>{
