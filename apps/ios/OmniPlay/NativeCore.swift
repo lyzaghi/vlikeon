@@ -139,7 +139,7 @@ struct NativeRecoverySnapshot {
     let pendingClientTicket:String?
     let pendingHostTicket:String?
     let pairingOrigins:[String]
-    var needsAttention:Bool{namespaceProvenanceMissing || records.contains{$0.sessionRecoveryRequired || ($0.nextStep != nil && $0.nextStep != "revalidate_before_use")}}
+    var needsAttention:Bool{namespaceProvenanceMissing || pendingHostTicket != nil || records.contains{$0.sessionRecoveryRequired || ($0.nextStep != nil && $0.nextStep != "revalidate_before_use")}}
 }
 /// Trusted native begin context. It contains public metadata, never invite proof.
 final class NativeClientSetup {

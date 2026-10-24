@@ -2,6 +2,11 @@
 
 ## Current sequence — 1–109 outstanding tasks
 
+Item 58 LocalHost identity material removal now refuses while a retained host
+invitation may require that exact signer. Both mobile status attention predicates
+include pending host cleanup. Source-only; durable cross-crash retention and
+full recovery/build/test remain due.
+
 Item 58 invitation close now accepts the original retained Revoking identity
 only for cleanup, requiring exact generation/pinned host key and non-absent vault
 material under lease. No new pairing authority. Source-only; build/test/crash/

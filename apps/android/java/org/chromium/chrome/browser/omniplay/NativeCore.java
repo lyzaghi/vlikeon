@@ -611,7 +611,7 @@ public final class NativeCore {
         final boolean namespaceProvenanceMissing;
         final String pendingClientTicket;
         final String pendingHostTicket;
-        boolean needsAttention(){if(namespaceProvenanceMissing)return true;for(RecoveryRecord record:records)if(record.sessionRecoveryRequired||(record.nextStep!=null&&!"revalidate_before_use".equals(record.nextStep)))return true;return false;}
+        boolean needsAttention(){if(namespaceProvenanceMissing||pendingHostTicket!=null)return true;for(RecoveryRecord record:records)if(record.sessionRecoveryRequired||(record.nextStep!=null&&!"revalidate_before_use".equals(record.nextStep)))return true;return false;}
         private RecoverySnapshot(JSONObject status,String profile,long deadline) throws Exception {
             if(status.getInt("credential_protocol")!=1||status.getInt("recovery_protocol")!=1||!profile.equals(status.getString("profile_id"))||!canonicalPairingId(status.getString("device_id")))throw new IllegalStateException();
             revision=status.getLong("revision");expires=deadline;

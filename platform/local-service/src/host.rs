@@ -129,6 +129,9 @@ impl LocalHost {
     pub fn native_pairing_remove_material(&mut self,address:omniplay_streaming::native_credentials::CredentialAddress,
         expected:u64,store:&dyn omniplay_streaming::native_credentials::PairingSecretStore,deadline:std::time::Instant)->Result<Value>{
         self.ensure_open()?;
+        if self.pairing_host.as_ref().is_some_and(|pending|pending.registration_attempted&&pending.identity==address){
+            return Err(PlatformError::new(ErrorCode::Busy,"Close the retained host invitation before removing its signing identity"));
+        }
         if std::time::Instant::now()>=deadline{return Err(PlatformError::new(ErrorCode::DeadlineExceeded,"Native vault cleanup expired before lease admission"));}
         let lease=omniplay_core::stream_credential_lease::CredentialLease::acquire(&self.database,self.profile_id)?;
         self.identity_review=None;

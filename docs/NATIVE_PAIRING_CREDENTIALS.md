@@ -1840,6 +1840,15 @@ this checkpoint.
 
 ## Remaining implementation and qualification
 
+LocalHost exact material removal now refuses an identity generation referenced
+by a retained possibly-registered host invitation. Closing the invitation first
+preserves its cleanup signer; new-session policy need not be enabled for close.
+Mobile status attention now includes any pending host ticket, surfacing the
+existing native close action. This guard is only within the live LocalHost: it
+does not protect against independent core callers, detach or crash because
+durable invitation ownership is still missing. No build/test/runtime operation
+ran; durable retention and expiry reconciliation remain required.
+
 Invitation close now permits exact retained Active or Revoking identity material
 on its cleanup-only stack. Current scoped journal must contain the original
 DeviceSigning generation, matching pinned invitation host key, with material not
