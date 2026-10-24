@@ -1840,6 +1840,16 @@ this checkpoint.
 
 ## Remaining implementation and qualification
 
+iOS successful peer persistence now issues at most one activation snapshot from
+the consumed peer review, checking exact ticket/pair/profile, candidate generation,
+MaterialReady phase and bounded revision. Snapshot retains copied address/revision
+and original grant/owner/core/cancel/expiry. A separate native dialog displays
+host, pair, generation, input permission and grant expiry; its explicit positive
+action consumes activation once and calls the reviewed ABI. Dismissal leaves
+saved state for reconciliation. No connection/session starts. No compiler/build/
+test, UI render or native operation ran. Interrupted-candidate rereview, native
+host flow, retirement ownership and end-to-end qualification remain unfinished.
+
 iOS native-only client lane now dispatches typed action activate to the separate
 reviewed activation ABI, not generic ticket actions. Input <=1024 requires exact
 profile/pair-kind canonical address IDs, bounded integral revision and canonical

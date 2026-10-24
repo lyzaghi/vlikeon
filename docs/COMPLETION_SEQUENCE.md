@@ -2,6 +2,11 @@
 
 ## Current sequence — 1–109 outstanding tasks
 
+Item 58 iOS now authors one-use activation snapshots from exact successful peer
+persistence and an explicit activation dialog. Original peer owner/core/fence/
+expiry and exact candidate/revision/grant are retained. No transport starts.
+Source-only; no build/test. Interrupted-candidate rereview and qualification due.
+
 Item 58 iOS private client lane now calls reviewed activation ABI with 1024-byte
 request bound, exact address/grant/revision response checks and existing owner/
 deadline/cancel admission. Source-only; no build/test. Typed activation snapshot

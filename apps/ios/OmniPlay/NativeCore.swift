@@ -30,6 +30,7 @@ final class NativePeerApproval {
     fileprivate let origin:ObjectIdentifier
     private let lock=NSLock()
     private var consumed=false
+    private var activationIssued=false
     private let current:()->Bool
     fileprivate init(origin:NativeCore,ticket:String,hash:String,pair:String,host:String,fingerprint:String,comparison:String,input:Bool,grantExpiresAt:Date,expires:DispatchTime,current:@escaping ()->Bool){
         self.origin=ObjectIdentifier(origin)
@@ -43,6 +44,19 @@ final class NativePeerApproval {
         consumed=true;return true
     }
     fileprivate var admitted:Bool{DispatchTime.now()<expires&&current()}
+    fileprivate func issueActivation()->Bool{
+        lock.lock();defer{lock.unlock()}
+        guard consumed,!activationIssued,admitted else{return false};activationIssued=true;return true
+    }
+}
+final class NativePeerActivation {
+    let peer:NativePeerApproval,generation:String
+    fileprivate let address:[String:Any],revision:UInt64
+    private let lock=NSLock();private var consumed=false
+    fileprivate init(peer:NativePeerApproval,address:[String:Any],revision:UInt64,generation:String){self.peer=peer;self.address=address;self.revision=revision;self.generation=generation}
+    fileprivate func consume()->Bool{
+        lock.lock();defer{lock.unlock()};guard !consumed,peer.admitted else{return false};consumed=true;return true
+    }
 }
 private final class NativePairingDeliveryFence {
     final class Token {}
@@ -445,6 +459,26 @@ final class NativeCore {
                 guard review.admitted else{completion(.failure(OmniFailure.message("Kết quả xác nhận đã cũ. Hãy kiểm tra trạng thái native.")));return}
                 completion(result)
             }
+        }catch{completion(.failure(error))}
+    }
+    @MainActor func activationForPeer(_ review:NativePeerApproval,value:[String:Any]) throws->NativePeerActivation{
+        guard review.origin==ObjectIdentifier(self),review.admitted,
+              (value["credential_protocol"] as? NSNumber)?.uint32Value==1,value["phase"] as? String=="material_ready",value["pairing_ticket"] as? String==review.ticket,
+              let address=value["address"] as? [String:Any],address.count==5,address["profile"] as? String==profileID.uuidString.lowercased(),address["kind"] as? String=="pair_encryption",address["id"] as? String==review.pairID,
+              let generation=address["generation"] as? String,let revision=value["revision"] as? NSNumber,CFGetTypeID(revision) != CFBooleanGetTypeID(),revision.doubleValue>=1,revision.doubleValue<10_000_000,revision.doubleValue==Double(revision.uint64Value) else{throw OmniFailure.message("Candidate đã lưu không khớp phiên duyệt. Hãy kiểm tra trạng thái.")}
+        for field in ["device","generation"]{
+            guard let text=address[field] as? String,let id=UUID(uuidString:text),id.uuidString.lowercased()==text,
+                  id != UUID(uuid:(0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0)) else{throw OmniFailure.message("Địa chỉ candidate không hợp lệ.")}
+        }
+        guard review.issueActivation() else{throw OmniFailure.message("Phiên kích hoạt đã được sử dụng hoặc kết thúc.")}
+        return NativePeerActivation(peer:review,address:address,revision:revision.uint64Value,generation:generation)
+    }
+    @MainActor func activatePairingPeer(_ activation:NativePeerActivation,owner:NativeDocumentLifetime,
+        completion:@escaping @MainActor (Result<[String:Any],Error>)->Void){
+        guard owner.active,activation.peer.origin==ObjectIdentifier(self),activation.consume() else{completion(.failure(OmniFailure.message("Phiên kích hoạt đã kết thúc. Hãy kiểm tra trạng thái.")));return}
+        do{
+            var input=try JSONSerialization.data(withJSONObject:["address":activation.address,"expected_revision":activation.revision,"reviewed_grant_hash":activation.peer.grantHash])
+            pairingClient(.activate,input:&input,owner:owner,admission:{activation.peer.admitted},completion:completion)
         }catch{completion(.failure(error))}
     }
     /// Read-only native recovery inspection remains available with policy off.

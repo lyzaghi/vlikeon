@@ -284,12 +284,33 @@ final class GameHubViewController: UIViewController, WKNavigationDelegate, WKUID
         let alert=UIAlertController(title:"Xác nhận quyền của cặp thiết bị",message:"Host: \(review.hostFingerprint)\nCặp: \(review.pairID)\nQuyền: \(permission)\nHạn dùng quyền: \(expiry)\n\nLưu ghép đôi đã xác minh; kết nối chưa được kích hoạt. Phiên xác nhận đóng trong tối đa một phút.",preferredStyle:.alert)
         pairingAlert=alert
         alert.addAction(UIAlertAction(title:"Hủy",style:.cancel){[weak self]_ in self?.cancelPairingIdentity()})
-        alert.addAction(UIAlertAction(title:"Đồng ý quyền và lưu ghép đôi",style:.default){[weak self]_ in
+        alert.addAction(UIAlertAction(title:"Đồng ý quyền và lưu ghép đôi",style:.default){[weak self,weak alert]_ in
             guard let self=self,self.pairingFlow === owner,owner.active,DispatchTime.now()<review.expires,
                   self.hubVisible,!self.pendingSuspend,UIApplication.shared.applicationState == .active,UIApplication.shared.isProtectedDataAvailable else{self?.cancelPairingIdentity();return}
-            self.core.confirmPairingPeer(review,owner:owner){[weak self] result in
-                guard let self=self,self.pairingFlow === owner,owner.active else{return};self.cancelPairingIdentity()
-                switch result{case .success:self.pairingNotice("Đã lưu ghép đôi. Mở lại trạng thái để kiểm tra; chưa khởi động kết nối.");case .failure:self.pairingNotice("Chưa xác nhận được kết quả. Mở lại trạng thái trước khi tiếp tục.")}
+            alert?.dismiss(animated:false){[weak self] in
+                guard let self=self,self.peerReviewAvailable(owner) else{self?.cancelPairingIdentity();return}
+                self.core.confirmPairingPeer(review,owner:owner){[weak self] result in
+                    guard let self=self,self.pairingFlow === owner,owner.active else{return}
+                    do{let value=try result.get();let activation=try self.core.activationForPeer(review,value:value);self.showPeerActivation(activation,owner:owner)}
+                    catch{self.cancelPairingIdentity();self.pairingNotice("Chưa xác nhận được kết quả hoặc phiên duyệt đã hết hạn. Mở lại trạng thái trước khi tiếp tục.")}
+                }
+            }
+        })
+        present(alert,animated:true)
+    }
+    private func showPeerActivation(_ activation:NativePeerActivation,owner:NativeDocumentLifetime){
+        guard peerReviewAvailable(owner),DispatchTime.now()<activation.peer.expires else{cancelPairingIdentity();return}
+        let peer=activation.peer,permission=activation.peer.inputAllowed ? "Cho phép":"Không cho phép"
+        let expiry=DateFormatter.localizedString(from:peer.grantExpiresAt,dateStyle:.medium,timeStyle:.short)
+        let alert=UIAlertController(title:"Kích hoạt ghép đôi đã xác minh?",message:"Host: \(peer.hostFingerprint)\nCặp: \(peer.pairID)\nThế hệ: \(activation.generation)\nĐiều khiển đầu vào: \(permission)\nHạn dùng quyền: \(expiry)\n\nXác nhận lại quyền trên dịch vụ và kích hoạt ghép đôi đã lưu. Bước này chưa mở kết nối.",preferredStyle:.alert);pairingAlert=alert
+        alert.addAction(UIAlertAction(title:"Để sau",style:.cancel){[weak self]_ in self?.cancelPairingIdentity()})
+        alert.addAction(UIAlertAction(title:"Kích hoạt ghép đôi",style:.default){[weak self,weak alert]_ in
+            alert?.dismiss(animated:false){[weak self] in
+                guard let self=self,self.peerReviewAvailable(owner),DispatchTime.now()<peer.expires else{self?.cancelPairingIdentity();return}
+                self.core.activatePairingPeer(activation,owner:owner){[weak self] result in
+                    guard let self=self,self.pairingFlow === owner,owner.active else{return};self.cancelPairingIdentity()
+                    switch result{case .success:self.pairingNotice("Đã kích hoạt ghép đôi. Chưa mở kết nối; hãy xem lại trạng thái.");case .failure:self.pairingNotice("Chưa xác nhận được kích hoạt. Hãy đọc lại trạng thái trước khi thử lại.")}
+                }
             }
         })
         present(alert,animated:true)
