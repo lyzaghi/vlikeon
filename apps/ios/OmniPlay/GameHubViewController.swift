@@ -329,6 +329,11 @@ final class GameHubViewController: UIViewController, WKNavigationDelegate, WKUID
         if snapshot.namespaceProvenanceMissing{message += "\n\nHồ sơ này chưa có thông tin xác thực vùng lưu trữ khóa. Cần phục hồi hồ sơ được kiểm tra trước khi thay đổi khóa hoặc trạng thái."}
         let alert=UIAlertController(title:"Chi tiết Remote Play",message:message,preferredStyle:.alert);pairingAlert=alert
         alert.addAction(UIAlertAction(title:"Đóng",style:.cancel){[weak self]_ in self?.cancelPairingIdentity()})
+        if !snapshot.namespaceProvenanceMissing && !record.isIdentity && record.phase=="material_ready" && !record.sessionRecoveryRequired{
+            alert.addAction(UIAlertAction(title:"Duyệt lại ghép đôi đã lưu",style:.default){[weak self,weak alert]_ in
+                alert?.dismiss(animated:false){[weak self] in self?.reviewSavedPeer(record,snapshot:snapshot,owner:owner)}
+            })
+        }
         if canAdvance{
             let title=record.phase=="active" ? "Vô hiệu hóa thế hệ này":(record.nextStep=="revoke_relay" ? "Thu hồi trên dịch vụ":(record.nextStep=="remove_material" ? "Xóa khóa thế hệ này":(record.nextStep=="fence_generation" ? "Vô hiệu hóa thế hệ này":"Hoàn tất trạng thái")))
             alert.addAction(UIAlertAction(title:title,style:record.nextStep=="finalize_retirement" ? .default:.destructive){[weak self]_ in
@@ -339,6 +344,43 @@ final class GameHubViewController: UIViewController, WKNavigationDelegate, WKUID
                 }
             })
         }
+        present(alert,animated:true)
+    }
+    private func reviewSavedPeer(_ record:NativeRecoveryRecord,snapshot:NativeRecoverySnapshot,owner:NativeDocumentLifetime){
+        guard peerReviewAvailable(owner),DispatchTime.now()<snapshot.expires else{cancelPairingIdentity();return}
+        core.reviewSavedPeer(record,snapshot:snapshot,owner:owner){[weak self] result in
+            guard let self=self,self.pairingFlow === owner,owner.active else{return}
+            guard self.peerReviewAvailable(owner) else{self.cancelPairingIdentity();return}
+            switch result{
+            case .failure(let error):self.cancelPairingIdentity();self.pairingNotice(error.localizedDescription)
+            case .success(let review):
+                guard DispatchTime.now()<review.expires else{self.cancelPairingIdentity();return}
+                self.pairingExpiry?.cancel()
+                let alert=UIAlertController(title:"Xác minh lại host",message:"Khóa host:\n\(review.hostPublicKey)\nFingerprint:\n\(review.hostFingerprint)\nDịch vụ: \(review.audience)\nCặp: \(review.pairID)\n\nMã đối chiếu cũ không còn khả dụng. Hãy xác minh độc lập khóa host một lần nữa trước khi tiếp tục.",preferredStyle:.alert);self.pairingAlert=alert
+                alert.addAction(UIAlertAction(title:"Để sau",style:.cancel){[weak self]_ in self?.cancelPairingIdentity()})
+                alert.addAction(UIAlertAction(title:"Đã xác minh độc lập khóa host",style:.default){[weak self,weak alert]_ in
+                    alert?.dismiss(animated:false){[weak self] in self?.showSavedPeerPermission(review,owner:owner)}
+                })
+                let expiry=DispatchWorkItem{[weak self] in guard let self=self,self.pairingFlow === owner else{return};self.cancelPairingIdentity()}
+                self.pairingExpiry=expiry;DispatchQueue.main.asyncAfter(deadline:review.expires,execute:expiry);self.present(alert,animated:true)
+            }
+        }
+    }
+    private func showSavedPeerPermission(_ review:NativeSavedPeerReview,owner:NativeDocumentLifetime){
+        guard peerReviewAvailable(owner),DispatchTime.now()<review.expires else{cancelPairingIdentity();return}
+        let permission=review.inputAllowed ? "Cho phép điều khiển đầu vào":"Không cho phép điều khiển đầu vào"
+        let expiry=DateFormatter.localizedString(from:review.grantExpiresAt,dateStyle:.medium,timeStyle:.short)
+        let alert=UIAlertController(title:"Kích hoạt ghép đôi đã lưu?",message:"Host: \(review.hostFingerprint)\nCặp: \(review.pairID)\nThế hệ: \(review.generation)\nQuyền: \(permission)\nHạn dùng: \(expiry)\n\nĐồng ý quyền hiển thị và xác nhận lại trên dịch vụ để kích hoạt. Bước này chưa mở kết nối.",preferredStyle:.alert);pairingAlert=alert
+        alert.addAction(UIAlertAction(title:"Để sau",style:.cancel){[weak self]_ in self?.cancelPairingIdentity()})
+        alert.addAction(UIAlertAction(title:"Đồng ý quyền và kích hoạt",style:.default){[weak self,weak alert]_ in
+            alert?.dismiss(animated:false){[weak self] in
+                guard let self=self,self.peerReviewAvailable(owner),DispatchTime.now()<review.expires else{self?.cancelPairingIdentity();return}
+                self.core.activateSavedPeer(review,owner:owner){[weak self] result in
+                    guard let self=self,self.pairingFlow === owner,owner.active else{return};self.cancelPairingIdentity()
+                    switch result{case .success:self.pairingNotice("Đã kích hoạt ghép đôi đã lưu. Chưa mở kết nối; hãy xem lại trạng thái.");case .failure:self.pairingNotice("Chưa xác nhận được kích hoạt. Hãy đọc lại trạng thái trước khi thử lại.")}
+                }
+            }
+        })
         present(alert,animated:true)
     }
     @objc private func cancelPairingIdentity(){

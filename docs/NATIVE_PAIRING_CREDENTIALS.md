@@ -1840,6 +1840,15 @@ this checkpoint.
 
 ## Remaining implementation and qualification
 
+iOS MaterialReady pair details now offer saved-pair rereview when provenance
+exists and no session recovery debt is present. A fresh review snapshot feeds
+two native dialogs: independent host-key verification (explicit old comparison
+unavailability), then permission/expiry/generation review and one-use activation.
+The same owner and capped monotonic review deadline cover both stages; lifecycle
+and protected-data admission remain. No connection starts. No build/test, UI
+render or native runtime operation ran. Native host product flow, actual producer
+retirement/recovery ownership and full qualification remain unfinished.
+
 iOS saved-peer review helper now requires a matching MaterialReady record from
 native status, verified provenance, no session debt and a live snapshot. Validated
 reviewSaved output becomes immutable metadata with private address/revision/hash,

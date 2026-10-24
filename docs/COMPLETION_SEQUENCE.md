@@ -2,6 +2,11 @@
 
 ## Current sequence — 1–109 outstanding tasks
 
+Item 58 iOS saved MaterialReady pair details now link fresh leased rereview to
+independent host verification then explicit permission/activation confirmation.
+Original owner/review expiry remains; missing old comparison is explicit.
+Source-only; no build/test/UI run. Host flow/retirement qualification remain due.
+
 Item 58 iOS now authors immutable saved-peer review and one-use activation
 helpers bound to native status record, core/owner/cancel and capped expiry.
 No old comparison is reconstructed. Source-only; resume view/build/test due.
