@@ -36,3 +36,49 @@ real tab operations, permission admission/rejection, native broker registration
 and actual connection/failure handling. A manifest incognito policy or absent
 ordinary-page native API alone cannot prove these broader requirements. There
 is currently no task-6 acceptance or release approval.
+
+## Subsequent diagnosis and native-host provisioning
+
+Antigravity analyzed the existing owned QA crash dump using Microsoft's local
+debugger and local build symbols. The exact failing process is the sandboxed
+`network.mojom.NetworkService` utility. `DelayLoadInfo` identifies USER32.dll,
+PostThreadMessageW and Windows error 1114 (DLL initialization failure), reached
+from CommonSubprocessInit. This establishes the crash site and loader error;
+it does not establish which policy or initialization condition triggered it.
+USER32 appears in the dump's module map, so a missing DLL file is not proved.
+Raw dumps and process memory stay in private QA storage.
+
+An instrumented navigation diagnostic subsequently loaded chrome://version,
+the actual bundled Game Hub document and chrome://newtab rewritten to that
+document. The initial controlled data navigation timed out and was aborted
+when the next navigation began. The page's scripts attempted native messaging,
+which revealed a second concrete issue: the broker manifest was absent.
+
+Codex built the real development broker from the existing task-3 frozen source
+export with `cargo build --frozen`, in a new QA target directory. The build
+completed successfully. Its executable SHA-256 is
+`6cdc00319d59f76c7a4b8a0e233d2e7c17448cb458b9c8045f24262a3bd0493d`.
+After confirming no prior product host registration existed, Codex used the
+frozen development installer to register only the exact component origin under
+the product-specific current-user native-host key. This is development setup,
+not an Authenticode-signed distribution. Actual browser/native tests redirect
+LOCALAPPDATA to an owned QA directory; personal data is not used.
+
+Extending first-profile startup observation to 60 seconds still left a blank
+document. Enabling the CDP Runtime domain did not repair that startup. A restart
+of the same initialized QA profile then passed the initial Game Hub DOM and
+ordinary-page privilege smoke, with no delay-load or network-service crash in
+that run. The old debug endpoint file initially confused the restart harness;
+Codex corrected it to wait for a newly written endpoint before the valid test.
+This establishes a first-profile versus initialized-profile difference, not a
+completed causal proof or permanent startup fix. Native protocol, true private
+profile isolation and permission cases remain part of the open task.
+
+A further Antigravity run made an actual `PlatformBridge.request('hello')`
+from the loaded component document to the registered real broker. It returned
+application OmniPlay, protocol 1.0, version 0.1.0 and platform windows, with the
+test exiting 0. This verifies that specific native protocol round trip on the
+initialized QA profile. Capabilities in hello are advertised metadata, not
+independent qualification of every module. No personal data or account was
+used. Identifiers from the private result are excluded from the public summary
+at `qa/evidence/sequential/item-006/diagnosis-summary.json`.

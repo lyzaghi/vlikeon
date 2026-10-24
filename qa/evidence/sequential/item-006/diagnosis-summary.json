@@ -1,0 +1,39 @@
+{
+  "item": 6,
+  "task_complete": false,
+  "executor": "antigravity-test-only-codex-reviewed",
+  "windows_executable_sha256": "ef891f1d2a673fbe21e0156d95e95c0ca62d3f5efd04be831bdbde4bc686b907",
+  "crash_diagnosis": {
+    "process": "network.mojom.NetworkService",
+    "sandbox_type": "network",
+    "exception_code": "0xc06d007e",
+    "delay_load_library": "USER32.dll",
+    "delay_load_procedure": "PostThreadMessageW",
+    "windows_last_error": 1114,
+    "site": "CommonSubprocessInit",
+    "triggering_policy_or_initialization_condition": "not_proven"
+  },
+  "startup": {
+    "fresh_profile": "blank_document_reproduced_in_60_second_observation",
+    "explicit_runtime_enable": "did_not_fix_fresh_profile_startup",
+    "subsequent_navigation": "actual_Game_Hub_and_newtab_rewrite_loaded",
+    "same_initialized_profile_restart": "initial_scope_passed",
+    "first_profile_startup_fix": "not_implemented_or_qualified",
+    "harness_stale_endpoint_bug": "corrected_to_wait_for_changed_DevToolsActivePort_before_valid_restart_test"
+  },
+  "native_host": {
+    "missing_manifest_observed": true,
+    "corrective_action": "built_real_frozen_source_broker_and_registered_development_manifest_for_exact_component_origin_only",
+    "broker_sha256": "6cdc00319d59f76c7a4b8a0e233d2e7c17448cb458b9c8045f24262a3bd0493d",
+    "build_frozen": true,
+    "build_exit_code": 0,
+    "existing_registration_replaced": false,
+    "qa_local_appdata_isolated": true,
+    "actual_component_bridge_hello": {"passed": true, "application": "OmniPlay", "protocol_major": 1, "protocol_minor": 0, "version": "0.1.0", "platform": "windows"},
+    "signed_release": false
+  },
+  "ordinary_page": {"chrome_runtime": "undefined", "connect_native": "undefined"},
+  "remaining": ["first-profile startup and network-service initialization fix", "actual private/normal multi-profile isolation and persistence", "tab lifecycle and authority cases", "permission admission and denial coverage", "native bridge lifecycle and failure handling"],
+  "release_approval": false,
+  "privacy_note": "Raw dumps, process memory and QA client/device identifiers remain local and are excluded. Advertised capabilities are not module acceptance evidence."
+}
