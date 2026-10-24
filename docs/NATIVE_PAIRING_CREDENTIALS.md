@@ -91,8 +91,30 @@ network orchestration. Loading metadata is not a live authority lease. Existing
 in-memory key objects are not yet fenced by journal changes. A native owner must
 serialize side effects, retire all old writers before declaring cleanup, keep
 the grant required for relay revocation and enforce current epochs across
-processes. The journal stores only the grant hash/expiry, so a durable signed-
-grant metadata record and relay-revocation integration are still required.
+processes. The journal now also retains the exact signed grant and its canonical
+HTTPS relay audience as non-secret native recovery metadata, in addition to the
+hash/expiry. Every journal admission verifies the signature, original grant
+shape, UUID, local participant, audience, hash and expiry bindings. Historical
+validation uses the grant's signed creation time to retain expired revocation
+metadata; this does not authorize use now. Native operations/activation still
+require current time and live authority. A pair record missing that metadata is
+refused for recovery, never filled from an untrusted renderer or silently reset.
+Metadata consumes the existing 192-KiB bound, so large grants can exhaust the
+journal before its 128-generation ceiling. No private seed, pair AES key or
+invitation secret is written to the journal.
+
+`Journal::recovery_plan` is now a read-only bounded plan for each retained
+generation. Incomplete candidate states and expired active pairs first request
+a durable fence; valid active records request revalidation before use, not
+automatic activation. Revoking records request actual writer retirement, local
+session retirement, relay revocation, material removal and finalization in that
+order. An identity waits for every pair to retire before its material cleanup;
+acknowledging identity material absence while pair debt remains is refused.
+`finalize_retirement` can finish an identity after its earlier receipts and pair
+cleanup are complete, without inventing new evidence. The caller must reload
+after every transition/side effect: a plan is a snapshot, not an authority lease
+or executor. Vault lock, unknown writer and failed relay requests keep debt;
+elapsed time alone does not acknowledge writer or session retirement.
 
 ## Required durable ordering and integration
 
@@ -122,7 +144,7 @@ The caller must fence and retire writers first. Failed cleanup keeps debt.
 
 ## Remaining implementation and qualification
 
-- Journal product integration, authority epochs, startup reconciliation,
+- Journal product integration, authority epochs, actual startup recovery execution,
   rotation/re-pair and local/relay revocation orchestration.
 - Native authenticated ECDH/HKDF pairing and encrypted signaling sequence/replay
   lifecycle compatible with the current signed protocol; no secret IPC export.

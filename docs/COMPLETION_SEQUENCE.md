@@ -2,6 +2,15 @@
 
 ## Current sequence — 1–109 outstanding tasks
 
+The next item-58 source checkpoint retains signed grant/audience recovery
+metadata with signature and exact record-binding checks, including historical
+admission of expired grants without reviving permission. A bounded read-only
+restart plan orders generation fences, writer/local retirement, relay cleanup
+and vault removal; identity material cannot be acknowledged absent while pair
+cleanup debt remains. Finalization requires all retained receipts. No recovery
+executor, vault/relay call, SQL operation, build or test was run; actual product
+and mobile integration plus original item-58 scope remain unfinished.
+
 The subsequent item-58 checkpoint authors a bounded SQLite generation journal
 with immediate/revision-checked transitions, write intent before vault I/O,
 permanent revocation fences and separate writer/material/local/relay cleanup

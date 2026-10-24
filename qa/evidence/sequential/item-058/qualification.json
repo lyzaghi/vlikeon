@@ -11,7 +11,9 @@
     "Desktop binary keyring provider candidates; mobile refuses until separate scoped provider integration",
     "Bounded SQLite profile/device generation journal with immediate transactions, whole-journal revision checks and retained tombstones",
     "Reserved/writing/material-ready/active states and permanent local revocation fences; identity revocation atomically fences all pairs",
-    "Separate native cleanup observations for writer, material, local and relay retirement; identity retirement waits for pair retirement"
+    "Separate native cleanup observations for writer, material, local and relay retirement; identity retirement waits for pair retirement",
+    "Durable signed-grant and canonical relay-audience recovery metadata with signature, participant, UUID, hash and expiry admission",
+    "Read-only restart action planning for incomplete/expired generations and ordered cleanup; identity material absence is refused while pair debt remains"
   ],
   "build_executed": false,
   "tests_executed": false,
@@ -21,7 +23,7 @@
   "mobile_provider_integrated": false,
   "durable_lifecycle_integrated": false,
   "remaining": [
-    "Journal product integration, startup reconciliation, actual candidate/cleanup producers and relay revocation metadata/debt orchestration",
+    "Journal product integration, actual restart action execution, candidate/cleanup producers and relay revocation orchestration",
     "Authenticated native key exchange and encrypted signaling sequence/replay lifecycle",
     "Native broker authority and document/session capability integration",
     "Separate Android/iOS credential provider ABI and app integration",

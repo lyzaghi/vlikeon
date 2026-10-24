@@ -2,7 +2,7 @@
 //! Every transition commits before its corresponding vault/network side effect.
 use crate::{Database,util::storage_error};
 use omniplay_contracts::{ErrorCode,PlatformError,Result};
-use omniplay_streaming::{key,document_hash,verify_grant,SignedDocument,
+use omniplay_streaming::{key,document_hash,verify_grant,verify,inspect,validate_audience,PairGrant,GRANT_DOMAIN,SignedDocument,
     native_credentials::{CredentialAddress,SecretKind}};
 use rusqlite::{OptionalExtension,Transaction,TransactionBehavior,params};
 use serde::{Deserialize,Serialize};
@@ -21,8 +21,23 @@ fn conflict()->PlatformError{PlatformError::new(ErrorCode::Conflict,"Native Remo
 #[serde(rename_all="snake_case")]
 pub enum Phase{Reserved,Writing,MaterialReady,Active,Revoking,Retired}
 #[derive(Clone,Serialize,Deserialize)]#[serde(deny_unknown_fields)]
+pub struct GrantMetadata{audience:String,document:SignedDocument}
+impl GrantMetadata{
+    pub fn audience(&self)->&str{&self.audience}
+    pub fn document(&self)->&SignedDocument{&self.document}
+    fn historical_grant(&self)->Result<PairGrant>{
+        validate_audience(&self.audience)?;
+        let untrusted:PairGrant=inspect(&self.document,8192)?;
+        let grant:PairGrant=verify(&untrusted.host_public_key,GRANT_DOMAIN,&self.document,8192)?;
+        // Signature/shape verification for recovery metadata, not permission
+        // to use an expired grant. Activation/operation still needs native now.
+        grant.validate(&self.audience,grant.created_at_ms)?;Ok(grant)
+    }
+}
+#[derive(Clone,Serialize,Deserialize)]#[serde(deny_unknown_fields)]
 pub struct Record{
     address:CredentialAddress,public_key:String,grant_hash:Option<String>,expires_at_ms:Option<u64>,
+    #[serde(default)]grant:Option<GrantMetadata>,
     phase:Phase,writer_retired:bool,material_absent:bool,local_retired:bool,relay_retired:bool,
 }
 impl Record{
@@ -31,6 +46,8 @@ impl Record{
     pub fn public_key(&self)->&str{&self.public_key}
     pub fn grant_hash(&self)->Option<&str>{self.grant_hash.as_deref()}
     pub fn expires_at_ms(&self)->Option<u64>{self.expires_at_ms}
+    /// Native recovery metadata only. Grant presence never revives authority.
+    pub fn grant(&self)->Option<&GrantMetadata>{self.grant.as_ref()}
     pub fn writer_retired(&self)->bool{self.writer_retired}
     pub fn material_absent(&self)->bool{self.material_absent}
     pub fn local_retired(&self)->bool{self.local_retired}
@@ -41,6 +58,27 @@ pub struct Journal{schema_version:u32,profile:Uuid,device:Uuid,revision:u64,reco
 impl Journal{
     pub fn revision(&self)->u64{self.revision}
     pub fn records(&self)->&[Record]{&self.records}
+    /// Read-only restart plan, not execution/retirement evidence. Reload after
+    /// each durable transition or external operation; this snapshot is no lease.
+    pub fn recovery_plan(&self,now:u64)->Result<Vec<RecoveryAction>>{
+        self.validate()?;let mut actions=Vec::with_capacity(self.records.len());
+        for record in &self.records{
+            let step=match record.phase{
+                Phase::Reserved|Phase::Writing|Phase::MaterialReady=>RecoveryStep::FenceGeneration,
+                Phase::Active=>if record.expires_at_ms.is_some_and(|expiry|expiry<=now){RecoveryStep::FenceGeneration}else{RecoveryStep::RevalidateBeforeUse},
+                Phase::Retired=>continue,
+                Phase::Revoking=>{
+                    if !record.writer_retired{RecoveryStep::RetireWriter}
+                    else if !record.local_retired{RecoveryStep::RetireLocalSessions}
+                    else if record.address.kind()==SecretKind::DeviceSigning&&self.records.iter().any(|pair|pair.address.kind()==SecretKind::PairEncryption&&pair.phase!=Phase::Retired){RecoveryStep::WaitForPairCleanup}
+                    else if !record.relay_retired{RecoveryStep::RevokeRelay}
+                    else if !record.material_absent{RecoveryStep::RemoveMaterial}
+                    else{RecoveryStep::FinalizeRetirement}
+                },
+            };
+            actions.push(RecoveryAction{address:record.address,step});
+        }Ok(actions)
+    }
     fn validate(&self)->Result<()>{
         if self.schema_version!=1||self.profile.is_nil()||self.device.is_nil()||self.revision>MAX_REVISION||self.records.len()>MAX_RECORDS||self.revision==0&&!self.records.is_empty(){return Err(invalid());}
         let mut generations=BTreeSet::new();let mut live=BTreeSet::new();
@@ -50,8 +88,14 @@ impl Journal{
             let kind=match address.kind(){SecretKind::DeviceSigning=>0u8,SecretKind::PairEncryption=>1};
             if record.phase!=Phase::Retired&&!live.insert((kind,address.id())){return Err(invalid());}
             match address.kind(){
-                SecretKind::DeviceSigning=>if record.grant_hash.is_some()||record.expires_at_ms.is_some(){return Err(invalid());},
-                SecretKind::PairEncryption=>if record.expires_at_ms.is_none_or(|value|value==0)||record.grant_hash.as_ref().is_none_or(|hash|hash.len()!=64||!hash.bytes().all(|byte|byte.is_ascii_digit()||(b'a'..=b'f').contains(&byte))){return Err(invalid());},
+                SecretKind::DeviceSigning=>if record.grant_hash.is_some()||record.expires_at_ms.is_some()||record.grant.is_some(){return Err(invalid());},
+                SecretKind::PairEncryption=>{
+                    let metadata=record.grant.as_ref().ok_or_else(invalid)?;
+                    let grant=metadata.historical_grant()?;
+                    if grant.id!=address.id()||grant.invite_id.is_nil()||record.expires_at_ms!=Some(grant.expires_at_ms)||
+                        record.grant_hash.as_deref()!=Some(document_hash(&metadata.document)?.as_str())||
+                        (record.public_key!=grant.host_public_key&&record.public_key!=grant.client_public_key){return Err(invalid());}
+                },
             }
             match record.phase{
                 Phase::Reserved|Phase::MaterialReady|Phase::Active=>if !record.writer_retired||record.material_absent||record.local_retired||record.relay_retired{return Err(invalid());},
@@ -65,6 +109,22 @@ impl Journal{
         }
         Ok(())
     }
+}
+#[derive(Clone,Copy)]
+pub enum RecoveryStep{FenceGeneration,RevalidateBeforeUse,RetireWriter,RetireLocalSessions,WaitForPairCleanup,RevokeRelay,RemoveMaterial,FinalizeRetirement}
+#[derive(Clone,Copy)]
+pub struct RecoveryAction{address:CredentialAddress,step:RecoveryStep}
+impl RecoveryAction{
+    pub fn address(&self)->CredentialAddress{self.address}
+    pub fn step(&self)->RecoveryStep{self.step}
+}
+pub fn finalize_retirement(database:&Database,profile:Uuid,expected:u64,address:CredentialAddress)->Result<Journal>{
+    update(database,profile,expected,|journal|{
+        if address.kind()==SecretKind::DeviceSigning&&journal.records.iter().any(|pair|pair.address.kind()==SecretKind::PairEncryption&&pair.phase!=Phase::Retired){return Err(conflict());}
+        let record=selected(journal,address)?;
+        if record.phase!=Phase::Revoking||!record.writer_retired||!record.material_absent||!record.local_retired||!record.relay_retired{return Err(conflict());}
+        record.phase=Phase::Retired;Ok(())
+    })
 }
 fn read(connection:&rusqlite::Connection,profile:Uuid,device:Uuid)->Result<Journal>{
     if profile.is_nil()||device.is_nil(){return Err(invalid());}
@@ -94,22 +154,23 @@ fn update(database:&Database,profile:Uuid,expected:u64,change:impl FnOnce(&mut J
 fn selected(journal:&mut Journal,address:CredentialAddress)->Result<&mut Record>{
     journal.records.iter_mut().find(|record|record.address==address).ok_or_else(conflict)
 }
-fn add(journal:&mut Journal,address:CredentialAddress,public_key:String,grant_hash:Option<String>,expires_at_ms:Option<u64>)->Result<()>{
+fn add(journal:&mut Journal,address:CredentialAddress,public_key:String,grant_hash:Option<String>,expires_at_ms:Option<u64>,grant:Option<GrantMetadata>)->Result<()>{
     address.validate()?;key(&public_key)?;
     if address.profile()!=journal.profile||address.device()!=journal.device{return Err(conflict());}
     // Retired tombstones are intentionally retained; no age-based resurrection.
     if journal.records.len()>=MAX_RECORDS{return Err(PlatformError::new(ErrorCode::ResourceLimit,"Native pairing generation history requires explicit maintenance before adding credentials"));}
     if journal.records.iter().any(|record|record.address.generation()==address.generation()||record.address.kind()==address.kind()&&record.address.id()==address.id()&&record.phase!=Phase::Retired){return Err(conflict());}
-    journal.records.push(Record{address,public_key,grant_hash,expires_at_ms,phase:Phase::Reserved,
+    journal.records.push(Record{address,public_key,grant_hash,expires_at_ms,grant,phase:Phase::Reserved,
         writer_retired:true,material_absent:false,local_retired:false,relay_retired:false});Ok(())
 }
 pub fn reserve_identity(database:&Database,profile:Uuid,expected:u64,address:CredentialAddress,public_key:String)->Result<Journal>{
     if address.kind()!=SecretKind::DeviceSigning{return Err(invalid());}
-    update(database,profile,expected,|journal|add(journal,address,public_key,None,None))
+    update(database,profile,expected,|journal|add(journal,address,public_key,None,None,None))
 }
 pub fn reserve_pair(database:&Database,profile:Uuid,expected:u64,address:CredentialAddress,local_public:String,document:&SignedDocument,audience:&str,now:u64)->Result<Journal>{
     let started=Instant::now();
     if address.kind()!=SecretKind::PairEncryption{return Err(invalid());}
+    validate_audience(audience)?;
     let grant=verify_grant(document,audience,now)?;
     if grant.id!=address.id()||(grant.host_public_key!=local_public&&grant.client_public_key!=local_public){return Err(invalid());}
     let hash=document_hash(document)?;
@@ -118,7 +179,7 @@ pub fn reserve_pair(database:&Database,profile:Uuid,expected:u64,address:Credent
         if !journal.records.iter().any(|record|record.address.kind()==SecretKind::DeviceSigning&&record.phase==Phase::Active&&record.public_key==local_public){return Err(conflict());}
         // A given grant ID never becomes usable again after local revocation.
         if journal.records.iter().any(|record|record.address.kind()==SecretKind::PairEncryption&&record.address.id()==address.id()){return Err(conflict());}
-        add(journal,address,local_public,Some(hash),Some(grant.expires_at_ms))
+        add(journal,address,local_public,Some(hash),Some(grant.expires_at_ms),Some(GrantMetadata{audience:audience.into(),document:document.clone()}))
     })
 }
 /// Commit BEFORE starting a single serialized vault writer. Restart recovery
@@ -161,7 +222,12 @@ pub fn revoke(database:&Database,profile:Uuid,expected:u64,address:CredentialAdd
 /// Evidence must come from native producer/vault/session/relay owners. There is
 /// no renderer endpoint and no timestamp-as-retirement inference here.
 pub fn observe_cleanup(database:&Database,profile:Uuid,expected:u64,address:CredentialAddress,observation:CleanupObservation)->Result<Journal>{
-    update(database,profile,expected,|journal|{let record=selected(journal,address)?;
+    update(database,profile,expected,|journal|{
+        // Identity material is needed to authenticate outstanding relay
+        // revocations. Do not acknowledge its removal while pair debt remains.
+        if matches!(observation,CleanupObservation::MaterialAbsent)&&address.kind()==SecretKind::DeviceSigning&&
+            journal.records.iter().any(|pair|pair.address.kind()==SecretKind::PairEncryption&&pair.phase!=Phase::Retired){return Err(conflict());}
+        let record=selected(journal,address)?;
         if record.phase!=Phase::Revoking{return Err(conflict());}
         match observation{
             CleanupObservation::WriterRetired=>record.writer_retired=true,
