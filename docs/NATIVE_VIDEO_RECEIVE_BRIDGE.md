@@ -1,5 +1,10 @@
 # Native ordered RTP to decoder bridge — item 56
 
+Ordinary complete slice-header syntax now has the source parser documented in
+`NATIVE_H264_SLICE_HEADER.md`. Actual DPB/reference validation, access-unit
+coverage, entropy/decoder and native negotiation admission remain unfinished.
+This bridge still has no default-success codec admission or parser caller.
+
 Ordinary slice identity-prefix parsing now exists as described in
 `NATIVE_H264_SLICE_PREFIX.md`. It is not complete header/AU/reference validation
 and is not yet called by this bridge; full native bitstream admission remains

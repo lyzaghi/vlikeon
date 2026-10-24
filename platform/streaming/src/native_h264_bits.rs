@@ -60,11 +60,11 @@ impl ParameterSetBits{
 }
 /// Only the bounded prefix is inspected. Slice entropy data, CABAC alignment,
 /// end padding and trailing syntax are deliberately NOT validated by this reader.
-pub(crate) struct SliceBits<'a>{nal:&'a[u8],index:usize,zeros:u8,current:u8,left:u8,failed:bool}
+pub(crate) struct SliceBits<'a>{nal:&'a[u8],index:usize,zeros:u8,current:u8,left:u8,offset:usize,failed:bool}
 impl<'a> SliceBits<'a>{
     pub(crate) fn from_nal(nal:&'a[u8])->Result<Self>{
         if !(2..=2*1024*1024).contains(&nal.len())||nal[0]&0x80!=0||!matches!(nal[0]&31,1|5)||nal[0]&31==5&&nal[0]&0x60==0{return Err(invalid());}
-        Ok(Self{nal,index:1,zeros:0,current:0,left:0,failed:false})
+        Ok(Self{nal,index:1,zeros:0,current:0,left:0,offset:0,failed:false})
     }
     fn reject<T>(&mut self)->Result<T>{self.failed=true;Err(invalid())}
     fn byte(&mut self)->Result<u8>{
@@ -86,10 +86,14 @@ impl<'a> SliceBits<'a>{
         let mut value=0u32;
         for _ in 0..count{
             if self.left==0{self.current=self.byte()?;self.left=8;}
-            self.left-=1;value=(value<<1)|u32::from((self.current>>self.left)&1);
+            self.left-=1;self.offset+=1;value=(value<<1)|u32::from((self.current>>self.left)&1);
         }Ok(value)
     }
     pub(crate) fn flag(&mut self)->Result<bool>{Ok(self.bits(1)?!=0)}
+    pub(crate) fn position(&self)->usize{self.offset}
+    pub(crate) fn cabac_alignment(&mut self)->Result<()>{
+        while self.offset%8!=0{if self.bits(1)?!=1{return self.reject();}}Ok(())
+    }
     pub(crate) fn ue(&mut self,maximum:u32)->Result<u32>{
         let mut leading=0u8;
         while self.bits(1)?==0{leading+=1;if leading>31{return self.reject();}}

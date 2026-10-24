@@ -34,6 +34,9 @@ impl SlicePrefix{
     /// Binds the prefix to actual retained parameter versions. Equality of
     /// identities is only a picture-grouping prerequisite, never full AU proof.
     pub fn parse(nal:&[u8],parameters:&ParameterSets)->Result<Self>{
+        Self::read(nal,parameters).map(|(prefix,_)|prefix)
+    }
+    pub(crate) fn read<'a>(nal:&'a[u8],parameters:&ParameterSets)->Result<(Self,SliceBits<'a>)>{
         let mut bits=SliceBits::from_nal(nal)?;
         let first_mb=bits.ue(262_143)?;let slice_type=bits.ue(9)?;
         let kind=match slice_type%5{0=>SliceKind::P,1=>SliceKind::B,2=>SliceKind::I,3=>SliceKind::Sp,_=>SliceKind::Si};
@@ -64,6 +67,6 @@ impl SlicePrefix{
         let redundant=if pps.redundant_picture_count{bits.ue(127)? as u8}else{0};
         let nal_reference_idc=(nal[0]>>5)&3;
         let picture=PictureIdentity{parameters:resolved.binding(),frame_num,field,colour_plane,reference:nal_reference_idc!=0,idr,order,redundant};
-        Ok(Self{first_mb,kind,same_kind:slice_type>=5,nal_reference_idc,picture})
+        Ok((Self{first_mb,kind,same_kind:slice_type>=5,nal_reference_idc,picture},bits))
     }
 }
