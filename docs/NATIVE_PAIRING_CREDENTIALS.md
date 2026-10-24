@@ -1840,6 +1840,14 @@ this checkpoint.
 
 ## Remaining implementation and qualification
 
+Confirmed reviewed-host activation now advances an existing invitation's expected
+journal revision only when it exactly matched activation's expected revision.
+The new revision comes from the successful leased writer, allowing subsequent
+live invitation operations after activation. Already-stale invitations and
+uncertain activation errors remain unreconciled; no guessed revisions or replay
+authority are introduced. Mobile host candidate ABI now uses the mutable host
+guard for this update. No build/test or native runtime operation ran.
+
 Dedicated host_candidate ABI now routes strict <=1024-byte review and reviewed
 activation requests to the corresponding host-role LocalHost methods. Activation
 requires canonical reviewed hash; both derive actual foreground provider epoch,

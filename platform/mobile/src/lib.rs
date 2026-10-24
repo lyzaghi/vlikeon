@@ -172,7 +172,7 @@ pub unsafe extern "C" fn om_mobile_pairing_host_candidate_v1(handle:u64,data:*co
         PairingMetadataRecovery{address:review.address,expected_revision:review.expected_revision}
     }else{serde_json::from_slice(bytes).map_err(|_|error(ErrorCode::InvalidRequest,"Native host candidate review is invalid"))?};
     let(host,provider,epoch)=pairing_operation(handle)?;
-    let host=host.lock().map_err(|_|error(ErrorCode::Internal,"Mobile profile is unavailable"))?;
+    let mut host=host.lock().map_err(|_|error(ErrorCode::Internal,"Mobile profile is unavailable"))?;
     provider.confirm_access(&request.address,epoch)?;let cancel=provider.operation_cancellation(epoch)?;
     let value=if let Some(review)=activation{
         host.native_pairing_activate_reviewed_host(provider.as_ref(),request.address,request.expected_revision,&review.reviewed_grant_hash,deadline,&cancel)?

@@ -2,6 +2,10 @@
 
 ## Current sequence — 1–109 outstanding tasks
 
+Item 58 confirmed reviewed-host activation now advances a matching live invitation
+revision from the actual writer result, preserving subsequent close/poll admission.
+Stale invitations/uncertain failures are not rebased. Source-only; build/test due.
+
 Item 58 host candidate review/activation now has a dedicated bounded mobile ABI
 with exact native address/revision/hash and actual provider epoch/cancel checks.
 No transport authority. Source-only; host callers/UI, durable recovery/build/test due.
