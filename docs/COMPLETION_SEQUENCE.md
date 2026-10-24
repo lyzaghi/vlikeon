@@ -2,6 +2,13 @@
 
 ## Current sequence — 1–109 outstanding tasks
 
+Item 58 backend review found Windows worker stop could succeed before all owned
+I/O threads retired. Input/video/gamepad now require completed successful joins,
+retain panic failure and preserve only actual input/video Stop receipts for later
+reaping. This does not implement the session owner or prove HID cleanup. No
+helper/native/thread/compiler/build/test ran; owner aggregation, deadlines and
+platform qualification remain due. Full original scope stays incomplete.
+
 Item 58 source review found session release could clear journal ownership after
 permit close without an enforced backend-retirement call. Release now requires
 the actual native owner, bounded deadline and exact registered permit/session/

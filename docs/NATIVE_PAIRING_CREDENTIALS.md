@@ -1386,6 +1386,28 @@ work requires its own cancellation/join path. Device/service qualification of
 those paths remains due. No backend/native/SQL operation, compiler, build or test
 was executed; only source review and whitespace checks were performed.
 
+## Worker retirement requires I/O completion
+
+Review of the concrete Windows worker clients found stop could report success
+after helper process exit while retaining unfinished I/O thread handles. Input,
+video and gamepad client stop/close now refuse a positive retirement result until
+all owned I/O threads have actually finished and joined. A thread panic is retained
+as a terminal join failure, including subsequent stop attempts. Process termination
+or a cancellation request alone does not satisfy this check.
+
+Input retains only an actually received released-state Stop observation; video
+retains only an exact successful Stop receipt. A caller retaining these worker
+objects may reap threads on a later call without resending the Stop operation or
+manufacturing a lost acknowledgment. Missing/failed acknowledgments remain errors.
+Gamepad transport stop still is not a HID release receipt; its existing independent
+device cleanup proof remains necessary. No session owner is implemented by this
+worker-only correction, and dropped objects still require external recovery when
+their result was uncertain.
+
+No helper, process/thread cancellation/join, OS input/video/device operation,
+compiler, build or test ran. Only source review/whitespace inspection was done.
+Deadline propagation, full owner aggregation and crash qualification remain due.
+
 ## Remaining implementation and qualification
 
 - Journal/executor/lease/writer product integration, authority epochs, actual native owner

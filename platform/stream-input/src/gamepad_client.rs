@@ -89,7 +89,7 @@ struct Call{action:Action,timeout:Duration,assigned:SyncSender<Result<u64>>}
 
 pub struct GamepadClient{
     shared:Arc<Shared>,commands:Option<SyncSender<Call>>,replies:mpsc::Receiver<Reply>,
-    threads:Vec<JoinHandle<()>>,sha256:ContentHash,prepared:bool,
+    threads:Vec<JoinHandle<()>>,sha256:ContentHash,prepared:bool,join_failed:bool,
 }
 fn thread_handle(thread:&JoinHandle<()>)->Result<OwnedHandle>{
     let mut duplicate=std::ptr::null_mut();let current=unsafe{GetCurrentProcess()};
@@ -113,7 +113,7 @@ impl GamepadClient{
             closed:AtomicBool::new(false),ready:AtomicBool::new(false),pending:Mutex::new(None),
             writing:Mutex::new(None),input_deadline:Mutex::new(None),reader_thread:OnceLock::new(),writer_thread:OnceLock::new()});
         let(sender,receiver)=mpsc::sync_channel::<Call>(2);let(reply_sender,replies)=mpsc::sync_channel::<Reply>(2);
-        let mut client=Self{shared:shared.clone(),commands:Some(sender),replies,threads:Vec::new(),sha256,prepared:false};
+        let mut client=Self{shared:shared.clone(),commands:Some(sender),replies,threads:Vec::new(),sha256,prepared:false,join_failed:false};
         let reader_shared=shared.clone();
         let reader=std::thread::Builder::new().name("vlikeon-pad-read".into()).spawn(move||reader(output,reader_shared,reply_sender)).map_err(|_|failure())?;
         let cancel=thread_handle(&reader);client.threads.push(reader);
@@ -190,8 +190,9 @@ impl GamepadClient{
         // acknowledged. Shared permit remains held until every thread retires,
         // preventing repeated launches from accumulating abandoned threads.
         let mut retained=Vec::new();
-        for thread in self.threads.drain(..){if thread.is_finished(){let _=thread.join();}else{retained.push(thread);}}
-        self.threads=retained;result
+        for thread in self.threads.drain(..){if thread.is_finished(){self.join_failed|=thread.join().is_err();}else{retained.push(thread);}}
+        self.threads=retained;
+        if !self.threads.is_empty()||self.join_failed{return Err(failure());}result
     }
 }
 impl Drop for GamepadClient{fn drop(&mut self){let _=self.stop();}}

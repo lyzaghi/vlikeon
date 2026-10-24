@@ -20,7 +20,7 @@ impl Drop for Shared{fn drop(&mut self){
     }
 }}
 struct Call{request:Request,reply:SyncSender<Result<Observation>>}
-pub struct InputWorker{shared:Arc<Shared>,sender:Option<SyncSender<Call>>,thread:Option<JoinHandle<()>>,sequence:u64,grant_id:Uuid,session_id:Uuid,closed:bool}
+pub struct InputWorker{shared:Arc<Shared>,sender:Option<SyncSender<Call>>,thread:Option<JoinHandle<()>>,sequence:u64,grant_id:Uuid,session_id:Uuid,closed:bool,stop_observation:Option<Observation>,join_failed:bool}
 impl InputWorker{
     pub fn spawn(executable:&Path,target:Target,grant_id:Uuid,session_id:Uuid,expires_at_ms:u64)->Result<Self>{
         let now=std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map_err(|_|failure())?.as_millis()as u64;
@@ -43,7 +43,7 @@ impl InputWorker{
             // cannot prove that the OS keyboard/mouse state was released.
             drop(input);
         }).map_err(|_|{let _=shared.process.stop(1000);failure()})?;
-        let mut worker=Self{shared,sender:Some(sender),thread:Some(thread),sequence:0,grant_id,session_id,closed:false};
+        let mut worker=Self{shared,sender:Some(sender),thread:Some(thread),sequence:0,grant_id,session_id,closed:false,stop_observation:None,join_failed:false};
         SuspendedChild::resume(&primary)?;
         worker.call(Action::Prepare{target,expires_at_ms},Duration::from_secs(5))?;Ok(worker)
     }
@@ -59,8 +59,10 @@ impl InputWorker{
     /// A process exit or a successful Stop RPC without a released-state
     /// observation is not proof that tracked keyboard/mouse input was released.
     pub fn stop_confirmed(&mut self)->Result<Observation>{
-        if self.closed{return Err(failure());}
-        let observed=self.call(Action::Stop,Duration::from_millis(750));self.closed=true;self.sender.take();
+        if !self.closed{
+            let observed=self.call(Action::Stop,Duration::from_millis(750));self.closed=true;self.sender.take();
+            if let Ok(value)=observed{if value.state=="revoked"&&value.reason.as_deref()!=Some("release_failed"){self.stop_observation=Some(value);}}
+        }
         let start=Instant::now();while start.elapsed()<Duration::from_secs(2){if self.shared.process.exited().unwrap_or(false){break;}std::thread::sleep(Duration::from_millis(20));}
         if let Some(thread)=self.thread.as_ref(){
             // Cancellation is only a request. A blocked thread retains Shared
@@ -69,10 +71,12 @@ impl InputWorker{
         }
         let retired=self.shared.process.stop(1000).is_ok();
         if self.thread.as_ref().is_some_and(|thread|thread.is_finished()){
-            if let Some(thread)=self.thread.take(){let _=thread.join();}
+            if let Some(thread)=self.thread.take(){self.join_failed|=thread.join().is_err();}
         }
-        if !retired{return Err(failure());}
-        observed.and_then(|value|if value.state=="revoked"&&value.reason.as_deref()!=Some("release_failed"){Ok(value)}else{Err(failure())})
+        if !retired||self.thread.is_some()||self.join_failed{return Err(failure());}
+        // Retain only a real released-state receipt. Retry may reap an already
+        // finished I/O thread, but cannot invent a lost helper acknowledgment.
+        self.stop_observation.clone().ok_or_else(failure)
     }
     pub fn close(&mut self){let _=self.stop_confirmed();}
 }

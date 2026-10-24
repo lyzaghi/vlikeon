@@ -129,7 +129,7 @@ mod authority_tests{
     }
 }
 struct Call{kind:u16,payload:Vec<u8>,reply:SyncSender<Result<Vec<u8>>>,timeout:Duration,receipt:Option<DecoderReceipt>}
-pub struct VideoWorker{shared:Arc<Shared>,sender:Option<SyncSender<Call>>,threads:Vec<JoinHandle<()>>,profile:Option<VideoProfile>,sha256:ContentHash}
+pub struct VideoWorker{shared:Arc<Shared>,sender:Option<SyncSender<Call>>,threads:Vec<JoinHandle<()>>,profile:Option<VideoProfile>,sha256:ContentHash,stop_acknowledged:bool,join_failed:bool}
 fn thread_handle(thread:&JoinHandle<()>)->Result<OwnedHandle>{
     let current=unsafe{GetCurrentProcess()};let mut handle=std::ptr::null_mut();
     if unsafe{DuplicateHandle(current,thread.as_raw_handle(),current,&mut handle,THREAD_TERMINATE|THREAD_SYNCHRONIZE,0,0)}==0||handle.is_null()||handle==INVALID_HANDLE_VALUE{return Err(failure());}
@@ -167,7 +167,7 @@ impl VideoWorker{
             closed:AtomicBool::new(false),revoking:AtomicBool::new(false),lease:Mutex::new(Lease{sequence:0,deadline:now+Duration::from_millis(300)}),
             stop_deadline:Mutex::new(None),pending:Mutex::new(None),packets:Mutex::new(Packets{queue:VecDeque::new(),bytes:0}),frames:Mutex::new(VecDeque::new()),io:OnceLock::new()});
         let(sender,receiver)=mpsc::sync_channel(1);
-        let mut client=Self{shared:shared.clone(),sender:Some(sender),threads:Vec::new(),profile:None,sha256};
+        let mut client=Self{shared:shared.clone(),sender:Some(sender),threads:Vec::new(),profile:None,sha256,stop_acknowledged:false,join_failed:false};
         let io_shared=shared.clone();
         let io=std::thread::Builder::new().name("vlikeon-video-io".into()).spawn(move||io_loop(input,output,io_shared,receiver)).map_err(|_|failure())?;
         let handle=thread_handle(&io);client.threads.push(io);shared.io.set(handle?).map_err(|_|failure())?;
@@ -265,18 +265,21 @@ impl VideoWorker{
         if !(1..=10_000_000).contains(&fence){self.shared.close();return Err(failure());}Ok(fence)
     }
     pub fn stop_confirmed(&mut self)->Result<()>{
+        if self.stop_acknowledged{return self.close();}
         if self.shared.revoking.load(Ordering::Acquire){return Err(failure());}
         *self.shared.stop_deadline.lock().map_err(|_|failure())?=Some(Instant::now()+Duration::from_millis(1000));
         self.shared.revoking.store(true,Ordering::Release);
         if let Ok(mut packets)=self.shared.packets.lock(){packets.queue.clear();packets.bytes=0;}
         if let Ok(mut frames)=self.shared.frames.lock(){frames.clear();}
         let receipt=self.call(STOP,Vec::new(),Duration::from_millis(750));
+        self.stop_acknowledged=receipt.as_ref().is_ok_and(|bytes|bytes.as_slice()==[0,0,0,0]);
         let retired=self.close();
-        if receipt?.as_slice()!=[0,0,0,0]{return Err(failure());}retired
+        if !self.stop_acknowledged{return Err(failure());}retired
     }
     pub fn close(&mut self)->Result<()>{
         self.shared.close();self.sender.take();let result=self.shared.process.stop(1000);
-        let mut retained=Vec::new();for thread in self.threads.drain(..){if thread.is_finished(){let _=thread.join();}else{retained.push(thread);}}self.threads=retained;result
+        let mut retained=Vec::new();for thread in self.threads.drain(..){if thread.is_finished(){self.join_failed|=thread.join().is_err();}else{retained.push(thread);}}self.threads=retained;
+        if !self.threads.is_empty()||self.join_failed{return Err(failure());}result
     }
 }
 impl Drop for VideoWorker{fn drop(&mut self){let _=self.close();}}
