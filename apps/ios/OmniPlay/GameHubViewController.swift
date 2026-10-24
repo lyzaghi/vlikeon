@@ -129,9 +129,14 @@ final class GameHubViewController: UIViewController, WKNavigationDelegate, WKUID
             case .success(let snapshot):
                 guard DispatchTime.now()<snapshot.expires else{self.cancelPairingIdentity();return}
                 self.applyPairingStatusBadge(snapshot)
-                if snapshot.records.isEmpty{self.cancelPairingIdentity();self.pairingNotice("Thiết bị này chưa có danh tính hoặc cặp Remote Play.");return}
+                if snapshot.records.isEmpty && snapshot.pendingClientTicket==nil{self.cancelPairingIdentity();self.pairingNotice("Thiết bị này chưa có danh tính hoặc cặp Remote Play.");return}
                 let sheet=UIAlertController(title:"Trạng thái Remote Play",message:"Chọn bản ghi để xem chi tiết. Đọc trạng thái không làm thay đổi khóa hoặc kết nối.",preferredStyle:.actionSheet)
                 self.pairingAlert=sheet
+                if let ticket=snapshot.pendingClientTicket{
+                    sheet.addAction(UIAlertAction(title:"Duyệt host của phiên đang chờ",style:.default){[weak self,weak sheet]_ in
+                        sheet?.dismiss(animated:false){[weak self] in self?.showPeerApproval(ticket:ticket,owner:owner)}
+                    })
+                }
                 for record in snapshot.records{
                     let title="\(record.isIdentity ? "Danh tính":"Cặp thiết bị") · \(record.generation)"
                     sheet.addAction(UIAlertAction(title:title,style:.default){[weak self,weak sheet]_ in
@@ -144,6 +149,46 @@ final class GameHubViewController: UIViewController, WKNavigationDelegate, WKUID
                 self.pairingExpiry=expiry;DispatchQueue.main.asyncAfter(deadline:snapshot.expires,execute:expiry);self.present(sheet,animated:true)
             }
         }
+    }
+    private func peerReviewAvailable(_ owner:NativeDocumentLifetime)->Bool{
+        pairingFlow === owner && owner.active && hubVisible && !fullScreenGame && !pendingSuspend && presentedViewController==nil && UIApplication.shared.applicationState == .active && UIApplication.shared.isProtectedDataAvailable
+    }
+    private func showPeerApproval(ticket:String,owner:NativeDocumentLifetime){
+        guard peerReviewAvailable(owner) else{cancelPairingIdentity();return}
+        core.reviewPairingPeer(ticket:ticket,owner:owner){[weak self] result in
+            guard let self=self,self.pairingFlow === owner,owner.active else{return}
+            guard self.peerReviewAvailable(owner) else{self.cancelPairingIdentity();return}
+            switch result{
+            case .failure(let error):self.cancelPairingIdentity();self.pairingNotice(error.localizedDescription)
+            case .success(let review):
+                guard DispatchTime.now()<review.expires else{self.cancelPairingIdentity();return}
+                self.pairingExpiry?.cancel()
+                let alert=UIAlertController(title:"Đối chiếu host Remote Play",message:"Khóa host:\n\(review.hostPublicKey)\nFingerprint:\n\(review.hostFingerprint)\nMã đối chiếu: \(review.comparisonCode)\nCặp: \(review.pairID)\n\nHãy xác minh host độc lập và đối chiếu mã trên cả hai thiết bị trước khi tiếp tục.",preferredStyle:.alert)
+                self.pairingAlert=alert
+                alert.addAction(UIAlertAction(title:"Hủy",style:.cancel){[weak self]_ in self?.cancelPairingIdentity()})
+                alert.addAction(UIAlertAction(title:"Đã xác minh host và đối chiếu mã",style:.default){[weak self,weak alert]_ in
+                    alert?.dismiss(animated:false){[weak self] in self?.showPeerPermission(review,owner:owner)}
+                })
+                let expiry=DispatchWorkItem{[weak self] in guard let self=self,self.pairingFlow === owner else{return};self.cancelPairingIdentity()}
+                self.pairingExpiry=expiry;DispatchQueue.main.asyncAfter(deadline:review.expires,execute:expiry);self.present(alert,animated:true)
+            }
+        }
+    }
+    private func showPeerPermission(_ review:NativePeerApproval,owner:NativeDocumentLifetime){
+        guard peerReviewAvailable(owner),DispatchTime.now()<review.expires else{cancelPairingIdentity();return}
+        let permission=review.inputAllowed ? "Cho phép điều khiển đầu vào":"Không cho phép điều khiển đầu vào"
+        let alert=UIAlertController(title:"Xác nhận quyền của cặp thiết bị",message:"Host: \(review.hostFingerprint)\nCặp: \(review.pairID)\nQuyền: \(permission)\n\nChỉ lưu candidate đã xác minh; kết nối chưa được kích hoạt.",preferredStyle:.alert)
+        pairingAlert=alert
+        alert.addAction(UIAlertAction(title:"Hủy",style:.cancel){[weak self]_ in self?.cancelPairingIdentity()})
+        alert.addAction(UIAlertAction(title:"Đồng ý quyền và lưu candidate",style:.default){[weak self]_ in
+            guard let self=self,self.pairingFlow === owner,owner.active,DispatchTime.now()<review.expires,
+                  self.hubVisible,!self.pendingSuspend,UIApplication.shared.applicationState == .active,UIApplication.shared.isProtectedDataAvailable else{self?.cancelPairingIdentity();return}
+            self.core.confirmPairingPeer(review,owner:owner){[weak self] result in
+                guard let self=self,self.pairingFlow === owner,owner.active else{return};self.cancelPairingIdentity()
+                switch result{case .success:self.pairingNotice("Đã lưu candidate. Mở lại trạng thái để kiểm tra; chưa khởi động kết nối.");case .failure:self.pairingNotice("Chưa xác nhận được kết quả. Mở lại trạng thái trước khi tiếp tục.")}
+            }
+        })
+        present(alert,animated:true)
     }
     private func showPairingRecovery(_ record:NativeRecoveryRecord,snapshot:NativeRecoverySnapshot,owner:NativeDocumentLifetime){
         guard pairingFlow === owner,owner.active,DispatchTime.now()<snapshot.expires,presentedViewController==nil,

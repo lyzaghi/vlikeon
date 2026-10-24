@@ -1840,6 +1840,15 @@ this checkpoint.
 
 ## Remaining implementation and qualification
 
+iOS status now retains an unexpired pending client ticket and offers a native
+review action. A fresh approved poll opens host key/fingerprint/comparison/pair
+review; an explicit verification action proceeds to a separate input-permission
+confirmation. Only the final action invokes one-use candidate persistence.
+Both stages retain the same snapshot/owner and expiry, with foreground,
+protected-data and lifecycle dismissal checks. This source UI has not been
+compiled, displayed or tested. Full begin/join entry, activation and end-to-end
+qualification remain unfinished; no runtime or network operation ran.
+
 Android native status/recovery now offers review of an unexpired pending-client
 ticket from native status. An explicit fresh poll creates the one-use approval
 snapshot; the native dialog displays its host key/fingerprint/comparison, pair

@@ -89,6 +89,7 @@ struct NativeRecoverySnapshot {
     let revision:UInt64,device:String,records:[NativeRecoveryRecord],expires:DispatchTime
     let relayRetirementAvailable:Bool
     let namespaceProvenanceMissing:Bool
+    let pendingClientTicket:String?
     var needsAttention:Bool{namespaceProvenanceMissing || records.contains{$0.sessionRecoveryRequired || ($0.nextStep != nil && $0.nextStep != "revalidate_before_use")}}
 }
 
@@ -418,7 +419,14 @@ final class NativeCore {
                     parsed.append(NativeRecoveryRecord(address:address,phase:phase,publicKey:key,nextStep:action?.1,sessionRecoveryRequired:sessionRecoveryRequired))
                 }
                 guard next.isEmpty,owner.active,DispatchTime.now()<expires else{throw OmniFailure.message("Trạng thái phục hồi đã hết hạn.")}
-                let snapshot=NativeRecoverySnapshot(revision:revision.uint64Value,device:device,records:parsed,expires:expires,relayRetirementAvailable:relayAvailable,namespaceProvenanceMissing:namespaceMissing)
+                var pendingTicket:String?
+                if let pending=value["pending_client"] as? [String:Any]{
+                    guard let ticket=pending["ticket"] as? String,let id=UUID(uuidString:ticket),id.uuidString.lowercased()==ticket,
+                          id != UUID(uuid:(0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0)),let expired=pending["expired"] as? Bool,
+                          let expiry=pending["expires_at_ms"] as? NSNumber else{throw OmniFailure.message("Phiên ghép đôi chờ không hợp lệ.")}
+                    if !expired && expiry.doubleValue>Date().timeIntervalSince1970*1000{pendingTicket=ticket}
+                }
+                let snapshot=NativeRecoverySnapshot(revision:revision.uint64Value,device:device,records:parsed,expires:expires,relayRetirementAvailable:relayAvailable,namespaceProvenanceMissing:namespaceMissing,pendingClientTicket:pendingTicket)
                 DispatchQueue.main.async{completion(.success(snapshot))}
             }catch{DispatchQueue.main.async{completion(.failure(error))}}
         }

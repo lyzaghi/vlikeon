@@ -2,6 +2,11 @@
 
 ## Current sequence — 1–109 outstanding tasks
 
+Item 58 iOS native status now links live pending-client tickets to a two-stage
+peer/comparison then input-permission consent flow. It uses the immutable one-use
+snapshot, owner/foreground/protected-data checks and original review expiry.
+Source-only; no build/test/UI run. Begin/join, activation and qualification due.
+
 Item 58 Android status now exposes a live pending-client review action and native
 peer-consent dialog. It displays retained host/comparison/pair/input metadata,
 requires separate peer-comparison and permission checks, and sends the one-use
