@@ -228,6 +228,7 @@ final class NativeCore {
                         : om_mobile_pairing_client_action_v1(self.handle,pointer,raw.count,action.rawValue,budget))
                 })
                 if action == .persistAfterPeerConsent{
+                    guard let ticket=value["pairing_ticket"] as? String,ticket==expectedTicket else{throw OmniFailure.message("Candidate không khớp ticket ghép đôi.")}
                     guard (value["credential_protocol"] as? NSNumber)?.uint32Value==1,value["phase"] as? String=="material_ready",
                           let address=value["address"] as? [String:Any],address["profile"] as? String==self.profileID.uuidString.lowercased(),
                           address["kind"] as? String=="pair_encryption" else{throw OmniFailure.message("Kết quả candidate không hợp lệ. Hãy đọc lại trạng thái.")}

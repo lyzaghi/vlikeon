@@ -1840,6 +1840,12 @@ this checkpoint.
 
 ## Remaining implementation and qualification
 
+Client candidate responses now include `pairing_ticket` from the exact consumed
+pending controller entry. Android/iOS require this to match the requested ticket
+before accepting MaterialReady metadata. This correlation does not imply relay
+activation, transport authority or undo a candidate committed before cancellation.
+This follow-up was authored without running build or tests.
+
 - Journal/executor/lease/writer product integration, authority epochs, actual native owner
   and startup recovery execution,
   rotation/re-pair and local/relay revocation orchestration.

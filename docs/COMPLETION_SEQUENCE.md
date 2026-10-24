@@ -2,6 +2,11 @@
 
 ## Current sequence — 1–109 outstanding tasks
 
+Item 58 persisted client candidate responses now carry the consumed pairing
+ticket; both mobile callers require the exact requested ticket before admitting
+the candidate metadata. This closes the previously missing response correlation.
+Source review only; build/test and actual consent UI remain deferred/incomplete.
+
 Item 58 mobile callers now check canonical request/reply tickets, protocol
 metadata and candidate profile/kind/phase before accepting successful replies.
 Both callers recheck the original deadline and dialog lifetime on main-thread

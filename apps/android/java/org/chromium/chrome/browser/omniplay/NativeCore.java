@@ -133,6 +133,7 @@ public final class NativeCore {
                 if("ok".equals(response.optString("status"))){
                     JSONObject value=response.getJSONObject("result");
                     if(action==3){
+                        if(!expectedTicket.equals(value.getString("pairing_ticket")))throw new IllegalStateException();
                         JSONObject address=value.getJSONObject("address");
                         if(value.getInt("credential_protocol")!=1||!"material_ready".equals(value.getString("phase"))||!mProfile.equals(address.getString("profile"))||!"pair_encryption".equals(address.getString("kind")))throw new IllegalStateException();
                     }else if(value.getInt("pairing_protocol")!=1||!canonicalPairingId(value.getString("ticket"))||(expectedTicket!=null&&!expectedTicket.equals(value.getString("ticket"))))throw new IllegalStateException();
