@@ -1516,6 +1516,33 @@ qualification. No HTTP/crypto/parser/SQL/native/vault operation, compiler, build
 or test was executed. Product grant-to-writer activation and the host invitation
 controller remain unfinished, together with producer/crash recovery scope.
 
+## Approved client transcript to native candidate writer
+
+The retained-lease writer now accepts an opaque NativeClientPairing after actual
+native comparison/peer consent. It admits the exact expected journal revision and
+Active identity generation, reloads the pinned vault identity, and verifies the
+pending hello/client key against that identity before consuming the ephemeral
+exchange. The caller supplies no alternate grant, audience or key; the exact
+approved grant is copied from the pending object and independently rechecked by
+its consumed transcript finish.
+
+Derived material flows directly into the existing reserve/write-intent/vault
+write/read-back/MaterialReady path under the same credential lease. The original
+operation deadline is capped by the pending invite's original monotonic deadline,
+so network/consent/derivation cannot renew the vault-publication budget. The
+candidate remains inactive; late or failed publication keeps existing journal
+recovery debt and does not restore the consumed scalar.
+
+LocalHost provides a native-only controller entry for this operation and enforces
+the installed pairing policy before vault/exchange work. The checked-in disabled
+policy still refuses it. No mobile JSON/C ABI accepts a pending transcript or
+secret material; actual pending-controller ownership and native peer-consent UI
+must still be integrated before this entry has a product caller.
+
+No identity/vault/crypto/SQL/native operation, compiler, build or test ran. Pair
+activation with persisted approval/recovery semantics, client UI/controller and
+host invitation flow remain unfinished, together with backend/crash recovery.
+
 ## Remaining implementation and qualification
 
 - Journal/executor/lease/writer product integration, authority epochs, actual native owner

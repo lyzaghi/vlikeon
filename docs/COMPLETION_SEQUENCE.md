@@ -2,6 +2,13 @@
 
 ## Current sequence — 1–109 outstanding tasks
 
+Item 58 now connects the opaque approved native client transcript to the retained
+lease writer and a policy-gated LocalHost entry. Active pinned identity possession
+is rechecked before consuming ECDH, and exact stored grant/material flow through
+existing candidate write/read-back with original invite deadline retained. Result
+is MaterialReady only. No native/vault/crypto/SQL/compiler/build/test ran. Product
+pending/consent controller, activation and host flow remain due; full scope is open.
+
 Item 58 now authors native client approval polling with bound invite/client/
 hello-hash status receipts, pinned-host grant admission and monotonic terminal
 state/first-grant binding. Finish consumes only the stored approved transcript;

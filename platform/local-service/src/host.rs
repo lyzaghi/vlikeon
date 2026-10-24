@@ -169,6 +169,20 @@ impl LocalHost {
         Ok(json!({"credential_protocol":1,"address":review.address,"revision":revision,"phase":"active","approves_remote_peer":false}))
     }
     pub fn native_pairing_cancel_identity_review(&mut self){self.identity_review=None;}
+    /// Trusted native peer-consent controller only. No renderer/native JSON can
+    /// construct the pending object or supply replacement grant/key material.
+    /// Current disabled installed policy refuses before vault/exchange work.
+    pub fn native_pairing_prepare_client_after_local_consent(&self,
+        store:&dyn omniplay_streaming::native_credentials::PairingSecretStore,
+        identity:omniplay_streaming::native_credentials::CredentialAddress,expected:u64,
+        pending:omniplay_streaming::native_pair_exchange::NativeClientPairing,deadline:std::time::Instant)->Result<Value>{
+        self.ensure_open()?;
+        omniplay_core::stream_signal_authority::require_installed_pairing_policy()?;
+        if std::time::Instant::now()>=deadline{return Err(PlatformError::new(ErrorCode::DeadlineExceeded,"Native client pairing expired before writer admission"));}
+        let mut writer=omniplay_core::stream_credential_writer::NativeCredentialWriter::open(&self.database,self.profile_id,store)?;
+        let candidate=writer.prepare_client_after_local_consent(expected,identity,pending,omniplay_core::now_ms(),deadline)?;
+        Ok(json!({"credential_protocol":1,"address":candidate.address(),"public_key":candidate.public_key(),"revision":candidate.revision(),"phase":"material_ready"}))
+    }
     pub fn background_sync_policy(&self)->Result<Value>{
         self.ensure_open()?;
         let opted_in=self.database.mobile_background_sync()?;

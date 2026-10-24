@@ -68,6 +68,9 @@ impl NativeClientPairing{
     pub fn signed_hello(&self)->&SignedDocument{&self.hello}
     pub fn comparison_code(&self)->&str{&self.comparison}
     pub fn expires_at_ms(&self)->u64{self.expires}
+    /// Native writer must retain this original bound through vault publication,
+    /// not restart the invitation lifetime after ECDH or network completion.
+    pub fn native_deadline(&self)->Instant{self.deadline}
     /// Signed public metadata for the native writer, not an activation receipt.
     pub fn approved_grant(&self)->Option<&SignedDocument>{self.approved.as_ref()}
     pub(crate) fn join_material<'a>(&'a self,identity:&crate::native_credentials::NativeSigningIdentity,now:u64)->Result<(&'a str,uuid::Uuid,&'a str,&'a SignedDocument)>{

@@ -60,6 +60,31 @@ impl<'a> NativeCredentialWriter<'a>{
         let updated=journal::activate(self.database,&self.lease,self.profile,expected,address,elapsed_now(now,started)?)?;
         drop(identity);check(deadline)?;Ok(updated.revision())
     }
+    /// Completes the exact polled client transcript only after the real native
+    /// comparison/peer consent UI approves it. Caller supplies no replacement
+    /// grant, audience or key. Candidate remains MaterialReady, not Active.
+    pub fn prepare_client_after_local_consent(&mut self,expected:u64,identity_address:CredentialAddress,
+        pending:omniplay_streaming::native_pair_exchange::NativeClientPairing,now:u64,deadline:Instant)->Result<Candidate>{
+        let started=begin(deadline)?;let deadline=deadline.min(pending.native_deadline());check(deadline)?;
+        let snapshot=journal::load_scoped(self.database,&self.lease,self.profile)?;check(deadline)?;
+        if snapshot.revision()!=expected{return Err(conflict());}
+        let record=snapshot.records().iter().find(|record|record.address()==identity_address).ok_or_else(conflict)?;
+        if identity_address.kind()!=SecretKind::DeviceSigning||record.phase()!=Phase::Active{return Err(conflict());}
+        // Prove current identity possession before consuming the one-use scalar.
+        let identity=load_identity(self.store,&identity_address,record.public_key())?;
+        check(deadline)?;self.lease.check(self.database,self.profile)?;
+        let hello:omniplay_streaming::ClientHello=omniplay_streaming::verify(record.public_key(),omniplay_streaming::HELLO_DOMAIN,pending.signed_hello(),4096)?;
+        if hello.client_public_key!=identity.public_key(){return Err(conflict());}
+        let document=pending.approved_grant().ok_or_else(conflict)?.clone();
+        let grant:omniplay_streaming::PairGrant=omniplay_streaming::inspect(&document,8192)?;
+        if grant.client_public_key!=identity.public_key(){return Err(conflict());}
+        // finish rechecks the separately pinned host/transcript, joined/polled
+        // approval and original monotonic invite bound before deriving material.
+        let material=pending.finish_after_local_consent(elapsed_now(now,started)?)?;
+        check(deadline)?;self.lease.check(self.database,self.profile)?;
+        drop(identity);
+        self.prepare_pair(expected,identity_address,&document,&grant.audience,&material,elapsed_now(now,started)?,deadline)
+    }
     /// The key must come from the native authenticated exchange. This primitive
     /// does not derive it or prove the exchange; no browser key import exists.
     /// Approval is still pending when the returned candidate is MaterialReady.
