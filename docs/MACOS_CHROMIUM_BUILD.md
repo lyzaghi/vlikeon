@@ -274,3 +274,20 @@ old/new recipe and preparation hashes and the prior synced journal; it does
 not relabel a failed build as successful. Batch 005-build-c resumes from synced
 dependencies with two jobs and independent durable logs. Full compilation and
 subsequent runtime qualification remain pending.
+
+## Batch c: SDK prerequisite failure
+
+Batch c completed dependency admission, upstream hooks and overlay application,
+then GN exited 1 because SDK 15.5 lacks DarwinFoundation1.modulemap,
+DarwinFoundation2.modulemap and DarwinFoundation3.modulemap required by the
+pinned build/modules/BUILD.gn. The installed SDK provides only the older
+DarwinFoundation.modulemap. Journal phase is overlay, failed gn_configuration;
+there is no full compiler success. Preserve this terminal result before any
+new attempt. Do not manufacture modulemaps or disable checks to hide the mismatch.
+
+Apple lists Xcode 26.3 with macOS SDK 26.2 as supporting macOS Sequoia 15.6
+and later: https://developer.apple.com/xcode/system-requirements/ . This makes
+it a host-compatible candidate for the current macOS 15.7, not proof that GN
+or the full Chromium build passes. The pinned official SDK is 26.5; that
+official combination needs a newer host OS. A compatible SDK must be installed
+and checked for the required modulemaps before another build is started.
