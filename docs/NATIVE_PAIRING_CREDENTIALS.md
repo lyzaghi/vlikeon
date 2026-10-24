@@ -337,10 +337,55 @@ product registry/observer implementation. Epoch changes reject in-flight results
 These outputs are not indefinite capabilities: the relay owner must recheck
 authority/deadline before every network attempt, and queued/delayed receive
 delivery must recheck before dispatch. Per-call exclusion is not a long-lived
-receiver ownership lease or a cross-profile/profile-clone arbiter. HTTP signing,
-receiver lifecycle, real native authority, session dispatch, startup/mobile
+receiver ownership lease or a cross-profile/profile-clone arbiter. Paired HTTP
+signing/send source is now connected below; receiver lifecycle, real native authority, session dispatch, startup/mobile
 integration and runtime verification remain due. Neither operation has a current
 product caller or has been executed.
+
+## Native paired HTTPS source
+
+`native_relay.rs` now authors a reqwest 0.12.28 blocking client for Send, Receive,
+IceCredentials and RevokePair. Invitation/approval operations are explicitly
+unsupported by this client. Its at-most-eight canonical HTTPS origins must come
+from admitted installed/native policy; no invitation/renderer/environment URL
+defines the allowlist. Requests use only `/v1/relay`, with standard TLS validation,
+no redirect, ambient proxy, cookies or caller headers. Connect timeout is five
+seconds, total request timeout is the lesser of original remaining time and
+15 seconds, and idle connections per host are bounded to two.
+
+The supplied native signing identity must participate in the verified live grant.
+The existing RelayRequest body is signed in its original domain, then re-admitted
+through `verify_request` before HTTP. Each attempt has a fresh request nonce;
+there is no hidden transport retry. Request envelopes are bounded to 192 KiB,
+response bodies to 1 MiB including chunked replies, with JSON-object and content-
+type admission and no content-encoding fallback. Error text/URLs/body are not
+included in returned diagnostics. The request operations do not contain a
+pairing invitation secret; native invite/join controller integration is still due.
+
+Cancellation/deadline checks occur before/after HTTP, between bounded response
+reads and before success. A blocking DNS/connect/read/backend operation cannot
+be synchronously interrupted merely by the AtomicBool; request timeout and the
+future native supervisor must cover that interval. A cancelled, late, failed or
+expired-grant result is never positive approval/revocation acknowledgment, even
+if the remote side effect happened. Original state must be reconciled explicitly.
+This code must run on its native blocking-I/O lane, not inside an async/UI thread.
+
+`stream_signal_operations::send_prepared` now connects the original prepared
+packet to this transport. It reacquires the profile lease, verifies current
+active generation/revision, signed-grant hash, sender, audience and previously
+reserved sequence, reloads the pinned active identity from the vault, and checks
+native session authority before HTTP. The same lease is retained through the
+request and result checks. Only a bounded exact `{accepted:true,cursor}` response
+plus post-network authority/certificate/packet/cancellation checks returns a send
+receipt. A send receipt is not durable session delivery; no ack/outbox journal
+or receive-poll dispatcher is introduced here. Retry reuses the exact prepared
+message ID/sequence/expiry/IV/ciphertext while signing a fresh HTTP envelope.
+
+No client was constructed, request signed or network contacted. Real native
+authority, approved-pair activation, receive/ICE/revocation controllers,
+background/cancellation supervision, product/startup/mobile callers and all
+HTTP/crypto/replay interoperability/platform qualification remain unfinished.
+This is not item-59 relay/TURN deployment and does not enable streaming policy.
 
 ## Required durable ordering and integration
 

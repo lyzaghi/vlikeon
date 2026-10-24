@@ -8,6 +8,7 @@ pub mod native_rtp_reorder;
 pub mod native_credentials;
 pub mod native_pair_exchange;
 pub mod native_signal;
+pub mod native_relay;
 pub use protocol::*;
 
 use omniplay_contracts::{ErrorCode,PlatformError,Result};

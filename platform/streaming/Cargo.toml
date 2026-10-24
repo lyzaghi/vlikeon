@@ -17,6 +17,7 @@ url.workspace = true
 zeroize.workspace = true
 getrandom.workspace = true
 ring = "=0.17.14"
+reqwest = { version = "=0.12.28", default-features = false, features = ["blocking","json","rustls-tls"] }
 
 [target.'cfg(target_os = "windows")'.dependencies]
 keyring = { version = "=3.6.3", features = ["windows-native"] }

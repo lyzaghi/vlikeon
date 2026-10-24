@@ -2,6 +2,14 @@
 
 ## Current sequence — 1–109 outstanding tasks
 
+Item 58 now authors a bounded allowlisted paired HTTPS relay client and connects
+prepared-send packets to pinned vault identity/request signing and exact send
+acknowledgment admission under the retained credential lease. Original session
+authority, cancellation and expiry are rechecked after network work in source.
+No HTTP/client/crypto/vault operation was executed. Actual native authority,
+pair approval/receive/ICE/revocation/product/mobile callers remain due; this is
+not deployed item-59 infrastructure and full original completion scope stays open.
+
 Item 58 now connects a native per-operation signal pipeline: retained lease,
 active generation/vault admission, durable send reservation before encryption,
 and authenticated receive acceptance before returning plaintext. Required native

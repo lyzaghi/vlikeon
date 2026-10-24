@@ -1,12 +1,14 @@
-//! Native per-operation signal pipeline. No relay HTTP/client or product caller
-//! is installed here. Never retain its outputs as indefinite session authority.
+//! Native per-operation signal pipeline with paired HTTP send orchestration.
+//! No product caller is installed. Outputs are not indefinite session authority.
 use crate::{Database,stream_credentials::{self as journal,Journal,Record,Phase},stream_credential_lease::CredentialLease};
 use omniplay_contracts::{ErrorCode,PlatformError,Result};
-use omniplay_streaming::{RelayOperation,SignedDocument,MAX_PACKET_BYTES,
-    native_credentials::{CredentialAddress,SecretKind,PairingSecretStore,load_pair},
+use omniplay_streaming::{RelayOperation,SignedDocument,MAX_PACKET_BYTES,document_hash,native_relay::NativePairRelay,
+    native_credentials::{CredentialAddress,SecretKind,PairingSecretStore,load_pair,load_identity},
     native_signal::{SignalMetadata,EncryptedSignal,NativeSignalCipher}};
 use std::time::{Duration,Instant};
 use uuid::Uuid;
+use serde::Deserialize;
+use std::sync::atomic::{AtomicBool,Ordering};
 use zeroize::Zeroizing;
 
 /// Native observations must retain their original observation time. No serde
@@ -44,6 +46,14 @@ impl CommittedSignal{
     pub fn revision(&self)->u64{self.revision}
     /// Immediate native delivery only; recheck live authority if queued/delayed.
     pub fn body(&self)->&[u8]{&self.body}
+}
+#[derive(Deserialize)]#[serde(deny_unknown_fields)]
+struct SendAcknowledgement{accepted:bool,cursor:u64}
+pub struct SentSignal{message_id:Uuid,sequence:u64,cursor:u64}
+impl SentSignal{
+    pub fn message_id(&self)->Uuid{self.message_id}
+    pub fn sequence(&self)->u64{self.sequence}
+    pub fn cursor(&self)->u64{self.cursor}
 }
 struct Clock{now:u64,started:Instant,deadline:Instant}
 impl Clock{
@@ -114,4 +124,32 @@ pub fn accept_received(database:&Database,profile:Uuid,address:CredentialAddress
     let current=clock.current()?;active(&accepted,address,accepted.revision(),current)?;
     if metadata.expires_at_ms<=current.saturating_sub(30_000){return Err(denied());}
     Ok(CommittedSignal{session,epoch,revision:accepted.revision(),body})
+}
+
+/// Sends the original prepared ciphertext exactly once per call. Retry may call
+/// this again with that same prepared value and a current journal revision; the
+/// HTTP envelope has a fresh nonce/signature but payload identity is unchanged.
+/// Unknown/late replies never acknowledge send; the server may already have it.
+pub fn send_prepared(database:&Database,profile:Uuid,prepared:&OutgoingSignal,expected:u64,store:&dyn PairingSecretStore,
+    owner:&mut dyn NativeSignalAuthority,relay:&NativePairRelay,now:u64,deadline:Instant,cancel:&AtomicBool)->Result<SentSignal>{
+    let clock=Clock::new(now,deadline)?;let address=prepared.address;
+    let session=prepared.metadata.session_id;let epoch=prepared.epoch;
+    let lease=CredentialLease::acquire(database,profile)?;clock.authority(owner,address,session,epoch)?;
+    let snapshot=journal::load(database,profile)?;let record=active(&snapshot,address,expected,clock.current()?)?;
+    let grant=record.grant().ok_or_else(denied)?;
+    if prepared.revision>expected||prepared.metadata.sequence==0||prepared.metadata.sequence>record.send_sequence()||
+        prepared.sender!=record.public_key()||prepared.audience!=grant.audience()||
+        Some(document_hash(&prepared.grant)?.as_str())!=record.grant_hash()||prepared.metadata.expires_at_ms<=clock.current()?{return Err(denied());}
+    let identity_record=snapshot.records().iter().find(|identity|identity.address().kind()==SecretKind::DeviceSigning&&identity.phase()==Phase::Active&&identity.public_key()==record.public_key()).ok_or_else(denied)?;
+    let identity=load_identity(store,&identity_record.address(),identity_record.public_key())?;
+    clock.authority(owner,address,session,epoch)?;lease.check(database,profile)?;
+    if prepared.metadata.expires_at_ms<=clock.current()?{return Err(denied());}
+    let response=relay.request(&identity,&prepared.audience,prepared.relay_operation(),clock.current()?,deadline,cancel)?;
+    let acknowledgement:SendAcknowledgement=serde_json::from_value(response).map_err(|_|denied())?;
+    if !acknowledgement.accepted||acknowledgement.cursor==0||acknowledgement.cursor>9_007_199_254_740_991{return Err(denied());}
+    clock.authority(owner,address,session,epoch)?;lease.check(database,profile)?;
+    let current=clock.current()?;active(&snapshot,address,expected,current)?;
+    if prepared.metadata.expires_at_ms<=current{return Err(denied());}
+    if cancel.load(Ordering::Acquire){return Err(PlatformError::new(ErrorCode::Cancelled,"Native signaling send was cancelled"));}
+    Ok(SentSignal{message_id:prepared.metadata.message_id,sequence:prepared.metadata.sequence,cursor:acknowledgement.cursor})
 }

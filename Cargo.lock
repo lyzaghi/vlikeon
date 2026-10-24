@@ -1540,6 +1540,7 @@ dependencies = [
  "getrandom 0.2.17",
  "keyring",
  "omniplay-contracts",
+ "reqwest",
  "ring",
  "serde",
  "serde_json",

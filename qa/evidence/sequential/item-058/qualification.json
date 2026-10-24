@@ -25,7 +25,9 @@
     "Native AES-GCM signal primitive with browser AAD layout, bounded metadata/body and pinned peer/certificate; decrypted bytes remain uncommitted",
     "Durable per-generation send reservation, receive sequence/cursor and bounded duplicate-message history; missing counters are refused instead of reset",
     "Native per-operation pipeline connects retained lease, active generation/vault load, reserved send AEAD and authenticated receive acceptance before plaintext publication",
-    "Required exact generation/session/epoch native observations around slow work; no actual native authority or relay/product caller implementation yet"
+    "Required exact generation/session/epoch native observations around slow work; no actual native authority or product caller implementation yet",
+    "Allowlisted canonical HTTPS paired relay client source with native request signing, no redirects/ambient proxy, original deadlines and bounded JSON responses",
+    "Prepared-send orchestration reloads the pinned active identity from vault, retains the profile lease through HTTP and requires exact accepted/cursor plus post-network authority admission"
   ],
   "build_executed": false,
   "tests_executed": false,
@@ -36,7 +38,7 @@
   "durable_lifecycle_integrated": false,
   "remaining": [
     "Journal/executor/lease/writer product integration, native consent/session owner, copied-profile coordination, startup dispatch and authenticated relay approval/revocation",
-    "Native consent/invitation-secret/relay controller, real session authority/receiver lifecycle, HTTP signing/delivery and WebCrypto/native interoperability",
+    "Native consent/invitation-secret/approval controller, real session authority, receive/ICE/revocation lifecycle, product HTTP dispatch and WebCrypto/native interoperability",
     "Native broker authority and document/session capability integration",
     "Separate Android/iOS credential provider ABI and app integration",
     "Lock, restore, rotation, profile/device deletion and explicit browser-to-native re-pairing",
