@@ -2,6 +2,10 @@
 
 ## Current sequence — 1–109 outstanding tasks
 
+Item 58 Android now authors bounded one-use host begin from retained Active
+identity setup, with exact local-key/revision and unregistered reply admission.
+Setup refuses existing pending host/client flows. Source-only; UI/share/build/test due.
+
 Item 58 iOS native status now retains validated pending-host ticket/flags and
 offers explicit host invitation closure with existing bounded typed caller.
 Source-only; no build/test. Full host views/durable recovery/qualification due.

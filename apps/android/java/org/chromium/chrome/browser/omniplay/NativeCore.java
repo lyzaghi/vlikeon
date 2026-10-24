@@ -295,7 +295,7 @@ public final class NativeCore {
             JSONObject response=pairingResponse(nativePairingIdentity(0,mHandle,0,null)),value=pairingResult(response);
             if(!Boolean.TRUE.equals(value.get("policy_available")))return failure("","unsupported_capability","Remote Play pairing is not enabled in this version.");
             RecoverySnapshot snapshot=new RecoverySnapshot(value,mProfile,deadline);
-            if(snapshot.namespaceProvenanceMissing||snapshot.pendingClientTicket!=null)throw new IllegalStateException();
+            if(snapshot.namespaceProvenanceMissing||snapshot.pendingClientTicket!=null||snapshot.pendingHostTicket!=null)throw new IllegalStateException();
             RecoveryRecord identity=null;
             for(RecoveryRecord record:snapshot.records)if(record.isIdentity()&&!"retired".equals(record.phase)){
                 if(identity!=null||!"active".equals(record.phase)||record.sessionRecoveryRequired)throw new IllegalStateException();identity=record;
@@ -314,6 +314,39 @@ public final class NativeCore {
             if(setup!=null&&alive.getAsBoolean()&&mPairingClientDeliveryFence.get()==fence&&android.os.SystemClock.elapsedRealtime()<deadline)reply.accept(setup,null);
             else reply.accept(null,"Pairing setup is unavailable. Enable the configured service and inspect identity/status before continuing.");
         });
+    }
+    /** Explicit native host creation only; registration/sharing are separate. */
+    void beginPairingHost(ClientSetup setup,String audience,String label,java.util.function.BooleanSupplier alive,Reply reply){
+        if(setup==null||!alive.getAsBoolean()||mPairingClientDeliveryFence.get()!=setup.fence||android.os.SystemClock.elapsedRealtime()>=setup.expires
+                ||!setup.relayOrigins.contains(audience)||label==null||label.isEmpty()||label.getBytes(StandardCharsets.UTF_8).length>120||!setup.consumed.compareAndSet(false,true)){
+            reply.accept(failure("","cancelled","Host setup ended. Reopen setup."));return;
+        }
+        if(!mPairingClientBusy.compareAndSet(false,true)){reply.accept(failure("","busy","Native pairing work is still finishing."));return;}
+        if(mWorkPending.incrementAndGet()>32){mWorkPending.decrementAndGet();mPairingClientBusy.set(false);reply.accept(failure("","busy","Native queue is full."));return;}
+        final long deadline=Math.min(setup.expires,android.os.SystemClock.elapsedRealtime()+25_000);
+        try{mIo.execute(()->{
+            JSONObject response;byte[] input=null;
+            try{
+                long remaining=deadline-android.os.SystemClock.elapsedRealtime();
+                if(mHandle==0||mFailed||!mPairingAttached||remaining<1000||!alive.getAsBoolean()||mPairingClientDeliveryFence.get()!=setup.fence)throw new IllegalStateException();
+                input=new JSONObject().put("identity",setup.identity.address()).put("expected_revision",setup.revision).put("audience",audience).put("label",label).toString().getBytes(StandardCharsets.UTF_8);
+                if(input.length>1024)throw new IllegalStateException();
+                response=pairingResponse(nativePairingHostV1(mHandle,input,0,(int)Math.min(25_000,remaining)));
+                if("ok".equals(response.optString("status"))){
+                    JSONObject value=pairingResult(response);Object revision=value.get("revision"),expiry=value.get("expires_at_ms");
+                    if(value.getInt("pairing_protocol")!=1||!canonicalPairingId(value.getString("ticket"))||!canonicalPairingId(value.getString("invite_id"))
+                            ||!setup.identityKey.equals(value.getString("host_public_key"))||!Boolean.FALSE.equals(value.get("registered"))||!Boolean.FALSE.equals(value.get("share_available"))
+                            ||!(revision instanceof Number)||((Number)revision).doubleValue()!=setup.revision||!(expiry instanceof Number)
+                            ||((Number)expiry).doubleValue()!=((Number)expiry).longValue()||((Number)expiry).longValue()<=System.currentTimeMillis()
+                            ||((Number)expiry).longValue()>9_007_199_254_740_991L)throw new IllegalStateException();
+                }
+            }catch(Exception|LinkageError error){response=failure("","runtime_unavailable","Host preparation is uncertain. Inspect status before retrying.");}
+            finally{if(input!=null)java.util.Arrays.fill(input,(byte)0);mWorkPending.decrementAndGet();mPairingClientBusy.set(false);}
+            final JSONObject completed=response;mMain.post(()->{
+                if(android.os.SystemClock.elapsedRealtime()>=deadline||!alive.getAsBoolean()||mPairingClientDeliveryFence.get()!=setup.fence)reply.accept(failure("","cancelled","Host preparation became stale. Inspect status."));
+                else reply.accept(completed);
+            });
+        });}catch(java.util.concurrent.RejectedExecutionException error){mWorkPending.decrementAndGet();mPairingClientBusy.set(false);reply.accept(failure("","busy","Native host queue is unavailable."));}
     }
     /** Native UI independently pins host. UI must clear its code field after call;
      * immutable Java/UI string copies cannot be reliably wiped here. */

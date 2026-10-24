@@ -1840,6 +1840,15 @@ this checkpoint.
 
 ## Remaining implementation and qualification
 
+Android native host begin now consumes the retained Active-identity setup once,
+selects an installed origin and uses shared bounded admission plus the earlier
+setup/operation deadline. Successful response must match local identity key and
+revision, canonical ticket/invite ID, future integral expiry and explicit false
+registered/share flags. Delivery rechecks owner/cancel/deadline; input clears on
+worker return. Setup now refuses both pending host and client flows. No automatic
+registration/sharing or renderer route. No build/test/native operation ran; host
+setup UI, sharing and remaining peer/candidate caller integration remain due.
+
 iOS native status now admits canonical pending-host ticket and actual boolean
 expiry/local-close/remote-cleanup flags. It exposes a separate close invitation
 action even without credential records, explaining local stop, conditional
