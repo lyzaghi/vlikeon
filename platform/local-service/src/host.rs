@@ -48,8 +48,9 @@ impl LocalHost {
     pub fn native_device_id(&self)->Uuid{self.database.device_id}
     /// Native controller only, absent from Command/renderer dispatch. Metadata
     /// remains readable with streaming disabled for reviewed cleanup/recovery.
-    pub fn native_pairing_status(&self)->Result<Value>{
+    pub fn native_pairing_status(&mut self)->Result<Value>{
         self.ensure_open()?;
+        self.expire_native_pairing_client();
         let snapshot=omniplay_core::stream_credentials::load(&self.database,self.profile_id)?;
         let observed_at_ms=omniplay_core::now_ms();
         let recovery:Vec<_>=snapshot.recovery_plan(observed_at_ms)?.iter().map(|action|
@@ -175,6 +176,13 @@ impl LocalHost {
         Ok(json!({"credential_protocol":1,"address":review.address,"revision":revision,"phase":"active","approves_remote_peer":false}))
     }
     pub fn native_pairing_cancel_identity_review(&mut self){self.identity_review=None;}
+    /// Expired transient exchange/proof is no longer needed for status or retry.
+    /// Dropping it does not retire a persisted candidate or revoke relay state.
+    fn expire_native_pairing_client(&mut self){
+        if self.pairing_client.as_ref().is_some_and(|pending|std::time::Instant::now()>=pending.pairing.native_deadline()){
+            self.pairing_client=None;
+        }
+    }
     /// Native controller only; code includes bearer proof and must never enter
     /// renderer commands/logs. Epoch comes from the attached live native host.
     pub fn native_pairing_client_begin(&mut self,store:&dyn omniplay_streaming::native_credentials::PairingSecretStore,
@@ -197,6 +205,7 @@ impl LocalHost {
     pub fn native_pairing_client_join_or_poll(&mut self,store:&dyn omniplay_streaming::native_credentials::PairingSecretStore,
         ticket:Uuid,epoch:u64,poll:bool,deadline:std::time::Instant,cancel:&std::sync::atomic::AtomicBool)->Result<Value>{
         self.ensure_open()?;
+        self.expire_native_pairing_client();
         let origins=omniplay_core::stream_signal_authority::installed_pairing_origins()?;
         if std::time::Instant::now()>=deadline||cancel.load(std::sync::atomic::Ordering::Acquire){return Err(PlatformError::new(ErrorCode::Cancelled,"Native pairing operation expired or was cancelled"));}
         let pending=self.pairing_client.as_mut().ok_or_else(||PlatformError::new(ErrorCode::NotFound,"Native client pairing is absent"))?;
@@ -225,6 +234,7 @@ impl LocalHost {
     pub fn native_pairing_client_prepare_after_local_consent(&mut self,store:&dyn omniplay_streaming::native_credentials::PairingSecretStore,
         ticket:Uuid,epoch:u64,reviewed_grant_hash:&str,deadline:std::time::Instant,cancel:&std::sync::atomic::AtomicBool)->Result<Value>{
         self.ensure_open()?;omniplay_core::stream_signal_authority::require_installed_pairing_policy()?;
+        self.expire_native_pairing_client();
         let pending=self.pairing_client.as_ref().ok_or_else(||PlatformError::new(ErrorCode::NotFound,"Native client pairing is absent"))?;
         if pending.id!=ticket||pending.epoch!=epoch||epoch==0||std::time::Instant::now()>=deadline.min(pending.pairing.native_deadline())||cancel.load(std::sync::atomic::Ordering::Acquire){
             return Err(PlatformError::new(ErrorCode::PermissionDenied,"Native pairing ticket expired, cancelled or changed lifecycle"));

@@ -1840,6 +1840,14 @@ this checkpoint.
 
 ## Remaining implementation and qualification
 
+LocalHost now drops a pending client exchange once its original monotonic
+deadline has expired when native status is read or join/poll/persistence is
+attempted. This releases the retained zeroizing invitation proof and exchange
+owner; it does not mutate the durable journal/vault or acknowledge relay cleanup.
+No automatic timer is introduced: an idle live host may retain the expired
+object until the next relevant entry or host detach/close. Status's Rust receiver
+is now mutable solely for this transient cleanup. No build/test ran.
+
 Both mobile peer-permission dialogs now display the exact retained grant's
 wall-clock expiry using local date/time formatting, separate from the existing
 monotonic review deadline capped at 60 seconds. iOS retains this Date in the

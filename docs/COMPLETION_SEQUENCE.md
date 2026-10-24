@@ -2,6 +2,11 @@
 
 ## Current sequence — 1–109 outstanding tasks
 
+Item 58 LocalHost now drops expired transient client exchange/proof on native
+status reads and before join/poll/consented persistence admission. Status remains
+read-only for durable journal/vault/relay state. No timer/background cleanup or
+runtime claim; build/test and full native pairing integration remain due.
+
 Item 58 mobile peer-permission dialogs now display retained grant expiry in the
 device locale and explain the separate one-minute review cap. User-facing save
 labels say pairing rather than candidate; persistence remains MaterialReady only.
