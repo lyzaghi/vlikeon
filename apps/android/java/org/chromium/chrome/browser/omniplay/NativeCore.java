@@ -279,6 +279,7 @@ public final class NativeCore {
         final String clientPublicKey,label,comparisonCode;final long expires;
         private final String ticket,helloHash;private final Object fence;
         private final java.util.function.BooleanSupplier owner;
+        private final java.util.concurrent.atomic.AtomicBoolean decided=new java.util.concurrent.atomic.AtomicBoolean();
         private HostPeerReview(String ticket,JSONObject peer,Object fence,java.util.function.BooleanSupplier owner,long expires) throws Exception{
             this.ticket=ticket;clientPublicKey=peer.getString("client_public_key");label=peer.getString("label");comparisonCode=peer.getString("comparison_code");
             helloHash=peer.getString("hello_hash");this.fence=fence;this.owner=owner;this.expires=expires;
@@ -286,6 +287,34 @@ public final class NativeCore {
         boolean current(){return owner.getAsBoolean()&&android.os.SystemClock.elapsedRealtime()<expires;}
     }
     interface HostPeersReply {void accept(java.util.List<HostPeerReview> peers,String error);}
+    void declineHostPeer(HostPeerReview peer,java.util.function.BooleanSupplier alive,Reply reply){
+        if(peer==null||!peer.current()||!alive.getAsBoolean()||mPairingClientDeliveryFence.get()!=peer.fence||!peer.decided.compareAndSet(false,true)){
+            reply.accept(failure("","cancelled","Peer review ended or was used. Check requests again."));return;
+        }
+        if(!mPairingClientBusy.compareAndSet(false,true)){reply.accept(failure("","busy","Pairing work is still finishing. Check requests again."));return;}
+        if(mWorkPending.incrementAndGet()>32){mWorkPending.decrementAndGet();mPairingClientBusy.set(false);reply.accept(failure("","busy","Native queue is full. Check requests again."));return;}
+        final long deadline=Math.min(peer.expires,android.os.SystemClock.elapsedRealtime()+25_000);
+        try{mIo.execute(()->{
+            JSONObject response;byte[] input=null;
+            try{
+                long remaining=deadline-android.os.SystemClock.elapsedRealtime();
+                if(mHandle==0||mFailed||!mPairingAttached||remaining<1000||!alive.getAsBoolean()||!peer.current()||mPairingClientDeliveryFence.get()!=peer.fence)throw new IllegalStateException();
+                input=new JSONObject().put("ticket",peer.ticket).put("client_public_key",peer.clientPublicKey).put("reviewed_hello_hash",peer.helloHash).toString().getBytes(StandardCharsets.UTF_8);
+                if(input.length>1024)throw new IllegalStateException();
+                response=pairingResponse(nativePairingHostV1(mHandle,input,5,(int)Math.min(25_000,remaining)));
+                if("ok".equals(response.optString("status"))){
+                    JSONObject value=pairingResult(response);
+                    if(value.getInt("pairing_protocol")!=1||!peer.ticket.equals(value.getString("ticket"))||!peer.clientPublicKey.equals(value.getString("client_public_key"))
+                            ||!peer.helloHash.equals(value.getString("hello_hash"))||!Boolean.TRUE.equals(value.get("declined"))||!Boolean.FALSE.equals(value.get("pairs_revoked")))throw new IllegalStateException();
+                }
+            }catch(Exception|LinkageError error){response=failure("","runtime_unavailable","Decline result is uncertain. Check current host requests and status.");}
+            finally{if(input!=null)java.util.Arrays.fill(input,(byte)0);mWorkPending.decrementAndGet();mPairingClientBusy.set(false);}
+            final JSONObject completed=response;mMain.post(()->{
+                if(android.os.SystemClock.elapsedRealtime()>=deadline||!alive.getAsBoolean()||!peer.current()||mPairingClientDeliveryFence.get()!=peer.fence)reply.accept(failure("","cancelled","Decline result became stale. Inspect status."));
+                else reply.accept(completed);
+            });
+        });}catch(java.util.concurrent.RejectedExecutionException error){mWorkPending.decrementAndGet();mPairingClientBusy.set(false);reply.accept(failure("","busy","Native decline queue is unavailable."));}
+    }
     void reviewHostPeers(String ticket,java.util.function.BooleanSupplier alive,HostPeersReply reply){
         final Object fence=mPairingClientDeliveryFence.get();final long expires=android.os.SystemClock.elapsedRealtime()+30_000;
         pairingHostTicket(ticket,2,alive,response->{

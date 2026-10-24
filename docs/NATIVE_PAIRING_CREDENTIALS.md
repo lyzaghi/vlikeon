@@ -1840,6 +1840,15 @@ this checkpoint.
 
 ## Remaining implementation and qualification
 
+Android peer details now lead to a separate decline confirmation showing retained
+client key/comparison context. The native caller consumes a one-use decision
+flag, constructs only retained ticket/client/hello hash, and uses bounded ordinary
+pairing admission with original review/operation deadline. Successful response
+must match ticket, client and hash, with actual declined:true/pairs_revoked:false.
+Late/uncertain results require fresh requests/status; no automatic retry or revoke
+is inferred. No build/test/UI render/native operation ran. Approval/persistence/
+activation UI and corresponding iOS product flow remain unfinished.
+
 Android host invitation screen now offers explicit peer-request checks. Validated
 poll output becomes immutable per-peer metadata retaining private ticket/hello
 hash and original owner/cancel fence with a queue-inclusive 30-second lifetime.

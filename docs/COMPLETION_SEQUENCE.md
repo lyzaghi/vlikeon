@@ -2,6 +2,11 @@
 
 ## Current sequence — 1–109 outstanding tasks
 
+Item 58 Android host peer details now offer explicit exact-request decline,
+consuming the review snapshot once and checking bound receipt metadata. Queue,
+owner/cancel/deadline fences remain. Source-only; host approval/activation UI,
+iOS flow and build/test remain unfinished.
+
 Item 58 Android host UI now exposes manual peer polling and bounded immutable
 request snapshots tied to ticket/hello hash/owner/fence/30-second review lifetime.
 Unverified labels, keys and comparison are displayed without automatic consent.

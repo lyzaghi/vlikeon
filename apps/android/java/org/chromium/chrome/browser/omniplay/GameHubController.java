@@ -264,12 +264,29 @@ public final class GameHubController implements AutoCloseable {
                         AlertDialog detail=new AlertDialog.Builder(mActivity).setTitle("Compare peer identity")
                                 .setMessage("Unverified label: "+peer.label+"\nClient public key:\n"+peer.clientPublicKey+"\nComparison code: "+peer.comparisonCode+"\n\nVerify the intended peer independently and compare this code on both devices. This view does not approve the peer or input control.")
                                 .setPositiveButton("Back to invitation",(view,which)->{mIdentityDialog=null;showHostShareAction(ticket,owner);})
+                                .setNeutralButton("Decline this request",(view,which)->{mIdentityDialog=null;confirmHostPeerDecline(ticket,peer,owner);})
                                 .setNegativeButton("Close invitation",(view,which)->{mIdentityDialog=null;closeHostInvitation(ticket,owner);}).create();
                         mIdentityDialog=detail;detail.setOnCancelListener(view->cancelIdentityReview());detail.show();
                         mMain.postDelayed(()->{if(mIdentityDialog==detail&&!peer.current()){detail.dismiss();mIdentityDialog=null;showHostShareAction(ticket,owner);}},Math.max(0,peer.expires-android.os.SystemClock.elapsedRealtime()));
                     }).setNegativeButton("Back",(dialog,which)->{mIdentityDialog=null;showHostShareAction(ticket,owner);}).create();
             mIdentityDialog=list;list.setOnCancelListener(dialog->cancelIdentityReview());list.show();
         });
+    }
+    private void confirmHostPeerDecline(String ticket,NativeCore.HostPeerReview peer,java.util.concurrent.atomic.AtomicBoolean owner){
+        if(mIdentityFlow!=owner||!owner.get()||!identityUiAvailable()||!peer.current()){cancelIdentityReview();return;}
+        AlertDialog alert=new AlertDialog.Builder(mActivity).setTitle("Decline this exact request?")
+                .setMessage("Client public key:\n"+peer.clientPublicKey+"\nComparison code: "+peer.comparisonCode+"\n\nRefuse this pairing request. This does not revoke existing pairs or close the invitation.")
+                .setNegativeButton("Back",(dialog,which)->{mIdentityDialog=null;showHostShareAction(ticket,owner);})
+                .setPositiveButton("Decline request",(dialog,which)->{
+                    mIdentityDialog=null;
+                    if(mIdentityFlow!=owner||!owner.get()||!identityUiAvailable()||!peer.current()){cancelIdentityReview();return;}
+                    mCore.declineHostPeer(peer,owner::get,response->{
+                        if(mIdentityFlow!=owner||!owner.get())return;
+                        if(identityUiAvailable()&&"ok".equals(response.optString("status")))showHostShareAction(ticket,owner);
+                        else{cancelIdentityReview();if(identityUiAvailable())identityNotice("Decline result could not be confirmed. Check host requests and status before retrying.");}
+                    });
+                }).create();
+        mIdentityDialog=alert;alert.setOnCancelListener(dialog->cancelIdentityReview());alert.show();
     }
     private void beginClientPairing(){
         if(!identityUiAvailable()||mIdentityFlow!=null)return;
