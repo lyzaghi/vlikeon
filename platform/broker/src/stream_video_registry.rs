@@ -4,7 +4,7 @@ use crate::{stream_video_session::{WindowsReceiveSession,WindowsReceiveConfigura
     stream_video_authority::NativeVideoAuthority,stream_video_receive::ReceiveState,stream_video::UnpresentedVideoFrame};
 use omniplay_contracts::{ErrorCode,PlatformError,Result};
 use omniplay_stream_input::video_client::{VideoOwner,DecoderReceipt};
-use std::time::Instant;
+use std::{time::Instant,sync::{Arc,Weak,atomic::{AtomicBool,Ordering}}};
 use uuid::Uuid;
 
 fn denied()->PlatformError{PlatformError::new(ErrorCode::PermissionDenied,"The native receive slot belongs to another document or media generation")}
@@ -22,29 +22,48 @@ impl<S:NativeVideoAuthority> ReceiveOwner for WindowsReceiveSession<S>{
     fn close(&mut self,deadline:Instant)->Result<()>{self.close_until(deadline)}
     fn state(&self)->ReceiveState{WindowsReceiveSession::state(self)}
 }
-struct Entry{document:Uuid,owner:VideoOwner,session:Box<dyn ReceiveOwner>}
+/// Owned by the trusted native document lifecycle. Closing or dropping the
+/// final owner fences delivery immediately without waiting for broker cleanup.
+pub struct ReceiveDocument{state:Arc<DocumentState>}
+struct DocumentState{id:Uuid,alive:AtomicBool}
+impl ReceiveDocument{
+    pub fn new()->Self{Self{state:Arc::new(DocumentState{id:Uuid::new_v4(),alive:AtomicBool::new(true)})}}
+    pub fn close(&self){self.state.alive.store(false,Ordering::Release);}
+    pub fn id(&self)->Uuid{self.state.id}
+}
+impl Drop for ReceiveDocument{fn drop(&mut self){self.close();}}
+struct Entry{document:Weak<DocumentState>,document_id:Uuid,owner:VideoOwner,sealed:bool,session:Box<dyn ReceiveOwner>}
 #[derive(Default)]
 pub struct ReceiveRegistry{entry:Option<Entry>,closed:bool}
 impl ReceiveRegistry{
-    pub fn open(&mut self,document:Uuid,configuration:WindowsReceiveConfiguration,source:impl NativeVideoAuthority,deadline:Instant)->Result<()>{
-        if self.closed||document.is_nil(){return Err(denied());}
+    pub fn open(&mut self,document:&ReceiveDocument,configuration:WindowsReceiveConfiguration,source:impl NativeVideoAuthority,deadline:Instant)->Result<()>{
+        if self.closed||!document.state.alive.load(Ordering::Acquire){return Err(denied());}
         if self.entry.is_some(){return Err(PlatformError::new(ErrorCode::Busy,"The previous native receive session must retire before replacement"));}
         let owner=configuration.owner;
         let session=WindowsReceiveSession::open(configuration,source,deadline)?;
-        self.entry=Some(Entry{document,owner,session:Box::new(session)});Ok(())
+        self.entry=Some(Entry{document:Arc::downgrade(&document.state),document_id:document.state.id,owner,sealed:false,session:Box::new(session)});
+        if !document.state.alive.load(Ordering::Acquire){
+            if let Some(entry)=self.entry.as_mut(){entry.sealed=true;let _=entry.session.close(deadline);}return Err(denied());
+        }Ok(())
     }
-    fn exact(&mut self,document:Uuid,owner:VideoOwner)->Result<&mut Entry>{
+    fn exact(&mut self,document:&ReceiveDocument,owner:VideoOwner)->Result<&mut Entry>{
         if self.closed{return Err(denied());}
-        self.entry.as_mut().filter(|entry|entry.document==document&&entry.owner==owner).ok_or_else(denied)
+        self.entry.as_mut().filter(|entry|entry.document_id==document.state.id&&entry.owner==owner&&!entry.sealed&&
+            entry.document.upgrade().is_some_and(|state|Arc::ptr_eq(&state,&document.state)&&state.alive.load(Ordering::Acquire))).ok_or_else(denied)
     }
-    pub fn push_authenticated(&mut self,document:Uuid,owner:VideoOwner,bytes:&[u8],receipt:DecoderReceipt)->Result<()>{self.exact(document,owner)?.session.push(bytes,receipt)}
-    pub fn tick(&mut self,document:Uuid,owner:VideoOwner)->Result<()>{self.exact(document,owner)?.session.tick()}
-    pub fn take_unpresented(&mut self,document:Uuid,owner:VideoOwner)->Result<Option<UnpresentedVideoFrame>>{self.exact(document,owner)?.session.take()}
+    pub fn push_authenticated(&mut self,document:&ReceiveDocument,owner:VideoOwner,bytes:&[u8],receipt:DecoderReceipt)->Result<()>{self.exact(document,owner)?.session.push(bytes,receipt)}
+    pub fn tick(&mut self,document:&ReceiveDocument,owner:VideoOwner)->Result<()>{self.exact(document,owner)?.session.tick()}
+    pub fn take_unpresented(&mut self,document:&ReceiveDocument,owner:VideoOwner)->Result<Option<UnpresentedVideoFrame>>{
+        let result=self.exact(document,owner)?.session.take()?;
+        self.exact(document,owner)?;Ok(result)
+    }
     pub fn state(&self,document:Uuid,owner:VideoOwner)->Result<ReceiveState>{
-        self.entry.as_ref().filter(|entry|entry.document==document&&entry.owner==owner).map(|entry|entry.session.state()).ok_or_else(denied)
+        self.entry.as_ref().filter(|entry|entry.document_id==document&&entry.owner==owner).map(|entry|
+            if entry.sealed&&entry.session.state()==ReceiveState::Active{ReceiveState::CleanupRequired}else{entry.session.state()}).ok_or_else(denied)
     }
     pub fn retire(&mut self,document:Uuid,owner:VideoOwner,deadline:Instant)->Result<()>{
-        let entry=self.entry.as_mut().filter(|entry|entry.document==document&&entry.owner==owner).ok_or_else(denied)?;
+        let entry=self.entry.as_mut().filter(|entry|entry.document_id==document&&entry.owner==owner).ok_or_else(denied)?;
+        entry.sealed=true;
         entry.session.close(deadline)?;
         if entry.session.state()!=ReceiveState::Revoked{return Err(denied());}
         self.entry.take();Ok(())
@@ -54,9 +73,18 @@ impl ReceiveRegistry{
     pub fn close_until(&mut self,deadline:Instant)->Result<()>{
         self.closed=true;
         if let Some(entry)=self.entry.as_mut(){
+            entry.sealed=true;
             entry.session.close(deadline)?;
             if entry.session.state()!=ReceiveState::Revoked{return Err(denied());}
             self.entry.take();
+        }Ok(())
+    }
+    /// Called independently of packet arrival to reap closed native documents.
+    pub fn maintain(&mut self,deadline:Instant)->Result<()>{
+        let lost=self.entry.as_ref().is_some_and(|entry|entry.sealed||entry.document.upgrade().is_none_or(|state|!state.alive.load(Ordering::Acquire)));
+        if lost{
+            let entry=self.entry.as_ref().ok_or_else(denied)?;
+            let(document,owner)=(entry.document_id,entry.owner);self.retire(document,owner,deadline)?;
         }Ok(())
     }
 }

@@ -2,6 +2,8 @@
 
 ## Current sequence — 1–109 outstanding tasks
 
+Source checkpoint: receive media operations now require an opaque native document lifetime, reject closed/dropped documents and recheck after output retrieval. Cleanup seals entries and can reap abandoned documents through maintain(). Actual native document issuer/scheduler and transport integration remain open; build/test stay deferred.
+
 Source checkpoint: Broker owns the Windows receive registry and shuts it down through the deadline-aware session owner. Exact document/media binding and retained cleanup prevent replacement of uncertain sessions. Native document capability and authenticated transport caller remain unfinished; build/test stay deferred.
 
 Source checkpoint: Windows receive-session owner now connects installed decoder launch, native authority lane, concrete codec/POC/DPB receiver and deadline-aware lifecycle. Joined observer retirement is distinguished from an ended thread. Actual authenticated transport caller, broker session registry and presentation/audio integration remain unfinished. Build/test stay deferred.

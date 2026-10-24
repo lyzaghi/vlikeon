@@ -1,5 +1,14 @@
 # Native ordered RTP to decoder bridge — item 56
 
+ReceiveRegistry now accepts an opaque native ReceiveDocument lifetime instead
+of a caller-supplied UUID for media operations. Close/drop fences new delivery;
+post-read admission also rejects output when the document closed while blocked.
+Cleanup stores only a weak lifetime and retained ID, seals the entry before
+retirement, and offers independent maintain() reaping for abandoned documents.
+The real native document owner and independent maintenance scheduler still need
+product wiring; this token does not replace the actual authority observer or
+authenticate transport. No build/test ran.
+
 Broker now owns a Windows ReceiveRegistry and invokes its deadline-bearing close
 from broker shutdown. One exact document/media owner can open/push/tick/take or
 retire a native receive session. Replacement is refused while any old entry is
