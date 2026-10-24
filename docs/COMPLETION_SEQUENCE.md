@@ -2,6 +2,11 @@
 
 ## Current sequence — 1–109 outstanding tasks
 
+Item 58 host expiry now fences sharing and clears proof/request snapshots on
+native status, capability maintenance and new-host entry. Possibly registered
+public cleanup owner stays retained; never-attempted expired invitations drop.
+Source-only; no build/test. Durable expiry/relay reconciliation remains due.
+
 Item 58 iOS now authors explicit raw host-share caller retaining the Rust buffer
 until a scoped UI byte borrow, then wiping/freeing it. Queue/deadline/owner/cancel
 admission applies. Source-only; actual sharing UI/OS copy lifecycle/build/test due.

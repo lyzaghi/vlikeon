@@ -1840,6 +1840,15 @@ this checkpoint.
 
 ## Remaining implementation and qualification
 
+LocalHost host expiry now fences the invitation and zeroes owned bearer proof/
+clears request snapshots during status, capability maintenance and new-host
+entry. Never-attempted expired invitations can drop locally; possibly registered
+ones retain signed public metadata/identity/revision for explicit cleanup rather
+than claiming relay absence. No new timer/background task is created, so an idle
+host may retain proof until these entries or detach/close. Expired registered
+remote cleanup is still not reconciled by this change. No build/test/runtime
+operation ran; durable ownership and expiry acknowledgment remain unfinished.
+
 iOS explicit share caller now owns the raw Rust allocation in a dedicated buffer
 object instead of copying through String/JSON/Data responses. It validates bounded
 OPRP1/base64url bytes, shares existing admission/deadline/owner/cancel fencing and

@@ -54,6 +54,7 @@ impl LocalHost {
     pub fn native_pairing_status(&mut self)->Result<Value>{
         self.ensure_open()?;
         self.expire_native_pairing_client();
+        self.expire_native_pairing_host();
         let snapshot=omniplay_core::stream_credentials::load(&self.database,self.profile_id)?;
         let observed_at_ms=omniplay_core::now_ms();
         let pairing_origins=omniplay_core::stream_signal_authority::installed_pairing_origins().unwrap_or_default();
@@ -188,6 +189,7 @@ impl LocalHost {
         identity:omniplay_streaming::native_credentials::CredentialAddress,expected:u64,epoch:u64,audience:&str,label:&str,
         deadline:std::time::Instant)->Result<Value>{
         self.ensure_open()?;
+        self.expire_native_pairing_host();
         if epoch==0||std::time::Instant::now()>=deadline{return Err(PlatformError::new(ErrorCode::PermissionDenied,"Native host epoch/deadline is unavailable"));}
         // Never replace a possibly registered invitation silently. The explicit
         // close/reconciliation path must dispose of its remote ownership first.
@@ -288,6 +290,16 @@ impl LocalHost {
         writer.close_host(pending.revision,pending.identity,&mut pending.invitation,&relay,omniplay_core::now_ms(),deadline,cancel)?;
         self.pairing_host=None;
         Ok(json!({"pairing_protocol":1,"ticket":ticket,"closed":true,"relay_close_confirmed":true,"pairs_revoked":false}))
+    }
+    /// Expiry removes bearer proof/review state but keeps possibly registered
+    /// public metadata for explicit remote cleanup; never claims relay absence.
+    fn expire_native_pairing_host(&mut self){
+        if let Some(pending)=self.pairing_host.as_mut(){
+            if std::time::Instant::now()>=pending.invitation.native_deadline(){
+                pending.invitation.fence_closed();
+                if !pending.registration_attempted{self.pairing_host=None;}
+            }
+        }
     }
     /// Expired transient exchange/proof is no longer needed for status or retry.
     /// Dropping it does not retire a persisted candidate or revoke relay state.
@@ -461,7 +473,7 @@ impl LocalHost {
         if self.background_sync_policy()?["eligible"]!=true{return Err(PlatformError::new(ErrorCode::PermissionDenied,"Background synchronization is disabled or its account is unavailable"));}
         let provider=self.sync_provider()?;self.sync_jobs.start_background(&self.database.root,provider,budget_ms)
     }
-    pub fn expire_capabilities(&mut self){self.transfers.expire();self.permissions.expire();self.directories.expire();self.asset_ranges.expire();}
+    pub fn expire_capabilities(&mut self){self.expire_native_pairing_client();self.expire_native_pairing_host();self.transfers.expire();self.permissions.expire();self.directories.expire();self.asset_ranges.expire();}
     fn sync_provider(&self)->Result<Arc<dyn omniplay_sync_client::CredentialStore>>{self.credentials.clone().ok_or_else(||PlatformError::new(ErrorCode::UnsupportedCapability,"Open this profile with its native secure credential provider"))}
     pub fn selected_import(&mut self,path:&Path)->Result<Value>{let grant_id=self.permissions.grant_selected_file(self.owner,path,FileAccess::ImportRead,300_000)?;Ok(json!({"grant_id":grant_id,"suggested_title":path.file_stem().and_then(|v|v.to_str()).unwrap_or("Game").chars().take(120).collect::<String>(),"format_hint":path.extension().and_then(|v|v.to_str()).and_then(ContentFormat::from_extension)}))}
     pub fn selected_export(&mut self,path:&Path)->Result<Value>{let grant_id=self.permissions.grant_selected_file(self.owner,path,FileAccess::ExportWrite,300_000)?;Ok(json!({"grant_id":grant_id}))}
