@@ -187,9 +187,55 @@ final class GameHubViewController: UIViewController, WKNavigationDelegate, WKUID
     private func showHostPeer(_ peer:NativeHostPeerReview,ticket:String,origin:String,owner:NativeDocumentLifetime){
         guard peerReviewAvailable(owner),peer.admitted else{cancelPairingIdentity();return}
         let alert=UIAlertController(title:"Đối chiếu peer",message:"Nhãn chưa xác minh: \(peer.label)\nKhóa peer: \(peer.clientKey)\nMã đối chiếu: \(peer.comparison)\nĐối chiếu mã trên thiết bị người nhận. Xem yêu cầu chưa cấp quyền.",preferredStyle:.alert);pairingAlert=alert
+        alert.addAction(UIAlertAction(title:"Chọn quyền cho peer",style:.default){[weak self,weak alert]_ in alert?.dismiss(animated:false){[weak self] in self?.chooseHostPermission(peer,owner:owner)}})
         alert.addAction(UIAlertAction(title:"Quay lại",style:.cancel){[weak self,weak alert]_ in alert?.dismiss(animated:false){[weak self] in self?.showHostRegistration(ticket:ticket,origin:origin,owner:owner,registered:true)}})
         alert.addAction(UIAlertAction(title:"Từ chối yêu cầu này",style:.destructive){[weak self,weak alert]_ in alert?.dismiss(animated:false){[weak self] in self?.confirmHostPeerDecline(peer,ticket:ticket,origin:origin,owner:owner)}})
         present(alert,animated:true)
+    }
+    private func chooseHostPermission(_ peer:NativeHostPeerReview,owner:NativeDocumentLifetime){
+        guard peerReviewAvailable(owner),peer.admitted else{cancelPairingIdentity();return}
+        let alert=UIAlertController(title:"Quyền của peer",message:"Chọn quyền cho khóa \(peer.clientKey). Chưa lưu hoặc kích hoạt ở bước này.",preferredStyle:.alert);pairingAlert=alert
+        alert.addAction(UIAlertAction(title:"Chỉ xem",style:.default){[weak self,weak alert]_ in alert?.dismiss(animated:false){[weak self] in self?.chooseHostLifetime(peer,inputAllowed:false,owner:owner)}})
+        alert.addAction(UIAlertAction(title:"Cho phép điều khiển",style:.default){[weak self,weak alert]_ in alert?.dismiss(animated:false){[weak self] in self?.chooseHostLifetime(peer,inputAllowed:true,owner:owner)}})
+        alert.addAction(UIAlertAction(title:"Hủy",style:.cancel){[weak self]_ in self?.cancelPairingIdentity()});present(alert,animated:true)
+    }
+    private func chooseHostLifetime(_ peer:NativeHostPeerReview,inputAllowed:Bool,owner:NativeDocumentLifetime){
+        guard peerReviewAvailable(owner),peer.admitted else{cancelPairingIdentity();return}
+        let sheet=UIAlertController(title:"Thời hạn cấp quyền",message:"Quyền đã chọn: \(inputAllowed ? "xem và điều khiển" : "chỉ xem").",preferredStyle:.actionSheet);pairingAlert=sheet
+        for (label,lifetime) in [("1 giờ",UInt64(3_600_000)),("24 giờ",UInt64(86_400_000)),("7 ngày",UInt64(604_800_000))]{
+            sheet.addAction(UIAlertAction(title:label,style:.default){[weak self,weak sheet]_ in sheet?.dismiss(animated:false){[weak self] in self?.confirmHostPermission(peer,inputAllowed:inputAllowed,lifetime:lifetime,label:label,owner:owner)}})
+        }
+        sheet.addAction(UIAlertAction(title:"Hủy",style:.cancel){[weak self]_ in self?.cancelPairingIdentity()})
+        sheet.popoverPresentationController?.sourceView=pairingButton;sheet.popoverPresentationController?.sourceRect=pairingButton.bounds;present(sheet,animated:true)
+    }
+    private func confirmHostPermission(_ peer:NativeHostPeerReview,inputAllowed:Bool,lifetime:UInt64,label:String,owner:NativeDocumentLifetime){
+        guard peerReviewAvailable(owner),peer.admitted else{cancelPairingIdentity();return}
+        let alert=UIAlertController(title:"Xác nhận đối chiếu và quyền",message:"Khóa peer: \(peer.clientKey)\nMã đối chiếu: \(peer.comparison)\nQuyền: \(inputAllowed ? "xem và điều khiển" : "chỉ xem")\nThời hạn: \(label)\nChỉ tiếp tục sau khi đã đối chiếu mã với người nhận qua kênh độc lập. Lưu cặp còn cần bước kích hoạt riêng.",preferredStyle:.alert);pairingAlert=alert
+        alert.addAction(UIAlertAction(title:"Hủy",style:.cancel){[weak self]_ in self?.cancelPairingIdentity()})
+        alert.addAction(UIAlertAction(title:"Đã đối chiếu, lưu cặp",style:.default){[weak self,weak alert]_ in
+            alert?.dismiss(animated:false){[weak self] in
+                guard let self=self,self.peerReviewAvailable(owner),peer.admitted else{self?.cancelPairingIdentity();return}
+                self.core.persistHostPeer(peer,inputAllowed:inputAllowed,lifetime:lifetime,owner:owner){[weak self] result in
+                    guard let self=self,self.pairingFlow === owner,owner.active else{return}
+                    guard self.peerReviewAvailable(owner) else{self.cancelPairingIdentity();return}
+                    switch result{case .success(let activation):self.showHostActivation(activation,owner:owner);case .failure:self.cancelPairingIdentity();self.pairingNotice("Chưa xác nhận được lưu cặp. Hãy đọc lại trạng thái; không tự gửi lại quyết định.")}
+                }
+            }
+        });present(alert,animated:true)
+    }
+    private func showHostActivation(_ activation:NativeHostActivation,owner:NativeDocumentLifetime){
+        guard peerReviewAvailable(owner),activation.peer.admitted else{cancelPairingIdentity();return}
+        let alert=UIAlertController(title:"Kích hoạt cặp host?",message:"Khóa peer: \(activation.peer.clientKey)\nCặp: \(activation.pairID)\nThế hệ: \(activation.generation)\nQuyền: \(activation.inputAllowed ? "xem và điều khiển" : "chỉ xem")\nHết hạn: \(activation.expiresAt)\nKích hoạt gửi chấp thuận đến relay. Phiên truyền phát cần được bắt đầu riêng.",preferredStyle:.alert);pairingAlert=alert
+        alert.addAction(UIAlertAction(title:"Để sau",style:.cancel){[weak self]_ in self?.cancelPairingIdentity()})
+        alert.addAction(UIAlertAction(title:"Chấp thuận và kích hoạt",style:.default){[weak self,weak alert]_ in
+            alert?.dismiss(animated:false){[weak self] in
+                guard let self=self,self.peerReviewAvailable(owner),activation.peer.admitted else{self?.cancelPairingIdentity();return}
+                self.core.activateHostPeer(activation,owner:owner){[weak self] result in
+                    guard let self=self,self.pairingFlow === owner,owner.active else{return};self.cancelPairingIdentity()
+                    switch result{case .success:self.pairingNotice("Đã xác nhận kích hoạt cặp host. Hãy xem trạng thái trước khi bắt đầu phiên truyền phát.");case .failure:self.pairingNotice("Chưa xác nhận được kích hoạt. Hãy đọc lại trạng thái trước khi tiếp tục.")}
+                }
+            }
+        });present(alert,animated:true)
     }
     private func confirmHostPeerDecline(_ peer:NativeHostPeerReview,ticket:String,origin:String,owner:NativeDocumentLifetime){
         guard peerReviewAvailable(owner),peer.admitted else{cancelPairingIdentity();return}
