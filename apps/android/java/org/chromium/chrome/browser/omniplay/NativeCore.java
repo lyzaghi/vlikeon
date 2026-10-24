@@ -148,6 +148,16 @@ public final class NativeCore {
                                 ||!canonicalPairingId(address.getString("device"))||!canonicalPairingId(address.getString("id"))
                                 ||!canonicalPairingId(address.getString("generation"))||!value.getString("public_key").matches("[A-Za-z0-9_-]{42}[AEIMQUYcgkosw048]"))throw new IllegalStateException();
                     }else if(value.getInt("pairing_protocol")!=1||!canonicalPairingId(value.getString("ticket"))||(expectedTicket!=null&&!expectedTicket.equals(value.getString("ticket"))))throw new IllegalStateException();
+                    if(action==0){
+                        Object expiry=value.get("expires_at_ms"),revision=value.get("revision");
+                        if(!value.getString("comparison_code").matches("[0-9]{6}")
+                                ||!value.getString("host_public_key").matches("[A-Za-z0-9_-]{42}[AEIMQUYcgkosw048]")
+                                ||!value.getString("host_fingerprint").matches("[0-9a-f]{64}")
+                                ||!(expiry instanceof Number)||((Number)expiry).doubleValue()!=((Number)expiry).longValue()
+                                ||((Number)expiry).longValue()<=System.currentTimeMillis()||((Number)expiry).longValue()>9_007_199_254_740_991L
+                                ||!(revision instanceof Number)||((Number)revision).doubleValue()!=((Number)revision).longValue()
+                                ||((Number)revision).longValue()<1||((Number)revision).longValue()>10_000_000)throw new IllegalStateException();
+                    }
                     if(action==1&&(!"pending".equals(value.getString("state"))||!Boolean.FALSE.equals(value.get("approves_peer"))))throw new IllegalStateException();
                     if(action==2){
                         if(!Boolean.TRUE.equals(value.get("local_consent_required")))throw new IllegalStateException();

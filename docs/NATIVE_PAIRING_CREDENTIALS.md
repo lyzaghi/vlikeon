@@ -1840,6 +1840,12 @@ this checkpoint.
 
 ## Remaining implementation and qualification
 
+Mobile begin replies now receive comparison-code, host key/fingerprint format,
+future safe-range integral expiry and bounded revision checks. These format
+checks do not independently pin the host or verify fingerprint derivation;
+native transcript validation and the future consent controller retain those
+responsibilities. No build/test ran for this follow-up.
+
 Join response admission requires pending state and `approves_peer:false`.
 Poll admission requires `local_consent_required:true` and a known pending,
 declined or approved state. Approved metadata requires canonical nonzero pair

@@ -2,6 +2,10 @@
 
 ## Current sequence — 1–109 outstanding tasks
 
+Item 58 begin-response metadata now checks comparison code, host key/fingerprint
+format, future safe-range integral expiry and bounded journal revision in mobile
+callers. Source-only; build/test and native consent UI remain due.
+
 Item 58 mobile callers now admit only known join/poll/cancel response states.
 Approved poll metadata requires a canonical pair UUID, actual boolean input
 permission and unexpired integral safe-range expiry; local consent remains

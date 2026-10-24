@@ -253,6 +253,16 @@ final class NativeCore {
                 if action == .join{
                     guard value["state"] as? String == "pending",exactBool(value["approves_peer"],false) else{throw OmniFailure.message("Kết quả gửi yêu cầu không hợp lệ.")}
                 }
+                if action == .begin{
+                    guard let comparison=value["comparison_code"] as? String,comparison.range(of:"^[0-9]{6}$",options:.regularExpression) != nil,
+                          let host=value["host_public_key"] as? String,host.range(of:"^[A-Za-z0-9_-]{42}[AEIMQUYcgkosw048]$",options:.regularExpression) != nil,
+                          let fingerprint=value["host_fingerprint"] as? String,fingerprint.range(of:"^[0-9a-f]{64}$",options:.regularExpression) != nil,
+                          let expiry=value["expires_at_ms"] as? NSNumber,CFGetTypeID(expiry) != CFBooleanGetTypeID(),
+                          expiry.doubleValue>Date().timeIntervalSince1970*1000,expiry.doubleValue<=9_007_199_254_740_991,
+                          expiry.doubleValue==Double(expiry.uint64Value),
+                          let revision=value["revision"] as? NSNumber,CFGetTypeID(revision) != CFBooleanGetTypeID(),
+                          revision.doubleValue>=1,revision.doubleValue<=10_000_000,revision.doubleValue==Double(revision.uint64Value) else{throw OmniFailure.message("Thông tin bắt đầu ghép đôi không hợp lệ.")}
+                }
                 if action == .poll{
                     guard exactBool(value["local_consent_required"],true),let status=value["status"] as? [String:Any],let state=status["state"] as? String else{throw OmniFailure.message("Trạng thái ghép đôi không hợp lệ.")}
                     if state == "approved"{
