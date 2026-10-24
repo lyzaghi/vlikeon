@@ -116,8 +116,8 @@ OmniBuffer om_mobile_pairing_host_peer_v1(uint64_t handle,const uint8_t* data,si
  * activation grants no transport. Late errors require status reconciliation. */
 OmniBuffer om_mobile_pairing_host_candidate_v1(uint64_t handle,const uint8_t* data,size_t length,uint32_t action,uint32_t budget_ms);
 /* Explicit native restart cleanup <=256: {invite_id,expected_revision} from status.
- * Budget 1000..25000. Foreground provider required; current implementation refuses
- * expired invites. Bound close precedes durable intent completion; reload status
+ * Budget 1000..25000. Foreground provider required; expired invites require exact
+ * server expiry/absence receipt. Bound close precedes durable intent completion; reload status
  * after every result. Does not resume sharing/approval or revoke existing pairs. */
 OmniBuffer om_mobile_pairing_recover_host_close_v1(uint64_t handle,const uint8_t* data,size_t length,uint32_t budget_ms);
 /* Trusted native controller only, never renderer commands. Status returns

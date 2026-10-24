@@ -279,7 +279,7 @@ public final class NativeCore {
     void recoverHostInvitation(RecoverySnapshot snapshot,HostInvitationCleanup invitation,java.util.function.BooleanSupplier alive,Reply reply){
         final long deadline=Math.min(snapshot.expires,android.os.SystemClock.elapsedRealtime()+25_000);
         if(!alive.getAsBoolean()||snapshot.namespaceProvenanceMissing||!snapshot.relayRetirementAvailable||!snapshot.hostInvitationCleanup.contains(invitation)
-                ||invitation.expired||invitation.expiresAt<=System.currentTimeMillis()||android.os.SystemClock.elapsedRealtime()>=deadline){reply.accept(failure("","conflict","Reload host cleanup status. Expired invitations need separate reconciliation."));return;}
+                ||android.os.SystemClock.elapsedRealtime()>=deadline){reply.accept(failure("","conflict","Reload host cleanup status before continuing."));return;}
         final Object fence=new Object();mPairingClientDeliveryFence.set(fence);
         try{if(mHandle==0||!nativePairingInvalidateEpoch(mHandle)){reply.accept(failure("","runtime_unavailable","Cleanup invalidation was not acknowledged. Inspect status."));return;}}
         catch(LinkageError error){reply.accept(failure("","unsupported_capability","Native cleanup is unavailable."));return;}

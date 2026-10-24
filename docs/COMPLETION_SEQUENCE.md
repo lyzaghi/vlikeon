@@ -2,6 +2,11 @@
 
 ## Current sequence — 1–109 outstanding tasks
 
+Item 58 both mobile durable-cleanup views now allow explicit expired invitation
+reconciliation through the native receipt branch. UI expiry only selects wording;
+server-bound evidence remains required to clear intent. Source-only; no build/
+test/deploy ran. Actual compatibility and full qualification remain due.
+
 Item 58 durable restart cleanup now authors expired-invitation receipt validation
 and exact intent completion under the same lease, after authenticated relay
 absence confirmation. Native UI expiry guards remain to update. Source-only;

@@ -351,10 +351,10 @@ final class NativeCore {
         completion:@escaping @MainActor (Result<[String:Any],Error>)->Void){
         let deadline=min(snapshot.expires,DispatchTime.now()+25)
         guard owner.active,DispatchTime.now()<deadline,!snapshot.namespaceProvenanceMissing,snapshot.relayRetirementAvailable,
-              !invitation.expired,invitation.expiresAt>Date(),snapshot.hostInvitationCleanup.contains(where:{
+              snapshot.hostInvitationCleanup.contains(where:{
                   $0.inviteID==invitation.inviteID && $0.inviteHash==invitation.inviteHash && $0.audience==invitation.audience &&
                   $0.expiresAt==invitation.expiresAt && $0.expired==invitation.expired && NSDictionary(dictionary:$0.identity).isEqual(to:invitation.identity)
-              }) else{completion(.failure(OmniFailure.message("Hãy đọc lại trạng thái cleanup. Lời mời hết hạn cần xử lý riêng.")));return}
+              }) else{completion(.failure(OmniFailure.message("Hãy đọc lại trạng thái cleanup trước khi tiếp tục.")));return}
         let token=pairingClientDeliveryFence.capture(cancel:true)
         guard handle != 0,om_mobile_pairing_invalidate_epoch(handle)==1 else{completion(.failure(OmniFailure.message("Chưa xác nhận được vô hiệu hóa phiên. Hãy xem trạng thái.")));return}
         guard pairingClientQueuePermit.wait(timeout:.now()) == .success else{completion(.failure(OmniFailure.message("Hàng đợi cleanup đang bận.")));return}

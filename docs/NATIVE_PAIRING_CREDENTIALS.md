@@ -1840,6 +1840,15 @@ this checkpoint.
 
 ## Remaining implementation and qualification
 
+Android/iOS durable cleanup callers no longer reject expired records solely by
+local time. Confirmation views label expiry reconciliation explicitly and state
+that the service must confirm expiry/live absence; unsupported/error responses
+keep the record. Existing snapshot/provenance/retirement-origin, epoch/cancel and
+deadline checks remain. Native writer chooses live close versus expiry receipt
+using its verified original metadata; UI labels grant no completion authority.
+No build/test/UI render/network operation or deployment ran. Relay rollout and
+actual client/server compatibility qualification remain required.
+
 Native relay cleanup now verifies the original expired host-signed invitation
 and requires an exact expired_absent receipt binding protocol, invite ID/hash,
 host, original expiry and pairs_revoked:false. Network/status/shape mismatch is

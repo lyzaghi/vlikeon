@@ -251,10 +251,10 @@ final class GameHubViewController: UIViewController, WKNavigationDelegate, WKUID
         let expired=invitation.expired || invitation.expiresAt<=Date()
         let expiry=DateFormatter.localizedString(from:invitation.expiresAt,dateStyle:.medium,timeStyle:.short)
         let message="Lời mời: \(invitation.inviteID)\nThế hệ danh tính ký: \(invitation.identityGeneration)\nDịch vụ: \(invitation.audience)\nHết hạn: \(expiry)\n\nĐóng đúng lời mời trên dịch vụ rồi hoàn tất record cleanup đã giữ. Các cặp hiện có không bị thu hồi."
-        let alert=UIAlertController(title:"Phục hồi cleanup lời mời host",message:message+(expired ? "\n\nLời mời đã hết hạn. Phiên bản này chưa hỗ trợ đối soát hết hạn; record vẫn được giữ.":""),preferredStyle:.alert);pairingAlert=alert
+        let alert=UIAlertController(title:"Phục hồi cleanup lời mời host",message:message+(expired ? "\n\nLời mời đã hết hạn. Dịch vụ phải xác nhận hết hạn và không còn lời mời hoạt động. Lỗi hoặc phản hồi chưa hỗ trợ sẽ giữ nguyên record.":""),preferredStyle:.alert);pairingAlert=alert
         alert.addAction(UIAlertAction(title:"Để sau",style:.cancel){[weak self]_ in self?.cancelPairingIdentity()})
-        if !expired && !snapshot.namespaceProvenanceMissing && snapshot.relayRetirementAvailable{
-            alert.addAction(UIAlertAction(title:"Đóng và hoàn tất cleanup",style:.destructive){[weak self,weak alert]_ in
+        if !snapshot.namespaceProvenanceMissing && snapshot.relayRetirementAvailable{
+            alert.addAction(UIAlertAction(title:expired ? "Đối soát hết hạn và cleanup":"Đóng và hoàn tất cleanup",style:.destructive){[weak self,weak alert]_ in
                 alert?.dismiss(animated:false){[weak self] in
                     guard let self=self,self.peerReviewAvailable(owner),DispatchTime.now()<snapshot.expires else{self?.cancelPairingIdentity();return}
                     self.core.recoverHostInvitation(invitation,snapshot:snapshot,owner:owner){[weak self] result in

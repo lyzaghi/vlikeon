@@ -304,9 +304,9 @@ public final class GameHubController implements AutoCloseable {
         if(mIdentityFlow!=owner||!owner.get()||!identityUiAvailable()||android.os.SystemClock.elapsedRealtime()>=snapshot.expires){cancelIdentityReview();return;}
         boolean expired=invitation.expired||invitation.expiresAt<=System.currentTimeMillis();
         AlertDialog.Builder builder=new AlertDialog.Builder(mActivity).setTitle("Recover host invitation cleanup")
-                .setMessage("Invitation: "+invitation.inviteId+"\nSigning generation: "+invitation.identityGeneration+"\nService: "+invitation.audience+"\nExpires: "+java.text.DateFormat.getDateTimeInstance().format(new java.util.Date(invitation.expiresAt))+"\n\nClose this exact invitation on the service and clear its retained cleanup record. Existing pairs are not revoked."+(expired?"\n\nThis invitation has expired. Expiry reconciliation is not available in this version; its record remains retained.":""))
+                .setMessage("Invitation: "+invitation.inviteId+"\nSigning generation: "+invitation.identityGeneration+"\nService: "+invitation.audience+"\nExpires: "+java.text.DateFormat.getDateTimeInstance().format(new java.util.Date(invitation.expiresAt))+"\n\nRequest confirmation from the service before clearing this invitation's cleanup record. Existing pairs are not revoked."+(expired?"\n\nThis invitation has expired. The service must confirm expiry and absence of a live invitation. A failed or unsupported response keeps the record.":""))
                 .setNegativeButton("Later",(dialog,which)->cancelIdentityReview());
-        if(!expired&&!snapshot.namespaceProvenanceMissing&&snapshot.relayRetirementAvailable)builder.setPositiveButton("Close and finish cleanup",(dialog,which)->{
+        if(!snapshot.namespaceProvenanceMissing&&snapshot.relayRetirementAvailable)builder.setPositiveButton(expired?"Reconcile expiry and clean up":"Close and finish cleanup",(dialog,which)->{
             mIdentityDialog=null;
             if(mIdentityFlow!=owner||!owner.get()||!identityUiAvailable()){cancelIdentityReview();return;}
             mCore.recoverHostInvitation(snapshot,invitation,owner::get,response->{
