@@ -1,0 +1,116 @@
+import Foundation
+import Security
+
+/// Remote Play candidate only. Native host must wire protected-data events and
+/// consume callbacks through the dedicated provider bridge; save-sync ABI is
+/// deliberately separate. No WebView/JavaScript secret-returning method exists.
+final class PairingCredentials {
+    private static let service = "org.vlikeon.remote-play.credentials.v1"
+    private static let accessLock = NSLock()
+    private static var protectedDataAvailable = false
+    private static let nilID = UUID(uuidString: "00000000-0000-0000-0000-000000000000")!
+    private let profile: UUID
+    private let device: UUID
+    private let lock = NSLock()
+    private static let recordBytes = 137
+
+    init(profile: UUID, device: UUID) { self.profile = profile; self.device = device }
+    static func setProtectedDataAvailable(_ value: Bool) {
+        accessLock.lock(); protectedDataAvailable = value; accessLock.unlock()
+    }
+    private static func unlocked() -> Bool {
+        accessLock.lock(); defer { accessLock.unlock() }; return protectedDataAvailable
+    }
+    private func scope(_ pointer: UnsafePointer<OmniPairingAddress>?) -> (account: String, prefix: [UInt8])? {
+        guard let pointer = pointer else { return nil }
+        let value = pointer.pointee
+        let p = UUID(uuid: value.profile), d = UUID(uuid: value.device)
+        let item = UUID(uuid: value.item), generation = UUID(uuid: value.generation)
+        guard p == profile, d == device, [p, d, item, generation].allSatisfy({ $0 != Self.nilID }),
+              value.kind == 1 || value.kind == 2, value.kind != 1 || item == device else { return nil }
+        let kind = value.kind == 1 ? "identity" : "pair"
+        let account = "\(p.uuidString.lowercased())/\(d.uuidString.lowercased())/\(kind)/\(item.uuidString.lowercased())/\(generation.uuidString.lowercased())"
+        var prefix = Array("VLKRP001".utf8) + [UInt8(value.kind)]
+        for id in [p, d, item, generation] {
+            var bytes = id.uuid
+            prefix.append(contentsOf: withUnsafeBytes(of: &bytes) { Array($0) })
+        }
+        return (account, prefix)
+    }
+    private func query(_ account: String) -> [String: Any] {
+        [kSecClass as String: kSecClassGenericPassword,
+         kSecAttrService as String: Self.service, kSecAttrAccount as String: account,
+         kSecAttrSynchronizable as String: false,
+         kSecUseAuthenticationUI as String: kSecUseAuthenticationUIFail]
+    }
+    private func status(_ value: OSStatus) -> Int32 {
+        if value == errSecSuccess { return 0 }
+        if value == errSecItemNotFound { return -1 }
+        if value == errSecInteractionNotAllowed { return -2 }
+        return -3
+    }
+    private func check(_ address: UnsafePointer<OmniPairingAddress>?) -> Int32 {
+        guard scope(address) != nil else { return -3 }; return Self.unlocked() ? 0 : -2
+    }
+    private func read(_ address: UnsafePointer<OmniPairingAddress>?, output: UnsafeMutablePointer<UInt8>?, capacity: Int) -> Int64 {
+        guard let scope = scope(address), let output = output, capacity == Self.recordBytes else { return -3 }
+        lock.lock(); defer { lock.unlock() }; guard Self.unlocked() else { return -2 }
+        var request = query(scope.account)
+        request[kSecReturnData as String] = true
+        request[kSecReturnAttributes as String] = true
+        request[kSecMatchLimit as String] = kSecMatchLimitOne
+        var result: CFTypeRef?
+        let reply = SecItemCopyMatching(request as CFDictionary, &result)
+        guard reply == errSecSuccess else { return Int64(status(reply)) }
+        guard let attributes = result as? [String: Any],
+              attributes[kSecAttrService as String] as? String == Self.service,
+              attributes[kSecAttrAccount as String] as? String == scope.account,
+              attributes[kSecAttrAccessible as String] as? String == (kSecAttrAccessibleWhenUnlockedThisDeviceOnly as String),
+              var data = attributes[kSecValueData as String] as? Data else { return -3 }
+        // Best effort for this Data owner; Swift/OS internal copies are outside
+        // the application's guaranteed zeroization boundary.
+        defer { data.resetBytes(in: 0..<data.count) }
+        guard data.count == Self.recordBytes, data.starts(with: scope.prefix), Self.unlocked() else { return Self.unlocked() ? -3 : -2 }
+        data.copyBytes(to: output, count: Self.recordBytes)
+        return Self.unlocked() ? Int64(Self.recordBytes) : -2
+    }
+    private func write(_ address: UnsafePointer<OmniPairingAddress>?, secret: UnsafePointer<UInt8>?, length: Int) -> Int32 {
+        guard let scope = scope(address), let secret = secret, length == Self.recordBytes else { return -3 }
+        lock.lock(); defer { lock.unlock() }; guard Self.unlocked() else { return -2 }
+        var data = Data(bytes: secret, count: length)
+        defer { data.resetBytes(in: 0..<data.count) }
+        guard data.starts(with: scope.prefix) else { return -3 }
+        var item = query(scope.account)
+        item[kSecValueData as String] = data
+        item[kSecAttrAccessible as String] = kSecAttrAccessibleWhenUnlockedThisDeviceOnly
+        // New generation only. A duplicate is an error, never an update of old
+        // or uncertain material. Rust performs matching read-back separately.
+        let reply = SecItemAdd(item as CFDictionary, nil)
+        return Self.unlocked() ? status(reply) : -2
+    }
+    private func remove(_ address: UnsafePointer<OmniPairingAddress>?) -> Int32 {
+        guard let scope = scope(address) else { return -3 }
+        lock.lock(); defer { lock.unlock() }; guard Self.unlocked() else { return -2 }
+        let reply = SecItemDelete(query(scope.account) as CFDictionary)
+        return Self.unlocked() ? status(reply) : -2
+    }
+    /// Native-only factory. Rust consumes retained context even on rejection.
+    static func callbacks(profile: UUID, device: UUID) -> OmniPairingCredentialCallbacks {
+        let context = Unmanaged.passRetained(PairingCredentials(profile: profile, device: device)).toOpaque()
+        return OmniPairingCredentialCallbacks(abi_version: 1, context: context, read: { context, address, output, capacity in
+            guard let context = context else { return -3 }
+            return Unmanaged<PairingCredentials>.fromOpaque(context).takeUnretainedValue().read(address, output: output, capacity: capacity)
+        }, write: { context, address, secret, length in
+            guard let context = context else { return -3 }
+            return Unmanaged<PairingCredentials>.fromOpaque(context).takeUnretainedValue().write(address, secret: secret, length: length)
+        }, remove: { context, address in
+            guard let context = context else { return -3 }
+            return Unmanaged<PairingCredentials>.fromOpaque(context).takeUnretainedValue().remove(address)
+        }, check: { context, address in
+            guard let context = context else { return -3 }
+            return Unmanaged<PairingCredentials>.fromOpaque(context).takeUnretainedValue().check(address)
+        }, release: { context in
+            if let context = context { Unmanaged<PairingCredentials>.fromOpaque(context).release() }
+        })
+    }
+}

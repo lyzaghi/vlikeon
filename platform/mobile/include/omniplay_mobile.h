@@ -27,6 +27,29 @@ typedef struct {
   void (*release)(void *context);
   int32_t (*check)(void *context,const uint8_t *profile);
 } OmniCredentialCallbacks;
+/* Dedicated Remote Play ABI 1, NOT compatible with save-sync callbacks above.
+ * Four UUID arrays are network-order UUID bytes; kind 1=identity, 2=pair.
+ * Scope is the actual native profile/device. read capacity/write length is
+ * exactly 137 bytes (VLKRP001 secret envelope). read returns 137, -1 absent,
+ * -2 locked, -3 failure/corrupt; write/check return 0, -2 locked, -3 failure.
+ * remove permits 0 or -1 absent. Never turn a locked/error vault into absence.
+ * Separate OS-vault service org.vlikeon.remote-play.credentials.v1 is required.
+ * Same synchronous/thread/reentry/context-consumption contract as above.
+ * This table is source ABI only; no renderer or mobile-open endpoint is added.
+ */
+typedef struct {
+  uint8_t profile[16],device[16],item[16],generation[16];
+  uint32_t kind;
+} OmniPairingAddress;
+typedef struct {
+  uint32_t abi_version;
+  void *context;
+  int64_t (*read)(void *,const OmniPairingAddress *,uint8_t *,size_t);
+  int32_t (*write)(void *,const OmniPairingAddress *,const uint8_t *,size_t);
+  int32_t (*remove)(void *,const OmniPairingAddress *);
+  int32_t (*check)(void *,const OmniPairingAddress *);
+  void (*release)(void *);
+} OmniPairingCredentialCallbacks;
 /* Trusted native document-tree reader ABI 1. open receives 16 bound profile
  * bytes and a borrowed normalized relative UTF-8 path (<=2048 bytes, <=8 parts).
  * It must authorize each part within the user-selected tree and return a unique

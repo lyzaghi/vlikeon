@@ -10,6 +10,8 @@ use zeroize::Zeroize;
 use uuid::Uuid;
 mod credentials;
 pub use credentials::OmniCredentialCallbacks;
+pub mod pairing_credentials;
+pub use pairing_credentials::{OmniPairingAddress,OmniPairingCredentialCallbacks};
 mod media_provider;
 pub use media_provider::{OmniMediaCallbacks,OmniMediaStream};
 

@@ -119,14 +119,19 @@ fn encode(address:&CredentialAddress,binding:&[u8;32],secret:&[u8;32])->Result<Z
     record.extend_from_slice(binding);record.extend_from_slice(secret);Ok(record)
 }
 fn decode_record(address:&CredentialAddress,binding:&[u8;32],record:&[u8])->Result<Zeroizing<[u8;32]>>{
+    validate_secret_envelope(address,record)?;let mut offset=73;
+    if &record[offset..offset+32]!=binding{return Err(corrupt());}offset+=32;
+    let mut secret=Zeroizing::new([0u8;32]);secret.copy_from_slice(&record[offset..offset+32]);Ok(secret)
+}
+/// Provider-side shape/address admission only; binding/secret correctness still
+/// requires the identity or signed-grant load path. No key bytes are returned.
+pub fn validate_secret_envelope(address:&CredentialAddress,record:&[u8])->Result<()>{
     address.validate()?;
     if record.len()!=SECRET_RECORD_BYTES||&record[..8]!=MAGIC||record[8]!=address.tag(){return Err(corrupt());}
     let mut offset=9;
     for id in [address.profile,address.device,address.id,address.generation]{
         if &record[offset..offset+16]!=id.as_bytes(){return Err(corrupt());}offset+=16;
-    }
-    if &record[offset..offset+32]!=binding{return Err(corrupt());}offset+=32;
-    let mut secret=Zeroizing::new([0u8;32]);secret.copy_from_slice(&record[offset..offset+32]);Ok(secret)
+    }Ok(())
 }
 fn insert_candidate(store:&dyn PairingSecretStore,address:&CredentialAddress,record:&[u8])->Result<()>{
     // Caller must serialize lifecycle operations in its durable journal. Vault

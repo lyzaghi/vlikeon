@@ -2,6 +2,14 @@
 
 ## Current sequence — 1–109 outstanding tasks
 
+Item 58 now authors a separate mobile Remote Play callback ABI/Rust scoped
+provider and unintegrated iOS Keychain candidate, retaining profile/device/
+generation envelopes and missing-vs-locked/error distinction. New source uses
+device-only/non-synchronizing Keychain entries and default-closed protected-data
+access; actual iOS target/bridge/hooks, Android/JNI, mobile lease and product
+integration remain due. No callback/native/vault/SQL/build/test was executed;
+original 51–109 scope and item 58 remain open.
+
 Item 58 now authors a concrete native document/session authority registry using
 revocable lifetime guards, fixed installed policy and current journal state.
 Session ownership is durably exclusive per pair and epoch comes from committed

@@ -36,7 +36,9 @@
     "Pair/grant-bound ICE response protocol source, shared bounded TURN URI validator and native temporary credential/fingerprint/URL-policy admission",
     "Signed native ICE request orchestration retains the lease and rechecks session/epoch/deadline, with no relay-only downgrade or ICE allocation",
     "Concrete native document/session authority registry source uses atomic lifetime guards, installed disabled policy, fresh journal admission and original observation timestamps",
-    "One durable native session owner per pair and epoch from committed journal revision; all signal/ICE paths enforce the exact persisted session/epoch and crash ownership is not reclaimed by age"
+    "One durable native session owner per pair and epoch from committed journal revision; all signal/ICE paths enforce the exact persisted session/epoch and crash ownership is not reclaimed by age",
+    "Dedicated mobile Remote Play callback ABI and Rust scoped provider validates 68-byte address, exact 137-byte envelopes and native access before/after operations; missing differs from locked/error",
+    "Unintegrated iOS device-only non-synchronizing Keychain provider source with generation-only add, exact-scope read/remove and default-closed protected-data flag"
   ],
   "build_executed": false,
   "tests_executed": false,
@@ -49,7 +51,7 @@
     "Journal/executor/lease/writer product integration, native consent/session owner, copied-profile coordination, startup dispatch and authenticated relay approval/revocation",
     "Native origin/document/session hook and consent/invitation-secret/approval controller integration, abandoned receiver ownership recovery, ICE/backend refresh/stop and retirement dispatch, upgraded relay deployment and WebCrypto/native interoperability",
     "Native broker authority and document/session capability integration",
-    "Separate Android/iOS credential provider ABI and app integration",
+    "Android/JNI provider, iOS candidate target/bridge/protected-data hooks, callback consumption and mobile lease/app integration",
     "Lock, restore, rotation, profile/device deletion and explicit browser-to-native re-pairing",
     "All build, test, vault and platform runtime verification"
   ]

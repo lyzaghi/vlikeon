@@ -11,6 +11,7 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 [dependencies]
 omniplay-contracts.workspace = true
 omniplay-core.workspace = true
+omniplay-streaming.workspace = true
 omniplay-local-service.workspace = true
 omniplay-sync-client.workspace = true
 serde.workspace = true

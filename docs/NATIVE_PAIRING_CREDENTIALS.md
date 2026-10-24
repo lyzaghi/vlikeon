@@ -586,6 +586,55 @@ is no current native startup/controller hookup, origin admission callback,
 consent UI, backend-stop integration or mobile provider for this registry. No
 registration, guard event, SQL/OS/network operation, build or test was executed.
 
+## Dedicated mobile provider ABI and iOS candidate source
+
+`platform/mobile/src/pairing_credentials.rs` and the C header now define a
+dedicated Remote Play credential table, ABI 1, separate from save-sync ABI 2.
+Its address is four fixed 16-byte UUID arrays plus a u32 kind (68 bytes), and
+records are exactly 137 bytes. Rust binds the consumed native context to the
+actual profile/device, serializes synchronous callbacks, validates address and
+record envelope and checks native access before/after each operation. Context
+ownership is consumed on rejection and released after the final owner drops.
+Callbacks must remain valid across native worker threads, not retain pointers,
+overrun buffers or reenter Rust; the raw table is a trusted native ABI, not an
+untrusted renderer/IPC surface.
+
+Only an explicit read -1 maps to absence; -2 stays locked, other failures and
+wrong lengths/envelopes remain errors. Locked/error responses do not initialize
+replacement keys. Write/remove success is still subject to post-access checks
+and the existing native read-back/lifecycle journal. Header/UUID/kind admission
+does not prove the secret's public/grant binding; the typed load path still
+performs that verification. No secret bytes are serialized in the C address.
+
+`apps/ios/OmniPlay/PairingCredentials.swift` now authors a separate Keychain
+provider for `org.vlikeon.remote-play.credentials.v1`, with account names matching
+profile/device/kind/item/generation. It checks each nonzero UUID/scope, expected
+record magic/prefix and fixed length. Read admission requires matching returned
+service/account and accessibility. Entries use non-synchronizing generic-password
+items, noninteractive calls and `WhenUnlockedThisDeviceOnly`. Writes add a new
+generation only; duplicates are errors rather than updates. Removal targets one
+exact account. Temporary Data mutation is best effort and does not claim all
+Swift/OS copies are guaranteed zeroized or that generic-password keys are Secure
+Enclave non-exportable objects.
+
+The iOS protected-data flag starts false and is checked before/after Keychain
+calls. Actual UIApplication protected-data events must be wired by the native
+host; this new class is not registered with those events, added to project target
+membership or consumed by a mobile open/attach entry point yet. Its callback
+factory must only be invoked immediately for a real consuming native call to
+avoid leaking its retained context. Android/JNI provider integration and a
+mobile credential file-lease implementation also remain due; the existing core
+lease still refuses non-Windows acquisition.
+
+Apple's documented
+[WhenUnlockedThisDeviceOnly](https://developer.apple.com/documentation/security/ksecattraccessiblewhenunlockedthisdeviceonly)
+and [accessibility behavior](https://developer.apple.com/documentation/security/restricting-keychain-item-accessibility)
+inform this candidate. Device-only data is not migrated to another device;
+restore/lost-key handling needs explicit recovery or re-pairing and must not
+silently replace a peer-pinned identity. No C callback, Swift/Keychain API,
+mobile open, vault/SQL/native operation, build or test was executed. Native
+provider/product lifecycle and device qualification remain incomplete.
+
 ## Remaining implementation and qualification
 
 - Journal/executor/lease/writer product integration, authority epochs, actual native owner
@@ -596,8 +645,9 @@ registration, guard event, SQL/OS/network operation, build or test was executed.
   compatible with the current signed protocol; no secret IPC export.
 - Broker operations and document-scoped native capabilities, with explicit
   native opt-in and locking/background/expiry behavior.
-- Separate Android Keystore/iOS Keychain provider namespace and scoped callback
-  ABI. Existing save-sync callbacks are not reused as pairing storage.
+- Android Keystore/JNI provider, iOS candidate target/bridge/protected-data wiring,
+  scoped callback consumption and mobile lease/product lifecycle. Existing
+  save-sync callbacks are not reused as pairing storage.
 - Device-lock, protected-data, backup/restore/reinstall, profile deletion,
   missing vault and lost-key behavior. Native identity recovery must not silently
   replace the identity pinned by remote peers.
