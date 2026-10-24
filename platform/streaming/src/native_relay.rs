@@ -20,6 +20,7 @@ struct JoinProof<'a>{#[serde(rename="type")]kind:&'static str,invite_id:Uuid,sec
 struct JoinRequest<'a>{schema_version:u32,audience:&'a str,issued_at_ms:u64,nonce:Uuid,operation:JoinProof<'a>}
 
 const MAX_RESPONSE:usize=1024*1024;
+pub(crate) struct NativeJoinStatus{pub state:String,pub grant:Option<crate::SignedDocument>}
 pub struct NativePairRelay{client:Client,allowed:Vec<String>}
 impl NativePairRelay{
     /// Allowlist must come from admitted installed/native policy, never an
@@ -77,6 +78,24 @@ impl NativePairRelay{
         let receipt:Receipt=serde_json::from_value(response).map_err(|_|network())?;
         if receipt.join_protocol!=1||!receipt.pending||receipt.invite_id!=invite_id||receipt.client_public_key!=identity.public_key()||receipt.hello_hash!=crate::document_hash(hello)?{return Err(denied());}
         let _=pending.join_material(identity,elapsed_now(now,started)?)?;check(deadline,cancel)?;Ok(())
+    }
+    pub(crate) fn pairing_status(&self,identity:&NativeSigningIdentity,pending:&crate::native_pair_exchange::NativeClientPairing,
+        now:u64,deadline:Instant,cancel:&AtomicBool)->Result<NativeJoinStatus>{
+        let started=Instant::now();check(deadline,cancel)?;
+        let(audience,invite_id,_,hello)=pending.join_material(identity,now)?;
+        let body=RelayRequest{schema_version:1,audience:audience.into(),issued_at_ms:now,nonce:Uuid::new_v4(),operation:RelayOperation::PairingStatus{invite_id}};
+        let document=identity.sign(SigningDomain::Request,&serde_json::to_vec(&body).map_err(|_|network())?)?;
+        let envelope=RelayEnvelope{public_key:identity.public_key(),document};
+        let _=verify_request(&envelope,audience,elapsed_now(now,started)?)?;
+        let response=self.post(audience,&serde_json::to_vec(&envelope).map_err(|_|network())?,deadline,cancel)?;
+        #[derive(serde::Deserialize)]#[serde(deny_unknown_fields)]
+        struct Receipt{pairing_status_protocol:u32,invite_id:Uuid,client_public_key:String,hello_hash:String,state:String,grant:Option<crate::SignedDocument>}
+        let receipt:Receipt=serde_json::from_value(response).map_err(|_|network())?;
+        if receipt.pairing_status_protocol!=1||receipt.invite_id!=invite_id||receipt.client_public_key!=identity.public_key()||
+            receipt.hello_hash!=crate::document_hash(hello)?||!matches!(receipt.state.as_str(),"pending"|"declined"|"approved")||
+            (receipt.state=="approved")!=receipt.grant.is_some(){return Err(denied());}
+        let _=pending.join_material(identity,elapsed_now(now,started)?)?;check(deadline,cancel)?;
+        Ok(NativeJoinStatus{state:receipt.state,grant:receipt.grant})
     }
     fn post(&self,audience:&str,bytes:&[u8],deadline:Instant,cancel:&AtomicBool)->Result<Value>{
         let started=Instant::now();check(deadline,cancel)?;validate_audience(audience)?;

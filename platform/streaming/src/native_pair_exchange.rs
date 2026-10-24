@@ -22,8 +22,11 @@ pub struct NativeClientPairing{
     exchange:NativePairExchange,invite:SignedDocument,hello:SignedDocument,
     expected_host:String,audience:String,comparison:String,deadline:Instant,expires:u64,
     _secret:Zeroizing<String>,
-    joined:bool,
+    joined:bool,approved:Option<SignedDocument>,declined:bool,
 }
+/// Public native UI metadata only. Approved still requires actual local peer
+/// consent, exchange completion, vault/journal persistence and activation.
+pub enum NativeClientPairingStatus{Pending,Declined,Approved{pair_id:uuid::Uuid,input_allowed:bool,expires_at_ms:u64}}
 impl NativeClientPairing{
     /// expected_host and audience must be pinned by trusted native policy/UI,
     /// never inferred as authorized solely from the scanned invitation itself.
@@ -59,12 +62,14 @@ impl NativeClientPairing{
         // Retain opaque proof for future native relay submission. Never expose
         // it via metadata getters/Debug/Serialize or leave its String on drop.
         let retained_secret=Zeroizing::new(std::mem::take(&mut invitation.secret));
-        Ok(Self{exchange,invite:invitation.invite.clone(),hello,expected_host:expected_host.into(),audience:audience.into(),comparison,deadline,expires:invite.expires_at_ms,_secret:retained_secret,joined:false})
+        Ok(Self{exchange,invite:invitation.invite.clone(),hello,expected_host:expected_host.into(),audience:audience.into(),comparison,deadline,expires:invite.expires_at_ms,_secret:retained_secret,joined:false,approved:None,declined:false})
     }
     pub fn signed_invite(&self)->&SignedDocument{&self.invite}
     pub fn signed_hello(&self)->&SignedDocument{&self.hello}
     pub fn comparison_code(&self)->&str{&self.comparison}
     pub fn expires_at_ms(&self)->u64{self.expires}
+    /// Signed public metadata for the native writer, not an activation receipt.
+    pub fn approved_grant(&self)->Option<&SignedDocument>{self.approved.as_ref()}
     pub(crate) fn join_material<'a>(&'a self,identity:&crate::native_credentials::NativeSigningIdentity,now:u64)->Result<(&'a str,uuid::Uuid,&'a str,&'a SignedDocument)>{
         if Instant::now()>=self.deadline||now>=self.expires{return Err(unauthorized());}
         let invite:Invite=verify(&self.expected_host,INVITE_DOMAIN,&self.invite,4096)?;invite.validate(&self.audience,now)?;
@@ -81,11 +86,47 @@ impl NativeClientPairing{
         relay.join_invitation(identity,self,now,deadline.min(self.deadline),cancel)?;
         self.joined=true;Ok(())
     }
+    /// One explicit bounded poll, no background retry loop. Pin the first exact
+    /// approved grant; a later conflicting or regressed response is refused.
+    pub fn poll_status(&mut self,relay:&crate::native_relay::NativePairRelay,identity:&crate::native_credentials::NativeSigningIdentity,
+        now:u64,deadline:Instant,cancel:&std::sync::atomic::AtomicBool)->Result<NativeClientPairingStatus>{
+        let started=Instant::now();
+        if !self.joined||deadline<=started||deadline.saturating_duration_since(started)>Duration::from_secs(30){return Err(unauthorized());}
+        let response=relay.pairing_status(identity,self,now,deadline.min(self.deadline),cancel)?;
+        let current=elapsed_now(now,started)?;
+        let mut approved=None;
+        let result=match response.state.as_str(){
+            "pending"=>{if self.declined||self.approved.is_some(){return Err(unauthorized());}NativeClientPairingStatus::Pending},
+            "declined"=>{if self.approved.is_some(){return Err(unauthorized());}NativeClientPairingStatus::Declined},
+            "approved"=>{
+                if self.declined{return Err(unauthorized());}
+                let document=response.grant.ok_or_else(invalid)?;
+                let grant:crate::PairGrant=verify(&self.expected_host,crate::GRANT_DOMAIN,&document,8192)?;grant.validate(&self.audience,current)?;
+                let invite:Invite=verify(&self.expected_host,INVITE_DOMAIN,&self.invite,4096)?;invite.validate(&self.audience,current)?;
+                let hello:ClientHello=verify(&identity.public_key(),HELLO_DOMAIN,&self.hello,4096)?;hello.validate(invite.id,current)?;
+                if grant.id.is_nil()||grant.invite_id!=invite.id||grant.host_public_key!=self.expected_host||grant.client_public_key!=identity.public_key()||
+                    grant.client_hello_hash.0!=document_hash(&self.hello)?||grant.client_ecdh!=hello.client_ecdh||grant.client_nonce!=hello.client_nonce||
+                    grant.created_at_ms<invite.created_at_ms.saturating_sub(30_000)||grant.created_at_ms<hello.created_at_ms.saturating_sub(30_000)||grant.created_at_ms>=invite.expires_at_ms{return Err(unauthorized());}
+                if let Some(previous)=&self.approved{if document_hash(previous)?!=document_hash(&document)?{return Err(unauthorized());}}
+                let status=NativeClientPairingStatus::Approved{pair_id:grant.id,input_allowed:grant.input_allowed,expires_at_ms:grant.expires_at_ms};
+                approved=Some(document);status
+            },_=>return Err(invalid()),
+        };
+        if Instant::now()>=deadline.min(self.deadline)||cancel.load(std::sync::atomic::Ordering::Acquire){return Err(unauthorized());}
+        if let Some(document)=&approved{
+            let grant:crate::PairGrant=verify(&self.expected_host,crate::GRANT_DOMAIN,document,8192)?;grant.validate(&self.audience,elapsed_now(now,started)?)?;
+        }
+        let _=self.join_material(identity,elapsed_now(now,started)?)?;
+        if Instant::now()>=deadline.min(self.deadline)||cancel.load(std::sync::atomic::Ordering::Acquire){return Err(unauthorized());}
+        if let Some(document)=approved{self.approved=Some(document);}
+        if matches!(&result,NativeClientPairingStatus::Declined){self.declined=true;}Ok(result)
+    }
     /// Native controller calls only after actual local peer comparison/approval.
     /// Finishing consumes this pending transcript even if the grant is rejected.
-    pub fn finish_after_local_consent(self,grant:&SignedDocument,now:u64)->Result<NativePairKey>{
+    pub fn finish_after_local_consent(self,now:u64)->Result<NativePairKey>{
         let started=Instant::now();
         if !self.joined||Instant::now()>=self.deadline||now>=self.expires{return Err(unauthorized());}
+        let grant=self.approved.as_ref().ok_or_else(unauthorized)?;
         let material=self.exchange.finish_client(&self.expected_host,&self.invite,&self.hello,grant,&self.audience,elapsed_now(now,started)?)?;
         if Instant::now()>=self.deadline{return Err(unauthorized());}Ok(material)
     }

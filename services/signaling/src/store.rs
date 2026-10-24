@@ -64,12 +64,14 @@ impl Store {
                 let rows=statement.query_map([invite_id.to_string()],|r|r.get::<_,String>(0)).map_err(sql)?;let mut hellos=Vec::<SignedDocument>::new();for row in rows{hellos.push(serde_json::from_str(&row.map_err(sql)?).map_err(sql)?);}Ok(json!({"requests":hellos}))
             }
             RelayOperation::PairingStatus{invite_id}=>{
-                let state:Option<String>=tx.query_row("SELECT state FROM joins WHERE invite=?1 AND client=?2",params![invite_id.to_string(),sender],|r|r.get(0)).optional().map_err(sql)?;
-                let Some(state)=state else{return Err(ApiError::not_found());};
+                let joined:Option<(String,String)>=tx.query_row("SELECT state,hello FROM joins WHERE invite=?1 AND client=?2",params![invite_id.to_string(),sender],|r|Ok((r.get(0)?,r.get(1)?))).optional().map_err(sql)?;
+                let Some((state,hello))=joined else{return Err(ApiError::not_found());};
+                let hello:SignedDocument=serde_json::from_str(&hello).map_err(sql)?;
+                let hello_hash=document_hash(&hello).map_err(|_|ApiError::invalid())?;
                 if state=="approved"{
                     let document:String=tx.query_row("SELECT document FROM pairs WHERE invite=?1 AND client=?2 AND revoked=0 AND expires>?3",params![invite_id.to_string(),sender,now],|r|r.get(0)).optional().map_err(sql)?.ok_or_else(ApiError::unauthorized)?;
-                    let grant:SignedDocument=serde_json::from_str(&document).map_err(sql)?;Ok(json!({"state":state,"grant":grant}))
-                }else{Ok(json!({"state":state,"grant":null}))}
+                    let grant:SignedDocument=serde_json::from_str(&document).map_err(sql)?;Ok(json!({"state":state,"grant":grant,"pairing_status_protocol":1,"invite_id":invite_id,"client_public_key":sender,"hello_hash":hello_hash}))
+                }else{Ok(json!({"state":state,"grant":null,"pairing_status_protocol":1,"invite_id":invite_id,"client_public_key":sender,"hello_hash":hello_hash}))}
             }
             RelayOperation::ApprovePair{invite_id,client_public_key,grant:document}=>{
                 invite_row(tx,&invite_id.to_string(),Some(sender))?;let grant=verify_grant(&document,audience,now).map_err(|_|ApiError::unauthorized())?;

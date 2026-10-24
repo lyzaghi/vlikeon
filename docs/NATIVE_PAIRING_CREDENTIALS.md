@@ -1491,6 +1491,31 @@ build or test was executed. Product Active identity/lease/foreground admission,
 native peer-consent UI, grant polling, pair activation and host invitation flow
 remain unfinished; protocol and interoperability qualification remain due.
 
+## Native client approval polling
+
+The pending client now authors one explicit PairingStatus poll, signed by the
+same identity and limited by the original invite and operation deadlines. The
+server source binds status to protocol 1, invite/client and stored signed-hello
+hash, alongside pending/declined/approved state and an optional grant. Native
+refuses unbound legacy status, unknown states and a grant outside approved state.
+The first approved document is pinned; regressions, later conflicting grants or
+approval after observed decline are rejected instead of replacing local trust.
+
+Approval verifies the grant against the separately pinned host public key, then
+checks audience, participant keys, invite ID, exact hello hash, client exchange
+and nonce, creation bounds and expiry. The final deadline/cancellation/invite
+checks occur before publishing pending-object state. Native UI receives only
+pair ID, input permission and expiry metadata; public signed grant access is
+available to the later native writer. Finish consumes the stored admitted grant
+rather than accepting a caller-substituted document.
+
+Poll status is not local comparison-code consent or activation. No automatic
+poll loop, pair persistence, foreground/lease controller or UI caller is added.
+The additive server receipt source still needs deployment and interoperability
+qualification. No HTTP/crypto/parser/SQL/native/vault operation, compiler, build
+or test was executed. Product grant-to-writer activation and the host invitation
+controller remain unfinished, together with producer/crash recovery scope.
+
 ## Remaining implementation and qualification
 
 - Journal/executor/lease/writer product integration, authority epochs, actual native owner

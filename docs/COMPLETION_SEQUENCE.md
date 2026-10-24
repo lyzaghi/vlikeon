@@ -2,6 +2,13 @@
 
 ## Current sequence — 1–109 outstanding tasks
 
+Item 58 now authors native client approval polling with bound invite/client/
+hello-hash status receipts, pinned-host grant admission and monotonic terminal
+state/first-grant binding. Finish consumes only the stored approved transcript;
+local consent and product persistence remain separate. Signaling receipt changes
+are source only. No HTTP/native/crypto/SQL/vault/deployment/compiler/build/test
+ran; UI/controller/writer activation and host flow remain due. Full scope is open.
+
 Item 58 now authors explicit pending-transcript JoinInvite transport and bound
 protocol-1 invite/client/hello-hash receipt admission. Signaling source returns
 the same binding for first/identical joins; legacy unbound replies cannot mark
