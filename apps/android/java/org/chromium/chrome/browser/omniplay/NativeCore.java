@@ -196,7 +196,7 @@ public final class NativeCore {
     interface PeerApprovalReply { void accept(PeerApproval review,String error); }
     /** Immutable approved-poll snapshot owned by trusted native UI only. */
     static final class PeerApproval {
-        final String pairId,grantHash,hostPublicKey,hostFingerprint,comparisonCode;final boolean inputAllowed;final long expires;
+        final String pairId,grantHash,hostPublicKey,hostFingerprint,comparisonCode;final boolean inputAllowed;final long expires,grantExpiresAt;
         private final String ticket;private final Object deliveryFence;
         private final java.util.concurrent.atomic.AtomicBoolean consumed=new java.util.concurrent.atomic.AtomicBoolean();
         private PeerApproval(JSONObject value,Object fence) throws Exception {
@@ -205,7 +205,7 @@ public final class NativeCore {
             ticket=value.getString("ticket");pairId=status.getString("pair_id");grantHash=value.getString("grant_hash");
             hostPublicKey=value.getString("host_public_key");hostFingerprint=value.getString("host_fingerprint");comparisonCode=value.getString("comparison_code");
             inputAllowed=status.getBoolean("input_allowed");deliveryFence=fence;
-            long remaining=status.getLong("expires_at_ms")-System.currentTimeMillis();
+            grantExpiresAt=status.getLong("expires_at_ms");long remaining=grantExpiresAt-System.currentTimeMillis();
             if(remaining<=0)throw new IllegalStateException();
             expires=android.os.SystemClock.elapsedRealtime()+Math.min(60_000,remaining);
         }
@@ -334,12 +334,19 @@ public final class NativeCore {
         final long revision,expires;final java.util.List<RecoveryRecord> records;
         final boolean relayRetirementAvailable;
         final boolean namespaceProvenanceMissing;
+        final String pendingClientTicket;
         boolean needsAttention(){if(namespaceProvenanceMissing)return true;for(RecoveryRecord record:records)if(record.sessionRecoveryRequired||(record.nextStep!=null&&!"revalidate_before_use".equals(record.nextStep)))return true;return false;}
         private RecoverySnapshot(JSONObject status,String profile,long deadline) throws Exception {
             if(status.getInt("credential_protocol")!=1||status.getInt("recovery_protocol")!=1||!profile.equals(status.getString("profile_id"))||!canonicalPairingId(status.getString("device_id")))throw new IllegalStateException();
             revision=status.getLong("revision");expires=deadline;
             relayRetirementAvailable=status.getBoolean("relay_retirement_available");
             namespaceProvenanceMissing=status.getBoolean("namespace_provenance_missing");
+            JSONObject client=status.optJSONObject("pending_client");String ticket=null;
+            if(client!=null){
+                String id=client.getString("ticket");if(!canonicalPairingId(id))throw new IllegalStateException();
+                if(!client.getBoolean("expired")&&client.getLong("expires_at_ms")>System.currentTimeMillis())ticket=id;
+            }
+            pendingClientTicket=ticket;
             if(revision<0||revision>10_000_000||android.os.SystemClock.elapsedRealtime()>=expires)throw new IllegalStateException();
             org.json.JSONArray rows=status.getJSONArray("records"),actions=status.getJSONArray("recovery");
             if(rows.length()>128||actions.length()>128)throw new IllegalStateException();

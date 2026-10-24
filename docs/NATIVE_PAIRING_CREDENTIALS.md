@@ -1840,6 +1840,16 @@ this checkpoint.
 
 ## Remaining implementation and qualification
 
+Android native status/recovery now offers review of an unexpired pending-client
+ticket from native status. An explicit fresh poll creates the one-use approval
+snapshot; the native dialog displays its host key/fingerprint/comparison, pair
+and input permission. Separate unchecked peer/comparison and permission boxes
+gate the save button. Owner/cancel/expiry checks and existing lifecycle dismissal
+remain in effect; dismissal is not advertised as remote revocation. Confirmation
+persists MaterialReady only and directs the user back to status. This is authored
+UI wiring, not evidence of displayed/runtime behavior. No build/test ran. Full
+begin/join entry, activation, iOS consent views and end-to-end qualification remain.
+
 Client poll replies now carry the original independently pinned host key,
 its native-derived fingerprint and the retained invite/hello comparison code.
 These come from the same pending exchange as the approved grant, not mutable

@@ -207,14 +207,47 @@ public final class GameHubController implements AutoCloseable {
             if(snapshot==null){cancelIdentityReview();identityNotice(error);return;}
             long remaining=snapshot.expires-android.os.SystemClock.elapsedRealtime();
             if(remaining<=0){cancelIdentityReview();identityNotice("Recovery status expired. Open it again.");return;}
-            if(snapshot.records.isEmpty()){cancelIdentityReview();identityNotice("This device has no Remote Play identity or pair records.");return;}
-            String[] titles=new String[snapshot.records.size()];
-            for(int i=0;i<titles.length;i++){NativeCore.RecoveryRecord record=snapshot.records.get(i);titles[i]=(record.isIdentity()?"Identity · ":"Device pair · ")+record.generation;}
+            if(snapshot.records.isEmpty()&&snapshot.pendingClientTicket==null){cancelIdentityReview();identityNotice("This device has no Remote Play identity or pair records.");return;}
+            String[] titles=new String[snapshot.records.size()+(snapshot.pendingClientTicket==null?0:1)];
+            for(int i=0;i<snapshot.records.size();i++){NativeCore.RecoveryRecord record=snapshot.records.get(i);titles[i]=(record.isIdentity()?"Identity · ":"Device pair · ")+record.generation;}
+            if(snapshot.pendingClientTicket!=null)titles[titles.length-1]="Review pending host approval";
             AlertDialog list=new AlertDialog.Builder(mActivity).setTitle("Remote Play status")
-                    .setItems(titles,(dialog,index)->{mIdentityDialog=null;showPairingRecovery(snapshot,snapshot.records.get(index),owner);})
+                    .setItems(titles,(dialog,index)->{mIdentityDialog=null;if(index==snapshot.records.size())showPeerApproval(snapshot.pendingClientTicket,owner);else showPairingRecovery(snapshot,snapshot.records.get(index),owner);})
                     .setNegativeButton(android.R.string.cancel,(dialog,which)->cancelIdentityReview()).create();
             mIdentityDialog=list;list.setOnCancelListener(dialog->cancelIdentityReview());
             mIdentityExpiry=()->{if(mIdentityFlow==owner)cancelIdentityReview();};mMain.postDelayed(mIdentityExpiry,remaining);list.show();
+        });
+    }
+    private void showPeerApproval(String ticket,java.util.concurrent.atomic.AtomicBoolean owner){
+        if(mIdentityFlow!=owner||!owner.get()||!identityUiAvailable()){cancelIdentityReview();return;}
+        mCore.reviewPairingPeer(ticket,owner::get,(review,error)->{
+            if(mIdentityFlow!=owner||!owner.get())return;
+            if(!identityUiAvailable()||review==null){cancelIdentityReview();if(identityUiAvailable())identityNotice(error);return;}
+            if(mIdentityExpiry!=null)mMain.removeCallbacks(mIdentityExpiry);
+            long remaining=review.expires-android.os.SystemClock.elapsedRealtime();
+            if(remaining<=0){cancelIdentityReview();return;}
+            android.widget.LinearLayout checks=new android.widget.LinearLayout(mActivity);checks.setOrientation(android.widget.LinearLayout.VERTICAL);
+            android.widget.CheckBox peer=new android.widget.CheckBox(mActivity),permission=new android.widget.CheckBox(mActivity);
+            peer.setText("I independently verified this host and matched the comparison code on both devices.");
+            permission.setText(review.inputAllowed?"I approve the input-control permission shown for this pair.":"I approve this pair without input-control permission.");
+            checks.addView(peer);checks.addView(permission);
+            AlertDialog alert=new AlertDialog.Builder(mActivity).setTitle("Confirm Remote Play peer")
+                    .setMessage("Host key:\n"+review.hostPublicKey+"\nFingerprint:\n"+review.hostFingerprint+"\nComparison code: "+review.comparisonCode+"\nPair: "+review.pairId+"\nInput control: "+(review.inputAllowed?"Allowed":"Not allowed")+"\n\nSave this pairing candidate after verification. Activation is a separate step.")
+                    .setView(checks).setNegativeButton(android.R.string.cancel,(dialog,which)->cancelIdentityReview())
+                    .setPositiveButton("Save verified candidate",null).create();
+            mIdentityDialog=alert;alert.setOnCancelListener(dialog->cancelIdentityReview());alert.show();
+            android.widget.Button confirm=alert.getButton(AlertDialog.BUTTON_POSITIVE);confirm.setEnabled(false);
+            android.widget.CompoundButton.OnCheckedChangeListener changed=(button,checked)->confirm.setEnabled(peer.isChecked()&&permission.isChecked());
+            peer.setOnCheckedChangeListener(changed);permission.setOnCheckedChangeListener(changed);
+            confirm.setOnClickListener(button->{
+                if(!peer.isChecked()||!permission.isChecked()||mIdentityFlow!=owner||!owner.get()||!identityUiAvailable()||android.os.SystemClock.elapsedRealtime()>=review.expires){cancelIdentityReview();return;}
+                confirm.setEnabled(false);alert.dismiss();mIdentityDialog=null;
+                mCore.confirmPairingPeer(review,owner::get,response->{
+                    if(mIdentityFlow!=owner||!owner.get())return;cancelIdentityReview();
+                    if(identityUiAvailable())identityNotice("ok".equals(response.optString("status"))?"Verified candidate saved. Open status to inspect it; no connection was started.":"Candidate result is uncertain. Open status before continuing.");
+                });
+            });
+            mIdentityExpiry=()->{if(mIdentityFlow==owner)cancelIdentityReview();};mMain.postDelayed(mIdentityExpiry,remaining);
         });
     }
     private static String recoveryPhase(String phase){

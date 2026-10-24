@@ -2,6 +2,12 @@
 
 ## Current sequence — 1–109 outstanding tasks
 
+Item 58 Android status now exposes a live pending-client review action and native
+peer-consent dialog. It displays retained host/comparison/pair/input metadata,
+requires separate peer-comparison and permission checks, and sends the one-use
+snapshot only on explicit confirmation. Source-only; no UI/build/test ran.
+Begin/join entry, activation, iOS views and full qualification remain incomplete.
+
 Item 58 approved-poll review snapshots now retain the transcript's pinned host
 key, derived fingerprint and comparison code alongside pair/input metadata.
 LocalHost sources these from the retained native exchange, and both mobile
