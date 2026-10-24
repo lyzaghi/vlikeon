@@ -2,6 +2,8 @@
 
 ## Current sequence — 1–109 outstanding tasks
 
+Source checkpoint: broker-channel receive document now owns session scope, closes before teardown, and has a private native open route. The main loop runs receive gap/age and retained cleanup maintenance at request boundaries. An independent idle scheduler, navigation document scope and transport caller remain open; build/test stay deferred.
+
 Source checkpoint: receive document lifetime now directly fences the independent native authority observer and codec callbacks, including closure during slow observation. No fresh timestamp or strong lifetime is minted. Lost-document status reports cleanup debt. Product document issuer/scheduler/transport integration remains open; build/test stay deferred.
 
 Source checkpoint: receive media operations now require an opaque native document lifetime, reject closed/dropped documents and recheck after output retrieval. Cleanup seals entries and can reap abandoned documents through maintain(). Actual native document issuer/scheduler and transport integration remain open; build/test stay deferred.

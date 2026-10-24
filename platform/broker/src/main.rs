@@ -102,6 +102,7 @@ fn run() -> omniplay_contracts::Result<()> {
             omniplay_updater::acknowledge_broker_health()?;
         }
         let active_broker = broker.as_mut().expect("broker was initialized above");
+        active_broker.maintain_native_receive();
         if matches!(&request.command,omniplay_contracts::Command::AssetRangeRead{..}){
             let id=request.id;let admission=(||{
                 let operation=active_broker.prepare_range_read(&request,&bytes)?;

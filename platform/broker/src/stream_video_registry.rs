@@ -94,6 +94,13 @@ impl ReceiveRegistry{
     }
     /// Called independently of packet arrival to reap closed native documents.
     pub fn maintain(&mut self,deadline:Instant)->Result<()>{
+        if self.closed{return self.close_until(deadline);}
+        if let Some(entry)=self.entry.as_mut(){
+            if !entry.sealed&&entry.document.upgrade().is_some_and(|state|state.alive.load(Ordering::Acquire)){
+                // Run receive-gap/assembly/age checks even without an RTP push.
+                if entry.session.tick().is_err(){entry.sealed=true;}
+            }
+        }
         let lost=self.entry.as_ref().is_some_and(|entry|entry.sealed||entry.document.upgrade().is_none_or(|state|!state.alive.load(Ordering::Acquire)));
         if lost{
             let entry=self.entry.as_ref().ok_or_else(denied)?;

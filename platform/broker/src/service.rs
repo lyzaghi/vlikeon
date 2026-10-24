@@ -26,6 +26,8 @@ pub struct Broker {
     stream_inputs:crate::stream_input::StreamInputs,
     #[cfg(windows)]
     receive_video:crate::stream_video_registry::ReceiveRegistry,
+    #[cfg(windows)]
+    receive_document:crate::stream_video_registry::ReceiveDocument,
     gamepad_recovery:crate::stream_gamepad_recovery::RecoveryLane,
     device_probe:omniplay_device_info::DeviceProbe,
     native_work_jobs:crate::native_work_jobs::NativeWorkJobs,
@@ -51,6 +53,8 @@ impl Broker {
             stream_inputs:crate::stream_input::StreamInputs::default(),
             #[cfg(windows)]
             receive_video:crate::stream_video_registry::ReceiveRegistry::default(),
+            #[cfg(windows)]
+            receive_document:crate::stream_video_registry::ReceiveDocument::new(),
             gamepad_recovery:crate::stream_gamepad_recovery::RecoveryLane::default(),
             device_probe:omniplay_device_info::DeviceProbe::default(),
             native_work_jobs:crate::native_work_jobs::NativeWorkJobs::default(),
@@ -441,7 +445,19 @@ impl Broker {
         Ok(preview)
     }
 
+    /// Broker-channel native lifetime only. Navigation/focus-specific documents
+    /// still require their own native issuer; no renderer-selected scope exists.
+    #[cfg(windows)]
+    pub(crate) fn open_native_receive(&mut self,configuration:crate::stream_video_session::WindowsReceiveConfiguration,source:impl crate::stream_video_authority::NativeVideoAuthority,deadline:std::time::Instant)->Result<()>{
+        self.receive_video.open(&self.receive_document,configuration,source,deadline)
+    }
+    pub(crate) fn maintain_native_receive(&mut self){
+        #[cfg(windows)]{
+            let _=self.receive_video.maintain(std::time::Instant::now()+std::time::Duration::from_millis(25));
+        }
+    }
     pub fn close(&mut self) {
+        #[cfg(windows)]{self.receive_document.close();}
         #[cfg(windows)]{let _=self.receive_video.close_until(std::time::Instant::now()+std::time::Duration::from_millis(1000));}
         self.gamepad_recovery.cancel();self.native_work_jobs.cancel_all();self.asset_ranges.close_owner(self.client_id);self.stream_inputs.close();self.jobs.cancel_all();self.update_jobs.cancel_all();self.import_jobs.cancel_all();self.preparations.cancel_all();let ids=self.sessions.list().into_iter().filter(|s|!s.state.is_terminal()).map(|s|s.id).collect::<Vec<_>>();for id in ids{let _=self.detach_session(id);}self.sessions.stop_all(&self.database);self.web_sessions.close(&self.database);self.transfers.clear();self.permissions.revoke_owner(self.client_id);self.directory_grants.revoke_owner(self.client_id);
     }

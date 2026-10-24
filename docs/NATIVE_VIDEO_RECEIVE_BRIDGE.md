@@ -1,5 +1,16 @@
 # Native ordered RTP to decoder bridge — item 56
 
+Broker now creates a native receive-document lifetime for its channel and closes
+it before shutdown cleanup. A private native open method binds sessions to that
+owner. The message loop invokes registry maintenance at each admitted request
+boundary, including the asset-range branch. Maintenance ticks active receivers
+without an RTP push and seals/reaps failed or abandoned entries using its supplied
+cleanup budget. This is request-boundary maintenance, not an independent timer:
+the current blocking input loop still needs a scheduler for idle-channel cleanup.
+Independent worker authority expiry remains in effect during silence. Navigation/
+focus document issuance and authenticated transport caller remain unfinished.
+Build/test stay deferred.
+
 ReceiveRegistry now wraps its real native authority source with the document's
 weak lifetime before session launch. Both the independent authority lane and
 codec callback reject a closed/dropped document before and after observing the
