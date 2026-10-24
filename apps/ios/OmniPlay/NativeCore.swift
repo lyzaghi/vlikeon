@@ -225,7 +225,7 @@ final class NativeCore {
         let fail:(String)->Void={message in
             owned.clear();DispatchQueue.main.async{completion(.failure(OmniFailure.message(message)))}
         }
-        let maximum=action == .begin ? 16_384:128
+        let maximum=action == .begin ? 16_384:(action == .persistAfterPeerConsent ? 256:128)
         guard !owned.bytes.isEmpty,owned.bytes.count<=maximum else{fail("Yêu cầu ghép đôi vượt giới hạn.");return}
         let deliveryToken=pairingClientDeliveryFence.capture(cancel:action == .cancel)
         if action == .cancel{
@@ -243,10 +243,13 @@ final class NativeCore {
             do{
                 var expectedTicket:String?
                 if action != .begin{
-                    guard let request=try JSONSerialization.jsonObject(with:owned.bytes) as? [String:Any],request.count==1,
+                    guard let request=try JSONSerialization.jsonObject(with:owned.bytes) as? [String:Any],request.count==(action == .persistAfterPeerConsent ? 2:1),
                           let ticket=request["ticket"] as? String,let id=UUID(uuidString:ticket),id.uuidString.lowercased()==ticket,
                           id != UUID(uuid:(0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0)) else{throw OmniFailure.message("Ticket ghép đôi không hợp lệ.")}
                     expectedTicket=ticket
+                    if action == .persistAfterPeerConsent{
+                        guard let hash=request["reviewed_grant_hash"] as? String,NativePairingText.fingerprint(hash) else{throw OmniFailure.message("Thiếu grant đã được người dùng duyệt.")}
+                    }
                 }
                 let now=DispatchTime.now()
                 guard self.handle != 0,now<deadline,(action == .cancel || (self.pairingClientDeliveryFence.admits(deliveryToken)&&owner.active&&self.pairingAttached)) else{throw OmniFailure.message("Phiên ghép đôi đã kết thúc. Hãy mở lại trạng thái.")}
@@ -297,6 +300,7 @@ final class NativeCore {
                 if action == .poll{
                     guard exactBool(value["local_consent_required"],true),let status=value["status"] as? [String:Any],let state=status["state"] as? String else{throw OmniFailure.message("Trạng thái ghép đôi không hợp lệ.")}
                     if state == "approved"{
+                        guard let hash=value["grant_hash"] as? String,NativePairingText.fingerprint(hash) else{throw OmniFailure.message("Thiếu mã ràng buộc grant được host duyệt.")}
                         guard let text=status["pair_id"] as? String,let id=UUID(uuidString:text),id.uuidString.lowercased()==text,
                               id != UUID(uuid:(0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0)),
                               exactBool(status["input_allowed"],true)||exactBool(status["input_allowed"],false),

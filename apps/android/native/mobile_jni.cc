@@ -207,7 +207,7 @@ extern "C" JNIEXPORT jbyteArray JNICALL
 Java_org_chromium_chrome_browser_omniplay_NativeCore_nativePairingClientV1(JNIEnv* env,jclass,jlong handle,jbyteArray input,jint action,jint budget){
   if(handle<=0||!input||budget<1000||budget>25000||action<0||action>4)return nullptr;
   const auto length=env->GetArrayLength(input);
-  if(exception(env)||length<=0||length>(action==0?16384:128))return nullptr;
+  if(exception(env)||length<=0||length>(action==0?16384:(action==3?256:128)))return nullptr;
   std::vector<uint8_t> bytes(static_cast<size_t>(length));WipeBytes wipe{bytes};
   env->GetByteArrayRegion(input,0,length,reinterpret_cast<jbyte*>(bytes.data()));if(exception(env))return nullptr;
   if(action==0)return response_bytes(env,om_mobile_pairing_client_begin_v1(static_cast<uint64_t>(handle),bytes.data(),bytes.size(),static_cast<uint32_t>(budget)));

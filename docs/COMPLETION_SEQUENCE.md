@@ -2,6 +2,12 @@
 
 ## Current sequence — 1–109 outstanding tasks
 
+Item 58 now binds consented client persistence to an exact reviewed grant hash.
+Approved poll returns grant_hash; action 3 requires ticket plus reviewed_grant_hash
+and checks it against the retained signed grant before consuming the exchange.
+Rust ABI, Android JNI/caller and iOS caller bounds/parsing are updated together.
+Source-only: no build/test; actual native consent UI and activation remain due.
+
 Item 58 iOS now mirrors Android's immediate cancel delivery fence, using locked
 object-identity tokens checked before ABI, after response and on main delivery.
 Source-only; build/test and actual consent UI/transcript binding remain due.

@@ -69,8 +69,10 @@ OmniBuffer om_mobile_attach_pairing_credentials_v1(uint64_t handle,OmniPairingCr
  * host_public_key (independently confirmed), audience and label. Caller clears
  * its input/share/clipboard copies; native parsing cannot guarantee clearing
  * parser-internal allocations. Budget 1000..25000 ms includes mutex wait.
- * action JSON <=128 bytes: {"ticket":"UUID"}; action 1 join, 2 poll,
- * 3 persist AFTER explicit native peer/comparison/input consent, 4 cancel.
+ * action JSON <=128 bytes: {"ticket":"UUID"}; action 1 join, 2 poll, 4 cancel.
+ * Action 3 JSON <=256 bytes: {"ticket":"UUID","reviewed_grant_hash":"64 hex"}.
+ * Persist AFTER explicit native peer/comparison/input consent to the exact
+ * grant_hash from approved poll; missing/mismatched hash refuses persistence.
  * Epoch is sourced from attached foreground host, never supplied by caller.
  * Cancel first calls invalidate_epoch to signal in-flight work, then queues
  * action 4; cancel is local only and does not revoke relay-approved pairs.

@@ -150,6 +150,7 @@ pub extern "C" fn om_mobile_pairing_prepare_identity_v1(handle:u64,expected_revi
 struct PairingClientBegin{identity:omniplay_streaming::native_credentials::CredentialAddress,expected_revision:u64,code:String,host_public_key:String,audience:String,label:String}
 impl Drop for PairingClientBegin{fn drop(&mut self){self.code.zeroize();}}
 #[derive(Deserialize)]#[serde(deny_unknown_fields)]struct PairingClientTicket{ticket:Uuid}
+#[derive(Deserialize)]#[serde(deny_unknown_fields)]struct PairingClientConsent{ticket:Uuid,reviewed_grant_hash:String}
 /// # Safety
 /// Trusted native UI supplies bounded readable JSON, not renderer input. Host
 /// key must be independently confirmed/pinned by UI, not trusted from code alone.
@@ -170,15 +171,20 @@ pub unsafe extern "C" fn om_mobile_pairing_client_begin_v1(handle:u64,data:*cons
     if std::time::Instant::now()>=deadline{return Err(error(ErrorCode::DeadlineExceeded,"Native client preparation completed late; cancel the pending flow before retry"));}Ok(value)
 })())}
 /// # Safety
-/// Trusted native ticket JSON <=128 bytes. action: 1 join, 2 poll, 3 explicit
+/// Trusted native ticket JSON <=128 bytes (consent <=256). action: 1 join, 2 poll, 3 explicit
 /// local peer/comparison/input consent to persist, 4 cancel. No auto-consent.
 /// Cancel should first invalidate epoch through the separate immediate entry.
 #[no_mangle]
 pub unsafe extern "C" fn om_mobile_pairing_client_action_v1(handle:u64,data:*const u8,length:usize,action:u32,budget_ms:u32)->OmniBuffer{result((||{
-    if length>128||!(1..=4).contains(&action)||!(1000..=25000).contains(&budget_ms){return Err(error(ErrorCode::InvalidRequest,"Native pairing action exceeds its bounds"));}
+    if length>(if action==3{256}else{128})||!(1..=4).contains(&action)||!(1000..=25000).contains(&budget_ms){return Err(error(ErrorCode::InvalidRequest,"Native pairing action exceeds its bounds"));}
     let deadline=std::time::Instant::now()+std::time::Duration::from_millis(u64::from(budget_ms));
     // SAFETY: caller supplies the synchronous readable input borrow above.
-    let request:PairingClientTicket=serde_json::from_slice(unsafe{input(data,length)?}).map_err(|_|error(ErrorCode::InvalidRequest,"Native pairing ticket is invalid"))?;
+    let bytes=unsafe{input(data,length)?};
+    let consent:Option<PairingClientConsent>=if action==3{Some(serde_json::from_slice(bytes).map_err(|_|error(ErrorCode::InvalidRequest,"Native reviewed grant is required"))?)}else{None};
+    let request:PairingClientTicket=if let Some(review)=&consent{
+        if review.reviewed_grant_hash.len()!=64||!review.reviewed_grant_hash.bytes().all(|b|b.is_ascii_digit()||(b'a'..=b'f').contains(&b)){return Err(error(ErrorCode::InvalidRequest,"Native reviewed grant hash is invalid"));}
+        PairingClientTicket{ticket:review.ticket}
+    }else{serde_json::from_slice(bytes).map_err(|_|error(ErrorCode::InvalidRequest,"Native pairing ticket is invalid"))?};
     if request.ticket.is_nil(){return Err(error(ErrorCode::InvalidRequest,"Native pairing ticket is invalid"));}
     if action==4{
         host(handle)?.lock().map_err(|_|error(ErrorCode::Internal,"Mobile profile is unavailable"))?.native_pairing_client_cancel(request.ticket)?;
@@ -187,7 +193,7 @@ pub unsafe extern "C" fn om_mobile_pairing_client_action_v1(handle:u64,data:*con
     let(host,provider,epoch)=pairing_operation(handle)?;
     let mut host=host.lock().map_err(|_|error(ErrorCode::Internal,"Mobile profile is unavailable"))?;
     provider.require_operation_epoch(epoch)?;let cancel=provider.operation_cancellation(epoch)?;
-    let value=if action==3{host.native_pairing_client_prepare_after_local_consent(provider.as_ref(),request.ticket,epoch,deadline,&cancel)?}
+    let value=if let Some(review)=consent{host.native_pairing_client_prepare_after_local_consent(provider.as_ref(),request.ticket,epoch,&review.reviewed_grant_hash,deadline,&cancel)?}
         else{host.native_pairing_client_join_or_poll(provider.as_ref(),request.ticket,epoch,action==2,deadline,&cancel)?};
     provider.require_operation_epoch(epoch)?;
     if cancel.load(Ordering::Acquire)||std::time::Instant::now()>=deadline{return Err(error(ErrorCode::Cancelled,"Native pairing result became stale; inspect state before retry"));}Ok(value)

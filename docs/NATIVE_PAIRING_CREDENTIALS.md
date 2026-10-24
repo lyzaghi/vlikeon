@@ -1840,6 +1840,18 @@ this checkpoint.
 
 ## Remaining implementation and qualification
 
+Approved client poll now returns the SHA-256 document_hash of its retained signed
+grant. Trusted native action 3 requires ticket and reviewed_grant_hash (strict
+JSON <=256 bytes); other ticket actions remain <=128 bytes. Before taking the
+pending exchange, LocalHost compares the supplied hash with the current approved
+signed grant. Missing or changed approval fails without consuming the exchange.
+The hash binds all signed grant fields, including pair ID, input permission and
+expiry. A hash is not proof of user consent: native UI must retain it with the
+displayed metadata and send it only after actual peer/comparison/input approval.
+Both mobile callers admit canonical hash text; JNI bounds match the Rust ABI.
+No compiler/build/test, crypto execution, vault or HTTP operation ran. Product
+consent UI, activation, recovery and end-to-end qualification remain unfinished.
+
 iOS client pairing now mirrors Android delivery fencing with NSLock-protected
 object-identity tokens. Cancel rotates the token before native invalidation and
 queue admission; ordinary work checks it before ABI, after response and at main

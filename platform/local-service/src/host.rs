@@ -209,7 +209,8 @@ impl LocalHost {
         let status=writer.poll_client(pending.revision,pending.identity,&mut pending.pairing,&relay,omniplay_core::now_ms(),deadline,cancel)?;
         let status=match status{NativeClientPairingStatus::Pending=>json!({"state":"pending"}),NativeClientPairingStatus::Declined=>json!({"state":"declined"}),
             NativeClientPairingStatus::Approved{pair_id,input_allowed,expires_at_ms}=>json!({"state":"approved","pair_id":pair_id,"input_allowed":input_allowed,"expires_at_ms":expires_at_ms})};
-        Ok(json!({"pairing_protocol":1,"ticket":ticket,"status":status,"local_consent_required":true}))
+        let grant_hash=pending.pairing.approved_grant().map(omniplay_streaming::document_hash).transpose()?;
+        Ok(json!({"pairing_protocol":1,"ticket":ticket,"status":status,"grant_hash":grant_hash,"local_consent_required":true}))
     }
     pub fn native_pairing_client_cancel(&mut self,ticket:Uuid)->Result<()>{
         self.ensure_open()?;
@@ -220,12 +221,14 @@ impl LocalHost {
     /// Consumes the exact pending transcript even on uncertain writer failure;
     /// inspect durable journal state rather than recreating the exchange.
     pub fn native_pairing_client_prepare_after_local_consent(&mut self,store:&dyn omniplay_streaming::native_credentials::PairingSecretStore,
-        ticket:Uuid,epoch:u64,deadline:std::time::Instant,cancel:&std::sync::atomic::AtomicBool)->Result<Value>{
+        ticket:Uuid,epoch:u64,reviewed_grant_hash:&str,deadline:std::time::Instant,cancel:&std::sync::atomic::AtomicBool)->Result<Value>{
         self.ensure_open()?;omniplay_core::stream_signal_authority::require_installed_pairing_policy()?;
         let pending=self.pairing_client.as_ref().ok_or_else(||PlatformError::new(ErrorCode::NotFound,"Native client pairing is absent"))?;
         if pending.id!=ticket||pending.epoch!=epoch||epoch==0||std::time::Instant::now()>=deadline.min(pending.pairing.native_deadline())||cancel.load(std::sync::atomic::Ordering::Acquire){
             return Err(PlatformError::new(ErrorCode::PermissionDenied,"Native pairing ticket expired, cancelled or changed lifecycle"));
         }
+        let grant=pending.pairing.approved_grant().ok_or_else(||PlatformError::new(ErrorCode::Conflict,"Native peer approval must be reviewed before persistence"))?;
+        if omniplay_streaming::document_hash(grant)?!=reviewed_grant_hash{return Err(PlatformError::new(ErrorCode::Conflict,"Native reviewed grant changed; review the current peer approval"));}
         let pending=self.pairing_client.take().ok_or_else(||PlatformError::new(ErrorCode::NotFound,"Native client pairing is absent"))?;
         let mut value=self.native_pairing_prepare_client_after_local_consent(store,pending.identity,pending.revision,pending.pairing,deadline)?;
         value["pairing_ticket"]=json!(ticket);

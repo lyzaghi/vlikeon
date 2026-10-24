@@ -109,7 +109,7 @@ public final class NativeCore {
      * Never expose through renderer request/nativeCall or forward raw replies.
      */
     void pairingClient(byte[] ownedInput,int action,java.util.function.BooleanSupplier alive,Reply reply){
-        int maximum=action==0?16_384:128;
+        int maximum=action==0?16_384:(action==3?256:128);
         if(ownedInput==null||ownedInput.length==0||ownedInput.length>maximum||action<0||action>4){
             if(ownedInput!=null)java.util.Arrays.fill(ownedInput,(byte)0);reply.accept(failure("","invalid_request","Native pairing request is invalid."));return;
         }
@@ -135,7 +135,8 @@ public final class NativeCore {
                 if(action!=0){
                     JSONObject request=new JSONObject(new String(ownedInput,StandardCharsets.UTF_8));
                     expectedTicket=request.getString("ticket");
-                    if(request.length()!=1||!canonicalPairingId(expectedTicket))throw new IllegalStateException();
+                    if(request.length()!=(action==3?2:1)||!canonicalPairingId(expectedTicket))throw new IllegalStateException();
+                    if(action==3&&!request.getString("reviewed_grant_hash").matches("[0-9a-f]{64}"))throw new IllegalStateException();
                 }
                 long remaining=expires-android.os.SystemClock.elapsedRealtime();
                 if(mHandle==0||mFailed||remaining<1000||(action!=4&&(mPairingClientDeliveryFence.get()!=deliveryFence||!alive.getAsBoolean()||!mPairingAttached)))throw new IllegalStateException();
@@ -167,6 +168,7 @@ public final class NativeCore {
                         if(!Boolean.TRUE.equals(value.get("local_consent_required")))throw new IllegalStateException();
                         JSONObject status=value.getJSONObject("status");String state=status.getString("state");
                         if("approved".equals(state)){
+                            if(!value.getString("grant_hash").matches("[0-9a-f]{64}"))throw new IllegalStateException();
                             Object expiry=status.get("expires_at_ms");
                             if(!canonicalPairingId(status.getString("pair_id"))||!(status.get("input_allowed") instanceof Boolean)
                                     ||!(expiry instanceof Number)||((Number)expiry).doubleValue()!=((Number)expiry).longValue()
