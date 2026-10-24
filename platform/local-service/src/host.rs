@@ -58,7 +58,8 @@ impl LocalHost {
         })).collect();
         Ok(json!({"credential_protocol":1,"profile_id":self.profile_id,"device_id":self.database.device_id,
             "revision":snapshot.revision(),"policy_available":omniplay_core::stream_signal_authority::require_installed_pairing_policy().is_ok(),"records":records,
-            "recovery_protocol":1,"observed_at_ms":observed_at_ms,"recovery":recovery}))
+            "recovery_protocol":1,"observed_at_ms":observed_at_ms,"recovery":recovery,
+            "relay_retirement_available":omniplay_core::stream_signal_authority::installed_retirement_origins().is_ok()}))
     }
     /// Explicit native recovery dispatch, not automatic startup cleanup. May
     /// permanently fence a candidate; caller must not use this as a status read.
@@ -79,6 +80,21 @@ impl LocalHost {
             StepOutcome::AlreadyRetired=>json!({"outcome":"already_retired"}),
         };
         Ok(json!({"recovery_protocol":1,"address":address,"result":value,"reload_required":true}))
+    }
+    /// Authenticated relay retirement with the retained native identity. No
+    /// caller URL or positive receipt inferred from network errors/local expiry.
+    pub fn native_pairing_revoke_relay(&mut self,address:omniplay_streaming::native_credentials::CredentialAddress,
+        expected:u64,store:&dyn omniplay_streaming::native_credentials::PairingSecretStore,
+        deadline:std::time::Instant,cancel:&std::sync::atomic::AtomicBool)->Result<Value>{
+        self.ensure_open()?;
+        if std::time::Instant::now()>=deadline||cancel.load(std::sync::atomic::Ordering::Acquire){return Err(PlatformError::new(ErrorCode::Cancelled,"Native relay cleanup expired or was cancelled"));}
+        let origins=omniplay_core::stream_signal_authority::installed_retirement_origins()?;
+        let relay=omniplay_streaming::native_relay::NativePairRelay::new(origins)?;
+        let lease=omniplay_core::stream_credential_lease::CredentialLease::acquire(&self.database,self.profile_id)?;
+        self.identity_review=None;
+        let updated=omniplay_core::stream_credential_recovery::retire_pair_remote(&self.database,&lease,self.profile_id,address,
+            expected,store,&relay,omniplay_core::now_ms(),deadline,cancel)?;
+        Ok(json!({"recovery_protocol":1,"address":address,"result":{"outcome":"committed","revision":updated.revision()},"reload_required":true}))
     }
     /// Actual exact-generation removal after all persisted retirement receipts.
     /// No policy enablement is required to finish cleanup; no fallback receipts.

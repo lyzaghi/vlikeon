@@ -16,7 +16,7 @@ type Check=unsafe extern "C" fn(*mut c_void,*const OmniPairingAddress)->i32;
 type Release=unsafe extern "C" fn(*mut c_void);
 #[repr(C)]
 pub struct OmniPairingCredentialCallbacks{pub abi_version:u32,pub context:*mut c_void,pub read:Option<Read>,pub write:Option<Write>,pub remove:Option<Remove>,pub check:Option<Check>,pub release:Option<Release>}
-pub struct NativePairingCredentialStore{profile:Uuid,device:Uuid,callbacks:OmniPairingCallbacksOwned,gate:Mutex<()>,available:AtomicBool,closed:AtomicBool,epoch:AtomicU64}
+pub struct NativePairingCredentialStore{profile:Uuid,device:Uuid,callbacks:OmniPairingCallbacksOwned,gate:Mutex<()>,available:AtomicBool,closed:AtomicBool,epoch:AtomicU64,cancellation:Mutex<Arc<AtomicBool>>}
 struct OmniPairingCallbacksOwned{context:usize,read:Option<Read>,write:Option<Write>,remove:Option<Remove>,check:Option<Check>,release:Option<Release>}
 impl Drop for OmniPairingCallbacksOwned{fn drop(&mut self){
     if self.context!=0{if let Some(release)=self.release{
@@ -36,14 +36,25 @@ impl NativePairingCredentialStore{
     pub unsafe fn take(table:OmniPairingCredentialCallbacks,profile:Uuid,device:Uuid)->Result<Arc<Self>>{
         let callbacks=OmniPairingCallbacksOwned{context:table.context as usize,read:table.read,write:table.write,remove:table.remove,check:table.check,release:table.release};
         if table.abi_version!=1||profile.is_nil()||device.is_nil()||callbacks.context==0||callbacks.read.is_none()||callbacks.write.is_none()||callbacks.remove.is_none()||callbacks.check.is_none()||callbacks.release.is_none(){return Err(denied());}
-        Ok(Arc::new(Self{profile,device,callbacks,gate:Mutex::new(()),available:AtomicBool::new(false),closed:AtomicBool::new(false),epoch:AtomicU64::new(1)}))
+        Ok(Arc::new(Self{profile,device,callbacks,gate:Mutex::new(()),available:AtomicBool::new(false),closed:AtomicBool::new(false),epoch:AtomicU64::new(1),cancellation:Mutex::new(Arc::new(AtomicBool::new(true)))}))
     }
     pub(crate) fn set_available(&self,value:bool){
         self.available.store(false,Ordering::Release);
-        if self.epoch.fetch_update(Ordering::AcqRel,Ordering::Acquire,|epoch|epoch.checked_add(1)).is_err(){self.close();return;}
-        self.available.store(value&&!self.closed.load(Ordering::Acquire),Ordering::Release);
+        let mut token=match self.cancellation.lock(){Ok(token)=>token,Err(poison)=>{poison.into_inner().store(true,Ordering::Release);self.closed.store(true,Ordering::Release);return;}};
+        token.store(true,Ordering::Release);
+        if self.epoch.fetch_update(Ordering::AcqRel,Ordering::Acquire,|epoch|epoch.checked_add(1)).is_err(){self.closed.store(true,Ordering::Release);return;}
+        let available=value&&!self.closed.load(Ordering::Acquire);
+        // Never reset an older in-flight token when foreground resumes.
+        *token=Arc::new(AtomicBool::new(!available));self.available.store(available,Ordering::Release);
     }
-    pub(crate) fn close(&self){self.closed.store(true,Ordering::Release);self.available.store(false,Ordering::Release);}
+    pub(crate) fn close(&self){
+        self.closed.store(true,Ordering::Release);self.available.store(false,Ordering::Release);
+        match self.cancellation.lock(){Ok(token)=>token.store(true,Ordering::Release),Err(poison)=>poison.into_inner().store(true,Ordering::Release)}
+    }
+    pub(crate) fn operation_cancellation(&self,expected:u64)->Result<Arc<AtomicBool>>{
+        let token=self.cancellation.lock().map_err(|_|denied())?;self.require_operation_epoch(expected)?;
+        if token.load(Ordering::Acquire){return Err(denied());}Ok(token.clone())
+    }
     pub(crate) fn operation_epoch(&self)->Result<u64>{
         let epoch=self.epoch.load(Ordering::Acquire);
         if self.closed.load(Ordering::Acquire)||!self.available.load(Ordering::Acquire){return Err(denied());}Ok(epoch)

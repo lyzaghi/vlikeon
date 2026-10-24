@@ -1082,6 +1082,43 @@ No native/UI/vault/lease/SQL operation, compiler, build or test was executed.
 Actual producer retirement owners, startup reconciliation, relay cleanup product
 integration and all provider/device/failure qualification remain unfinished.
 
+## Installed-policy relay retirement product path
+
+LocalHost now connects the concrete authenticated pair-retirement branch to the
+mobile recovery API. It builds the bounded native HTTPS client only from validated
+installed origins, retains the real credential lease through pinned identity
+reload/network/receipt publication, and uses the journal's exact signed grant.
+Prior writer/local retirement remains required. The response must bind the
+expected pair and grant hash with the retirement protocol acknowledgment; network
+failure, HTTP status alone, local expiry or a missing live grant is not success.
+
+Installed configuration validation is shared with normal signaling, including
+canonical bounded distinct origins. Cleanup may use those configured origins
+while new sessions remain disabled. An empty origin list refuses retirement
+before client/lease/vault/network work. The checked-in list is still empty and
+streaming is still disabled; no relay was configured or contacted.
+
+Mobile providers now retain a cancellation token for each availability epoch.
+Every foreground transition cancels the old token permanently and creates a
+separate token for the new epoch; terminal close also cancels. Resuming never
+uncancels an older HTTP operation. The retirement call captures the matching
+token and rechecks provider access/epoch afterward. HTTP cancellation remains
+cooperative and cannot forcibly preempt a blocked OS call. A change racing the
+last observation/commit can still leave a committed receipt with a suppressed
+response; reload remains mandatory. UI timeout/cancel alone is not a native
+network-preemption guarantee.
+
+Status exposes whether configured retirement origins are available. Android/iOS
+native recovery dialogs offer explicit remote revocation only when this is true,
+and otherwise explain the missing service configuration. They send no URL/key or
+receipt flags. Android uses the renamed private `nativePairingRecoveryV2` JNI
+entry for its expanded action selector, so mixed old native/Java components fail
+linking instead of interpreting the old boolean selector as a different action.
+
+No compiler, UI/JNI/native/provider/lease/SQL operation, HTTP request, deployment,
+build or test was executed. Actual writer/session retirement owners, startup
+reconciliation, relay deployment and device/failure qualification remain due.
+
 ## Remaining implementation and qualification
 
 - Journal/executor/lease/writer product integration, authority epochs, actual native owner

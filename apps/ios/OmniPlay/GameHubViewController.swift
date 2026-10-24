@@ -147,14 +147,15 @@ final class GameHubViewController: UIViewController, WKNavigationDelegate, WKUID
               hubVisible,UIApplication.shared.applicationState == .active,UIApplication.shared.isProtectedDataAvailable else{cancelPairingIdentity();return}
         let phases=["reserved":"Đã đặt trước","writing":"Ghi khóa chưa xác nhận","material_ready":"Chờ xác nhận danh tính","active":"Đã kích hoạt","revoking":"Đang vô hiệu hóa","retired":"Đã dọn dẹp"]
         let steps=["fence_generation":"Vô hiệu hóa bản ghi trước khi phục hồi","revalidate_before_use":"Cần xác thực lại trước khi sử dụng","retire_writer":"Chờ xác nhận tiến trình ghi khóa đã dừng","retire_local_sessions":"Chờ xác nhận các phiên cục bộ đã dừng","wait_for_pair_cleanup":"Chờ dọn dẹp các cặp thiết bị","revoke_relay":"Chờ xác nhận thu hồi từ relay","remove_material":"Chờ xóa và kiểm tra kho khóa","finalize_retirement":"Hoàn tất trạng thái dọn dẹp"]
-        let canAdvance=["fence_generation","finalize_retirement","remove_material"].contains(record.nextStep ?? "")
+        let canAdvance=["fence_generation","finalize_retirement","remove_material"].contains(record.nextStep ?? "") || (record.nextStep=="revoke_relay" && snapshot.relayRetirementAvailable)
         var message="Thiết bị: \(snapshot.device)\nThế hệ: \(record.generation)\nTrạng thái: \(phases[record.phase] ?? record.phase)\nKhóa công khai:\n\(record.publicKey)\n\n\(record.nextStep.flatMap{steps[$0]} ?? "Không còn bước dọn dẹp.")"
         if record.nextStep=="fence_generation"{message += "\n\nVô hiệu hóa là vĩnh viễn đối với thế hệ này. Danh tính bị vô hiệu hóa sẽ vô hiệu hóa các cặp của nó; thao tác này chưa xác nhận kết nối đã dừng hoặc khóa đã được xóa."}
         if record.nextStep=="remove_material"{message += "\n\nXóa vĩnh viễn khóa của đúng thế hệ này khỏi kho khóa thiết bị. Không thể khôi phục bằng thao tác này; hệ thống chỉ cho phép xóa sau khi đã có đủ xác nhận dừng và thu hồi."}
+        if record.nextStep=="revoke_relay"{message += snapshot.relayRetirementAvailable ? "\n\nGửi yêu cầu thu hồi cặp này đến dịch vụ kết nối đã cấu hình. Chỉ hoàn tất khi nhận đúng xác nhận của cặp; bước này chưa xóa khóa thiết bị.":"\n\nPhiên bản này chưa cấu hình dịch vụ kết nối để hoàn tất thu hồi."}
         let alert=UIAlertController(title:"Chi tiết Remote Play",message:message,preferredStyle:.alert);pairingAlert=alert
         alert.addAction(UIAlertAction(title:"Đóng",style:.cancel){[weak self]_ in self?.cancelPairingIdentity()})
         if canAdvance{
-            let title=record.nextStep=="remove_material" ? "Xóa khóa thế hệ này":(record.nextStep=="fence_generation" ? "Vô hiệu hóa thế hệ này":"Hoàn tất trạng thái")
+            let title=record.nextStep=="revoke_relay" ? "Thu hồi trên dịch vụ":(record.nextStep=="remove_material" ? "Xóa khóa thế hệ này":(record.nextStep=="fence_generation" ? "Vô hiệu hóa thế hệ này":"Hoàn tất trạng thái"))
             alert.addAction(UIAlertAction(title:title,style:record.nextStep=="finalize_retirement" ? .default:.destructive){[weak self]_ in
                 guard let self=self,self.pairingFlow === owner,owner.active,DispatchTime.now()<snapshot.expires,self.hubVisible,UIApplication.shared.applicationState == .active,UIApplication.shared.isProtectedDataAvailable else{self?.cancelPairingIdentity();return}
                 self.core.advancePairingRecovery(record,snapshot:snapshot,owner:owner){[weak self] result in

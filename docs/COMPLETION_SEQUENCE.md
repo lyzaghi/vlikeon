@@ -2,6 +2,15 @@
 
 ## Current sequence — 1–109 outstanding tasks
 
+Item 58 now connects explicit native relay retirement through LocalHost/mobile
+to pinned-key signed revocation and exact pair/grant receipts. Only validated
+installed origins are used; empty current configuration refuses network work.
+Foreground epochs own separate cancellation tokens, never reset for older work.
+Native dialogs admit configured retirement availability and Android JNI uses a
+versioned selector entry. No UI/native/vault/SQL/HTTP/deployment/compiler/build/
+test was executed. Producer owners, startup reconciliation and qualification
+remain due; full original scope and item 58 remain unfinished.
+
 Item 58 now connects exact-generation vault removal/read-back from the native
 recovery dialogs through scoped mobile providers and LocalHost. The real lease,
 current RemoveMaterial plan and retained writer/local/relay receipts are required;

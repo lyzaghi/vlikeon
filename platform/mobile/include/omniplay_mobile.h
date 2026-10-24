@@ -84,6 +84,15 @@ OmniBuffer om_mobile_pairing_advance_metadata_v1(uint64_t handle,const uint8_t* 
  * follow successful deletion/commit: reload instead of assuming rollback.
  */
 OmniBuffer om_mobile_pairing_remove_material_v1(uint64_t handle,const uint8_t* data,size_t length,uint32_t budget_ms);
+/* Same bounded recovery request; explicit native approval of relay revocation.
+ * Requires prior writer/local retirement, retained native signing identity,
+ * installed HTTPS origin allowlist and exact pair/grant receipt. New sessions
+ * may stay disabled; empty installed allowlist refuses all relay traffic.
+ * Foreground/close transitions cancel the operation's original token, which is
+ * never reset on resume. HTTP/OS cancellation is cooperative, not preemption;
+ * uncertain errors require reload of the same grant. No URL/receipt flags input.
+ */
+OmniBuffer om_mobile_pairing_revoke_relay_v1(uint64_t handle,const uint8_t* data,size_t length,uint32_t budget_ms);
 OmniBuffer om_mobile_pairing_prepare_identity_v1(uint64_t handle,uint64_t expected_revision,uint32_t budget_ms);
 /* Native UI must display the returned exact identity/action, then invoke
  * confirmation ONLY after explicit user approval. Token alone is not consent.

@@ -36,13 +36,21 @@ impl Drop for NativeSignalPermit{fn drop(&mut self){self.close();}}
 struct Entry{address:CredentialAddress,epoch:u64,document:Weak<DocumentState>,permit:Weak<PermitState>,deadline:Instant}
 #[derive(Deserialize)]#[serde(deny_unknown_fields)]
 struct InstalledPolicy{schema_version:u32,enabled:bool,relay_origins:Vec<String>,allow_browser_host:bool,allow_remote_input:bool,default_profile:String}
-fn installed_policy()->Result<InstalledPolicy>{
+fn installed_configuration()->Result<InstalledPolicy>{
     let policy:InstalledPolicy=serde_json::from_str(include_str!("../../../security/streaming-channel.json")).map_err(|_|denied())?;
-    if policy.schema_version!=1||!policy.enabled||policy.relay_origins.is_empty()||policy.relay_origins.len()>8||
+    if policy.schema_version!=1||policy.relay_origins.len()>8||
         !["p720_30","p720_60","p1080_30","p1080_60"].contains(&policy.default_profile.as_str()){return Err(denied());}
-    for origin in &policy.relay_origins{validate_audience(origin)?;}
+    for (index,origin) in policy.relay_origins.iter().enumerate(){validate_audience(origin)?;if policy.relay_origins[..index].contains(origin){return Err(denied());}}
     // Signaling authorization does not grant capture, host or remote input.
     let _=(policy.allow_browser_host,policy.allow_remote_input);Ok(policy)
+}
+fn installed_policy()->Result<InstalledPolicy>{
+    let policy=installed_configuration()?;if !policy.enabled||policy.relay_origins.is_empty(){return Err(denied());}Ok(policy)
+}
+/// Retirement can finish while new sessions are disabled, but never derives a
+/// network allowlist from journal/renderer/peer URLs. Empty configuration refuses.
+pub fn installed_retirement_origins()->Result<Vec<String>>{
+    let policy=installed_configuration()?;if policy.relay_origins.is_empty(){return Err(denied());}Ok(policy.relay_origins)
 }
 /// Native product entry gate only; this does not supply local consent or a
 /// session grant. Current installed policy is disabled and therefore refuses.

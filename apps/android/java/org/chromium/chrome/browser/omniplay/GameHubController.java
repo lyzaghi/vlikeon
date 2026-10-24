@@ -227,10 +227,11 @@ public final class GameHubController implements AutoCloseable {
         String message="Device: "+record.device+"\nGeneration: "+record.generation+"\nStatus: "+recoveryPhase(record.phase)+"\nPublic key:\n"+record.key+"\n\n"+recoveryStep(record.nextStep);
         if("fence_generation".equals(record.nextStep))message+="\n\nDisabling this generation is permanent. Disabling an identity also disables its pairs. This does not confirm that connections stopped or keys were deleted.";
         if("remove_material".equals(record.nextStep))message+="\n\nPermanently delete only this generation's key from the device vault. This action cannot restore it. Removal is allowed only after all stop/revocation confirmations already exist.";
+        if("revoke_relay".equals(record.nextStep))message+=snapshot.relayRetirementAvailable?"\n\nRequest revocation of this pair from the configured connection service. Only the exact pair acknowledgment completes this step; device keys are not deleted.":"\n\nThis version has no configured connection service for completing revocation.";
         AlertDialog.Builder builder=new AlertDialog.Builder(mActivity).setTitle("Remote Play record").setMessage(message)
                 .setNegativeButton(android.R.string.cancel,(dialog,which)->cancelIdentityReview());
-        String actionTitle="remove_material".equals(record.nextStep)?"Delete this generation's key":("fence_generation".equals(record.nextStep)?"Disable this generation":"Finish cleanup");
-        if(record.canAdvance())builder.setPositiveButton(actionTitle,(dialog,which)->{
+        String actionTitle="revoke_relay".equals(record.nextStep)?"Revoke on service":("remove_material".equals(record.nextStep)?"Delete this generation's key":("fence_generation".equals(record.nextStep)?"Disable this generation":"Finish cleanup"));
+        if(record.canAdvance()&&(!"revoke_relay".equals(record.nextStep)||snapshot.relayRetirementAvailable))builder.setPositiveButton(actionTitle,(dialog,which)->{
             mIdentityDialog=null;
             if(mIdentityFlow!=owner||!owner.get()||!identityUiAvailable()||android.os.SystemClock.elapsedRealtime()>=snapshot.expires){cancelIdentityReview();return;}
             mCore.advancePairingRecovery(snapshot,record,owner::get,response->{

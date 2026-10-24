@@ -66,7 +66,10 @@
     "Android immutable bounded recovery snapshots admit exact native record/plan mappings and establish expiry before status I/O",
     "Android native recovery list/detail source permits explicit journal fence/finalization; private retained JNI recovery entry bounds input/budget and caller admits exact response binding",
     "Concrete vault removal product path retains the real lease, requires exact current RemoveMaterial plan/revision and commits MaterialAbsent only after scoped deletion and explicit-missing read-back",
-    "Mobile removal ABI observes provider access/foreground epoch; Android/iOS dialogs require explicit permanent-key-removal approval and route only the exact selected admitted generation"
+    "Mobile removal ABI observes provider access/foreground epoch; Android/iOS dialogs require explicit permanent-key-removal approval and route only the exact selected admitted generation",
+    "LocalHost/mobile relay retirement product path constructs HTTPS transport only from validated installed origins and uses pinned identity, prior writer/local receipts and exact pair/grant acknowledgment",
+    "Each mobile availability epoch owns a separate cooperative cancellation token; background/resume and close never uncancel older relay work",
+    "Native status/UI gates remote retirement on configured origin availability; Android expanded action selector uses private versioned JNI entry; current empty allowlist refuses network work"
   ],
   "build_executed": false,
   "tests_executed": false,
