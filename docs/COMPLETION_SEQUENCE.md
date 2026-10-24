@@ -2,6 +2,11 @@
 
 ## Current sequence — 1–109 outstanding tasks
 
+Item 58 host controller now distinguishes never-attempted registration from any
+possibly-sent attempt. Never-registered invitations close locally without false
+relay acknowledgment; attempted ones retain exact remote cleanup requirement.
+Source-only; durable crash recovery/ABI/UI/build/test remain due.
+
 Item 58 host controller now declines exact reviewed peer requests by ticket/
 epoch/hello hash and reports transient pending-host cleanup metadata in native
 status. No proof is exposed; durable crash recovery/ABI/UI/build/test remain due.

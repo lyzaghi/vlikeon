@@ -9,7 +9,7 @@ struct NativeIdentityReview{ id:Uuid,address:omniplay_streaming::native_credenti
 struct NativePendingClient{id:Uuid,identity:omniplay_streaming::native_credentials::CredentialAddress,revision:u64,epoch:u64,
     pairing:omniplay_streaming::native_pair_exchange::NativeClientPairing}
 struct NativePendingHost{id:Uuid,identity:omniplay_streaming::native_credentials::CredentialAddress,revision:u64,epoch:u64,
-    invitation:omniplay_streaming::native_pair_exchange::NativeHostInvitation}
+    invitation:omniplay_streaming::native_pair_exchange::NativeHostInvitation,registration_attempted:bool}
 /// Trusted native UI supplies file capabilities. WebView requests contain UUIDs,
 /// never arbitrary filesystem paths or native executable locations.
 pub struct LocalHost {
@@ -75,7 +75,7 @@ impl LocalHost {
                 "expired":std::time::Instant::now()>=pending.pairing.native_deadline()})),
             "pending_host":self.pairing_host.as_ref().map(|pending|json!({"ticket":pending.id,"revision":pending.revision,
                 "expired":std::time::Instant::now()>=pending.invitation.native_deadline(),"locally_closed":pending.invitation.locally_closed(),
-                "remote_close_required":true}))}))
+                "remote_close_required":pending.registration_attempted}))}))
     }
     /// Explicit native recovery dispatch, not automatic startup cleanup. May
     /// permanently fence a candidate; caller must not use this as a status read.
@@ -198,7 +198,7 @@ impl LocalHost {
         let id=Uuid::new_v4();let value=json!({"pairing_protocol":1,"ticket":id,"invite_id":metadata.id,
             "host_public_key":metadata.host_public_key,"expires_at_ms":metadata.expires_at_ms,"revision":expected,
             "registered":false,"share_available":false});
-        self.pairing_host=Some(NativePendingHost{id,identity,revision:expected,epoch,invitation});Ok(value)
+        self.pairing_host=Some(NativePendingHost{id,identity,revision:expected,epoch,invitation,registration_attempted:false});Ok(value)
     }
     pub fn native_pairing_host_register(&mut self,store:&dyn omniplay_streaming::native_credentials::PairingSecretStore,
         ticket:Uuid,epoch:u64,deadline:std::time::Instant,cancel:&std::sync::atomic::AtomicBool)->Result<Value>{
@@ -207,6 +207,8 @@ impl LocalHost {
         if pending.id!=ticket||epoch==0||pending.epoch!=epoch||std::time::Instant::now()>=deadline.min(pending.invitation.native_deadline())||cancel.load(std::sync::atomic::Ordering::Acquire){return Err(PlatformError::new(ErrorCode::Cancelled,"Native host invitation expired or changed lifecycle"));}
         let relay=omniplay_streaming::native_relay::NativePairRelay::new(omniplay_core::stream_signal_authority::installed_pairing_origins()?)?;
         let writer=omniplay_core::stream_credential_writer::NativeCredentialWriter::open(&self.database,self.profile_id,store)?;
+        // Set before entering a path that can send HTTP; any failure is uncertain.
+        pending.registration_attempted=true;
         writer.register_host(pending.revision,pending.identity,&mut pending.invitation,&relay,omniplay_core::now_ms(),deadline,cancel)?;
         Ok(json!({"pairing_protocol":1,"ticket":ticket,"registered":true,"share_available":true,"approves_peer":false}))
     }
@@ -266,6 +268,11 @@ impl LocalHost {
         let pending=self.pairing_host.as_mut().ok_or_else(||PlatformError::new(ErrorCode::NotFound,"Native host invitation is absent"))?;
         if pending.id!=ticket{return Err(PlatformError::new(ErrorCode::NotFound,"Native host invitation ticket does not match"));}
         pending.invitation.fence_closed();
+        if !pending.registration_attempted{
+            self.pairing_host=None;
+            return Ok(json!({"pairing_protocol":1,"ticket":ticket,"closed":true,"relay_close_confirmed":false,
+                "remote_close_required":false,"reason":"never_registered","pairs_revoked":false}));
+        }
         let relay=omniplay_streaming::native_relay::NativePairRelay::new(omniplay_core::stream_signal_authority::installed_retirement_origins()?)?;
         let writer=omniplay_core::stream_credential_writer::NativeCredentialWriter::open(&self.database,self.profile_id,store)?;
         writer.close_host(pending.revision,pending.identity,&mut pending.invitation,&relay,omniplay_core::now_ms(),deadline,cancel)?;

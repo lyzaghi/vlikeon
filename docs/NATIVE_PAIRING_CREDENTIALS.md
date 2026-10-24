@@ -1840,6 +1840,15 @@ this checkpoint.
 
 ## Remaining implementation and qualification
 
+Host controller now records registration_attempted before entering the writer's
+potential HTTP registration path. It remains sticky on every later error. A
+never-attempted invitation can be locally fenced/dropped without provider/relay
+access; its receipt explicitly has relay_close_confirmed:false, remote_close_required:
+false and reason never_registered. Any attempted path still requires exact remote
+close confirmation, even if failure actually preceded HTTP. Native status reports
+this conservative distinction. This marker is transient, not crash evidence.
+No build/test or runtime operation ran; durable recovery and product wiring due.
+
 Host decline controller now validates exact ticket/epoch/live invitation and
 reviewed retained hello hash before calling the leased decline path. Bound success
 returns peer/hash and pairs_revoked:false. Native status exposes pending-host
