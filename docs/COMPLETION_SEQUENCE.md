@@ -2,6 +2,14 @@
 
 ## Current sequence — 1–109 outstanding tasks
 
+Item 58 now connects native candidate preparation through one retained writer
+lease, durable reserve/write intent, actual vault API calls in source and exact
+read-back before MaterialReady publication. Identity activation reloads its
+pinned key after required native caller consent; pair preparation verifies the
+active identity and grant lifetime without assuming relay approval. Errors and
+late/uncertain commits keep journal recovery state. No caller or native exchange
+is integrated, and no API/build/test was run; original completion scope stays open.
+
 Item 58 now authors a Windows cooperative credential lease with a fixed zero-
 byte nonblocking lock file, retained non-reparse ancestor handles and exact
 profile/device/root binding. Every journal mutation and recovery step requires

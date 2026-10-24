@@ -179,6 +179,41 @@ lock/reparse/contender/crash qualification are still due. Other platforms refuse
 lease acquisition until their scoped provider is implemented; no plaintext or
 process-local mutex fallback is supplied.
 
+## Candidate writer orchestration source
+
+`stream_credential_writer.rs` now connects the journal, retained lease and vault
+primitives. `NativeCredentialWriter::open` acquires the scoped lease and refuses
+corrupt/mismatched journal history. It owns that same lease through every
+synchronous operation, including provider errors or blocking calls. There is no
+detached writer whose exclusion disappears while its vault call remains live.
+
+`prepare_identity` refuses any existing non-retired identity, generates an
+in-memory candidate, commits Reserved then Writing, writes/read-backs the exact
+generation and only then commits MaterialReady. It returns public key/address/
+revision metadata, never a seed or signer. Missing or locked existing identities
+are not replaced. `activate_identity_after_local_consent` requires the exact
+MaterialReady generation/revision and reloads its pinned key from the vault
+before marking Active. The native caller must actually obtain local consent;
+this method does not show a dialog or supply a consent capability.
+
+`prepare_pair` requires an active native identity and pinned vault reload,
+validates the signed grant/current lifetime and local participant, and uses a
+key supplied by the future authenticated native exchange. Reserved and Writing
+commit before the key enters the vault; matching read-back precedes MaterialReady.
+The grant is rechecked after vault work and after ready commit using original
+time plus monotonic elapsed duration. Pair approval/activation is deliberately
+not inferred from preparation; no relay-approved activation orchestration exists
+yet. The wrapper accepts no browser-extracted key or renderer secret endpoint.
+
+These operations require original monotonic deadlines of at most 30 seconds.
+Late/error results retain their last authoritative Reserved/Writing/MaterialReady
+state; no automatic deletion, rollback, retry with a fresh identity or false
+activation is performed. A SQL commit can be durable even when a caller receives
+an error/timeout, including identity activation. Reload before deciding the next
+action. OS/SQLite/provider calls may block beyond a deadline and still need
+runtime supervision/qualification. Current APIs are native-only source with no
+broker/startup/UI/mobile caller; no key, vault or SQL operation was executed.
+
 ## Required durable ordering and integration
 
 The journal authors the state transitions below. Their external effects and
@@ -207,7 +242,7 @@ The caller must fence and retire writers first. Failed cleanup keeps debt.
 
 ## Remaining implementation and qualification
 
-- Journal/executor/lease product integration, authority epochs, actual native owner
+- Journal/executor/lease/writer product integration, authority epochs, actual native owner
   and startup recovery execution,
   rotation/re-pair and local/relay revocation orchestration.
 - Native authenticated ECDH/HKDF pairing and encrypted signaling sequence/replay
