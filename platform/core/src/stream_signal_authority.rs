@@ -55,6 +55,8 @@ pub fn installed_retirement_origins()->Result<Vec<String>>{
 /// Native product entry gate only; this does not supply local consent or a
 /// session grant. Current installed policy is disabled and therefore refuses.
 pub fn require_installed_pairing_policy()->Result<()>{installed_policy().map(|_|())}
+/// Origins for new pairing/activation, unlike retirement this requires enabled.
+pub fn installed_pairing_origins()->Result<Vec<String>>{installed_policy().map(|policy|policy.relay_origins)}
 /// Real native controller owns all backends for this exact session. Confirmed
 /// means canceled/joined signaling work and confirmed ICE/media/input/gamepad
 /// retirement, including work retained after document close. No default owner.

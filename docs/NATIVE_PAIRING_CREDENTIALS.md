@@ -1543,6 +1543,38 @@ No identity/vault/crypto/SQL/native operation, compiler, build or test ran. Pair
 activation with persisted approval/recovery semantics, client UI/controller and
 host invitation flow remain unfinished, together with backend/crash recovery.
 
+## Client candidate activation with fresh pair confirmation
+
+The native writer now authors explicit client candidate activation after actual
+native local consent. It requires the exact MaterialReady pair/revision under
+the retained scoped lease, a live grant naming this client, an Active matching
+identity, pinned identity reload and exact pair-material reload. Missing/locked/
+retired material cannot become a new identity or silently regenerated pair.
+
+Before Active publication it sends ConfirmPair, authenticated by that identity,
+and requires protocol-1 approval for the exact pair ID, signed-grant hash and
+expiry. Signaling source checks the current unrevoked live pair row and signed
+participant grant, independently of invite/join rows that expire after five
+minutes. It allocates no ICE credentials and does not mutate approval state.
+Legacy/unknown responses, missing/revoked/expired pairs and network uncertainty
+refuse activation. This is a fresh observation, not an atomic guarantee against
+a later remote revocation; subsequent operations still need live admission.
+
+Journal activation re-admits revision/namespace under the same lease. Deadline,
+cancellation and grant expiry are checked again before publishing its result.
+An error may follow an already committed Active transition, requiring reload and
+reconciliation; no automatic retry is introduced. This client-only path is not
+a session/capture/input capability or a host approval implementation.
+
+LocalHost gates the operation on enabled installed pairing policy and constructs
+transport only from that policy's origins. Retirement origins while disabled
+cannot enable activation. Current disabled policy still refuses; native pending/
+consent UI and mobile foreground controller integration remain unfinished.
+
+No relay deployment, network/native/vault/SQL operation, compiler, build or test
+was executed. Protocol deployment/interoperability, activation races, owner/crash
+recovery and the full original scope remain unqualified and incomplete.
+
 ## Remaining implementation and qualification
 
 - Journal/executor/lease/writer product integration, authority epochs, actual native owner

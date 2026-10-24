@@ -4,7 +4,7 @@ use crate::{Database,stream_credentials::{self as journal,Phase},stream_credenti
 use omniplay_contracts::{ErrorCode,PlatformError,Result};
 use omniplay_streaming::{SignedDocument,verify_grant,validate_audience,native_credentials::{
     CredentialAddress,SecretKind,NativeSigningIdentity,NativePairKey,PairingSecretStore,
-    store_identity_candidate,store_pair_candidate,load_identity}};
+    store_identity_candidate,store_pair_candidate,load_identity,load_pair}};
 use std::time::{Duration,Instant};
 use uuid::Uuid;
 
@@ -84,6 +84,34 @@ impl<'a> NativeCredentialWriter<'a>{
         check(deadline)?;self.lease.check(self.database,self.profile)?;
         drop(identity);
         self.prepare_pair(expected,identity_address,&document,&grant.audience,&material,elapsed_now(now,started)?,deadline)
+    }
+    /// Explicit native client consent only. Reload exact stored material and
+    /// obtain fresh bound relay approval before publishing Active. No replacement
+    /// generation, generic boolean receipt or transport/session grant is created.
+    pub fn activate_client_after_local_consent(&mut self,address:CredentialAddress,expected:u64,
+        relay:&omniplay_streaming::native_relay::NativePairRelay,now:u64,deadline:Instant,cancel:&std::sync::atomic::AtomicBool)->Result<u64>{
+        let started=begin(deadline)?;
+        if cancel.load(std::sync::atomic::Ordering::Acquire){return Err(conflict());}
+        let snapshot=journal::load_scoped(self.database,&self.lease,self.profile)?;check(deadline)?;
+        if snapshot.revision()!=expected{return Err(conflict());}
+        let pair=snapshot.records().iter().find(|record|record.address()==address).ok_or_else(conflict)?;
+        if address.kind()!=SecretKind::PairEncryption||pair.phase()!=Phase::MaterialReady{return Err(conflict());}
+        let metadata=pair.grant().ok_or_else(conflict)?;
+        let grant=verify_grant(metadata.document(),metadata.audience(),elapsed_now(now,started)?)?;
+        if grant.client_public_key!=pair.public_key(){return Err(conflict());}
+        let identity=snapshot.records().iter().find(|record|record.address().kind()==SecretKind::DeviceSigning&&
+            record.phase()==Phase::Active&&record.public_key()==pair.public_key()).ok_or_else(conflict)?;
+        let signer=load_identity(self.store,&identity.address(),identity.public_key())?;
+        let material=load_pair(self.store,&address,metadata.document(),metadata.audience(),pair.public_key(),elapsed_now(now,started)?)?;
+        check(deadline)?;self.lease.check(self.database,self.profile)?;
+        relay.confirm_client_grant(&signer,metadata.audience(),metadata.document(),elapsed_now(now,started)?,deadline,cancel)?;
+        check(deadline)?;self.lease.check(self.database,self.profile)?;
+        if cancel.load(std::sync::atomic::Ordering::Acquire){return Err(conflict());}
+        let updated=journal::activate(self.database,&self.lease,self.profile,expected,address,elapsed_now(now,started)?)?;
+        drop(material);drop(signer);check(deadline)?;
+        grant.validate(metadata.audience(),elapsed_now(now,started)?)?;
+        if cancel.load(std::sync::atomic::Ordering::Acquire){return Err(PlatformError::new(ErrorCode::Cancelled,"Client activation may have committed; reload native pairing state"));}
+        Ok(updated.revision())
     }
     /// The key must come from the native authenticated exchange. This primitive
     /// does not derive it or prove the exchange; no browser key import exists.

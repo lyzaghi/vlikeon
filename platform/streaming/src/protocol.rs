@@ -84,6 +84,7 @@ pub enum RelayOperation {
     Send {grant:SignedDocument,message_id:Uuid,session_id:Uuid,sequence:u64,expires_at_ms:u64,iv:String,ciphertext:String},
     Receive {grant:SignedDocument,after:u64,limit:u16},
     IceCredentials {grant:SignedDocument},
+    ConfirmPair {grant:SignedDocument},
     RevokePair {grant:SignedDocument},
 }
 pub fn verify_request(envelope:&RelayEnvelope,audience:&str,now:u64)->Result<RelayRequest>{

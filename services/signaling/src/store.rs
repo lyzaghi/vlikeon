@@ -104,6 +104,8 @@ impl Store {
                 let rows=statement.query_map(params![grant.id.to_string(),sender,after,now,limit],|r|Ok((r.get::<_,u64>(0)?,r.get::<_,String>(1)?,r.get::<_,String>(2)?,r.get::<_,String>(3)?,r.get::<_,u64>(4)?,r.get::<_,u64>(5)?,r.get::<_,String>(6)?,r.get::<_,String>(7)?))).map_err(sql)?;
                 let mut packets=Vec::new();for row in rows{let(cursor,sender_public_key,message,session,sequence,expires_at_ms,iv,ciphertext)=row.map_err(sql)?;packets.push(RelayPacket{cursor,sender_public_key,message_id:message.parse().map_err(sql)?,session_id:session.parse().map_err(sql)?,sequence,expires_at_ms,iv,ciphertext});}Ok(json!({"packets":packets}))
             }
+            RelayOperation::ConfirmPair{grant:document}=>{let grant=pair(tx,sender,&document,audience,now)?;
+                Ok(json!({"pair_confirmation_protocol":1,"approved":true,"pair_id":grant.id,"grant_hash":document_hash(&document).map_err(|_|ApiError::invalid())?,"expires_at_ms":grant.expires_at_ms}))}
             RelayOperation::IceCredentials{grant:document}=>{let grant=pair(tx,sender,&document,audience,now)?;Ok(json!({"pair_id":grant.id,"grant_hash":document_hash(&document).map_err(|_|ApiError::invalid())?,"expires_at_ms":grant.expires_at_ms.min(now+600000)}))}
             RelayOperation::RevokePair{grant:document}=>{
                 let grant=verify_grant_for_retirement(&document,audience,now).map_err(|_|ApiError::unauthorized())?;

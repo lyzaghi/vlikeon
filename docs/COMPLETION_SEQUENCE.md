@@ -2,6 +2,14 @@
 
 ## Current sequence — 1–109 outstanding tasks
 
+Item 58 now authors client candidate activation with scoped pinned identity/pair
+reload and fresh exact ConfirmPair relay receipt before journal Active. Server
+confirmation uses the live unrevoked pair row independently of expired invites,
+without ICE allocation. LocalHost requires enabled installed origins; current
+policy refuses. No HTTP/deployment/native/vault/SQL/compiler/build/test ran.
+Actual UI/foreground consent controller, host flow, races and recovery remain
+due; full original 51–109 scope stays unfinished.
+
 Item 58 now connects the opaque approved native client transcript to the retained
 lease writer and a policy-gated LocalHost entry. Active pinned identity possession
 is rechecked before consuming ECDH, and exact stored grant/material flow through

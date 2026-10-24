@@ -101,7 +101,10 @@
     "Native pending-client status polling admits exact invite/client/hello-hash protocol receipt and verifies approved grant against pinned host, participants and stored exchange transcript",
     "Client approval state refuses regression/conflicting grant or approval after decline; finish consumes the stored approved grant, with local consent/product activation still separate and unintegrated",
     "Retained-lease client writer admits expected revision and Active pinned vault identity before consuming the approved pending transcript and writing MaterialReady pair material",
-    "Native LocalHost client preparation gates installed policy and retains the original invite deadline through vault publication; product pending/consent caller and pair activation remain unintegrated"
+    "Native LocalHost client preparation gates installed policy and retains the original invite deadline through vault publication; product pending/consent caller remains unintegrated",
+    "Client candidate activation source reloads Active pinned identity and exact pair material under the same scoped lease, obtains fresh exact pair/grant/expiry relay confirmation and commits Active with revision/deadline/cancellation checks",
+    "ConfirmPair server source admits the current live unrevoked pair independently of invite/join expiry and allocates no ICE credentials; no deployment/network/SQL/runtime was executed",
+    "LocalHost activation uses enabled installed pairing origins, never disabled-policy retirement origins; mobile foreground/peer-consent UI integration and actual qualification remain unfinished"
   ],
   "build_executed": false,
   "tests_executed": false,
