@@ -1,5 +1,10 @@
 # Native ordered RTP to decoder bridge — item 56
 
+Parameter-set parsing source now has the bounded RBSP reader described in
+`NATIVE_H264_PARAMETER_BITS.md`. Full SPS/PPS/VUI semantics, dependency/negotiation
+checks and the actual NativeH264Admission implementation remain missing. The
+bridge does not invoke this primitive or gain a default-success admission path.
+
 Source only. No Rust/C++ compiler, RTP parser, clock, worker/decoder, network,
 media, display or test execution occurred. No current service/UI/SRTP endpoint
 calls the new broker-private NativeVideoReceiver. Streaming remains disabled.

@@ -2,6 +2,8 @@
 
 ## Current sequence — 1–109 outstanding tasks
 
+Source checkpoint: native H.264 parameter-set parsing now has a bounded SPS/PPS RBSP bit-reader primitive with checked emulation-prevention removal, sticky read failures, caller-bounded Exp-Golomb fields and exact trailing-bit consumption. It does not yet parse full SPS/PPS/VUI semantics or implement the mandatory receiver admission interface. `NATIVE_H264_PARAMETER_BITS.md` records remaining integration and qualification. No build/test/parser/decoder/network operation ran.
+
 Source checkpoint: gamepad parent transport now exposes deadline-bearing stop and supervisor revoke paths. Stop exchange, helper termination and I/O reaping share the original deadline; late/failed containment remains an error. Journal/arbitration writes are checked before/after and may still finish late, requiring reload/reconciliation rather than a success receipt. No slot/device ownership is released merely because the helper exits. Build/test and actual driver/device qualification remain deferred.
 
 Source checkpoint: keyboard/mouse helper retirement now accepts one original caller deadline across Stop/release observation, graceful exit, forced process containment and I/O reaping. Broker revoke/close expose deadline-bearing paths and retain `CleanupRequired` on late/partial/missing-release results. Repeated cleanup may reap the same owner but cannot replace a missing release receipt with process exit. Build/test remain deferred; this is one component, not full session retirement.
