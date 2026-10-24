@@ -1845,6 +1845,9 @@ future safe-range integral expiry and bounded revision checks. These format
 checks do not independently pin the host or verify fingerprint derivation;
 native transcript validation and the future consent controller retain those
 responsibilities. No build/test ran for this follow-up.
+Swift now uses full ASCII byte validators for these strings and candidate keys;
+terminal newlines, Unicode substitutions and noncanonical pad bits are refused
+by the authored predicates. Compiler/runtime qualification remains deferred.
 
 Join response admission requires pending state and `approves_peer:false`.
 Poll admission requires `local_consent_required:true` and a known pending,

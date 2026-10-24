@@ -21,6 +21,22 @@ struct NativeIdentityReview {
     let expires:DispatchTime
 }
 enum NativeClientPairingAction:UInt32 { case begin=0,join=1,poll=2,persistAfterPeerConsent=3,cancel=4 }
+private enum NativePairingText {
+    static func publicKey(_ text:String)->Bool {
+        let bytes=Array(text.utf8)
+        // A 32-byte unpadded base64url value has 43 ASCII characters;
+        // the last character carries four data bits and two zero pad bits.
+        return bytes.count==43 && bytes.allSatisfy{
+            (65...90).contains($0)||(97...122).contains($0)||(48...57).contains($0)||$0==45||$0==95
+        } && bytes.last.map{Array("AEIMQUYcgkosw048".utf8).contains($0)} == true
+    }
+    static func comparison(_ text:String)->Bool {
+        text.utf8.count==6 && text.utf8.allSatisfy{(48...57).contains($0)}
+    }
+    static func fingerprint(_ text:String)->Bool {
+        text.utf8.count==64 && text.utf8.allSatisfy{(48...57).contains($0)||(97...102).contains($0)}
+    }
+}
 /// Consumes the caller's Data variable; Swift/OS aliases are outside this
 /// owner's best-effort wipe guarantee. Never log or forward to WebKit.
 private final class NativePairingInput {
@@ -235,7 +251,7 @@ final class NativeCore {
                           address["kind"] as? String=="pair_encryption" else{throw OmniFailure.message("Kết quả candidate không hợp lệ. Hãy đọc lại trạng thái.")}
                     guard let revision=value["revision"] as? NSNumber,CFGetTypeID(revision) != CFBooleanGetTypeID(),
                           revision.doubleValue>=1,revision.doubleValue<=10_000_000,revision.doubleValue==Double(revision.uint64Value),
-                          let key=value["public_key"] as? String,key.range(of:"^[A-Za-z0-9_-]{42}[AEIMQUYcgkosw048]$",options:.regularExpression) != nil else{throw OmniFailure.message("Metadata candidate không hợp lệ.")}
+                          let key=value["public_key"] as? String,NativePairingText.publicKey(key) else{throw OmniFailure.message("Metadata candidate không hợp lệ.")}
                     for field in ["device","id","generation"]{
                         guard let text=address[field] as? String,let id=UUID(uuidString:text),id.uuidString.lowercased()==text,
                               id != UUID(uuid:(0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0)) else{throw OmniFailure.message("Địa chỉ candidate không hợp lệ.")}
@@ -254,9 +270,9 @@ final class NativeCore {
                     guard value["state"] as? String == "pending",exactBool(value["approves_peer"],false) else{throw OmniFailure.message("Kết quả gửi yêu cầu không hợp lệ.")}
                 }
                 if action == .begin{
-                    guard let comparison=value["comparison_code"] as? String,comparison.range(of:"^[0-9]{6}$",options:.regularExpression) != nil,
-                          let host=value["host_public_key"] as? String,host.range(of:"^[A-Za-z0-9_-]{42}[AEIMQUYcgkosw048]$",options:.regularExpression) != nil,
-                          let fingerprint=value["host_fingerprint"] as? String,fingerprint.range(of:"^[0-9a-f]{64}$",options:.regularExpression) != nil,
+                    guard let comparison=value["comparison_code"] as? String,NativePairingText.comparison(comparison),
+                          let host=value["host_public_key"] as? String,NativePairingText.publicKey(host),
+                          let fingerprint=value["host_fingerprint"] as? String,NativePairingText.fingerprint(fingerprint),
                           let expiry=value["expires_at_ms"] as? NSNumber,CFGetTypeID(expiry) != CFBooleanGetTypeID(),
                           expiry.doubleValue>Date().timeIntervalSince1970*1000,expiry.doubleValue<=9_007_199_254_740_991,
                           expiry.doubleValue==Double(expiry.uint64Value),

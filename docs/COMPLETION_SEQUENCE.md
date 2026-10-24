@@ -5,6 +5,8 @@
 Item 58 begin-response metadata now checks comparison code, host key/fingerprint
 format, future safe-range integral expiry and bounded journal revision in mobile
 callers. Source-only; build/test and native consent UI remain due.
+Follow-up replaces Swift regex checks with exact ASCII byte validators for
+comparison/key/fingerprint text, including canonical base64url final pad bits.
 
 Item 58 mobile callers now admit only known join/poll/cancel response states.
 Approved poll metadata requires a canonical pair UUID, actual boolean input
