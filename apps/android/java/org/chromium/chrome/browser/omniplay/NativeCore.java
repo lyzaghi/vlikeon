@@ -105,12 +105,13 @@ public final class NativeCore {
     private final java.util.concurrent.atomic.AtomicReference<Object> mPairingClientDeliveryFence=new java.util.concurrent.atomic.AtomicReference<>(new Object());
     /** Dedicated trusted UI lane; consumes and clears the supplied byte array
      * on every path. UI must independently pin host and confirm peer/input.
-     * action 0 is begin, 1 join, 2 poll, 3 consented persistence, 4 local cancel.
+     * action 0 begin, 1 join, 2 poll, 3 consented persistence, 4 local cancel,
+     * 5 activation of the exact reviewed persisted client candidate.
      * Never expose through renderer request/nativeCall or forward raw replies.
      */
     void pairingClient(byte[] ownedInput,int action,java.util.function.BooleanSupplier alive,Reply reply){
-        int maximum=action==0?16_384:(action==3?256:128);
-        if(ownedInput==null||ownedInput.length==0||ownedInput.length>maximum||action<0||action>4){
+        int maximum=action==0?16_384:(action==5?1024:(action==3?256:128));
+        if(ownedInput==null||ownedInput.length==0||ownedInput.length>maximum||action<0||action>5){
             if(ownedInput!=null)java.util.Arrays.fill(ownedInput,(byte)0);reply.accept(failure("","invalid_request","Native pairing request is invalid."));return;
         }
         final Object deliveryFence=action==4?new Object():mPairingClientDeliveryFence.get();
@@ -132,7 +133,15 @@ public final class NativeCore {
             JSONObject response;
             try{
                 String expectedTicket=null;
-                if(action!=0){
+                JSONObject activation=null;
+                if(action==5){
+                    activation=new JSONObject(new String(ownedInput,StandardCharsets.UTF_8));
+                    JSONObject address=activation.getJSONObject("address");Object revision=activation.get("expected_revision");
+                    if(activation.length()!=3||address.length()!=5||!mProfile.equals(address.getString("profile"))||!"pair_encryption".equals(address.getString("kind"))
+                            ||!canonicalPairingId(address.getString("device"))||!canonicalPairingId(address.getString("id"))||!canonicalPairingId(address.getString("generation"))
+                            ||!activation.getString("reviewed_grant_hash").matches("[0-9a-f]{64}")||!(revision instanceof Number)
+                            ||((Number)revision).doubleValue()!=((Number)revision).longValue()||((Number)revision).longValue()<1||((Number)revision).longValue()>=10_000_000)throw new IllegalStateException();
+                }else if(action!=0){
                     JSONObject request=new JSONObject(new String(ownedInput,StandardCharsets.UTF_8));
                     expectedTicket=request.getString("ticket");
                     if(request.length()!=(action==3?2:1)||!canonicalPairingId(expectedTicket))throw new IllegalStateException();
@@ -143,7 +152,14 @@ public final class NativeCore {
                 response=pairingResponse(nativePairingClientV1(mHandle,ownedInput,action,(int)Math.min(25_000,remaining)));
                 if("ok".equals(response.optString("status"))){
                     JSONObject value=response.getJSONObject("result");
-                    if(action==3){
+                    if(action==5){
+                        JSONObject address=value.getJSONObject("address"),expected=activation.getJSONObject("address");Object revision=value.get("revision");
+                        if(value.getInt("credential_protocol")!=1||!"active".equals(value.getString("phase"))||!Boolean.TRUE.equals(value.get("reload_required"))
+                                ||!activation.getString("reviewed_grant_hash").equals(value.getString("grant_hash"))||address.length()!=5
+                                ||!(revision instanceof Number)||((Number)revision).doubleValue()!=((Number)revision).longValue()
+                                ||((Number)revision).longValue()<=activation.getLong("expected_revision")||((Number)revision).longValue()>10_000_000)throw new IllegalStateException();
+                        for(String field:new String[]{"profile","device","kind","id","generation"})if(!expected.getString(field).equals(address.getString(field)))throw new IllegalStateException();
+                    }else if(action==3){
                         if(!expectedTicket.equals(value.getString("pairing_ticket")))throw new IllegalStateException();
                         JSONObject address=value.getJSONObject("address");
                         if(value.getInt("credential_protocol")!=1||!"material_ready".equals(value.getString("phase"))||!mProfile.equals(address.getString("profile"))||!"pair_encryption".equals(address.getString("kind")))throw new IllegalStateException();

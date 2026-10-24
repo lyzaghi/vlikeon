@@ -1840,6 +1840,16 @@ this checkpoint.
 
 ## Remaining implementation and qualification
 
+Android private pairing JNI action 5 now calls the separate reviewed activation
+ABI with <=1024-byte input, retaining the existing wipe-on-return native vector.
+The Java native-only lane validates request scope/canonical IDs/hash/integral
+revision and checks exact five-field reply address, grant hash, Active phase,
+reload_required and advancing bounded revision. It shares ordinary-operation
+admission, queue-inclusive deadline, owner/cancel delivery fences and input clear
+behavior. No arbitrary renderer dispatch is added. Typed one-use activation
+snapshot/UI and iOS equivalent remain due; no compiler/build/test/native operation
+ran for this source checkpoint.
+
 The dedicated om_mobile_pairing_activate_client_v1 entry accepts native-only
 address/expected_revision/reviewed_grant_hash JSON <=1024 and an original bounded
 budget. It derives actual foreground provider epoch/cancellation, validates

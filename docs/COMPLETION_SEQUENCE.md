@@ -2,6 +2,11 @@
 
 ## Current sequence — 1–109 outstanding tasks
 
+Item 58 Android private JNI/caller now dispatches reviewed client activation
+through its bounded serialized lane. Caller checks exact scoped address, grant
+hash, Active phase and advancing bounded revision in successful replies. No
+renderer route; source-only, no build/test. Typed activation review/UI remains due.
+
 Item 58 now authors reviewed client activation from mobile C ABI through LocalHost
 to the leased writer. Exact candidate/revision/grant hash is checked before fresh
 relay confirmation and Active publication; native epoch/deadline checks surround
