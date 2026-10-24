@@ -165,7 +165,7 @@ impl<S:SoftwareTimestampSource> NativeDatagramReceipt for WinsockDatagrams<S>{
         let result=(||{
             if self.closed||socket.as_raw_socket()as usize!=self.socket||buffer.len()<65_536{return Err(denied());}
             self.source.require_current(socket)?;
-            // usize storage gives WSACMSGHDR native alignment. Parsing uses
+            // usize storage gives CMSGHDR native alignment. Parsing uses
             // checked lengths and unaligned copies, never peer-provided pointers.
             let mut control=[0usize;64];let capacity=size_of_val(&control);
             let mut data=WSABUF{len:buffer.len()as u32,buf:buffer.as_mut_ptr()};
@@ -178,13 +178,13 @@ impl<S:SoftwareTimestampSource> NativeDatagramReceipt for WinsockDatagrams<S>{
                 if error==WSAEWOULDBLOCK||error==WSAEINTR{return Ok(None);}return Err(denied());
             }
             if message.dwFlags!=0||received==0||received as usize>buffer.len()||message.Control.len as usize>capacity{return Err(denied());}
-            let length=message.Control.len as usize;let header=size_of::<WSACMSGHDR>();let alignment=size_of::<usize>();
+            let length=message.Control.len as usize;let header=size_of::<CMSGHDR>();let alignment=size_of::<usize>();
             let aligned=|value:usize|value.checked_add(alignment-1).map(|v|v&!(alignment-1)).ok_or_else(denied);
             let mut offset=0usize;let mut stamp=None;let mut interface=None;
             while offset<length{
                 if length-offset<header{return Err(denied());}
                 let pointer=unsafe{control.as_ptr().cast::<u8>().add(offset)};
-                let cmsg=unsafe{std::ptr::read_unaligned(pointer.cast::<WSACMSGHDR>())};
+                let cmsg=unsafe{std::ptr::read_unaligned(pointer.cast::<CMSGHDR>())};
                 let size=cmsg.cmsg_len;
                 if size<header||size>length-offset{return Err(denied());}
                 if cmsg.cmsg_level==SOL_SOCKET&&cmsg.cmsg_type==SO_TIMESTAMP as i32{
