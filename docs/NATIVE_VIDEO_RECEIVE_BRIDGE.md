@@ -1,5 +1,15 @@
 # Native ordered RTP to decoder bridge — item 56
 
+VideoIngress now connects a required native SRTP receiver backend directly to
+the broker registry with original ingress receipts, exact media-owner checks and
+bounded datagram/decrypted RTP sizes. Authentication/decryption/replay rejection
+must occur in that backend before RTP is delivered; there is no plaintext
+fallback or implementation claiming cryptography from a boolean. Retirement
+fences ingress and attempts both transport and video cleanup under one deadline,
+retaining separate confirmed states for retries. The actual ICE/DTLS/SRTP engine,
+socket/event caller and joint session owner are still missing. This is adapter
+source wiring, not an operational network transport. No build/test ran.
+
 The broker control loop now receives framed input from one bounded reader lane
 and runs receive maintenance on 25-ms idle timeouts. Partial stdin headers/bodies
 and packet silence no longer block the main loop's maintenance opportunity.

@@ -2,6 +2,8 @@
 
 ## Current sequence — 1–109 outstanding tasks
 
+Source checkpoint: bounded native transport ingress adapter now forwards only backend-authenticated/decrypted/replay-filtered RTP to the exact document/video registry, preserving original receipts. Coordinated transport/video cleanup tracks each completion across retries. Actual SRTP/DTLS/ICE engine and socket/product caller remain unfinished; build/test stay deferred.
+
 Source checkpoint: bounded control-input reader lane now lets the broker run receiver maintenance on 25-ms idle timeouts, including partial stdin reads. Ordered request backpressure and zeroizing queued messages remain; no database/session ownership moves to the reader. Blocking broker/OS work and actual transport integration remain open. Build/test stay deferred.
 
 Source checkpoint: broker-channel receive document now owns session scope, closes before teardown, and has a private native open route. The main loop runs receive gap/age and retained cleanup maintenance at request boundaries. An independent idle scheduler, navigation document scope and transport caller remain open; build/test stay deferred.
