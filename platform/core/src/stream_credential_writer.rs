@@ -78,6 +78,19 @@ impl<'a> NativeCredentialWriter<'a>{
         self.lease.check(self.database,self.profile)?;check(deadline)?;
         if cancel.load(std::sync::atomic::Ordering::Acquire){return Err(conflict());}Ok(())
     }
+    /// Explicit bounded host poll; peer keys/labels are not user-approved here.
+    pub fn poll_host(&self,expected:u64,address:CredentialAddress,invitation:&mut omniplay_streaming::native_pair_exchange::NativeHostInvitation,
+        relay:&omniplay_streaming::native_relay::NativePairRelay,now:u64,deadline:Instant,cancel:&std::sync::atomic::AtomicBool)
+        ->Result<Vec<omniplay_streaming::native_pair_exchange::NativeHostPeerReview>>{
+        let started=begin(deadline)?;
+        let metadata:omniplay_streaming::Invite=omniplay_streaming::inspect(invitation.signed_invite(),4096)?;
+        crate::stream_signal_authority::require_installed_host_grant(&metadata.audience,false)?;
+        if cancel.load(std::sync::atomic::Ordering::Acquire){return Err(conflict());}
+        let signer=self.active_signer(expected,address)?;check(deadline)?;
+        let reviews=invitation.poll_requests(relay,&signer,elapsed_now(now,started)?,deadline,cancel)?;
+        self.lease.check(self.database,self.profile)?;check(deadline)?;
+        if cancel.load(std::sync::atomic::Ordering::Acquire){return Err(conflict());}Ok(reviews)
+    }
     pub fn join_client(&self,expected:u64,address:CredentialAddress,pending:&mut omniplay_streaming::native_pair_exchange::NativeClientPairing,
         relay:&omniplay_streaming::native_relay::NativePairRelay,now:u64,deadline:Instant,cancel:&std::sync::atomic::AtomicBool)->Result<()>{
         let started=begin(deadline)?;let signer=self.active_signer(expected,address)?;check(deadline)?;

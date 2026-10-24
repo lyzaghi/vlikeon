@@ -2,6 +2,10 @@
 
 ## Current sequence — 1–109 outstanding tasks
 
+Item 58 now authors leased explicit host request polling using exact Active
+identity/revision and installed host/origin admission, with post-network lease,
+deadline/cancel checks. No approval inferred; host controller/UI and build/test due.
+
 Item 58 now authors leased host invitation create/register writer methods using
 the exact Active identity/revision and installed host/origin policy. Invitation
 sharing remains separate; registration keeps caller-owned state on uncertainty.

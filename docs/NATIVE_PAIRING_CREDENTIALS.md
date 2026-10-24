@@ -1840,6 +1840,15 @@ this checkpoint.
 
 ## Remaining implementation and qualification
 
+Writer poll_host now reloads the exact Active signing identity under its retained
+lease and requires installed host/origin policy before one bounded invitation
+poll. Existing native invitation code verifies signed request snapshots and
+comparison codes. Lease/deadline/cancellation are rechecked before publishing
+reviews. Peer labels and keys remain unapproved; this does not sign a grant,
+persist a candidate or activate anything. Caller must retain invitation state on
+uncertainty. No build/test or network/vault/crypto operation ran. Host controller,
+consent UI and complete qualification remain unfinished.
+
 NativeCredentialWriter now provides begin_host and register_host under its
 retained profile lease. Creation requires installed hosting/origin policy and
 exact Active identity/revision, then signs a local invitation without network or
