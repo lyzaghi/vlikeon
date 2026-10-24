@@ -145,6 +145,9 @@ final class GameHubViewController: UIViewController, WKNavigationDelegate, WKUID
         alert.addAction(UIAlertAction(title:"Để sau",style:.cancel){[weak self]_ in self?.cancelPairingIdentity()})
         alert.addAction(UIAlertAction(title:"Đóng lời mời",style:.destructive){[weak self,weak alert]_ in alert?.dismiss(animated:false){[weak self] in self?.closeHostInvitation(ticket:ticket,owner:owner)}})
         if registered{
+            alert.addAction(UIAlertAction(title:"Kiểm tra yêu cầu ghép đôi",style:.default){[weak self,weak alert]_ in
+                alert?.dismiss(animated:false){[weak self] in self?.showHostPeers(ticket:ticket,origin:origin,owner:owner)}
+            })
             alert.addAction(UIAlertAction(title:"Hiện mã mời",style:.default){[weak self,weak alert]_ in
                 alert?.dismiss(animated:false){[weak self] in self?.revealHostInvitation(ticket:ticket,origin:origin,owner:owner)}
             })
@@ -161,6 +164,47 @@ final class GameHubViewController: UIViewController, WKNavigationDelegate, WKUID
                 }
             })
         }
+        present(alert,animated:true)
+    }
+    private func showHostPeers(ticket:String,origin:String,owner:NativeDocumentLifetime){
+        guard peerReviewAvailable(owner) else{cancelPairingIdentity();return}
+        core.reviewHostPeers(ticket:ticket,owner:owner){[weak self] result in
+            guard let self=self,self.pairingFlow === owner,owner.active else{return}
+            guard self.peerReviewAvailable(owner) else{self.cancelPairingIdentity();return}
+            switch result{
+            case .failure:self.cancelPairingIdentity();self.pairingNotice("Chưa đọc được yêu cầu hiện tại. Hãy xem lại trạng thái.")
+            case .success(let peers):
+                let sheet=UIAlertController(title:"Yêu cầu ghép đôi",message:peers.isEmpty ? "Chưa có yêu cầu mới." : "Nhãn do peer tự cung cấp. Chọn yêu cầu để xem khóa và đối chiếu mã qua kênh độc lập. Phiên duyệt có hiệu lực tối đa 30 giây.",preferredStyle:.actionSheet);self.pairingAlert=sheet
+                for peer in peers{
+                    sheet.addAction(UIAlertAction(title:peer.label,style:.default){[weak self,weak sheet]_ in sheet?.dismiss(animated:false){[weak self] in self?.showHostPeer(peer,ticket:ticket,origin:origin,owner:owner)}})
+                }
+                sheet.addAction(UIAlertAction(title:"Quay lại",style:.cancel){[weak self,weak sheet]_ in sheet?.dismiss(animated:false){[weak self] in self?.showHostRegistration(ticket:ticket,origin:origin,owner:owner,registered:true)}})
+                sheet.popoverPresentationController?.sourceView=self.pairingButton;sheet.popoverPresentationController?.sourceRect=self.pairingButton.bounds
+                self.present(sheet,animated:true)
+            }
+        }
+    }
+    private func showHostPeer(_ peer:NativeHostPeerReview,ticket:String,origin:String,owner:NativeDocumentLifetime){
+        guard peerReviewAvailable(owner),peer.admitted else{cancelPairingIdentity();return}
+        let alert=UIAlertController(title:"Đối chiếu peer",message:"Nhãn chưa xác minh: \(peer.label)\nKhóa peer: \(peer.clientKey)\nMã đối chiếu: \(peer.comparison)\nĐối chiếu mã trên thiết bị người nhận. Xem yêu cầu chưa cấp quyền.",preferredStyle:.alert);pairingAlert=alert
+        alert.addAction(UIAlertAction(title:"Quay lại",style:.cancel){[weak self,weak alert]_ in alert?.dismiss(animated:false){[weak self] in self?.showHostRegistration(ticket:ticket,origin:origin,owner:owner,registered:true)}})
+        alert.addAction(UIAlertAction(title:"Từ chối yêu cầu này",style:.destructive){[weak self,weak alert]_ in alert?.dismiss(animated:false){[weak self] in self?.confirmHostPeerDecline(peer,ticket:ticket,origin:origin,owner:owner)}})
+        present(alert,animated:true)
+    }
+    private func confirmHostPeerDecline(_ peer:NativeHostPeerReview,ticket:String,origin:String,owner:NativeDocumentLifetime){
+        guard peerReviewAvailable(owner),peer.admitted else{cancelPairingIdentity();return}
+        let alert=UIAlertController(title:"Xác nhận từ chối",message:"Khóa peer: \(peer.clientKey)\nMã đối chiếu: \(peer.comparison)\nChỉ từ chối yêu cầu đã xem; các cặp đã duyệt không bị thu hồi.",preferredStyle:.alert);pairingAlert=alert
+        alert.addAction(UIAlertAction(title:"Quay lại",style:.cancel){[weak self,weak alert]_ in alert?.dismiss(animated:false){[weak self] in self?.showHostPeer(peer,ticket:ticket,origin:origin,owner:owner)}})
+        alert.addAction(UIAlertAction(title:"Xác nhận từ chối",style:.destructive){[weak self,weak alert]_ in
+            alert?.dismiss(animated:false){[weak self] in
+                guard let self=self,self.peerReviewAvailable(owner),peer.admitted else{self?.cancelPairingIdentity();return}
+                self.core.declineHostPeer(peer,owner:owner){[weak self] result in
+                    guard let self=self,self.pairingFlow === owner,owner.active else{return}
+                    guard self.peerReviewAvailable(owner) else{self.cancelPairingIdentity();return}
+                    switch result{case .success:self.showHostRegistration(ticket:ticket,origin:origin,owner:owner,registered:true);case .failure:self.cancelPairingIdentity();self.pairingNotice("Chưa xác nhận được từ chối. Đọc lại trạng thái trước khi tiếp tục.")}
+                }
+            }
+        })
         present(alert,animated:true)
     }
     private func revealHostInvitation(ticket:String,origin:String,owner:NativeDocumentLifetime){

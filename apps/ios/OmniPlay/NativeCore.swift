@@ -79,6 +79,17 @@ final class NativePeerActivation {
         lock.lock();defer{lock.unlock()};guard !consumed,peer.admitted else{return false};consumed=true;return true
     }
 }
+final class NativeHostPeerReview {
+    let clientKey:String,label:String,comparison:String,expires:DispatchTime
+    fileprivate let ticket:String,helloHash:String,origin:ObjectIdentifier
+    private let current:()->Bool
+    private let lock=NSLock();private var decided=false
+    fileprivate init(core:NativeCore,ticket:String,key:String,label:String,comparison:String,hash:String,expires:DispatchTime,current:@escaping ()->Bool){
+        origin=ObjectIdentifier(core);self.ticket=ticket;clientKey=key;self.label=label;self.comparison=comparison;helloHash=hash;self.expires=expires;self.current=current
+    }
+    var admitted:Bool{DispatchTime.now()<expires&&current()}
+    fileprivate func consume()->Bool{lock.lock();defer{lock.unlock()};guard !decided,admitted else{return false};decided=true;return true}
+}
 private final class NativePairingDeliveryFence {
     final class Token {}
     private let lock=NSLock()
@@ -420,6 +431,45 @@ final class NativeCore {
                 DispatchQueue.main.async{
                     guard owner.active,DispatchTime.now()<deadline,self.pairingClientDeliveryFence.admits(token) else{completion(.failure(OmniFailure.message("Kết quả host đã cũ. Hãy đọc lại trạng thái.")));return}
                     completion(.success(value))
+                }
+            }catch{DispatchQueue.main.async{completion(.failure(error))}}
+        }
+    }
+    @MainActor func reviewHostPeers(ticket:String,owner:NativeDocumentLifetime,completion:@escaping @MainActor (Result<[NativeHostPeerReview],Error>)->Void){
+        let expires=DispatchTime.now()+30,token=pairingClientDeliveryFence.capture(cancel:false)
+        pairingHostTicket(.poll,ticket:ticket,owner:owner){result in
+            do{
+                let value=try result.get()
+                guard owner.active,DispatchTime.now()<expires,self.pairingClientDeliveryFence.admits(token),let peers=value["peers"] as? [[String:Any]] else{throw OmniFailure.message("Danh sách peer đã cũ. Hãy đọc lại.")}
+                let reviews=try peers.map{peer->NativeHostPeerReview in
+                    guard let key=peer["client_public_key"] as? String,let label=peer["label"] as? String,let comparison=peer["comparison_code"] as? String,let hash=peer["hello_hash"] as? String else{throw OmniFailure.message("Thiếu metadata peer.")}
+                    return NativeHostPeerReview(core:self,ticket:ticket,key:key,label:label,comparison:comparison,hash:hash,expires:expires,current:{[weak self] in owner.active&&self?.pairingClientDeliveryFence.admits(token)==true})
+                }
+                completion(.success(reviews))
+            }catch{completion(.failure(error))}
+        }
+    }
+    @MainActor func declineHostPeer(_ peer:NativeHostPeerReview,owner:NativeDocumentLifetime,completion:@escaping @MainActor (Result<Void,Error>)->Void){
+        guard owner.active,peer.origin==ObjectIdentifier(self),peer.consume() else{completion(.failure(OmniFailure.message("Phiên duyệt peer đã kết thúc. Hãy đọc lại yêu cầu.")));return}
+        guard pairingClientPermit.wait(timeout:.now()) == .success else{completion(.failure(OmniFailure.message("Thao tác trước đang kết thúc. Hãy đọc lại yêu cầu.")));return}
+        guard pairingClientQueuePermit.wait(timeout:.now()) == .success else{pairingClientPermit.signal();completion(.failure(OmniFailure.message("Hàng đợi đang bận. Hãy đọc lại yêu cầu.")));return}
+        let deadline=min(peer.expires,DispatchTime.now()+25)
+        queue.async{
+            defer{self.pairingClientPermit.signal();self.pairingClientQueuePermit.signal()}
+            do{
+                let now=DispatchTime.now()
+                guard now<deadline,owner.active,peer.admitted,self.handle != 0,self.pairingAttached else{throw OmniFailure.message("Phiên duyệt peer đã hết hạn.")}
+                let remaining=(deadline.uptimeNanoseconds-now.uptimeNanoseconds)/1_000_000
+                guard remaining>=1000 else{throw OmniFailure.message("Từ chối hết hạn trong hàng đợi.")}
+                var input=try JSONSerialization.data(withJSONObject:["ticket":peer.ticket,"client_public_key":peer.clientKey,"reviewed_hello_hash":peer.helloHash]);defer{input.resetBytes(in:0..<input.count)}
+                guard input.count<=1024 else{throw OmniFailure.message("Yêu cầu từ chối vượt giới hạn.")}
+                let value=try self.unwrap(input.withUnsafeBytes{raw in try self.consume(om_mobile_pairing_host_peer_v1(self.handle,raw.bindMemory(to:UInt8.self).baseAddress,raw.count,2,UInt32(min(25_000,remaining))))})
+                guard (value["pairing_protocol"] as? NSNumber)?.uint32Value==1,value["ticket"] as? String==peer.ticket,value["client_public_key"] as? String==peer.clientKey,value["hello_hash"] as? String==peer.helloHash,
+                      let declined=value["declined"] as? NSNumber,CFGetTypeID(declined)==CFBooleanGetTypeID(),declined.boolValue,
+                      let revoked=value["pairs_revoked"] as? NSNumber,CFGetTypeID(revoked)==CFBooleanGetTypeID(),!revoked.boolValue else{throw OmniFailure.message("Chưa xác nhận đúng kết quả từ chối.")}
+                DispatchQueue.main.async{
+                    guard owner.active,peer.admitted,DispatchTime.now()<deadline else{completion(.failure(OmniFailure.message("Kết quả đã cũ. Hãy đọc lại trạng thái.")));return}
+                    completion(.success(()))
                 }
             }catch{DispatchQueue.main.async{completion(.failure(error))}}
         }
