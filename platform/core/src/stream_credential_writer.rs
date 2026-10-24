@@ -73,14 +73,29 @@ impl<'a> NativeCredentialWriter<'a>{
         let metadata:omniplay_streaming::Invite=omniplay_streaming::inspect(invitation.signed_invite(),4096)?;
         crate::stream_signal_authority::require_installed_host_grant(&metadata.audience,false)?;
         if cancel.load(std::sync::atomic::Ordering::Acquire){return Err(conflict());}
-        let signer=self.active_signer(expected,address)?;check(deadline)?;
-        let retained=journal::retain_host_invitation(self.database,&self.lease,self.profile,expected,address,invitation.signed_invite(),&metadata.audience)?;
+        let current=journal::load_scoped(self.database,&self.lease,self.profile)?;
+        let hash=omniplay_streaming::document_hash(invitation.signed_invite())?;
+        let mut retained=false;
+        for entry in current.host_invitations(){
+            let prior:omniplay_streaming::Invite=omniplay_streaming::inspect(entry.document(),4096)?;
+            if prior.id==metadata.id{
+                if entry.identity()!=address||entry.audience()!=metadata.audience||omniplay_streaming::document_hash(entry.document())?!=hash{return Err(conflict());}
+                retained=true;
+            }
+        }
+        // Reconcile only the single revision potentially committed by the
+        // previous registration intent, never arbitrary later journal changes.
+        if current.revision()!=expected&&(!retained||expected.checked_add(1)!=Some(current.revision())){return Err(conflict());}
+        let signer=self.active_signer(current.revision(),address)?;check(deadline)?;
+        let revision=if retained{current.revision()}else{
+            journal::retain_host_invitation(self.database,&self.lease,self.profile,expected,address,invitation.signed_invite(),&metadata.audience)?.revision()
+        };
         // The intent must commit before any registration request can leave.
         self.lease.check(self.database,self.profile)?;check(deadline)?;
         if cancel.load(std::sync::atomic::Ordering::Acquire){return Err(conflict());}
         invitation.register(relay,&signer,elapsed_now(now,started)?,deadline,cancel)?;
         self.lease.check(self.database,self.profile)?;check(deadline)?;
-        if cancel.load(std::sync::atomic::Ordering::Acquire){return Err(conflict());}Ok(retained.revision())
+        if cancel.load(std::sync::atomic::Ordering::Acquire){return Err(conflict());}Ok(revision)
     }
     /// Explicit native share action only; returned bearer proof must not enter logs.
     pub fn share_host(&self,expected:u64,address:CredentialAddress,invitation:&omniplay_streaming::native_pair_exchange::NativeHostInvitation,

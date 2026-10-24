@@ -1840,6 +1840,15 @@ this checkpoint.
 
 ## Remaining implementation and qualification
 
+Host registration retry now matches existing durable intent by invite ID, exact
+signed-document hash, identity generation and audience under the scoped lease.
+Matching intent is reused without another journal mutation. The expected revision
+may lag by exactly one when that intent exists, covering an intent commit followed
+by lost registration response; other revision changes refuse. The original exact
+Active identity is reloaded before HTTP and normal closed/expiry/epoch/cancel
+checks remain. This restores only registration retry, not proof/peer authority
+after restart. No build/test/SQL/network operation ran for this source follow-up.
+
 Android/iOS snapshots now count at most eight durable invitation cleanup entries,
 checking canonical nonzero unique invite IDs, hash text and actual expiry flags.
 Any entry triggers native status attention independently of transient host state.

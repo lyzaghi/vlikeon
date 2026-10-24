@@ -2,6 +2,11 @@
 
 ## Current sequence — 1–109 outstanding tasks
 
+Item 58 registration retry now recognizes an exact durable invitation intent
+without writing another revision. It can reconcile one potentially committed
+intent revision only, while reloading the original Active signer. Arbitrary later
+changes still refuse. Source-only; no build/test/network execution ran.
+
 Item 58 mobile status attention now includes durable invitation cleanup entries
 after restart, even without a transient host ticket. Bounded unique invite IDs,
 hashes and expiry booleans are admitted. Source-only; cleanup UI/build/test due.
