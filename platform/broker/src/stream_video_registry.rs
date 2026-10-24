@@ -3,7 +3,7 @@
 use crate::{stream_video_session::{WindowsReceiveSession,WindowsReceiveConfiguration},
     stream_video_authority::NativeVideoAuthority,stream_video_receive::ReceiveState,stream_video::UnpresentedVideoFrame};
 use omniplay_contracts::{ErrorCode,PlatformError,Result};
-use omniplay_stream_input::video_client::{VideoOwner,DecoderReceipt};
+use omniplay_stream_input::video_client::{VideoOwner,DecoderReceipt,VideoAuthorityObservation};
 use std::{time::Instant,sync::{Arc,Weak,atomic::{AtomicBool,Ordering}}};
 use uuid::Uuid;
 
@@ -32,6 +32,18 @@ impl ReceiveDocument{
     pub fn id(&self)->Uuid{self.state.id}
 }
 impl Drop for ReceiveDocument{fn drop(&mut self){self.close();}}
+struct DocumentAuthority<S:NativeVideoAuthority>{document:Weak<DocumentState>,source:S}
+impl<S:NativeVideoAuthority> NativeVideoAuthority for DocumentAuthority<S>{
+    fn observe(&mut self,owner:VideoOwner)->Result<VideoAuthorityObservation>{
+        let document=self.document.upgrade().ok_or_else(denied)?;
+        if !document.alive.load(Ordering::Acquire){return Err(denied());}
+        // Preserve the source's actual timestamp; a slow observe cannot refresh
+        // admission, and closing the document during it invalidates the result.
+        let observation=self.source.observe(owner)?;
+        if !document.alive.load(Ordering::Acquire){return Err(denied());}
+        Ok(observation)
+    }
+}
 struct Entry{document:Weak<DocumentState>,document_id:Uuid,owner:VideoOwner,sealed:bool,session:Box<dyn ReceiveOwner>}
 #[derive(Default)]
 pub struct ReceiveRegistry{entry:Option<Entry>,closed:bool}
@@ -40,6 +52,7 @@ impl ReceiveRegistry{
         if self.closed||!document.state.alive.load(Ordering::Acquire){return Err(denied());}
         if self.entry.is_some(){return Err(PlatformError::new(ErrorCode::Busy,"The previous native receive session must retire before replacement"));}
         let owner=configuration.owner;
+        let source=DocumentAuthority{document:Arc::downgrade(&document.state),source};
         let session=WindowsReceiveSession::open(configuration,source,deadline)?;
         self.entry=Some(Entry{document:Arc::downgrade(&document.state),document_id:document.state.id,owner,sealed:false,session:Box::new(session)});
         if !document.state.alive.load(Ordering::Acquire){
@@ -59,7 +72,7 @@ impl ReceiveRegistry{
     }
     pub fn state(&self,document:Uuid,owner:VideoOwner)->Result<ReceiveState>{
         self.entry.as_ref().filter(|entry|entry.document_id==document&&entry.owner==owner).map(|entry|
-            if entry.sealed&&entry.session.state()==ReceiveState::Active{ReceiveState::CleanupRequired}else{entry.session.state()}).ok_or_else(denied)
+            if (entry.sealed||entry.document.upgrade().is_none_or(|state|!state.alive.load(Ordering::Acquire)))&&entry.session.state()==ReceiveState::Active{ReceiveState::CleanupRequired}else{entry.session.state()}).ok_or_else(denied)
     }
     pub fn retire(&mut self,document:Uuid,owner:VideoOwner,deadline:Instant)->Result<()>{
         let entry=self.entry.as_mut().filter(|entry|entry.document_id==document&&entry.owner==owner).ok_or_else(denied)?;

@@ -1,5 +1,15 @@
 # Native ordered RTP to decoder bridge — item 56
 
+ReceiveRegistry now wraps its real native authority source with the document's
+weak lifetime before session launch. Both the independent authority lane and
+codec callback reject a closed/dropped document before and after observing the
+source, preserving its original timestamp. The wrapper cannot keep a document
+alive or restore a closed one. Thus packet silence does not bypass document
+revocation; helper authority still expires independently if observation blocks.
+Status reports cleanup debt for lost documents. Actual product document issuance,
+maintenance scheduling and authenticated transport caller remain unfinished.
+No build/test or helper execution occurred.
+
 ReceiveRegistry now accepts an opaque native ReceiveDocument lifetime instead
 of a caller-supplied UUID for media operations. Close/drop fences new delivery;
 post-read admission also rejects output when the document closed while blocked.
