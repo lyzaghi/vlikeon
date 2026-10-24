@@ -2,6 +2,10 @@
 
 ## Current sequence — 1–109 outstanding tasks
 
+Item 58 Android native status now retains pending-host ticket metadata and offers
+explicit invitation-close confirmation alongside client/record actions. Source-
+only; no build/test. Full host flow, durable cleanup and qualification remain due.
+
 Item 58 iOS now authors typed host register/poll/close calls with bounded shared
 admission, original deadline, close invalidation/fence and exact reply checks.
 Source-only; no build/test. Remaining host callers/views and durable recovery due.

@@ -1840,6 +1840,14 @@ this checkpoint.
 
 ## Remaining implementation and qualification
 
+Android native status now admits canonical pending-host ticket and boolean
+expired/local-close/remote-cleanup flags, offering a separate close invitation
+action even when no credential records exist. Confirmation explains local stop,
+conditional service cleanup and nonrevocation of existing pairs. It invokes the
+bounded host close caller; uncertainty directs back to status. Expired remote
+invitations can still require unfinished reconciliation; the UI does not pretend
+that retry guarantees success. No build/test/UI render/runtime operation ran.
+
 iOS typed host ticket caller now shares bounded pairing admission and original
 queue-inclusive deadline. Close rotates cancellation delivery token and requires
 immediate native epoch acknowledgment before queueing. Reply checks bind ticket,

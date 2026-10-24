@@ -543,6 +543,7 @@ public final class NativeCore {
         final boolean relayRetirementAvailable;
         final boolean namespaceProvenanceMissing;
         final String pendingClientTicket;
+        final String pendingHostTicket;
         boolean needsAttention(){if(namespaceProvenanceMissing)return true;for(RecoveryRecord record:records)if(record.sessionRecoveryRequired||(record.nextStep!=null&&!"revalidate_before_use".equals(record.nextStep)))return true;return false;}
         private RecoverySnapshot(JSONObject status,String profile,long deadline) throws Exception {
             if(status.getInt("credential_protocol")!=1||status.getInt("recovery_protocol")!=1||!profile.equals(status.getString("profile_id"))||!canonicalPairingId(status.getString("device_id")))throw new IllegalStateException();
@@ -555,6 +556,12 @@ public final class NativeCore {
                 if(!client.getBoolean("expired")&&client.getLong("expires_at_ms")>System.currentTimeMillis())ticket=id;
             }
             pendingClientTicket=ticket;
+            JSONObject host=status.optJSONObject("pending_host");String hostTicket=null;
+            if(host!=null){
+                hostTicket=host.getString("ticket");
+                if(!canonicalPairingId(hostTicket)||!(host.get("expired") instanceof Boolean)||!(host.get("locally_closed") instanceof Boolean)||!(host.get("remote_close_required") instanceof Boolean))throw new IllegalStateException();
+            }
+            pendingHostTicket=hostTicket;
             if(revision<0||revision>10_000_000||android.os.SystemClock.elapsedRealtime()>=expires)throw new IllegalStateException();
             org.json.JSONArray rows=status.getJSONArray("records"),actions=status.getJSONArray("recovery");
             if(rows.length()>128||actions.length()>128)throw new IllegalStateException();

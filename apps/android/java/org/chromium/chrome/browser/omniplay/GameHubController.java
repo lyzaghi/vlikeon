@@ -279,16 +279,38 @@ public final class GameHubController implements AutoCloseable {
             if(snapshot==null){cancelIdentityReview();identityNotice(error);return;}
             long remaining=snapshot.expires-android.os.SystemClock.elapsedRealtime();
             if(remaining<=0){cancelIdentityReview();identityNotice("Recovery status expired. Open it again.");return;}
-            if(snapshot.records.isEmpty()&&snapshot.pendingClientTicket==null){cancelIdentityReview();identityNotice("This device has no Remote Play identity or pair records.");return;}
-            String[] titles=new String[snapshot.records.size()+(snapshot.pendingClientTicket==null?0:2)];
+            if(snapshot.records.isEmpty()&&snapshot.pendingClientTicket==null&&snapshot.pendingHostTicket==null){cancelIdentityReview();identityNotice("This device has no Remote Play identity or pair records.");return;}
+            String[] titles=new String[snapshot.records.size()+(snapshot.pendingClientTicket==null?0:2)+(snapshot.pendingHostTicket==null?0:1)];
             for(int i=0;i<snapshot.records.size();i++){NativeCore.RecoveryRecord record=snapshot.records.get(i);titles[i]=(record.isIdentity()?"Identity · ":"Device pair · ")+record.generation;}
-            if(snapshot.pendingClientTicket!=null){titles[titles.length-2]="Review pending host approval";titles[titles.length-1]="Cancel pending pairing locally";}
+            if(snapshot.pendingClientTicket!=null){titles[snapshot.records.size()]="Review pending host approval";titles[snapshot.records.size()+1]="Cancel pending pairing locally";}
+            if(snapshot.pendingHostTicket!=null)titles[titles.length-1]="Close this device's host invitation";
             AlertDialog list=new AlertDialog.Builder(mActivity).setTitle("Remote Play status")
-                    .setItems(titles,(dialog,index)->{mIdentityDialog=null;if(index==snapshot.records.size())showPeerApproval(snapshot.pendingClientTicket,owner);else if(index>snapshot.records.size())cancelPendingPeer(snapshot.pendingClientTicket,owner);else showPairingRecovery(snapshot,snapshot.records.get(index),owner);})
+                    .setItems(titles,(dialog,index)->{
+                        mIdentityDialog=null;
+                        if(index<snapshot.records.size())showPairingRecovery(snapshot,snapshot.records.get(index),owner);
+                        else if(snapshot.pendingClientTicket!=null&&index==snapshot.records.size())showPeerApproval(snapshot.pendingClientTicket,owner);
+                        else if(snapshot.pendingClientTicket!=null&&index==snapshot.records.size()+1)cancelPendingPeer(snapshot.pendingClientTicket,owner);
+                        else closeHostInvitation(snapshot.pendingHostTicket,owner);
+                    })
                     .setNegativeButton(android.R.string.cancel,(dialog,which)->cancelIdentityReview()).create();
             mIdentityDialog=list;list.setOnCancelListener(dialog->cancelIdentityReview());
             mIdentityExpiry=()->{if(mIdentityFlow==owner)cancelIdentityReview();};mMain.postDelayed(mIdentityExpiry,remaining);list.show();
         });
+    }
+    private void closeHostInvitation(String ticket,java.util.concurrent.atomic.AtomicBoolean owner){
+        if(mIdentityFlow!=owner||!owner.get()||!identityUiAvailable()){cancelIdentityReview();return;}
+        AlertDialog alert=new AlertDialog.Builder(mActivity).setTitle("Close host invitation?")
+                .setMessage("Stop sharing and approving this invitation on this device, then request its closure on the configured service if registration was attempted. Existing pairs are not revoked. A failed result requires checking status again.")
+                .setNegativeButton("Later",(dialog,which)->cancelIdentityReview())
+                .setPositiveButton("Close invitation",(dialog,which)->{
+                    mIdentityDialog=null;
+                    if(mIdentityFlow!=owner||!owner.get()||!identityUiAvailable()){cancelIdentityReview();return;}
+                    mCore.pairingHostTicket(ticket,3,owner::get,response->{
+                        if(mIdentityFlow!=owner||!owner.get())return;cancelIdentityReview();
+                        if(identityUiAvailable())identityNotice("ok".equals(response.optString("status"))?"Host invitation closed. Existing pairs were not revoked.":"Closure could not be confirmed. Reopen status before continuing.");
+                    });
+                }).create();
+        mIdentityDialog=alert;alert.setOnCancelListener(dialog->cancelIdentityReview());alert.show();
     }
     private void cancelPendingPeer(String ticket,java.util.concurrent.atomic.AtomicBoolean owner){
         if(mIdentityFlow!=owner||!owner.get()||!identityUiAvailable()){cancelIdentityReview();return;}
