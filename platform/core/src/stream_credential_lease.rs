@@ -74,6 +74,14 @@ impl CredentialLease{
             let lease=Self{profile,device:database.device_id,root:root.clone(),_file:file,_directories:directories};
             lease.check(database,profile)?;Ok(lease)
         }
+    }
+    pub(crate) fn check(&self,database:&Database,profile:Uuid)->Result<()>{
+        if self.profile!=profile||self.device!=database.device_id||self.root!=database.root{return Err(invalid());}
+        #[cfg(windows)]{
+            let metadata=self._file.metadata().map_err(storage_error)?;plain(&metadata,false)?;
+            if metadata.len()!=0{return Err(invalid());}
+            for directory in &self._directories{plain(&directory.metadata().map_err(storage_error)?,true)?;}
+        }
         #[cfg(unix)]{
             // Unix open directory handles do not prohibit rename/unlink. Compare
             // held and named inode/device/owner every admission; same-UID hostile
@@ -87,14 +95,6 @@ impl CredentialLease{
             let named=fs::symlink_metadata(self.root.join("native-remote-play-credentials-v1.lock")).map_err(storage_error)?;
             if !held.is_file()||!named.is_file()||named.file_type().is_symlink()||held.len()!=0||named.len()!=0||held.nlink()!=1||named.nlink()!=1||
                 held.dev()!=named.dev()||held.ino()!=named.ino()||held.uid()!=directory.uid()||named.uid()!=directory.uid()||held.mode()&0o077!=0||named.mode()&0o077!=0{return Err(invalid());}
-        }
-    }
-    pub(crate) fn check(&self,database:&Database,profile:Uuid)->Result<()>{
-        if self.profile!=profile||self.device!=database.device_id||self.root!=database.root{return Err(invalid());}
-        #[cfg(windows)]{
-            let metadata=self._file.metadata().map_err(storage_error)?;plain(&metadata,false)?;
-            if metadata.len()!=0{return Err(invalid());}
-            for directory in &self._directories{plain(&directory.metadata().map_err(storage_error)?,true)?;}
         }
         Ok(())
     }

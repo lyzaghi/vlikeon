@@ -1183,6 +1183,26 @@ No startup callback, dialog, native/SQL read, compiler, build or test was execut
 Foreground scheduling, interruption, corrupt/locked journals, retained session
 recovery and real device presentation remain qualification requirements.
 
+## Lease source correction found during writer-retirement review
+
+Static source review found the Unix held/named namespace revalidation block in
+the wrong function: it followed acquisition inside the associated acquire()
+function while referring to self. In addition to being invalid Unix source, that
+placement left check() without the intended Unix per-admission namespace checks.
+
+The block is now inside check(&self, ...), after profile/device/root binding and
+alongside the Windows branch. Unix acquisition still retains the actual file and
+directory handles, acquires the nonblocking lock, then invokes this check before
+returning. Subsequent existing writer/recovery calls to check now have the same
+canonical-root, held/named inode/device/owner, kind/link-count/private-mode
+revalidation in their intended source path.
+
+No compiler, file/lock operation, build or test was run. This correction is source
+evidence only and does not qualify Unix locking or close writer retirement. In
+particular, obtaining a lock in one profile root is not by itself proof against
+an uncoordinated copied profile in another root. Actual retirement owner/root
+provenance and platform qualification remain required before positive receipts.
+
 ## Remaining implementation and qualification
 
 - Journal/executor/lease/writer product integration, authority epochs, actual native owner

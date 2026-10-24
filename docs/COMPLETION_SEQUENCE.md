@@ -2,6 +2,13 @@
 
 ## Current sequence — 1–109 outstanding tasks
 
+Item 58 writer-retirement source review found the Unix lease namespace block
+misplaced in acquire() instead of check(&self). It now runs in the intended
+per-admission method, including acquisition's final check. No compiler/native/
+file/lock/build/test was executed. This does not prove copied-profile exclusion
+or producer retirement; actual owner integration and qualification remain due.
+Item 58 and the original 51–109 scope remain incomplete.
+
 Item 58 now authors read-only Game Hub startup inspection and native attention
 indicators/notices, with separate cancellation lifetimes. Status exposes retained
 session-ownership debt so active records are not misclassified as ready for a new
