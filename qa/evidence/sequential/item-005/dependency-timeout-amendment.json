@@ -1,0 +1,51 @@
+{
+  "item": 5,
+  "batch": "005-build-c",
+  "status": "in_progress",
+  "compiler_or_runtime_accepted": false,
+  "previous_batches": [
+    {
+      "batch": "005-build-a",
+      "status": "failed",
+      "reason": "90-second read-only Git diff timeout in wasm_corpus"
+    },
+    {
+      "batch": "005-build-b",
+      "status": "failed",
+      "reason": "90-second read-only Git diff timeout in Dawn"
+    }
+  ],
+  "amendment": {
+    "path": "recipe/tools/chromium_dependencies.py",
+    "before_sha256": "389c0b55cddca5e8d3bcad4e4f40c80802d617853fbcf9cad1a887050688cfaf",
+    "after_sha256": "9c8a44161262e7924a198765c65e1b23dddd24c7a4788a24a0b6434e512e21d2",
+    "previous_preparation_sha256": "dd9776d0bb8300894311d53788d3529b646382408ca75fb6abce5ae2b8f9bbc8",
+    "new_preparation_sha256": "0c3955502c40f189853c84e994e572b5bbe98ee723888511fbe520a7762e31ed",
+    "tracked_diff_timeout_seconds": 1800,
+    "head_timeout_seconds": 90,
+    "pin_and_clean_source_checks_preserved": true
+  },
+  "regression": {
+    "executor": "Codex",
+    "real_git_fixture_clean_pinned_checkout": "passed",
+    "modified_tracked_content": "rejected",
+    "separate_timeout_bounds": "verified"
+  },
+  "preserved": {
+    "old_frozen_source_and_receipt": true,
+    "failed_logs_and_results": true,
+    "dependency_bytes": true,
+    "live_linux_build_unchanged": true
+  },
+  "resume": {
+    "phase": "synced",
+    "jobs": 2,
+    "external_workspace": true,
+    "process_survives_ssh_disconnect": true
+  },
+  "limits": [
+    "New frozen recipe identity; not a successful build receipt",
+    "Only dependency admission timeout changed; no Chromium or overlay source patch",
+    "Source tree identifier refers to base product source; recipe amendment separately hash-bound"
+  ]
+}
