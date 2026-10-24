@@ -151,6 +151,27 @@ extern "C" JNIEXPORT jbyteArray JNICALL
 Java_org_chromium_chrome_browser_omniplay_NativeCore_nativePairingScope(JNIEnv* env,jclass,jlong handle){
   return response_bytes(env,om_mobile_pairing_scope(static_cast<uint64_t>(handle)));
 }
+// Dedicated native-UI entry, deliberately separate from renderer nativeCall.
+extern "C" JNIEXPORT jbyteArray JNICALL
+Java_org_chromium_chrome_browser_omniplay_NativeCore_nativePairingIdentity(JNIEnv* env,jclass,jint operation,jlong handle,jlong revision,jbyteArray input){
+  if(handle<=0||revision<0)return nullptr;
+  const auto owned=static_cast<uint64_t>(handle);
+  switch(operation){
+    case 0:return response_bytes(env,om_mobile_pairing_status(owned));
+    case 1:return response_bytes(env,om_mobile_pairing_prepare_identity_v1(owned,static_cast<uint64_t>(revision),25000));
+    case 2:return response_bytes(env,om_mobile_pairing_review_identity_v1(owned,static_cast<uint64_t>(revision)));
+    case 3:{
+      if(!input)return nullptr;const auto length=env->GetArrayLength(input);
+      if(exception(env)||length<=0||length>128)return nullptr;
+      uint8_t bytes[128]{};
+      env->GetByteArrayRegion(input,0,length,reinterpret_cast<jbyte*>(bytes));
+      if(exception(env))return nullptr;
+      return response_bytes(env,om_mobile_pairing_confirm_identity_v1(owned,bytes,static_cast<size_t>(length),25000));
+    }
+    case 4:return response_bytes(env,om_mobile_pairing_cancel_identity_review(owned));
+    default:return nullptr;
+  }
+}
 extern "C" JNIEXPORT jbyteArray JNICALL
 Java_org_chromium_chrome_browser_omniplay_NativeCore_nativeAttachPairing(JNIEnv* env,jclass,jlong handle,jobject provider){
   if(!provider)return nullptr;auto context=std::make_unique<CredentialContext>();if(env->GetJavaVM(&context->vm)!=JNI_OK)return nullptr;

@@ -2,6 +2,14 @@
 
 ## Current sequence — 1–109 outstanding tasks
 
+Item 58 now authors Android dedicated JNI identity operations, serialized typed
+review callers and a native Game Hub actions/consent dialog. Admission checks
+current trusted tab/activity and unlocked device; one-use review metadata remains
+outside renderer messaging. Pause/disconnect/expiry/cancel suppress stale UI
+callbacks; uncertain states are not replaced or retried automatically. Policy
+remains disabled. No compiler/native/vault/build/test was executed; device/UI
+qualification, recovery, peer pairing and transport remain due. Full scope is open.
+
 Item 58 now authors an iOS native identity button/dialog and serialized status,
 prepare, review, confirm and cancel callers. Public scope/revision/action/expiry
 checks and a separate flow lifetime suppress stale callbacks; existing uncertain

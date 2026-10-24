@@ -48,6 +48,9 @@ public final class GameHubController implements AutoCloseable {
     private boolean mActivityResumed=true;
     private String mSuspension;
     private long mHandshake;
+    private java.util.concurrent.atomic.AtomicBoolean mIdentityFlow;
+    private AlertDialog mIdentityDialog;
+    private Runnable mIdentityExpiry;
     private final Runnable mPauseFallback;
     private final TabObserver mTabObserver=new TabObserver(){
         @Override public void onShown(Tab tab,int type){resume();}
@@ -65,7 +68,7 @@ public final class GameHubController implements AutoCloseable {
         if(mClosed||mOpening||mActivity.getTabModelSelector().isIncognitoSelected()||current!=null&&current.isIncognito())return;
         if(mTab!=null&&!mTab.isDestroyed()){
             var model=mActivity.getTabModelSelector().getModel(false);
-            int index=model.indexOf(mTab);if(index>=0){model.setIndex(index,TabSelectionType.FROM_USER);resume();return;}
+            int index=model.indexOf(mTab);if(index>=0){model.setIndex(index,TabSelectionType.FROM_USER);resume();showNativeHubActions();return;}
         }
         mOpening=true;if(sActive!=null&&sActive!=this)sActive.close();sActive=this;
         mCore.storage(root->{
@@ -142,7 +145,61 @@ public final class GameHubController implements AutoCloseable {
         mCore.request(request,()->!channel.closed,response->{if(!owns(channel)||finished[0])return;if(!mDocuments.finishExport(request,response,reply))reply.accept(response);});
     }
     private void send(Channel channel,JSONObject response){if(owns(channel))channel.port.postMessage(new MessagePayload(response.toString()),null);}
+    private boolean identityUiAvailable(){
+        android.app.KeyguardManager keyguard=(android.app.KeyguardManager)mActivity.getSystemService(android.content.Context.KEYGUARD_SERVICE);
+        android.os.UserManager user=(android.os.UserManager)mActivity.getSystemService(android.content.Context.USER_SERVICE);
+        return !mClosed&&mActivityResumed&&!mActivity.isFinishing()&&!mActivity.isDestroyed()&&mTab!=null&&!mTab.isDestroyed()
+                &&mActivity.getActivityTab()==mTab&&!mTab.isIncognito()&&mChannel!=null&&owns(mChannel)
+                &&keyguard!=null&&!keyguard.isDeviceLocked()&&user!=null&&user.isUserUnlocked();
+    }
+    /** Reachable only by reopening the native Chrome Game Hub menu item. */
+    private void showNativeHubActions(){
+        if(!identityUiAvailable()||mIdentityDialog!=null||mIdentityFlow!=null)return;
+        AlertDialog menu=new AlertDialog.Builder(mActivity).setTitle("Vlikeon Game Hub")
+                .setItems(new String[]{"Continue to library","Remote Play identity"},(dialog,index)->{mIdentityDialog=null;if(index==1)beginIdentityReview();})
+                .setNegativeButton(android.R.string.cancel,(dialog,which)->mIdentityDialog=null).create();
+        mIdentityDialog=menu;menu.setOnDismissListener(dialog->{if(mIdentityDialog==menu)mIdentityDialog=null;});menu.show();
+    }
+    private void beginIdentityReview(){
+        if(!identityUiAvailable()||mIdentityFlow!=null)return;
+        java.util.concurrent.atomic.AtomicBoolean owner=new java.util.concurrent.atomic.AtomicBoolean(true);mIdentityFlow=owner;
+        mCore.reviewPairingIdentity(owner::get,(review,error)->{
+            if(mIdentityFlow!=owner||!owner.get())return;
+            if(!identityUiAvailable()){cancelIdentityReview();return;}
+            if(review==null){cancelIdentityReview();identityNotice(error);return;}
+            long remaining=review.expires-android.os.SystemClock.elapsedRealtime();
+            if(remaining<=0){cancelIdentityReview();identityNotice("The identity review expired. Open its status again.");return;}
+            AlertDialog alert=new AlertDialog.Builder(mActivity).setTitle("Confirm Remote Play identity")
+                    .setMessage("Activate this device's local identity?\n\nDevice: "+review.device+"\nGeneration: "+review.generation+"\nPublic key:\n"+review.key+"\n\nThis does not approve any remote device, connection or input control.")
+                    .setNegativeButton(android.R.string.cancel,(dialog,which)->cancelIdentityReview())
+                    .setPositiveButton("Activate local identity",(dialog,which)->{
+                        mIdentityDialog=null;
+                        if(mIdentityFlow!=owner||!owner.get()||!identityUiAvailable()||android.os.SystemClock.elapsedRealtime()>=review.expires){cancelIdentityReview();return;}
+                        mCore.confirmPairingIdentity(review,owner::get,response->{
+                            if(mIdentityFlow!=owner||!owner.get())return;
+                            cancelIdentityReview();
+                            if(!identityUiAvailable())return;
+                            identityNotice("ok".equals(response.optString("status"))?"Local identity activated. No remote device has been approved.":"Activation could not be confirmed. Open identity status again before continuing.");
+                        });
+                    }).create();
+            mIdentityDialog=alert;alert.setOnCancelListener(dialog->cancelIdentityReview());
+            mIdentityExpiry=()->{if(mIdentityFlow==owner)cancelIdentityReview();};mMain.postDelayed(mIdentityExpiry,remaining);alert.show();
+        });
+    }
+    private void cancelIdentityReview(){
+        boolean hadFlow=mIdentityFlow!=null;
+        if(hadFlow){mIdentityFlow.set(false);mIdentityFlow=null;}
+        if(mIdentityExpiry!=null){mMain.removeCallbacks(mIdentityExpiry);mIdentityExpiry=null;}
+        if(mIdentityDialog!=null){AlertDialog dialog=mIdentityDialog;mIdentityDialog=null;dialog.dismiss();}
+        if(hadFlow)mCore.cancelPairingIdentityReview();
+    }
+    private void identityNotice(String message){
+        if(!identityUiAvailable()||mIdentityDialog!=null)return;
+        AlertDialog alert=new AlertDialog.Builder(mActivity).setTitle("Remote Play").setMessage(message).setPositiveButton(android.R.string.ok,null).create();
+        mIdentityDialog=alert;alert.setOnDismissListener(dialog->{if(mIdentityDialog==alert)mIdentityDialog=null;});alert.show();
+    }
     public void suspend(){
+        cancelIdentityReview();
         if(mClosed)return;
         mCore.setForeground(false);
         if(mChannel!=null&&owns(mChannel)){
@@ -153,6 +210,7 @@ public final class GameHubController implements AutoCloseable {
         }else mCore.suspend();
     }
     private void disconnect(){
+        cancelIdentityReview();
         mCore.setForeground(false);
         ++mHandshake;
         Channel previous=mChannel;mChannel=null;

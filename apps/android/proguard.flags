@@ -2,6 +2,7 @@
     private static native byte[] nativeCall(int, long, byte[]);
     private static native byte[] nativeOpen(byte[], org.chromium.chrome.browser.omniplay.SecureCredentials);
     private static native byte[] nativePairingScope(long);
+    private static native byte[] nativePairingIdentity(int, long, long, byte[]);
     private static native byte[] nativeAttachPairing(long, org.chromium.chrome.browser.omniplay.PairingCredentials);
     private static native byte[] nativeAuthorizeMedia(long, byte[], org.chromium.chrome.browser.omniplay.SelectedDiscTree);
     private static native void nativeSetForeground(long, boolean);

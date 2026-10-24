@@ -100,6 +100,74 @@ public final class NativeCore {
     private static native byte[] nativeCall(int operation, long handle, byte[] input);
     private static native byte[] nativeOpen(byte[] input, SecureCredentials provider);
     private static native byte[] nativePairingScope(long handle);
+    private static native byte[] nativePairingIdentity(int operation,long handle,long revision,byte[] input);
+    interface IdentityReply { void accept(IdentityReview review,String error); }
+    static final class IdentityReview {
+        final String id,key,device,generation; final long expires;
+        private IdentityReview(JSONObject value,String profile) throws Exception {
+            JSONObject address=value.getJSONObject("address");
+            id=value.getString("review_id");key=value.getString("public_key");device=address.getString("device");generation=address.getString("generation");
+            long ttl=value.getLong("expires_in_ms");
+            if(value.getInt("credential_protocol")!=1||!"activate_local_identity".equals(value.getString("action"))||value.getBoolean("approves_remote_peer")
+                    ||!profile.equals(address.getString("profile"))||!device.equals(address.getString("id"))||!"device_signing".equals(address.getString("kind"))
+                    ||!canonicalPairingId(id)||!canonicalPairingId(device)||!canonicalPairingId(generation)||!key.matches("[A-Za-z0-9_-]{43}")||ttl<=0||ttl>60_000)throw new IllegalStateException();
+            expires=android.os.SystemClock.elapsedRealtime()+ttl;
+        }
+    }
+    private static boolean canonicalPairingId(String id){
+        try{return UUID.fromString(id).toString().equals(id)&&!new UUID(0,0).toString().equals(id);}catch(IllegalArgumentException error){return false;}
+    }
+    private static JSONObject pairingResponse(byte[] bytes) throws Exception {
+        try{if(bytes==null||bytes.length==0||bytes.length>1_048_576)throw new IllegalStateException();return new JSONObject(new String(bytes,StandardCharsets.UTF_8));}
+        finally{if(bytes!=null)java.util.Arrays.fill(bytes,(byte)0);}
+    }
+    private static JSONObject pairingResult(JSONObject response) throws Exception {
+        if(!"ok".equals(response.optString("status")))throw new IllegalStateException();return response.getJSONObject("result");
+    }
+    /** Native UI only; no automatic replacement or renderer reply forwarding. */
+    void reviewPairingIdentity(java.util.function.BooleanSupplier alive,IdentityReply reply){
+        java.util.concurrent.atomic.AtomicReference<IdentityReview> candidate=new java.util.concurrent.atomic.AtomicReference<>();
+        work(()->{
+            if(!alive.getAsBoolean()||!mPairingAttached)throw new IllegalStateException();
+            JSONObject status=pairingResult(pairingResponse(nativePairingIdentity(0,mHandle,0,null)));
+            if(!status.getBoolean("policy_available"))return failure("","unsupported_capability","Remote Play is not enabled in this version.");
+            if(!mProfile.equals(status.getString("profile_id")))throw new IllegalStateException();
+            long revision=status.getLong("revision");org.json.JSONArray records=status.getJSONArray("records");JSONObject identity=null;
+            for(int i=0;i<records.length();i++){
+                JSONObject record=records.getJSONObject(i);
+                if("device_signing".equals(record.getJSONObject("address").getString("kind"))&&!"retired".equals(record.getString("phase"))){if(identity!=null)throw new IllegalStateException();identity=record;}
+            }
+            if(!alive.getAsBoolean())throw new IllegalStateException();
+            if(identity==null){
+                JSONObject prepared=pairingResult(pairingResponse(nativePairingIdentity(1,mHandle,revision,null)));
+                if(!"material_ready".equals(prepared.getString("phase")))throw new IllegalStateException();revision=prepared.getLong("revision");
+            }else if(!"material_ready".equals(identity.getString("phase")))return failure("","conflict","An identity already exists or needs recovery. No replacement key was created.");
+            if(!alive.getAsBoolean())throw new IllegalStateException();
+            JSONObject response=pairingResponse(nativePairingIdentity(2,mHandle,revision,null));JSONObject reviewed=pairingResult(response);
+            if(!alive.getAsBoolean()||reviewed.getLong("revision")!=revision||!status.getString("device_id").equals(reviewed.getJSONObject("address").getString("device"))){pairingResponse(nativePairingIdentity(4,mHandle,0,null));throw new IllegalStateException();}
+            candidate.set(new IdentityReview(reviewed,mProfile));
+            return response;
+        },response->{
+            IdentityReview review=candidate.get();
+            if("ok".equals(response.optString("status"))&&review!=null){reply.accept(review,null);return;}
+            if(alive.getAsBoolean())cancelPairingIdentityReview();JSONObject detail=response.optJSONObject("error");reply.accept(null,detail==null?"Identity review ended. Reload its status before continuing.":detail.optString("message","Identity review is unavailable."));
+        });
+    }
+    /** Invoked only by the trusted dialog's explicit approve action. */
+    void confirmPairingIdentity(IdentityReview review,java.util.function.BooleanSupplier alive,Reply reply){
+        work(()->{
+            if(!alive.getAsBoolean()||android.os.SystemClock.elapsedRealtime()>=review.expires||!mPairingAttached)throw new IllegalStateException();
+            byte[] input=new JSONObject().put("review_id",review.id).toString().getBytes(StandardCharsets.UTF_8);
+            JSONObject response;
+            try{response=pairingResponse(nativePairingIdentity(3,mHandle,0,input));}finally{java.util.Arrays.fill(input,(byte)0);}
+            JSONObject value=pairingResult(response),address=value.getJSONObject("address");
+            if(!alive.getAsBoolean()||!"active".equals(value.getString("phase"))||value.getBoolean("approves_remote_peer")
+                    ||!mProfile.equals(address.getString("profile"))||!review.device.equals(address.getString("device"))||!review.device.equals(address.getString("id"))
+                    ||!review.generation.equals(address.getString("generation"))||!"device_signing".equals(address.getString("kind")))throw new IllegalStateException();
+            return response;
+        },reply);
+    }
+    void cancelPairingIdentityReview(){mIo.execute(()->{if(mHandle!=0)try{pairingResponse(nativePairingIdentity(4,mHandle,0,null));}catch(Exception|LinkageError ignored){/* Review remains bounded by epoch/expiry. */}});}
     private static native byte[] nativeAttachPairing(long handle, PairingCredentials provider);
     private boolean attachPairingCredentials() throws Exception {
         byte[] scopeBytes = null, attachedBytes = null;

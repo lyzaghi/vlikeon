@@ -918,6 +918,42 @@ compiler, UIKit dialog, Keychain callback, native endpoint, build or test ran.
 Android callers, recovery, peer consent/exchange/approval, transport and all
 platform qualification remain unfinished. Policy remains disabled.
 
+## Android native identity dialog caller
+
+The dedicated JNI identity entry dispatches only status, preparation, review,
+confirmation and cancellation. It is separate from renderer `nativeCall` and its
+Java declaration is private and retained for shrinking. Confirmation copies at
+most 128 bytes of review-ID JSON onto the synchronous native call stack; budgets
+are fixed at 25 seconds and no secret is returned through JNI.
+
+NativeCore serializes these calls through its existing bounded work lane. It
+reads status/policy first, refuses replacement of active or uncertain identities,
+and checks public profile/device/generation/action/revision metadata. A typed
+review is created on the worker before UI dispatch, so main-thread delays do not
+restart its monotonic UI expiry. Rust's original expiry is authoritative. Public
+response arrays are bounded and cleared after decoding. The review token and
+metadata are not sent to the renderer channel.
+
+The current native entry is reached by selecting the Chrome Game Hub menu again
+when its existing tab is open. The resulting native actions menu offers the
+library or Remote Play identity. The confirmation alert displays exact public
+key/device/generation and explains local-only activation; only its positive
+action calls confirmation. A separate atomic lifetime suppresses stale callbacks
+after cancel, expiry, pause, tab hiding/navigation disconnect or close. Native UI
+admission checks the current non-incognito Game Hub, resumed activity, unlocked
+user and device. This does not attest to every intervening OS lock transition.
+
+Cancellation schedules transient review cleanup and does not preempt a blocked
+vault call or roll back a committed activation. Uncertain results require reading
+status again, with no automatic retry. The installed policy remains disabled and
+the menu reports unavailability before preparing a key. Peer consent/exchange,
+startup recovery, rotation, relay approval and transport are still unfinished.
+
+No Java/C++ compiler, Chromium menu, JNI callback, Android vault, native endpoint,
+build or test was executed. Only source review and whitespace inspection were
+performed. Menu discoverability, localization, lifecycle/lock/deadline behavior
+and all device/ABI qualification remain due.
+
 ## Remaining implementation and qualification
 
 - Journal/executor/lease/writer product integration, authority epochs, actual native owner
