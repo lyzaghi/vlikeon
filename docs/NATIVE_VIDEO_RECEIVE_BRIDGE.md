@@ -1,5 +1,20 @@
 # Native ordered RTP to decoder bridge — item 56
 
+`WindowsH264Backend<S>` now supplies concrete codec admission for the existing
+progressive SDR FIFO lane. Its native-only constructor pins negotiated profile
+66/77/100, exact constraints/level 3.1–4.2 and the configured 720/1080 30/60 profile.
+It checks 8-bit 4:2:0 geometry/crop, selected level frame/rate/reference capacity,
+explicit square-pixel BT.709 limited centered-chroma VUI, fixed timing and zero
+reorder restrictions, plus baseline/main syntax limits. Stateful/unimplemented
+SEI is refused; bounded user-data envelopes remain supported. Actual native
+authority is freshly observed on prepare/retry/completion. `into_receiver` checks
+the decoder's retained configuration/owner and constructs the real parameter +
+POC/DPB admission path. No product service/transport caller is installed yet.
+Full profile constraint semantics, HRD/bitrate/entropy/coverage validation,
+missing-metadata negotiation, extended formats/SEI/fields/reorder and platform
+qualification remain open. This is the current lane's implementation, not a
+redefinition of the broader Remote Play scope. Build/test remain deferred.
+
 ParameterAdmission now owns FrameDecodeState and puts the staged POC/reference
 plan in each admission proof. Its matched-output callback commits that plan
 after backend completion checks. The progressive FIFO receiver defers admission

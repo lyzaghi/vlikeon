@@ -96,14 +96,15 @@ impl Drop for WindowsOwnedVideo{fn drop(&mut self){let _=self.worker.close();}}
 pub struct UnpresentedVideoFrame{pub owner:VideoOwner,pub frame:omniplay_stream_input::video_client::DecodedVideoFrame}
 /// Private viewer adapter, not receiver/codec/display permission. Separate
 /// installed admission and native receive/document/pair observation are due.
-pub struct WindowsVideoDecoder{worker:VideoWorker,closed:bool}
+pub struct WindowsVideoDecoder{worker:VideoWorker,closed:bool,profile:Profile}
 impl WindowsVideoDecoder{
+    pub fn profile(&self)->Profile{self.profile}
     pub fn owner(&self)->VideoOwner{self.worker.owner()}
     pub fn check_authority(&self)->Result<()>{if self.closed{return Err(unavailable());}self.worker.remaining_authorized().map(|_|())}
     pub fn attach(mut worker:VideoWorker,profile:Profile)->Result<Self>{
         profile.validate()?;if !worker.decoder_mode(){return Err(unavailable());}
         worker.configure(VideoProfile{width:profile.width,height:profile.height,fps:profile.fps,bitrate:profile.bitrate_bps,require_hardware:false})?;
-        worker.remaining_authorized()?;Ok(Self{worker,closed:false})
+        worker.remaining_authorized()?;Ok(Self{worker,closed:false,profile})
     }
     pub fn submit_admitted(&mut self,annex_b:Vec<u8>,timestamp_100ns:i64,receipt:omniplay_stream_input::video_client::DecoderReceipt)->Result<bool>{
         self.submit_admitted_borrowed(&annex_b,timestamp_100ns,receipt)

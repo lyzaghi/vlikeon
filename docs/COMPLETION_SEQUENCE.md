@@ -2,6 +2,8 @@
 
 ## Current sequence — 1–109 outstanding tasks
 
+Source checkpoint: a concrete Windows progressive SDR H.264 backend now joins native authority observation, negotiated/configured format checks and the parameter/POC/DPB receiver pipeline through an explicit constructor. Actual transport/service ownership and extended-format/general reorder/coverage completion remain unfinished. No build/test executed.
+
 Source checkpoint: matched decoder output now commits the concrete POC/DPB plan owned by ParameterAdmission. Progressive FIFO scheduling defers plan preparation until queue head, preserves plans on S_FALSE and waits for prior completion before planning dependencies. General reorder/fields/gaps, complete codec/owner backend and product transport wiring remain unfinished; build/test stay deferred.
 
 Source checkpoint: Windows decoder output now produces a native-only matched-picture receipt; receiver retains accepted proofs until exact output correlation and calls consuming admission/backend completion. Combined pending/in-flight remains bounded. POC/DPB backend callback implementation and full negotiated/general reorder support remain unfinished; build/test stay deferred.

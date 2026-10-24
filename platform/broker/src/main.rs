@@ -15,6 +15,7 @@ mod stream_gamepad_recovery;
 #[cfg(windows)]mod stream_video_authority;
 #[cfg(windows)]mod stream_video_installation;
 #[cfg(windows)]mod stream_video_receive;
+#[cfg(windows)]mod stream_video_codec;
 
 use omniplay_contracts::{ErrorCode, PlatformError, Request, Response};
 use omniplay_core::Database;
