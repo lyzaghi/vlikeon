@@ -96,7 +96,7 @@ impl Sps{
 }
 /// An empty present list denotes the explicit use-default matrix flag. Missing
 /// lists and fallback matrix derivation are intentionally distinct and deferred.
-fn scaling_list(bits:&mut ParameterSetBits,count:usize)->Result<Vec<u8>>{
+pub(crate) fn scaling_list(bits:&mut ParameterSetBits,count:usize)->Result<Vec<u8>>{
     let mut last=8i32;let mut next=8i32;let mut values=Vec::new();
     for index in 0..count{
         if next!=0{

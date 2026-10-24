@@ -6,6 +6,7 @@ pub mod native_h264_rtp;
 pub mod native_h264_receive;
 pub mod native_h264_bits;
 pub mod native_h264_sps;
+pub mod native_h264_pps;
 pub mod native_rtp_reorder;
 pub mod native_credentials;
 pub mod native_pair_exchange;

@@ -2,6 +2,8 @@
 
 ## Current sequence — 1–109 outstanding tasks
 
+Source checkpoint: ordinary H.264 PPS parsing now binds the exact supplied SPS ID and retains bounded slice-group types 0–6, entropy/quantization/prediction/reference defaults and optional transform/scaling syntax. `NATIVE_H264_PPS.md` records geometry/allocation limits and missing table/version/slice/semantic work. No complete receiver admission or decoder wiring is claimed. Build/test/parser/media execution remain deferred.
+
 Source checkpoint: ordinary H.264 SPS parsing now retains bounded geometry/crop, chroma/depth/scaling, POC/reference state and VUI/HRD/timing/restriction metadata through exact trailing-bit consumption. `NATIVE_H264_SPS.md` records recognized syntax, resource caps and missing semantic/negotiation checks. This is not full decoder admission; PPS/slice/dependency checks and actual bridge wiring remain open. No build/test/parser/decoder execution ran.
 
 Source checkpoint: native H.264 parameter-set parsing now has a bounded SPS/PPS RBSP bit-reader primitive with checked emulation-prevention removal, sticky read failures, caller-bounded Exp-Golomb fields and exact trailing-bit consumption. It does not yet parse full SPS/PPS/VUI semantics or implement the mandatory receiver admission interface. `NATIVE_H264_PARAMETER_BITS.md` records remaining integration and qualification. No build/test/parser/decoder/network operation ran.

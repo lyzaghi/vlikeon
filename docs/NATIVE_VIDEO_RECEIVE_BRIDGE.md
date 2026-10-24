@@ -1,5 +1,10 @@
 # Native ordered RTP to decoder bridge — item 56
 
+Ordinary PPS metadata parsing now exists as described in `NATIVE_H264_PPS.md`.
+The actual bitstream/negotiation admission implementation, retained parameter
+versions and slice/reference checks remain unfinished. No bridge caller invokes
+this parser or treats parsed metadata as decoder authority.
+
 Ordinary SPS/VUI/HRD metadata now has the bounded parser described in
 `NATIVE_H264_SPS.md`. Parameter-set dependencies, full semantic/negotiation
 admission and the actual receiver implementation remain outstanding. No current

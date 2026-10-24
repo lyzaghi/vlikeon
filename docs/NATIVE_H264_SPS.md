@@ -1,5 +1,9 @@
 # Native H.264 ordinary SPS metadata — item 56
 
+The subsequent PPS metadata parser is documented in `NATIVE_H264_PPS.md`.
+It does not complete parameter versioning, semantic/negotiation checks or slice
+dependencies; the broader remaining requirements below still apply.
+
 Source only. No parser, compiler, test, decoder/media/device or network operation
 ran. The receiver admission interface still has no complete implementation.
 
