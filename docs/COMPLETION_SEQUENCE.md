@@ -2,6 +2,11 @@
 
 ## Current sequence — 1–109 outstanding tasks
 
+Item 58 Android native menu now authors host label/relay setup, explicit local
+creation, separate registration and explicit invitation-code reveal. Proof view
+uses FLAG_SECURE, no state saving and text clearing on dismissal. Source-only;
+peer approval UI, iOS host views and build/test/qualification remain due.
+
 Item 58 new host creation now refuses retained durable invitation cleanup under
 the scoped lease, including after process restart. Both mobile host-begin helpers
 surface the same gate before consuming setup; client setup remains usable.

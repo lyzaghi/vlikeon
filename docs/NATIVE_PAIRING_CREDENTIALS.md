@@ -1840,6 +1840,17 @@ this checkpoint.
 
 ## Remaining implementation and qualification
 
+Android host invitation setup is now reachable from the native menu. Active
+identity setup supplies relay choices; user creates locally then separately
+registers. Only another explicit action fetches/reveals proof. The selectable
+proof view disables state saving, requests FLAG_SECURE and clears displayed text
+on dismissal/lifecycle expiry. Its Java String/UI/clipboard aliases are not
+reliably erasable; the view explains copied text may remain in clipboard history.
+Raw callback bytes still wipe after rendering. Original setup/invitation timers
+cover the flow and explicit close uses existing cleanup. No automatic peer
+approval, connection or renderer route is added. No build/test/UI render/native
+operation ran. Host peer selection/consent, iOS views and qualification remain due.
+
 New host invitation creation now checks the current scoped journal under its
 retained lease and refuses any durable invitation cleanup debt before generating
 proof or signing an invite. Mobile setup snapshots retain this advisory state

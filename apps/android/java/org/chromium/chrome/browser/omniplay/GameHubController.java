@@ -168,9 +168,80 @@ public final class GameHubController implements AutoCloseable {
     private void showNativeHubActions(){
         if(!identityUiAvailable()||mIdentityDialog!=null||mIdentityFlow!=null)return;
         AlertDialog menu=new AlertDialog.Builder(mActivity).setTitle("Vlikeon Game Hub")
-                .setItems(new String[]{"Continue to library","Remote Play identity","Remote Play status and recovery","Pair with a remote host"},(dialog,index)->{mIdentityDialog=null;if(index==1)beginIdentityReview();else if(index==2)beginPairingRecovery();else if(index==3)beginClientPairing();})
+                .setItems(new String[]{"Continue to library","Remote Play identity","Remote Play status and recovery","Pair with a remote host","Create host invitation"},(dialog,index)->{mIdentityDialog=null;if(index==1)beginIdentityReview();else if(index==2)beginPairingRecovery();else if(index==3)beginClientPairing();else if(index==4)beginHostInvitation();})
                 .setNegativeButton(android.R.string.cancel,(dialog,which)->mIdentityDialog=null).create();
         mIdentityDialog=menu;menu.setOnDismissListener(dialog->{if(mIdentityDialog==menu)mIdentityDialog=null;});menu.show();
+    }
+    private void beginHostInvitation(){
+        if(!identityUiAvailable()||mIdentityFlow!=null)return;
+        java.util.concurrent.atomic.AtomicBoolean owner=new java.util.concurrent.atomic.AtomicBoolean(true);mIdentityFlow=owner;
+        mCore.clientPairingSetup(owner::get,(setup,error)->{
+            if(mIdentityFlow!=owner||!owner.get())return;
+            if(!identityUiAvailable()||setup==null){cancelIdentityReview();if(identityUiAvailable())identityNotice(error);return;}
+            android.widget.LinearLayout form=new android.widget.LinearLayout(mActivity);form.setOrientation(android.widget.LinearLayout.VERTICAL);
+            android.widget.EditText label=new android.widget.EditText(mActivity);label.setHint("Host device label");label.setSingleLine(true);label.setSaveEnabled(false);label.setFilters(new android.text.InputFilter[]{new android.text.InputFilter.LengthFilter(64)});
+            android.widget.Spinner relay=new android.widget.Spinner(mActivity);relay.setAdapter(new android.widget.ArrayAdapter<>(mActivity,android.R.layout.simple_spinner_dropdown_item,setup.relayOrigins));form.addView(label);form.addView(relay);
+            AlertDialog alert=new AlertDialog.Builder(mActivity).setTitle("Create host invitation")
+                    .setMessage("Local public key:\n"+setup.identityKey+"\n\nCreating an invitation does not publish it or approve any peer. Setup expires in 30 seconds.")
+                    .setView(form).setNegativeButton("Later",(dialog,which)->cancelIdentityReview()).setPositiveButton("Create locally",null).create();
+            mIdentityDialog=alert;alert.setOnCancelListener(dialog->cancelIdentityReview());alert.show();
+            alert.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(button->{
+                String name=label.getText().toString();
+                if(name.isEmpty()||name.getBytes(StandardCharsets.UTF_8).length>120){label.setError("Enter a label up to 120 UTF-8 bytes.");return;}
+                if(mIdentityFlow!=owner||!owner.get()||!identityUiAvailable()){cancelIdentityReview();return;}
+                String origin=(String)relay.getSelectedItem();alert.dismiss();mIdentityDialog=null;
+                if(mIdentityExpiry!=null){mMain.removeCallbacks(mIdentityExpiry);mIdentityExpiry=null;}
+                mCore.beginPairingHost(setup,origin,name,owner::get,response->{
+                    if(mIdentityFlow!=owner||!owner.get())return;
+                    try{
+                        if(!identityUiAvailable()||!"ok".equals(response.getString("status")))throw new IllegalStateException();
+                        JSONObject value=response.getJSONObject("result");String ticket=value.getString("ticket");
+                        long remaining=Math.min(300_000,value.getLong("expires_at_ms")-System.currentTimeMillis());if(remaining<=0)throw new IllegalStateException();
+                        mIdentityExpiry=()->{if(mIdentityFlow==owner)cancelIdentityReview();};mMain.postDelayed(mIdentityExpiry,remaining);showHostRegistration(ticket,owner);
+                    }catch(Exception failure){cancelIdentityReview();identityNotice("Host preparation is uncertain. Inspect status before retrying.");}
+                });
+            });
+            mIdentityExpiry=()->{if(mIdentityFlow==owner)cancelIdentityReview();};mMain.postDelayed(mIdentityExpiry,Math.max(0,setup.expires-android.os.SystemClock.elapsedRealtime()));
+        });
+    }
+    private void showHostRegistration(String ticket,java.util.concurrent.atomic.AtomicBoolean owner){
+        if(mIdentityFlow!=owner||!owner.get()||!identityUiAvailable()){cancelIdentityReview();return;}
+        AlertDialog alert=new AlertDialog.Builder(mActivity).setTitle("Register host invitation?")
+                .setMessage("Publish the signed public invitation to the configured service. This does not share the invitation code or approve a peer. Closing this screen leaves cleanup available in status.")
+                .setNegativeButton("Close invitation",(dialog,which)->{mIdentityDialog=null;closeHostInvitation(ticket,owner);})
+                .setPositiveButton("Register invitation",(dialog,which)->{
+                    mIdentityDialog=null;
+                    if(mIdentityFlow!=owner||!owner.get()||!identityUiAvailable()){cancelIdentityReview();return;}
+                    mCore.pairingHostTicket(ticket,1,owner::get,response->{
+                        if(mIdentityFlow!=owner||!owner.get())return;
+                        if(!identityUiAvailable()||!"ok".equals(response.optString("status"))){cancelIdentityReview();identityNotice("Registration could not be confirmed. Inspect status before retrying.");return;}
+                        showHostShareAction(ticket,owner);
+                    });
+                }).create();
+        mIdentityDialog=alert;alert.setOnCancelListener(dialog->cancelIdentityReview());alert.show();
+    }
+    private void showHostShareAction(String ticket,java.util.concurrent.atomic.AtomicBoolean owner){
+        if(mIdentityFlow!=owner||!owner.get()||!identityUiAvailable()){cancelIdentityReview();return;}
+        AlertDialog alert=new AlertDialog.Builder(mActivity).setTitle("Host invitation registered")
+                .setMessage("Reveal the invitation code only to the intended peer. Verify the host public key independently, then compare codes before approving. Viewing the code does not approve a peer.")
+                .setNegativeButton("Close invitation",(dialog,which)->{mIdentityDialog=null;closeHostInvitation(ticket,owner);})
+                .setPositiveButton("Reveal invitation code",(dialog,which)->{
+                    mIdentityDialog=null;
+                    if(mIdentityFlow!=owner||!owner.get()||!identityUiAvailable()){cancelIdentityReview();return;}
+                    mCore.sharePairingHost(ticket,owner::get,(bytes,error)->{
+                        if(mIdentityFlow!=owner||!owner.get())return;
+                        if(!identityUiAvailable()||bytes==null){cancelIdentityReview();if(identityUiAvailable())identityNotice(error);return;}
+                        android.widget.TextView code=new android.widget.TextView(mActivity);code.setSaveEnabled(false);code.setTextIsSelectable(true);code.setText(new String(bytes,StandardCharsets.US_ASCII));
+                        android.widget.ScrollView scroll=new android.widget.ScrollView(mActivity);scroll.addView(code);
+                        AlertDialog share=new AlertDialog.Builder(mActivity).setTitle("Private invitation code")
+                                .setMessage("Share only with the intended peer. Copied text may remain in clipboard history after this view closes.").setView(scroll)
+                                .setNegativeButton("Close invitation",(dialog,which)->{mIdentityDialog=null;closeHostInvitation(ticket,owner);})
+                                .setPositiveButton("Hide code",(dialog,which)->{mIdentityDialog=null;showHostShareAction(ticket,owner);}).create();
+                        mIdentityDialog=share;share.setOnCancelListener(dialog->cancelIdentityReview());share.setOnDismissListener(dialog->code.setText(""));
+                        if(share.getWindow()!=null)share.getWindow().addFlags(android.view.WindowManager.LayoutParams.FLAG_SECURE);share.show();
+                    });
+                }).create();
+        mIdentityDialog=alert;alert.setOnCancelListener(dialog->cancelIdentityReview());alert.show();
     }
     private void beginClientPairing(){
         if(!identityUiAvailable()||mIdentityFlow!=null)return;
