@@ -2,6 +2,14 @@
 
 ## Current sequence — 1–109 outstanding tasks
 
+Item 58 now connects exact-generation vault removal/read-back from the native
+recovery dialogs through scoped mobile providers and LocalHost. The real lease,
+current RemoveMaterial plan and retained writer/local/relay receipts are required;
+unknown external cleanup cannot be skipped. Missing-only read-back precedes the
+journal receipt; uncertain results require reload. No UI/native/vault/file/SQL,
+compiler/build/test was executed. Producer owners, relay/startup integration and
+qualification remain due; full original 51–109 scope is still incomplete.
+
 Item 58 now authors Android native recovery list/detail/approval UI, immutable
 bounded status/plan snapshots and a private recovery JNI caller. Exact selected
 address/revision and remaining snapshot budget bind metadata actions; external

@@ -64,7 +64,9 @@
     "iOS native recovery status caller admits bounded exact record/plan mappings and current native profile/device with a monotonic snapshot lifetime",
     "iOS status/list/detail source displays pending cleanup and permits only explicit journal fence/finalization approval, bound to selected snapshot address/revision and remaining budget",
     "Android immutable bounded recovery snapshots admit exact native record/plan mappings and establish expiry before status I/O",
-    "Android native recovery list/detail source permits explicit journal fence/finalization only; private retained JNI recovery entry bounds input/budget and caller admits exact response binding"
+    "Android native recovery list/detail source permits explicit journal fence/finalization; private retained JNI recovery entry bounds input/budget and caller admits exact response binding",
+    "Concrete vault removal product path retains the real lease, requires exact current RemoveMaterial plan/revision and commits MaterialAbsent only after scoped deletion and explicit-missing read-back",
+    "Mobile removal ABI observes provider access/foreground epoch; Android/iOS dialogs require explicit permanent-key-removal approval and route only the exact selected admitted generation"
   ],
   "build_executed": false,
   "tests_executed": false,

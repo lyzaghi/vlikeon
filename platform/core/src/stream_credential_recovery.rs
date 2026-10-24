@@ -78,6 +78,28 @@ pub fn advance_metadata(database:&Database,lease:&CredentialLease,profile:Uuid,a
 #[derive(Deserialize)]#[serde(deny_unknown_fields)]
 struct RelayRetirement{revoked:bool,retirement_protocol:u32,pair_id:Uuid,grant_hash:String,reason:String}
 
+/// Actual vault removal only after the journal admits RemoveMaterial. Existing
+/// writer/local/relay receipts and identity-child ordering are prerequisites;
+/// this function does not manufacture any of them. Hold the real lease through
+/// synchronous delete, missing-only read-back and final journal publication.
+pub fn remove_retired_material(database:&Database,lease:&CredentialLease,profile:Uuid,address:CredentialAddress,
+    expected:u64,store:&dyn PairingSecretStore,now:u64,deadline:Instant)->Result<Journal>{
+    let started=Instant::now();check_deadline(deadline)?;lease.check(database,profile)?;
+    if deadline.saturating_duration_since(started)>Duration::from_secs(30){return Err(conflict());}
+    address.validate()?;
+    if address.profile()!=profile||address.device()!=database.device_id{return Err(conflict());}
+    let snapshot=journal::load(database,profile)?;check_deadline(deadline)?;
+    if snapshot.revision()!=expected{return Err(conflict());}
+    let plan=snapshot.recovery_plan(checked_now(now,started)?)?;
+    if !plan.iter().any(|action|action.address()==address&&matches!(action.step(),RecoveryStep::RemoveMaterial)){return Err(conflict());}
+    lease.check(database,profile)?;check_deadline(deadline)?;
+    delete_material(store,&address)?;
+    // A locked/error/late read-back cannot become positive absence evidence.
+    check_deadline(deadline)?;lease.check(database,profile)?;
+    let updated=journal::observe_cleanup(database,lease,profile,expected,address,CleanupObservation::MaterialAbsent)?;
+    check_deadline(deadline)?;Ok(updated)
+}
+
 /// Concrete paired-relay cleanup branch for the native recovery controller.
 /// Local generation fencing, writer containment and local retirement must
 /// already be durably confirmed. It is NOT a renderer revoke endpoint or proof

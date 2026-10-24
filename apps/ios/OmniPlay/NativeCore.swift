@@ -210,17 +210,20 @@ final class NativeCore {
         }
     }
     /// Only after native approval of the exact record from this snapshot.
-    func advancePairingMetadata(_ record:NativeRecoveryRecord,snapshot:NativeRecoverySnapshot,owner:NativeDocumentLifetime,completion:@escaping @MainActor (Result<String,Error>)->Void){
+    func advancePairingRecovery(_ record:NativeRecoveryRecord,snapshot:NativeRecoverySnapshot,owner:NativeDocumentLifetime,completion:@escaping @MainActor (Result<String,Error>)->Void){
         queue.async{
             do{
                 let started=DispatchTime.now()
                 guard owner.active,started<snapshot.expires,self.handle != 0,self.pairingAttached,
-                      ["fence_generation","finalize_retirement"].contains(record.nextStep ?? ""),
+                      ["fence_generation","finalize_retirement","remove_material"].contains(record.nextStep ?? ""),
                       snapshot.records.contains(where:{$0.generation==record.generation&&$0.phase==record.phase&&$0.nextStep==record.nextStep&&NSDictionary(dictionary:$0.address).isEqual(to:record.address)}) else{throw OmniFailure.message("Hãy mở lại trạng thái trước khi phục hồi.")}
                 let remaining=(snapshot.expires.uptimeNanoseconds-started.uptimeNanoseconds)/1_000_000
                 guard remaining>=1_000 else{throw OmniFailure.message("Trạng thái đã hết hạn. Hãy mở lại trước khi phục hồi.")}
                 let budget=UInt32(min(25_000,remaining))
-                let value=try self.unwrap(self.call(["address":record.address,"expected_revision":snapshot.revision]){om_mobile_pairing_advance_metadata_v1(self.handle,$0,$1,budget)})
+                let value=try self.unwrap(self.call(["address":record.address,"expected_revision":snapshot.revision]){data,length in
+                    if record.nextStep=="remove_material"{return om_mobile_pairing_remove_material_v1(self.handle,data,length,budget)}
+                    return om_mobile_pairing_advance_metadata_v1(self.handle,data,length,budget)
+                })
                 guard owner.active,(value["recovery_protocol"] as? NSNumber)?.uint32Value==1,value["reload_required"] as? Bool == true,
                       let address=value["address"] as? [String:Any],NSDictionary(dictionary:address).isEqual(to:record.address),
                       let result=value["result"] as? [String:Any],let outcome=result["outcome"] as? String,

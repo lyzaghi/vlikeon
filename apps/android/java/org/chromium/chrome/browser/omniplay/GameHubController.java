@@ -226,12 +226,14 @@ public final class GameHubController implements AutoCloseable {
         if(mIdentityFlow!=owner||!owner.get()||!identityUiAvailable()||android.os.SystemClock.elapsedRealtime()>=snapshot.expires){cancelIdentityReview();return;}
         String message="Device: "+record.device+"\nGeneration: "+record.generation+"\nStatus: "+recoveryPhase(record.phase)+"\nPublic key:\n"+record.key+"\n\n"+recoveryStep(record.nextStep);
         if("fence_generation".equals(record.nextStep))message+="\n\nDisabling this generation is permanent. Disabling an identity also disables its pairs. This does not confirm that connections stopped or keys were deleted.";
+        if("remove_material".equals(record.nextStep))message+="\n\nPermanently delete only this generation's key from the device vault. This action cannot restore it. Removal is allowed only after all stop/revocation confirmations already exist.";
         AlertDialog.Builder builder=new AlertDialog.Builder(mActivity).setTitle("Remote Play record").setMessage(message)
                 .setNegativeButton(android.R.string.cancel,(dialog,which)->cancelIdentityReview());
-        if(record.canAdvance())builder.setPositiveButton("fence_generation".equals(record.nextStep)?"Disable this generation":"Finish cleanup",(dialog,which)->{
+        String actionTitle="remove_material".equals(record.nextStep)?"Delete this generation's key":("fence_generation".equals(record.nextStep)?"Disable this generation":"Finish cleanup");
+        if(record.canAdvance())builder.setPositiveButton(actionTitle,(dialog,which)->{
             mIdentityDialog=null;
             if(mIdentityFlow!=owner||!owner.get()||!identityUiAvailable()||android.os.SystemClock.elapsedRealtime()>=snapshot.expires){cancelIdentityReview();return;}
-            mCore.advancePairingMetadata(snapshot,record,owner::get,response->{
+            mCore.advancePairingRecovery(snapshot,record,owner::get,response->{
                 if(mIdentityFlow!=owner||!owner.get())return;cancelIdentityReview();
                 if(!identityUiAvailable())return;
                 identityNotice("ok".equals(response.optString("status"))?"Open status and recovery again to inspect the current result and next step.":"The result could not be confirmed. Open status and recovery again before continuing.");

@@ -80,6 +80,18 @@ impl LocalHost {
         };
         Ok(json!({"recovery_protocol":1,"address":address,"result":value,"reload_required":true}))
     }
+    /// Actual exact-generation removal after all persisted retirement receipts.
+    /// No policy enablement is required to finish cleanup; no fallback receipts.
+    pub fn native_pairing_remove_material(&mut self,address:omniplay_streaming::native_credentials::CredentialAddress,
+        expected:u64,store:&dyn omniplay_streaming::native_credentials::PairingSecretStore,deadline:std::time::Instant)->Result<Value>{
+        self.ensure_open()?;
+        if std::time::Instant::now()>=deadline{return Err(PlatformError::new(ErrorCode::DeadlineExceeded,"Native vault cleanup expired before lease admission"));}
+        let lease=omniplay_core::stream_credential_lease::CredentialLease::acquire(&self.database,self.profile_id)?;
+        self.identity_review=None;
+        let updated=omniplay_core::stream_credential_recovery::remove_retired_material(&self.database,&lease,self.profile_id,address,
+            expected,store,omniplay_core::now_ms(),deadline)?;
+        Ok(json!({"recovery_protocol":1,"address":address,"result":{"outcome":"committed","revision":updated.revision()},"reload_required":true}))
+    }
     /// Trusted native foreground/consent controller supplies the scoped store.
     /// Prepares MaterialReady only; no identity activation or pairing approval.
     pub fn native_pairing_prepare_identity(&self,store:&dyn omniplay_streaming::native_credentials::PairingSecretStore,

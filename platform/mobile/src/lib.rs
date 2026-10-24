@@ -148,6 +148,25 @@ pub unsafe extern "C" fn om_mobile_pairing_advance_metadata_v1(handle:u64,data:*
     Ok(value)
 })())}
 
+/// # Safety
+/// Same borrowed recovery request contract as advance_metadata_v1. Native user
+/// approval selects exact-generation key removal, only after all retirement
+/// receipts already exist. No flags/secret bytes or replacement key are accepted.
+#[no_mangle]
+pub unsafe extern "C" fn om_mobile_pairing_remove_material_v1(handle:u64,data:*const u8,length:usize,budget_ms:u32)->OmniBuffer{result((||{
+    if !(1000..=25000).contains(&budget_ms)||length>1024{return Err(error(ErrorCode::InvalidRequest,"Native vault cleanup arguments exceed their bounds"));}
+    let deadline=std::time::Instant::now()+std::time::Duration::from_millis(u64::from(budget_ms));
+    // SAFETY: caller supplies the bounded synchronous input borrow above.
+    let request:PairingMetadataRecovery=serde_json::from_slice(unsafe{input(data,length)?}).map_err(|_|error(ErrorCode::InvalidRequest,"Native vault cleanup arguments are invalid"))?;
+    let(host,provider,epoch)=pairing_operation(handle)?;
+    let mut host=host.lock().map_err(|_|error(ErrorCode::Internal,"Mobile profile is unavailable"))?;
+    provider.confirm_access(&request.address,epoch)?;
+    let value=host.native_pairing_remove_material(request.address,request.expected_revision,provider.as_ref(),deadline)?;
+    provider.confirm_access(&request.address,epoch)?;
+    if std::time::Instant::now()>=deadline{return Err(error(ErrorCode::DeadlineExceeded,"Native vault cleanup completed after its deadline; reload journal state"));}
+    Ok(value)
+})())}
+
 /// Metadata for a trusted native confirmation dialog, never renderer dispatch.
 #[no_mangle]
 pub extern "C" fn om_mobile_pairing_review_identity_v1(handle:u64,expected_revision:u64)->OmniBuffer{result((||{

@@ -76,6 +76,14 @@ OmniBuffer om_mobile_pairing_status(uint64_t handle);
  * error, which may follow a durable commit. This does not stop native backends.
  */
 OmniBuffer om_mobile_pairing_advance_metadata_v1(uint64_t handle,const uint8_t* data,size_t length,uint32_t budget_ms);
+/* Same request/budget contract, but explicit native approval of permanent
+ * exact-generation vault removal. Current plan MUST be RemoveMaterial, after
+ * durable writer/local/relay retirement and identity-child cleanup. Performs
+ * actual provider deletion/read-back under the retained credential lease.
+ * Locked, corrupt, failed or late observations do not prove absence. Errors may
+ * follow successful deletion/commit: reload instead of assuming rollback.
+ */
+OmniBuffer om_mobile_pairing_remove_material_v1(uint64_t handle,const uint8_t* data,size_t length,uint32_t budget_ms);
 OmniBuffer om_mobile_pairing_prepare_identity_v1(uint64_t handle,uint64_t expected_revision,uint32_t budget_ms);
 /* Native UI must display the returned exact identity/action, then invoke
  * confirmation ONLY after explicit user approval. Token alone is not consent.

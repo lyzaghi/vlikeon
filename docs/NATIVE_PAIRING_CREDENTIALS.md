@@ -1050,6 +1050,38 @@ No Java/C++ compilation, Android dialog/menu, JNI endpoint, lease/SQL mutation,
 vault, build or test was executed. Actual device/lifecycle/presentation/localization
 qualification, startup reconciliation and external retirement owners remain due.
 
+## Exact-generation vault removal product path
+
+A concrete removal branch now connects LocalHost and the mobile provider to
+actual exact-generation vault deletion/read-back. It requires the current plan
+to be RemoveMaterial under the retained real credential lease and exact expected
+journal revision. Existing writer, local and relay retirement receipts and the
+identity-child ordering must already be present. This branch does not infer or
+create any of those prerequisite receipts.
+
+The scoped provider removes only the admitted generation and then reads it back.
+Only explicit missing is absence evidence; locked, corrupt, failed or late
+observations keep cleanup uncertain. After read-back and lease/deadline checks,
+the journal records MaterialAbsent and applies its existing retirement invariant.
+A post-commit error may leave deletion/retirement committed, so callers reload
+status rather than assuming rollback or generating another key.
+
+The dedicated mobile C entry bounds the exact-address/revision request, retains
+host/provider ownership and observes provider access/foreground epoch before and
+after work. It is not renderer dispatch. iOS and Android typed recovery callers
+now route a selected RemoveMaterial step to this entry; other recovery steps
+retain their separate metadata path. Android's private JNI declaration and
+shrinker signature are updated together for the native removal selector.
+
+Both native dialogs display permanent exact-generation key removal and require
+explicit approval. Unobserved writer/session or relay cleanup still has no
+execution button and cannot be skipped to reach deletion. Installed streaming
+policy remains disabled; cleanup does not require enabling new sessions.
+
+No native/UI/vault/lease/SQL operation, compiler, build or test was executed.
+Actual producer retirement owners, startup reconciliation, relay cleanup product
+integration and all provider/device/failure qualification remain unfinished.
+
 ## Remaining implementation and qualification
 
 - Journal/executor/lease/writer product integration, authority epochs, actual native owner
