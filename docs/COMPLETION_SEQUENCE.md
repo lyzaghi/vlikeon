@@ -2,6 +2,8 @@
 
 ## Current sequence — 1–109 outstanding tasks
 
+Source correction: moved all Winsock/Win32 unsafe calls out of the forbid-unsafe broker into the existing native stream-input crate, exported a safe facade/receipt trait and transferred required Windows features. Adjusted active timestamp boolean fields and ancillary timestamp type to the pinned windows-sys bindings. No build/test executed; ICE/DTLS/SRTP and product caller remain unfinished.
+
 Source checkpoint: Windows active timestamp API is now resolved lazily from the already-imported system module, so an absent newer export rejects video capability instead of preventing broker startup. Generic UDP setup now also retains the crypto engine in the caller's slot on validation/socket errors. Actual ICE/DTLS/SRTP implementation and product caller remain open; build/test are deferred.
 
 Source checkpoint: native UDP ingress now has a concrete Windows constructor assembling selected-socket binding, active software timestamp validation and atomic datagram receipt. Setup errors retain the crypto engine in the caller's Option; broker attachment now consumes a caller slot only after registry admission, preserving rejected transports for explicit retirement. No actual ICE/DTLS/SRTP backend or product negotiation caller is supplied by this checkpoint. Build/test remain deferred.

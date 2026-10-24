@@ -57,12 +57,7 @@ fn denied()->PlatformError{PlatformError::new(ErrorCode::PermissionDenied,"The a
 /// Native OS receive adapter must return each datagram's actual ingress receipt
 /// (including kernel queue residence), not capture a new clock after dequeue.
 /// Windows implements this through the packet-info/software-QPC Winsock adapter.
-pub trait NativeDatagramReceipt{
-    /// One nonblocking recvmsg operation supplies BOTH bytes and ancillary
-    /// receipt. None means WouldBlock. Reject truncation/missing timestamps;
-    /// do not perform recv() followed by a separate timestamp lookup.
-    fn receive(&mut self,socket:&UdpSocket,buffer:&mut[u8])->Result<Option<(usize,DecoderReceipt)>>;
-}
+pub use omniplay_stream_input::video_winsock::NativeDatagramReceipt;
 /// Owns an already connected ICE-selected socket, never binds/connects to a
 /// renderer-provided address. Fixed peer checks are not SRTP authentication.
 pub struct UdpVideoIngress<T:NativeSrtpReceiver,C:NativeDatagramReceipt>{socket:Option<UdpSocket>,peer:SocketAddr,ingress:VideoIngress<T>,clock:C,closed:bool}
