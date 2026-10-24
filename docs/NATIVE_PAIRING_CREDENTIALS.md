@@ -1840,6 +1840,16 @@ this checkpoint.
 
 ## Remaining implementation and qualification
 
+Dedicated mobile host_begin/host_action ABI entries now accept strict bounded
+native-only JSON: begin exact identity/revision/audience/label <=1024, ticket
+actions <=128 for register/poll/close. Actual foreground attached provider supplies
+epoch and cancellation; original budgets include mutex wait and post-operation
+checks. Begin validates identity access before/after. No renderer route, share
+proof or consent/activation is exposed. Close currently requires foreground
+provider admission, so it is not a background/crash recovery solution. Late errors
+direct native status reconciliation. No compiler/build/test/runtime operation ran;
+JNI/Swift/product host UI and durable cleanup remain unfinished.
+
 Saved candidate review now shares leased validation for distinct client/host
 roles. Host review requires exact local host key and installed host/input/origin
 policy, MaterialReady/no-session state, live signed grant/hash and both vault

@@ -153,6 +153,44 @@ impl Drop for PairingClientBegin{fn drop(&mut self){self.code.zeroize();}}
 #[derive(Deserialize)]#[serde(deny_unknown_fields)]struct PairingClientConsent{ticket:Uuid,reviewed_grant_hash:String}
 #[derive(Deserialize)]#[serde(deny_unknown_fields)]
 struct PairingClientActivation{address:omniplay_streaming::native_credentials::CredentialAddress,expected_revision:u64,reviewed_grant_hash:String}
+#[derive(Deserialize)]#[serde(deny_unknown_fields)]
+struct PairingHostBegin{identity:omniplay_streaming::native_credentials::CredentialAddress,expected_revision:u64,audience:String,label:String}
+/// # Safety
+/// Native-only readable JSON <=1024; no renderer dispatch or automatic sharing.
+#[no_mangle]
+pub unsafe extern "C" fn om_mobile_pairing_host_begin_v1(handle:u64,data:*const u8,length:usize,budget_ms:u32)->OmniBuffer{result((||{
+    if length>1024||!(1000..=25000).contains(&budget_ms){return Err(error(ErrorCode::InvalidRequest,"Native host begin exceeds bounds"));}
+    let deadline=std::time::Instant::now()+std::time::Duration::from_millis(u64::from(budget_ms));
+    // SAFETY: caller supplies the bounded synchronous readable input above.
+    let request:PairingHostBegin=serde_json::from_slice(unsafe{input(data,length)?}).map_err(|_|error(ErrorCode::InvalidRequest,"Native host begin arguments are invalid"))?;
+    let(host,provider,epoch)=pairing_operation(handle)?;
+    let mut host=host.lock().map_err(|_|error(ErrorCode::Internal,"Mobile profile is unavailable"))?;
+    provider.confirm_access(&request.identity,epoch)?;let cancel=provider.operation_cancellation(epoch)?;
+    let value=host.native_pairing_host_begin(provider.as_ref(),request.identity,request.expected_revision,epoch,&request.audience,&request.label,deadline)?;
+    provider.confirm_access(&request.identity,epoch)?;
+    if cancel.load(Ordering::Acquire)||std::time::Instant::now()>=deadline{return Err(error(ErrorCode::Cancelled,"Host invitation may remain pending; inspect native status"));}Ok(value)
+})())}
+/// # Safety
+/// Native-only ticket JSON <=128; action 1 register, 2 poll, 3 close.
+/// Close fences local invitation before cleanup; no peer consent or share proof.
+#[no_mangle]
+pub unsafe extern "C" fn om_mobile_pairing_host_action_v1(handle:u64,data:*const u8,length:usize,action:u32,budget_ms:u32)->OmniBuffer{result((||{
+    if length>128||!(1..=3).contains(&action)||!(1000..=25000).contains(&budget_ms){return Err(error(ErrorCode::InvalidRequest,"Native host action exceeds bounds"));}
+    let deadline=std::time::Instant::now()+std::time::Duration::from_millis(u64::from(budget_ms));
+    // SAFETY: caller supplies the bounded synchronous readable input above.
+    let request:PairingClientTicket=serde_json::from_slice(unsafe{input(data,length)?}).map_err(|_|error(ErrorCode::InvalidRequest,"Native host ticket is invalid"))?;
+    if request.ticket.is_nil(){return Err(error(ErrorCode::InvalidRequest,"Native host ticket is invalid"));}
+    let(host,provider,epoch)=pairing_operation(handle)?;
+    let mut host=host.lock().map_err(|_|error(ErrorCode::Internal,"Mobile profile is unavailable"))?;
+    provider.require_operation_epoch(epoch)?;let cancel=provider.operation_cancellation(epoch)?;
+    let value=match action{
+        1=>host.native_pairing_host_register(provider.as_ref(),request.ticket,epoch,deadline,&cancel)?,
+        2=>host.native_pairing_host_poll(provider.as_ref(),request.ticket,epoch,deadline,&cancel)?,
+        _=>host.native_pairing_host_close(provider.as_ref(),request.ticket,deadline,&cancel)?,
+    };
+    provider.require_operation_epoch(epoch)?;
+    if cancel.load(Ordering::Acquire)||std::time::Instant::now()>=deadline{return Err(error(ErrorCode::Cancelled,"Native host result became stale; inspect status"));}Ok(value)
+})())}
 /// # Safety
 /// Trusted native UI supplies readable JSON <=1024 bytes containing exact
 /// address/expected_revision from native status. No renderer dispatch.

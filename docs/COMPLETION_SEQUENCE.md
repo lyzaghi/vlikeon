@@ -2,6 +2,11 @@
 
 ## Current sequence — 1–109 outstanding tasks
 
+Item 58 mobile ABI now authors native host begin/register/poll/close with strict
+bounded requests and actual foreground provider epoch/cancel/deadline admission.
+No proof sharing/peer approval; source-only, no build/test. JNI/Swift/UI and
+background/crash cleanup remain due.
+
 Item 58 saved candidate review now supports host role under the same leased
 scope/vault/grant checks, with installed host/input policy and explicit peer
 fingerprints/local role. LocalHost exposes read-only review with cancellation.

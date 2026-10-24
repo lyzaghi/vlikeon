@@ -92,6 +92,13 @@ OmniBuffer om_mobile_pairing_activate_client_v1(uint64_t handle,const uint8_t* d
  * no relay call, activation or consent. comparison_available is false: UI must
  * independently verify host and obtain fresh consent, not invent old code. */
 OmniBuffer om_mobile_pairing_review_client_v1(uint64_t handle,const uint8_t* data,size_t length,uint32_t budget_ms);
+/* Native host controller only. begin <=1024: {identity,expected_revision,audience,label}.
+ * action <=128: {ticket}; 1 register, 2 explicit poll, 3 close. Budget 1000..25000.
+ * Foreground provider epoch/cancel is native-derived. No proof sharing or peer
+ * approval. Late errors may leave pending/registered/closed state: inspect status.
+ * Close currently requires foreground provider; background/crash recovery is due. */
+OmniBuffer om_mobile_pairing_host_begin_v1(uint64_t handle,const uint8_t* data,size_t length,uint32_t budget_ms);
+OmniBuffer om_mobile_pairing_host_action_v1(uint64_t handle,const uint8_t* data,size_t length,uint32_t action,uint32_t budget_ms);
 /* Trusted native controller only, never renderer commands. Status returns
  * bounded public lifecycle metadata. Preparation requires foreground, attached
  * scoped provider, current journal revision, budget 1000..25000 ms and enabled
