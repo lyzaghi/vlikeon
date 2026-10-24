@@ -1840,6 +1840,14 @@ this checkpoint.
 
 ## Remaining implementation and qualification
 
+LocalHost host_poll now connects explicit native ticket/epoch admission to the
+leased host writer. It returns client public key, untrusted label, comparison
+code and exact retained signed hello hash for each bounded request snapshot,
+plus original revision and local_consent_required:true. Final deadline/cancel
+checks prevent late review publication. It neither signs a grant nor approves
+input or a peer. No automatic polling is added. No build/test/runtime operation
+ran; host consent/persistence controller, ABI/UI and qualification remain due.
+
 Host controller close now checks exact ticket then irreversibly fences local
 sharing/approval and clears invitation proof/request snapshots before cleanup
 policy/provider/lease admission can fail. It uses installed retirement origins

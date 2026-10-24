@@ -2,6 +2,10 @@
 
 ## Current sequence — 1–109 outstanding tasks
 
+Item 58 LocalHost host poll now returns bounded retained peer review metadata
+and exact hello hashes, scoped to ticket/epoch/revision with final cancel/expiry
+admission. No approval inferred. Source-only; consent controller/ABI/UI/build/test due.
+
 Item 58 LocalHost explicit host close now fences local invitation sharing/approval
 before relay/provider/lease admission and retains the exact owner on failure.
 Only confirmed close clears it; pairs are not revoked. Source-only; crash/expiry
