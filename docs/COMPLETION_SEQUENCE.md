@@ -2,6 +2,11 @@
 
 ## Current sequence — 1–109 outstanding tasks
 
+Item 58 LocalHost explicit host close now fences local invitation sharing/approval
+before relay/provider/lease admission and retains the exact owner on failure.
+Only confirmed close clears it; pairs are not revoked. Source-only; crash/expiry
+reconciliation, ABI/UI and build/test remain due.
+
 Item 58 LocalHost now retains a native host invitation with exact ticket,
 identity/revision/epoch and explicit registration. No silent replacement or
 automatic sharing/approval. Source-only; close/reconcile controller, ABI/UI and

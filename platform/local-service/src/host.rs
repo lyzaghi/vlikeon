@@ -207,6 +207,19 @@ impl LocalHost {
         writer.register_host(pending.revision,pending.identity,&mut pending.invitation,&relay,omniplay_core::now_ms(),deadline,cancel)?;
         Ok(json!({"pairing_protocol":1,"ticket":ticket,"registered":true,"share_available":true,"approves_peer":false}))
     }
+    /// Native local close plus exact remote cleanup. Failed cleanup retains owner.
+    pub fn native_pairing_host_close(&mut self,store:&dyn omniplay_streaming::native_credentials::PairingSecretStore,
+        ticket:Uuid,deadline:std::time::Instant,cancel:&std::sync::atomic::AtomicBool)->Result<Value>{
+        self.ensure_open()?;
+        let pending=self.pairing_host.as_mut().ok_or_else(||PlatformError::new(ErrorCode::NotFound,"Native host invitation is absent"))?;
+        if pending.id!=ticket{return Err(PlatformError::new(ErrorCode::NotFound,"Native host invitation ticket does not match"));}
+        pending.invitation.fence_closed();
+        let relay=omniplay_streaming::native_relay::NativePairRelay::new(omniplay_core::stream_signal_authority::installed_retirement_origins()?)?;
+        let writer=omniplay_core::stream_credential_writer::NativeCredentialWriter::open(&self.database,self.profile_id,store)?;
+        writer.close_host(pending.revision,pending.identity,&mut pending.invitation,&relay,omniplay_core::now_ms(),deadline,cancel)?;
+        self.pairing_host=None;
+        Ok(json!({"pairing_protocol":1,"ticket":ticket,"closed":true,"relay_close_confirmed":true,"pairs_revoked":false}))
+    }
     /// Expired transient exchange/proof is no longer needed for status or retry.
     /// Dropping it does not retire a persisted candidate or revoke relay state.
     fn expire_native_pairing_client(&mut self){

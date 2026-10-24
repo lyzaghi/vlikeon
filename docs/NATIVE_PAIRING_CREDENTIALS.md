@@ -1840,6 +1840,16 @@ this checkpoint.
 
 ## Remaining implementation and qualification
 
+Host controller close now checks exact ticket then irreversibly fences local
+sharing/approval and clears invitation proof/request snapshots before cleanup
+policy/provider/lease admission can fail. It uses installed retirement origins
+and leased Active identity for exact relay close; uncertainty retains the closed
+invitation owner for retry. Only confirmed completion clears the controller slot,
+with an explicit pairs_revoked:false receipt. No epoch replacement creates a new
+invitation during cleanup. Revision changes, expired invitation and identity
+retirement can still require unimplemented reconciliation. This is not durable
+crash cleanup. No build/test or native/network operation ran; ABI/UI remain due.
+
 LocalHost now authors host_begin and host_register around one retained invitation
 with native ticket, identity/revision/epoch and original monotonic lifetime.
 Begin creates locally only; register reloads the exact identity under lease and

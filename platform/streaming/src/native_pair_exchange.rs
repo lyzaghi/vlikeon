@@ -96,13 +96,16 @@ impl NativeHostInvitation{
     pub(crate) fn close_material<'a>(&'a self,identity:&crate::native_credentials::NativeSigningIdentity,now:u64)->Result<(&'a str,&'a SignedDocument,Invite)>{
         let invite=self.live_metadata(now)?;if identity.public_key()!=self.host{return Err(unauthorized());}Ok((&self.audience,&self.document,invite))
     }
+    /// Stop local sharing/approval before potentially failing cleanup admission.
+    /// This carries no relay acknowledgment and remains safe to repeat.
+    pub fn fence_closed(&mut self){self.closed=true;self.secret.zeroize();self.requests.clear();}
     /// Local close is terminal even if relay response is lost. Existing approved
     /// pairs require separate revocation; closing an invite does not revoke them.
     pub fn close(&mut self,relay:&crate::native_relay::NativePairRelay,identity:&crate::native_credentials::NativeSigningIdentity,
         now:u64,deadline:Instant,cancel:&std::sync::atomic::AtomicBool)->Result<()>{
         if identity.public_key()!=self.host{return Err(unauthorized());}
         if self.close_confirmed{return Ok(());}
-        self.closed=true;self.secret.zeroize();self.requests.clear();
+        self.fence_closed();
         let started=Instant::now();if deadline<=started||deadline.saturating_duration_since(started)>Duration::from_secs(30){return Err(unauthorized());}
         relay.close_invitation(identity,self,now,deadline.min(self.deadline),cancel)?;self.close_confirmed=true;Ok(())
     }
