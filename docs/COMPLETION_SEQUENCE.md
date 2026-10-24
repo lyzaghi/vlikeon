@@ -2,6 +2,11 @@
 
 ## Current sequence — 1–109 outstanding tasks
 
+Item 58 iOS now has immutable approved-poll peer snapshots, core/owner/cancel
+binding, capped monotonic review lifetime and one-use confirmation. Requests
+retain exact reviewed ticket/grant hash. Source-only; build/test, actual consent
+views and activation remain incomplete.
+
 Item 58 Android now has an immutable approved-poll review object and single-use
 native confirmation helper. It retains exact ticket/grant hash, displayed pair/
 input permission, delivery fence and at-most-60-second monotonic review lifetime.

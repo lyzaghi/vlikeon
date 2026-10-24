@@ -21,6 +21,25 @@ struct NativeIdentityReview {
     let expires:DispatchTime
 }
 enum NativeClientPairingAction:UInt32 { case begin=0,join=1,poll=2,persistAfterPeerConsent=3,cancel=4 }
+/// Immutable approved-poll metadata for a trusted native confirmation view.
+final class NativePeerApproval {
+    let pairID:String,inputAllowed:Bool,expires:DispatchTime
+    fileprivate let ticket:String,grantHash:String
+    fileprivate let origin:ObjectIdentifier
+    private let lock=NSLock()
+    private var consumed=false
+    private let current:()->Bool
+    fileprivate init(origin:NativeCore,ticket:String,hash:String,pair:String,input:Bool,expires:DispatchTime,current:@escaping ()->Bool){
+        self.origin=ObjectIdentifier(origin)
+        self.ticket=ticket;grantHash=hash;pairID=pair;inputAllowed=input;self.expires=expires;self.current=current
+    }
+    fileprivate func consume()->Bool{
+        lock.lock();defer{lock.unlock()}
+        guard !consumed,DispatchTime.now()<expires,current() else{return false}
+        consumed=true;return true
+    }
+    fileprivate var admitted:Bool{DispatchTime.now()<expires&&current()}
+}
 private final class NativePairingDeliveryFence {
     final class Token {}
     private let lock=NSLock()
@@ -318,6 +337,42 @@ final class NativeCore {
                 }
             }catch{DispatchQueue.main.async{completion(.failure(error))}}
         }
+    }
+    /// Poll once; only a validated approved response yields a consent snapshot.
+    @MainActor func reviewPairingPeer(ticket:String,owner:NativeDocumentLifetime,
+        completion:@escaping @MainActor (Result<NativePeerApproval,Error>)->Void){
+        let token=pairingClientDeliveryFence.capture(cancel:false)
+        do{
+            var input=try JSONSerialization.data(withJSONObject:["ticket":ticket])
+            pairingClient(.poll,input:&input,owner:owner){result in
+                do{
+                    let value=try result.get()
+                    guard owner.active,self.pairingClientDeliveryFence.admits(token),let status=value["status"] as? [String:Any],
+                          status["state"] as? String == "approved",let pair=status["pair_id"] as? String,
+                          let allowed=status["input_allowed"] as? Bool,let hash=value["grant_hash"] as? String,
+                          let expiry=status["expires_at_ms"] as? NSNumber else{throw OmniFailure.message("Chưa có grant hiện tại để xác nhận.")}
+                    let remaining=expiry.doubleValue-Date().timeIntervalSince1970*1000
+                    guard remaining>0 else{throw OmniFailure.message("Grant đã hết hạn. Hãy đọc lại trạng thái.")}
+                    let review=NativePeerApproval(origin:self,ticket:ticket,hash:hash,pair:pair,input:allowed,
+                        expires:DispatchTime.now() + .milliseconds(Int(min(60_000,remaining))),current:{[weak self] in
+                            owner.active && self?.pairingClientDeliveryFence.admits(token)==true
+                        })
+                    completion(.success(review))
+                }catch{completion(.failure(error))}
+            }
+        }catch{completion(.failure(error))}
+    }
+    /// Actual native peer/comparison/input consent must precede this call.
+    @MainActor func confirmPairingPeer(_ review:NativePeerApproval,owner:NativeDocumentLifetime,
+        completion:@escaping @MainActor (Result<[String:Any],Error>)->Void){
+        guard owner.active,review.origin==ObjectIdentifier(self),review.consume() else{completion(.failure(OmniFailure.message("Phiên xác nhận đã kết thúc. Hãy duyệt lại grant hiện tại.")));return}
+        do{
+            var input=try JSONSerialization.data(withJSONObject:["ticket":review.ticket,"reviewed_grant_hash":review.grantHash])
+            pairingClient(.persistAfterPeerConsent,input:&input,owner:owner){result in
+                guard review.admitted else{completion(.failure(OmniFailure.message("Kết quả xác nhận đã cũ. Hãy kiểm tra trạng thái native.")));return}
+                completion(result)
+            }
+        }catch{completion(.failure(error))}
     }
     /// Read-only native recovery inspection remains available with policy off.
     func pairingRecoveryStatus(owner:NativeDocumentLifetime,completion:@escaping @MainActor (Result<NativeRecoverySnapshot,Error>)->Void){

@@ -1840,6 +1840,15 @@ this checkpoint.
 
 ## Remaining implementation and qualification
 
+iOS now mirrors the approved-poll snapshot/confirmation helper using immutable
+public metadata, private ticket/hash, original core identity, owner/cancel fence,
+monotonic lifetime capped at 60 seconds and a locked one-use consume operation.
+Main-actor review/confirm helpers accept only validated approved polls, construct
+the consent request from retained fields and recheck snapshot validity before
+delivering persistence results. These helpers do not display or prove native
+peer/comparison/input consent; actual views and activation remain due. No Swift
+compiler/build/test, vault, crypto or HTTP operation ran for this checkpoint.
+
 Android NativeCore now exposes an immutable native PeerApproval snapshot created
 only by the validated explicit poll helper. It retains exact ticket/grant hash,
 pair ID/input permission, cancellation delivery fence and a monotonic review
