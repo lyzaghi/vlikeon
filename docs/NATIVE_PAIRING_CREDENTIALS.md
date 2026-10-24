@@ -1840,6 +1840,16 @@ this checkpoint.
 
 ## Remaining implementation and qualification
 
+prepare_reviewed_host_peer now connects exact retained hello review to host grant
+creation and candidate persistence under one lease. It checks reviewed hello
+hash, installed host/input/audience policy, Active identity/revision, cancellation
+and original deadline. Existing invitation attempted-peer fence precedes key/grant
+creation; any subsequent failure requires reconciliation, not regeneration of a
+competing grant. Success remains MaterialReady before remote approval. A late
+cancel explicitly reports possible commit. This does not prove actual native
+peer/comparison/input consent. No build/test/runtime operation ran; product host
+controller, consent UI, durable uncertainty recovery and qualification remain due.
+
 Leased writer now provides decline_host_peer and close_host around retained
 invitation state and exact Active identity/revision. Decline requires enabled
 host/origin policy and uses the existing local-before-remote peer decline fence.

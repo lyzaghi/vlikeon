@@ -2,6 +2,11 @@
 
 ## Current sequence — 1–109 outstanding tasks
 
+Item 58 leased host writer now binds consented grant creation/persistence to the
+exact retained polled hello hash, Active identity and installed input policy.
+One lease spans the operation; uncertainty never authorizes grant regeneration.
+Source-only; host controller/UI and build/test remain due.
+
 Item 58 leased host writer now authors exact-peer decline and live invitation
 close. Close uses configured retirement origins so disabled new-session policy
 does not alone block cleanup. Active identity/revision still required; crash and

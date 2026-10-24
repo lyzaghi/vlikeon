@@ -171,6 +171,25 @@ impl<'a> NativeCredentialWriter<'a>{
         drop(identity);
         self.prepare_pair(expected,identity_address,&document,&grant.audience,&material,elapsed_now(now,started)?,deadline)
     }
+    /// Actual native peer/comparison/input consent to the exact polled hello.
+    /// One lease spans signer reload, single-use grant creation and persistence.
+    pub fn prepare_reviewed_host_peer(&mut self,expected:u64,identity_address:CredentialAddress,
+        invitation:&mut omniplay_streaming::native_pair_exchange::NativeHostInvitation,client:&str,reviewed_hello_hash:&str,
+        input_allowed:bool,lifetime_ms:u64,now:u64,deadline:Instant,cancel:&std::sync::atomic::AtomicBool)->Result<Candidate>{
+        let started=begin(deadline)?;
+        let metadata:omniplay_streaming::Invite=omniplay_streaming::inspect(invitation.signed_invite(),4096)?;
+        crate::stream_signal_authority::require_installed_host_grant(&metadata.audience,input_allowed)?;
+        if cancel.load(std::sync::atomic::Ordering::Acquire){return Err(conflict());}
+        let hello=invitation.signed_request(client).ok_or_else(conflict)?.clone();
+        if omniplay_streaming::document_hash(&hello)?!=reviewed_hello_hash{return Err(conflict());}
+        let signer=self.active_signer(expected,identity_address)?;check(deadline)?;
+        let approval=invitation.prepare_approval_after_local_consent(&signer,&hello,client,input_allowed,lifetime_ms,elapsed_now(now,started)?)?;
+        drop(signer);self.lease.check(self.database,self.profile)?;check(deadline)?;
+        if cancel.load(std::sync::atomic::Ordering::Acquire){return Err(conflict());}
+        let candidate=self.prepare_host_after_local_consent(expected,identity_address,approval,elapsed_now(now,started)?,deadline)?;
+        if cancel.load(std::sync::atomic::Ordering::Acquire){return Err(PlatformError::new(ErrorCode::Cancelled,"Host candidate may have committed; reload native pairing state"));}
+        Ok(candidate)
+    }
     /// Persists a locally consented host approval BEFORE any ApprovePair request.
     /// The immutable signed grant goes into journal recovery metadata; no relay
     /// acknowledgment or Active transition is implied by MaterialReady.
