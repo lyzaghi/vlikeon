@@ -2,6 +2,11 @@
 
 ## Current sequence — 1–109 outstanding tasks
 
+Item 58 host controller now connects explicit peer consent to exact-ticket/
+epoch/hello-hash candidate persistence. Revision advances only on confirmed
+writer success; no relay approval/activation is implied. Source-only;
+uncertain-write reconciliation, ABI/UI and build/test remain unfinished.
+
 Item 58 LocalHost host poll now returns bounded retained peer review metadata
 and exact hello hashes, scoped to ticket/epoch/revision with final cancel/expiry
 admission. No approval inferred. Source-only; consent controller/ABI/UI/build/test due.

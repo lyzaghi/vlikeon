@@ -1840,6 +1840,16 @@ this checkpoint.
 
 ## Remaining implementation and qualification
 
+LocalHost host_prepare_peer now admits exact ticket/epoch/original invitation
+lifetime and forwards the retained peer hello hash plus explicit input/lifetime
+choice to the leased writer. Confirmed success updates the invitation's expected
+revision from the actual candidate result and returns exact address/revision,
+reviewed hello/client and relay_approved:false. Failure never guesses a revision
+or clears the attempted-peer fence; uncertain journal writes still require the
+unfinished reconciliation path. Actual native peer/comparison/input consent must
+precede this entry. No ABI/UI, build/test or runtime operation ran. Full host
+integration, recovery and qualification remain unfinished.
+
 LocalHost host_poll now connects explicit native ticket/epoch admission to the
 leased host writer. It returns client public key, untrusted label, comparison
 code and exact retained signed hello hash for each bounded request snapshot,

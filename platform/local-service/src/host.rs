@@ -225,6 +225,24 @@ impl LocalHost {
         if std::time::Instant::now()>=deadline.min(pending.invitation.native_deadline())||cancel.load(std::sync::atomic::Ordering::Acquire){return Err(PlatformError::new(ErrorCode::Cancelled,"Native host poll became stale"));}
         Ok(json!({"pairing_protocol":1,"ticket":ticket,"peers":peers,"revision":pending.revision,"local_consent_required":true}))
     }
+    /// Actual native peer/comparison/input consent to the exact poll snapshot.
+    /// Persistence only: no relay ApprovePair or Active publication here.
+    pub fn native_pairing_host_prepare_peer(&mut self,store:&dyn omniplay_streaming::native_credentials::PairingSecretStore,
+        ticket:Uuid,epoch:u64,client:&str,reviewed_hello_hash:&str,input_allowed:bool,lifetime_ms:u64,
+        deadline:std::time::Instant,cancel:&std::sync::atomic::AtomicBool)->Result<Value>{
+        self.ensure_open()?;
+        let pending=self.pairing_host.as_mut().ok_or_else(||PlatformError::new(ErrorCode::NotFound,"Native host invitation is absent"))?;
+        if pending.id!=ticket||epoch==0||pending.epoch!=epoch||std::time::Instant::now()>=deadline.min(pending.invitation.native_deadline())||cancel.load(std::sync::atomic::Ordering::Acquire){return Err(PlatformError::new(ErrorCode::Cancelled,"Native host consent expired or changed lifecycle"));}
+        let mut writer=omniplay_core::stream_credential_writer::NativeCredentialWriter::open(&self.database,self.profile_id,store)?;
+        let candidate=writer.prepare_reviewed_host_peer(pending.revision,pending.identity,&mut pending.invitation,client,reviewed_hello_hash,
+            input_allowed,lifetime_ms,omniplay_core::now_ms(),deadline,cancel)?;
+        // Advance only from an actual committed candidate; never guess revision
+        // after an uncertain failure. Other durable mutations require rereview.
+        pending.revision=candidate.revision();
+        Ok(json!({"credential_protocol":1,"pairing_ticket":ticket,"address":candidate.address(),"public_key":candidate.public_key(),
+            "revision":candidate.revision(),"phase":"material_ready","reviewed_hello_hash":reviewed_hello_hash,
+            "client_public_key":client,"relay_approved":false,"reload_required":true}))
+    }
     /// Native local close plus exact remote cleanup. Failed cleanup retains owner.
     pub fn native_pairing_host_close(&mut self,store:&dyn omniplay_streaming::native_credentials::PairingSecretStore,
         ticket:Uuid,deadline:std::time::Instant,cancel:&std::sync::atomic::AtomicBool)->Result<Value>{
