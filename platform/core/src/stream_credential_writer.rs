@@ -227,6 +227,12 @@ impl<'a> NativeCredentialWriter<'a>{
     /// Re-review after interruption: public signed metadata only, no activation.
     /// Reload vault material under the scoped lease before presenting a candidate.
     pub fn review_client_candidate(&self,address:CredentialAddress,expected:u64,now:u64,deadline:Instant)->Result<serde_json::Value>{
+        self.review_pair_candidate(address,expected,false,now,deadline)
+    }
+    pub fn review_host_candidate(&self,address:CredentialAddress,expected:u64,now:u64,deadline:Instant)->Result<serde_json::Value>{
+        self.review_pair_candidate(address,expected,true,now,deadline)
+    }
+    fn review_pair_candidate(&self,address:CredentialAddress,expected:u64,host:bool,now:u64,deadline:Instant)->Result<serde_json::Value>{
         let started=begin(deadline)?;
         let snapshot=journal::load_scoped(self.database,&self.lease,self.profile)?;
         if snapshot.revision()!=expected{return Err(conflict());}
@@ -234,7 +240,8 @@ impl<'a> NativeCredentialWriter<'a>{
         if address.kind()!=SecretKind::PairEncryption||pair.phase()!=Phase::MaterialReady||pair.signal_session().is_some(){return Err(conflict());}
         let metadata=pair.grant().ok_or_else(conflict)?;
         let grant=verify_grant(metadata.document(),metadata.audience(),elapsed_now(now,started)?)?;
-        if grant.id!=address.id()||grant.client_public_key!=pair.public_key(){return Err(conflict());}
+        if grant.id!=address.id()||(if host{&grant.host_public_key}else{&grant.client_public_key})!=pair.public_key(){return Err(conflict());}
+        if host{crate::stream_signal_authority::require_installed_host_grant(metadata.audience(),grant.input_allowed)?;}
         let identity=snapshot.records().iter().find(|record|record.phase()==Phase::Active&&record.address().kind()==SecretKind::DeviceSigning&&record.public_key()==pair.public_key()).ok_or_else(conflict)?;
         let signer=load_identity(self.store,&identity.address(),identity.public_key())?;
         let material=load_pair(self.store,&address,metadata.document(),metadata.audience(),pair.public_key(),elapsed_now(now,started)?)?;
@@ -243,8 +250,10 @@ impl<'a> NativeCredentialWriter<'a>{
         drop(material);drop(signer);check(deadline)?;self.lease.check(self.database,self.profile)?;
         grant.validate(metadata.audience(),elapsed_now(now,started)?)?;
         let fingerprint=omniplay_streaming::key_id(&grant.host_public_key)?;
+        let client_fingerprint=omniplay_streaming::key_id(&grant.client_public_key)?;
         Ok(serde_json::json!({"credential_protocol":1,"address":address,"revision":expected,"phase":"material_ready",
             "grant_hash":hash,"host_public_key":grant.host_public_key,"host_fingerprint":fingerprint,
+            "client_public_key":grant.client_public_key,"client_fingerprint":client_fingerprint,"local_role":if host{"host"}else{"client"},
             "pair_id":grant.id,"input_allowed":grant.input_allowed,"expires_at_ms":grant.expires_at_ms,
             "audience":metadata.audience(),"local_consent_required":true,"comparison_available":false}))
     }

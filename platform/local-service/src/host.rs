@@ -382,6 +382,16 @@ impl LocalHost {
         if std::time::Instant::now()>=deadline||cancel.load(std::sync::atomic::Ordering::Acquire){return Err(PlatformError::new(ErrorCode::Cancelled,"Native candidate review became stale"));}Ok(value)
     }
     /// Actual native client consent to exact persisted candidate and grant hash.
+    pub fn native_pairing_review_host_candidate(&self,store:&dyn omniplay_streaming::native_credentials::PairingSecretStore,
+        address:omniplay_streaming::native_credentials::CredentialAddress,expected:u64,deadline:std::time::Instant,
+        cancel:&std::sync::atomic::AtomicBool)->Result<Value>{
+        self.ensure_open()?;
+        if std::time::Instant::now()>=deadline||cancel.load(std::sync::atomic::Ordering::Acquire){return Err(PlatformError::new(ErrorCode::Cancelled,"Native host candidate review expired or was cancelled"));}
+        let writer=omniplay_core::stream_credential_writer::NativeCredentialWriter::open(&self.database,self.profile_id,store)?;
+        let value=writer.review_host_candidate(address,expected,omniplay_core::now_ms(),deadline)?;
+        if std::time::Instant::now()>=deadline||cancel.load(std::sync::atomic::Ordering::Acquire){return Err(PlatformError::new(ErrorCode::Cancelled,"Native host candidate review became stale"));}Ok(value)
+    }
+    /// Actual native client consent to exact persisted candidate and grant hash.
     pub fn native_pairing_activate_reviewed_client(&self,store:&dyn omniplay_streaming::native_credentials::PairingSecretStore,
         address:omniplay_streaming::native_credentials::CredentialAddress,expected:u64,reviewed_hash:&str,deadline:std::time::Instant,
         cancel:&std::sync::atomic::AtomicBool)->Result<Value>{

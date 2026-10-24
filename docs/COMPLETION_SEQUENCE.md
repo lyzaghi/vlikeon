@@ -2,6 +2,11 @@
 
 ## Current sequence — 1–109 outstanding tasks
 
+Item 58 saved candidate review now supports host role under the same leased
+scope/vault/grant checks, with installed host/input policy and explicit peer
+fingerprints/local role. LocalHost exposes read-only review with cancellation.
+Source-only; ABI/UI, durable recovery and build/test remain due.
+
 Item 58 reviewed host activation now binds exact persisted address/revision/grant
 hash under one writer lease before host-role/policy/vault/relay checks and Active
 publication. Source-only; host review/ABI/UI and build/test remain due.

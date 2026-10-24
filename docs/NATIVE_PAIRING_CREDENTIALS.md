@@ -1840,6 +1840,15 @@ this checkpoint.
 
 ## Remaining implementation and qualification
 
+Saved candidate review now shares leased validation for distinct client/host
+roles. Host review requires exact local host key and installed host/input/origin
+policy, MaterialReady/no-session state, live signed grant/hash and both vault
+records. Public metadata adds client key/fingerprint and explicit local_role to
+existing host metadata; missing old comparison remains explicit. LocalHost wraps
+host review with original deadline/cancel checks. Review is not relay approval,
+consent or activation. No ABI/UI, build/test or runtime operation ran. Durable
+recovery and full host product qualification remain unfinished.
+
 Reviewed host activation now has a LocalHost/writer entry requiring exact stored
 candidate address, journal revision and reviewed grant hash. The retained writer
 lease spans hash admission and existing host-role/installed input policy/vault/
