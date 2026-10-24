@@ -138,5 +138,7 @@
     "No signed-release, device capture, OS device consent dialog, arbitrary native module or reproducibility qualification",
     "Private contexts are real Chromium off-the-record contexts created through CDP; browser data and privileges tested",
     "Raw dumps, process memory, paths and profile/device identifiers remain private"
-  ]
+  ],
+  "harness_git_lf_sha256": "f1142b4d998c469ec50f28d3570b5490e667b27077c35285ea4124037bde2f15",
+  "harness_hash_note": "harness_sha256 identifies the exact Windows test-file bytes; harness_git_lf_sha256 identifies the same source with Git LF normalization. Exact tested bytes retained in private QA."
 }

@@ -58,7 +58,9 @@ was used.
 Run `qa/browser/runtime-lifecycle.mjs` with Node.js 22+ on an authorized Windows
 interactive test runner. Supply four absolute paths: the frozen browser EXE, a
 new report directory, its admitted identity JSON, and the real broker EXE.
-The identity JSON contains `windows_executable_sha256`, `chrome_dll_sha256`,
+The public receipt records both the exact Windows test-file hash and the same
+source hash with Git LF normalization; the exact tested file remains in private
+QA storage. The identity JSON contains `windows_executable_sha256`, `chrome_dll_sha256`,
 `content_dll_sha256`, and `broker_sha256`. The real development host must already
 be registered for the exact bundled component origin.
 
