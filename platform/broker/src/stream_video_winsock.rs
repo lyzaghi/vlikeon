@@ -5,7 +5,22 @@ use omniplay_contracts::{ErrorCode,PlatformError,Result};
 use omniplay_stream_input::video_client::DecoderReceipt;
 use std::{net::{SocketAddr,UdpSocket},os::windows::io::AsRawSocket,mem::{size_of,size_of_val,zeroed}};
 use windows_sys::Win32::Networking::WinSock::*;
-use windows_sys::Win32::NetworkManagement::{IpHelper::{ConvertInterfaceIndexToLuid,GetInterfaceActiveTimestampCapabilities,GetUnicastIpAddressEntry,INTERFACE_TIMESTAMP_CAPABILITIES,MIB_UNICASTIPADDRESS_ROW},Ndis::NET_LUID_LH};
+use windows_sys::Win32::NetworkManagement::{IpHelper::{ConvertInterfaceIndexToLuid,GetUnicastIpAddressEntry,INTERFACE_TIMESTAMP_CAPABILITIES,MIB_UNICASTIPADDRESS_ROW},Ndis::NET_LUID_LH};
+use windows_sys::Win32::System::LibraryLoader::{GetModuleHandleW,GetProcAddress};
+
+type ActiveTimestampCapabilities=unsafe extern "system" fn(*const NET_LUID_LH,*mut INTERFACE_TIMESTAMP_CAPABILITIES)->u32;
+fn active_timestamp_api()->Result<ActiveTimestampCapabilities>{
+    // Iphlpapi is already a process import through the Vista-era address APIs.
+    // Resolve this newer export lazily: its absence must disable native video,
+    // not prevent the whole broker from loading on older supported Windows.
+    let module_name:Vec<u16>="iphlpapi.dll\0".encode_utf16().collect();
+    let module=unsafe{GetModuleHandleW(module_name.as_ptr())};
+    if module.is_null(){return Err(denied());}
+    let address=unsafe{GetProcAddress(module,b"GetInterfaceActiveTimestampCapabilities\0".as_ptr())}.ok_or_else(denied)?;
+    // Exact SDK ABI for the named export; the imported module stays loaded for
+    // the process lifetime. No DLL search path or caller-supplied name is used.
+    Ok(unsafe{std::mem::transmute::<unsafe extern "system" fn()->isize,ActiveTimestampCapabilities>(address)})
+}
 
 fn denied()->PlatformError{PlatformError::new(ErrorCode::UnsupportedCapability,"Native Winsock software ingress timestamp is unavailable")}
 /// Native route/interface owner must recheck active SOFTWARE timestamp source,
@@ -75,12 +90,13 @@ impl WinsockDatagrams<InterfaceSoftwareTimestamp<BoundReceiveInterface>>{
 }
 /// Reads active driver configuration on every receive boundary. Supported-but-
 /// disabled software timestamps and any enabled hardware timestamps are rejected.
-pub struct InterfaceSoftwareTimestamp<B:NativeReceiveInterface>{binding:B,luid:u64,socket:usize,closed:bool}
+pub struct InterfaceSoftwareTimestamp<B:NativeReceiveInterface>{binding:B,luid:u64,socket:usize,active:ActiveTimestampCapabilities,closed:bool}
 impl<B:NativeReceiveInterface> InterfaceSoftwareTimestamp<B>{
     pub fn from_native_binding(socket:&UdpSocket,mut binding:B)->Result<Self>{
         let luid=binding.current_receive_luid(socket)?;
         if luid==0{return Err(denied());}
-        let mut source=Self{binding,luid,socket:socket.as_raw_socket()as usize,closed:false};
+        let active=active_timestamp_api()?;
+        let mut source=Self{binding,luid,socket:socket.as_raw_socket()as usize,active,closed:false};
         source.require_current(socket)?;Ok(source)
     }
 }
@@ -97,7 +113,7 @@ impl<B:NativeReceiveInterface> SoftwareTimestampSource for InterfaceSoftwareTime
             if self.closed||socket.as_raw_socket()as usize!=self.socket||self.binding.current_receive_luid(socket)?!=self.luid{return Err(denied());}
             let luid=NET_LUID_LH{Value:self.luid};
             let mut caps:INTERFACE_TIMESTAMP_CAPABILITIES=unsafe{zeroed()};
-            if unsafe{GetInterfaceActiveTimestampCapabilities(&luid,&mut caps)}!=0{return Err(denied());}
+            if unsafe{(self.active)(&luid,&mut caps)}!=0{return Err(denied());}
             let h=&caps.HardwareCapabilities;
             let hardware=[h.PtpV2OverUdpIPv4EventMessageReceive,h.PtpV2OverUdpIPv4AllMessageReceive,
                 h.PtpV2OverUdpIPv4EventMessageTransmit,h.PtpV2OverUdpIPv4AllMessageTransmit,

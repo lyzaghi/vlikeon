@@ -86,10 +86,14 @@ impl<T:NativeSrtpReceiver> UdpVideoIngress<T,crate::stream_video_winsock::Select
 }
 impl<T:NativeSrtpReceiver,C:NativeDatagramReceipt> UdpVideoIngress<T,C>{
     pub fn owner(&self)->VideoOwner{self.ingress.owner}
-    pub fn from_selected_socket(socket:UdpSocket,expected_peer:SocketAddr,owner:VideoOwner,transport:T,clock:C)->Result<Self>{
+    pub fn from_selected_socket(socket:UdpSocket,expected_peer:SocketAddr,owner:VideoOwner,transport:&mut Option<T>,clock:C)->Result<Self>{
         if socket.peer_addr().map_err(|_|denied())?!=expected_peer||expected_peer.port()==0||expected_peer.ip().is_unspecified()||expected_peer.ip().is_multicast(){return Err(denied());}
+        if transport.as_ref().ok_or_else(denied)?.owner()!=owner
+            ||[owner.capture,owner.game,owner.pair,owner.session].iter().any(|id|id.is_nil())
+            ||!(1..=1_000_000).contains(&owner.generation){return Err(denied());}
         socket.set_nonblocking(true).map_err(|_|denied())?;
-        let ingress=VideoIngress::new(owner,transport)?;
+        let transport=transport.take().ok_or_else(denied)?;
+        let ingress=VideoIngress{owner,transport,closed:false,retired:false,video_retired:false};
         Ok(Self{socket:Some(socket),peer:expected_peer,ingress,clock,closed:false})
     }
     /// Cooperative poll: no blocking receive, at most 32 datagrams per caller

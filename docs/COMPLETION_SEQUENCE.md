@@ -2,6 +2,8 @@
 
 ## Current sequence — 1–109 outstanding tasks
 
+Source checkpoint: Windows active timestamp API is now resolved lazily from the already-imported system module, so an absent newer export rejects video capability instead of preventing broker startup. Generic UDP setup now also retains the crypto engine in the caller's slot on validation/socket errors. Actual ICE/DTLS/SRTP implementation and product caller remain open; build/test are deferred.
+
 Source checkpoint: native UDP ingress now has a concrete Windows constructor assembling selected-socket binding, active software timestamp validation and atomic datagram receipt. Setup errors retain the crypto engine in the caller's Option; broker attachment now consumes a caller slot only after registry admission, preserving rejected transports for explicit retirement. No actual ICE/DTLS/SRTP backend or product negotiation caller is supplied by this checkpoint. Build/test remain deferred.
 
 Source checkpoint: concrete Windows receive binding now validates the ICE-selected socket's local unicast address and interface index with GetUnicastIpAddressEntry, retains local/peer/socket/LUID identity and fences ownership changes. SelectedWinsockDatagrams assembles binding, active software timestamp source and atomic recvmsg adapter. Actual native ICE candidate issuer, DTLS/SRTP engine and product negotiation wiring remain unfinished. Build/test stay deferred.
