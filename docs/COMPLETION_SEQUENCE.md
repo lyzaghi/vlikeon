@@ -2,6 +2,8 @@
 
 ## Current sequence — 1–109 outstanding tasks
 
+Source checkpoint: H.264 primary-picture header grouping now rejects mixed picture/parameter identities, conflicting reference-marking/FMO/SP state, duplicate starts and inconsistent slice-type/IDR metadata. It checks in-band parameter bytes against retained versions. This is header consistency only, not complete AU coverage, entropy/DPB or decoder admission; redundant/separate-plane pictures need a later coordinator. `NATIVE_H264_PICTURE_HEADERS.md` records limitations. Build/test remain deferred.
+
 Source checkpoint: ordinary H.264 slice-header parsing now continues the version-bound prefix through bounded reference edits/weights/marking, CABAC initialization/alignment, QP/QS, deblocking and FMO cycle syntax. It does not establish DPB reference availability, full picture coverage or entropy validity. `NATIVE_H264_SLICE_HEADER.md` records limits and remaining decoder admission work. Build/test remain deferred.
 
 Source checkpoint: ordinary H.264 slice identity prefixes now resolve exact retained PPS/SPS versions and parse bounded macroblock/type/frame/field/IDR/POC/redundancy metadata. A lazy borrowed reader consumes only needed header-prefix bytes; it does not validate entropy data or the remaining header. Parameter bindings now compare table identity plus versions. `NATIVE_H264_SLICE_PREFIX.md` records missing full header/AU/reference/decoder work. Build/test remain deferred.

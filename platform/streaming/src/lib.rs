@@ -10,6 +10,7 @@ pub mod native_h264_pps;
 pub mod native_h264_parameters;
 pub mod native_h264_slice;
 pub mod native_h264_slice_header;
+pub mod native_h264_picture;
 pub mod native_rtp_reorder;
 pub mod native_credentials;
 pub mod native_pair_exchange;

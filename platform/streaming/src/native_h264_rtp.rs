@@ -53,6 +53,8 @@ impl<'a> AccessUnit<'a>{
     }
     pub fn has_idr(&self)->bool{self.idr}
     pub fn nal_count(&self)->usize{self.nals.len()}
+    /// Borrow already bounded NAL slices; this adds no codec/decoder authority.
+    pub fn nals(&self)->impl ExactSizeIterator<Item=&'a[u8]>+'_ {self.nals.iter().copied()}
 }
 fn start_code(bytes:&[u8],offset:usize)->Option<(usize,usize)>{
     let mut index=offset;

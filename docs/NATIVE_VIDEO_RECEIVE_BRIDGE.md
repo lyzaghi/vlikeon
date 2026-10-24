@@ -1,5 +1,10 @@
 # Native ordered RTP to decoder bridge — item 56
 
+Primary-picture header consistency now has the source primitive described in
+`NATIVE_H264_PICTURE_HEADERS.md`. Complete AU/DPB/negotiation validation and the
+actual admission implementation remain unfinished; this bridge does not invoke
+the primitive or treat header consistency as decoder permission.
+
 Ordinary complete slice-header syntax now has the source parser documented in
 `NATIVE_H264_SLICE_HEADER.md`. Actual DPB/reference validation, access-unit
 coverage, entropy/decoder and native negotiation admission remain unfinished.
