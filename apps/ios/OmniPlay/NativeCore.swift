@@ -52,6 +52,7 @@ final class NativePeerApproval {
 }
 final class NativeSavedPeerReview {
     let hostPublicKey:String,hostFingerprint:String,pairID:String,generation:String,audience:String
+    let clientPublicKey:String,clientFingerprint:String,localRole:String
     let inputAllowed:Bool,grantExpiresAt:Date,expires:DispatchTime
     fileprivate let core:ObjectIdentifier,address:[String:Any],revision:UInt64,hash:String
     private let current:()->Bool
@@ -60,7 +61,10 @@ final class NativeSavedPeerReview {
         guard let address=value["address"] as? [String:Any],let generation=address["generation"] as? String,
               let host=value["host_public_key"] as? String,let fingerprint=value["host_fingerprint"] as? String,
               let pair=value["pair_id"] as? String,let audience=value["audience"] as? String,let allowed=value["input_allowed"] as? Bool,
-              let expiry=value["expires_at_ms"] as? NSNumber,let revision=value["revision"] as? NSNumber,let hash=value["grant_hash"] as? String else{throw OmniFailure.message("Thiếu dữ liệu ghép đôi đã lưu.")}
+              let expiry=value["expires_at_ms"] as? NSNumber,let revision=value["revision"] as? NSNumber,let hash=value["grant_hash"] as? String,
+              let client=value["client_public_key"] as? String,NativePairingText.publicKey(client),let clientHash=value["client_fingerprint"] as? String,NativePairingText.fingerprint(clientHash),
+              let role=value["local_role"] as? String,["host","client"].contains(role) else{throw OmniFailure.message("Thiếu dữ liệu ghép đôi đã lưu.")}
+        clientPublicKey=client;clientFingerprint=clientHash;localRole=role
         self.core=ObjectIdentifier(core);self.address=address;self.revision=revision.uint64Value;self.hash=hash
         hostPublicKey=host;hostFingerprint=fingerprint;pairID=pair;self.generation=generation;self.audience=audience;inputAllowed=allowed
         grantExpiresAt=Date(timeIntervalSince1970:expiry.doubleValue/1000);self.expires=expires;self.current=current
@@ -599,7 +603,7 @@ final class NativeCore {
                         : om_mobile_pairing_client_action_v1(self.handle,pointer,raw.count,action.rawValue,budget))
                 })
                 if action == .reviewSaved{
-                    guard let request=activation,let expected=request["address"] as? [String:Any],let address=value["address"] as? [String:Any],address.count==5,
+                    guard value["local_role"] as? String=="client",let request=activation,let expected=request["address"] as? [String:Any],let address=value["address"] as? [String:Any],address.count==5,
                           NSDictionary(dictionary:expected).isEqual(to:address),value["pair_id"] as? String==expected["id"] as? String,
                           (value["credential_protocol"] as? NSNumber)?.uint32Value==1,value["phase"] as? String=="material_ready",
                           let previous=request["expected_revision"] as? NSNumber,let revision=value["revision"] as? NSNumber,CFGetTypeID(revision) != CFBooleanGetTypeID(),revision.doubleValue==previous.doubleValue,
@@ -779,6 +783,64 @@ final class NativeCore {
             }
         }catch{completion(.failure(error))}
     }
+    @MainActor func reviewSavedHostPeer(_ record:NativeRecoveryRecord,snapshot:NativeRecoverySnapshot,owner:NativeDocumentLifetime,completion:@escaping @MainActor (Result<NativeSavedPeerReview,Error>)->Void){
+        let token=pairingClientDeliveryFence.capture(cancel:false),deadline=min(snapshot.expires,DispatchTime.now()+25)
+        guard owner.active,DispatchTime.now()<deadline,!snapshot.namespaceProvenanceMissing,!record.isIdentity,record.phase=="material_ready",!record.sessionRecoveryRequired,
+              snapshot.records.contains(where:{NSDictionary(dictionary:$0.address).isEqual(to:record.address)&&$0.phase==record.phase&&$0.publicKey==record.publicKey}) else{completion(.failure(OmniFailure.message("Hãy đọc lại trạng thái trước khi duyệt cặp host đã lưu.")));return}
+        savedHostCandidate(address:record.address,revision:snapshot.revision,hash:nil,owner:owner,deadline:deadline,admission:{DispatchTime.now()<snapshot.expires}){result in
+            do{
+                let value=try result.get()
+                guard owner.active,self.pairingClientDeliveryFence.admits(token),DispatchTime.now()<deadline,
+                      value["host_public_key"] as? String==record.publicKey,let expiry=value["expires_at_ms"] as? NSNumber else{throw OmniFailure.message("Phiên duyệt host đã kết thúc.")}
+                let remaining=min(60_000,expiry.doubleValue-Date().timeIntervalSince1970*1000)
+                guard remaining>0 else{throw OmniFailure.message("Quyền ghép đôi đã hết hạn.")}
+                completion(.success(try NativeSavedPeerReview(core:self,value:value,expires:.now() + .milliseconds(Int(remaining)),current:{[weak self] in owner.active&&self?.pairingClientDeliveryFence.admits(token)==true})))
+            }catch{completion(.failure(error))}
+        }
+    }
+    @MainActor func activateSavedHostPeer(_ review:NativeSavedPeerReview,owner:NativeDocumentLifetime,completion:@escaping @MainActor (Result<[String:Any],Error>)->Void){
+        guard owner.active,review.localRole=="host",review.core==ObjectIdentifier(self),review.consume() else{completion(.failure(OmniFailure.message("Hãy duyệt lại cặp host trước khi kích hoạt.")));return}
+        savedHostCandidate(address:review.address,revision:review.revision,hash:review.hash,owner:owner,deadline:min(review.expires,DispatchTime.now()+25),admission:{review.admitted&&review.grantExpiresAt>Date()},completion:completion)
+    }
+    @MainActor private func savedHostCandidate(address:[String:Any],revision:UInt64,hash:String?,owner:NativeDocumentLifetime,deadline:DispatchTime,admission:@escaping ()->Bool,completion:@escaping @MainActor (Result<[String:Any],Error>)->Void){
+        let token=pairingClientDeliveryFence.capture(cancel:false)
+        guard owner.active,admission(),DispatchTime.now()<deadline else{completion(.failure(OmniFailure.message("Phiên duyệt host đã kết thúc.")));return}
+        guard pairingClientPermit.wait(timeout:.now()) == .success else{completion(.failure(OmniFailure.message("Thao tác ghép đôi trước đang kết thúc.")));return}
+        guard pairingClientQueuePermit.wait(timeout:.now()) == .success else{pairingClientPermit.signal();completion(.failure(OmniFailure.message("Hàng đợi đang bận.")));return}
+        queue.async{
+            defer{self.pairingClientPermit.signal();self.pairingClientQueuePermit.signal()}
+            do{
+                let now=DispatchTime.now()
+                guard now<deadline,self.handle != 0,self.pairingAttached,owner.active,admission(),self.pairingClientDeliveryFence.admits(token) else{throw OmniFailure.message("Phiên duyệt host đã kết thúc.")}
+                let remaining=(deadline.uptimeNanoseconds-now.uptimeNanoseconds)/1_000_000
+                guard remaining>=1000 else{throw OmniFailure.message("Thao tác host hết hạn trong hàng đợi.")}
+                var request:[String:Any]=["address":address,"expected_revision":revision]
+                if let hash=hash{request["reviewed_grant_hash"]=hash}
+                var input=try JSONSerialization.data(withJSONObject:request);defer{input.resetBytes(in:0..<input.count)}
+                guard input.count<=1024 else{throw OmniFailure.message("Yêu cầu host vượt giới hạn.")}
+                let value=try self.unwrap(input.withUnsafeBytes{raw in try self.consume(om_mobile_pairing_host_candidate_v1(self.handle,raw.bindMemory(to:UInt8.self).baseAddress,raw.count,hash==nil ? 1:2,UInt32(min(25_000,remaining))))})
+                guard (value["credential_protocol"] as? NSNumber)?.uint32Value==1,let returned=value["address"] as? [String:Any],NSDictionary(dictionary:returned).isEqual(to:address),
+                      let rev=value["revision"] as? NSNumber,CFGetTypeID(rev) != CFBooleanGetTypeID(),rev.doubleValue<=10_000_000,rev.doubleValue==Double(rev.uint64Value) else{throw OmniFailure.message("Phản hồi host không khớp địa chỉ đã duyệt.")}
+                if let hash=hash{
+                    guard value["phase"] as? String=="active",value["grant_hash"] as? String==hash,rev.uint64Value>revision,
+                          let reload=value["reload_required"] as? NSNumber,CFGetTypeID(reload)==CFBooleanGetTypeID(),reload.boolValue else{throw OmniFailure.message("Chưa xác nhận được kích hoạt host.")}
+                }else{
+                    guard rev.uint64Value==revision,value["phase"] as? String=="material_ready",value["local_role"] as? String=="host",value["pair_id"] as? String==address["id"] as? String,
+                          let host=value["host_public_key"] as? String,NativePairingText.publicKey(host),let fingerprint=value["host_fingerprint"] as? String,NativePairingText.fingerprint(fingerprint),
+                          let client=value["client_public_key"] as? String,NativePairingText.publicKey(client),let clientHash=value["client_fingerprint"] as? String,NativePairingText.fingerprint(clientHash),
+                          let grant=value["grant_hash"] as? String,NativePairingText.fingerprint(grant),let audience=value["audience"] as? String,let url=URLComponents(string:audience),url.scheme=="https",url.host != nil,url.user==nil,url.password==nil,url.query==nil,url.fragment==nil,
+                          let consent=value["local_consent_required"] as? NSNumber,CFGetTypeID(consent)==CFBooleanGetTypeID(),consent.boolValue,
+                          let comparison=value["comparison_available"] as? NSNumber,CFGetTypeID(comparison)==CFBooleanGetTypeID(),!comparison.boolValue,
+                          let permission=value["input_allowed"] as? NSNumber,CFGetTypeID(permission)==CFBooleanGetTypeID(),
+                          let expiry=value["expires_at_ms"] as? NSNumber,CFGetTypeID(expiry) != CFBooleanGetTypeID(),expiry.doubleValue>Date().timeIntervalSince1970*1000,expiry.doubleValue<=9_007_199_254_740_991,expiry.doubleValue==Double(expiry.uint64Value) else{throw OmniFailure.message("Metadata cặp host đã lưu không hợp lệ.")}
+                }
+                DispatchQueue.main.async{
+                    guard owner.active,admission(),DispatchTime.now()<deadline,self.pairingClientDeliveryFence.admits(token) else{completion(.failure(OmniFailure.message("Kết quả host đã cũ. Hãy xem lại trạng thái.")));return}
+                    completion(.success(value))
+                }
+            }catch{DispatchQueue.main.async{completion(.failure(error))}}
+        }
+    }
     @MainActor func reviewSavedPeer(_ record:NativeRecoveryRecord,snapshot:NativeRecoverySnapshot,owner:NativeDocumentLifetime,
         completion:@escaping @MainActor (Result<NativeSavedPeerReview,Error>)->Void){
         let token=pairingClientDeliveryFence.capture(cancel:false)
@@ -802,7 +864,7 @@ final class NativeCore {
     /// Fresh independent host/permission consent required; no old code exists.
     @MainActor func activateSavedPeer(_ review:NativeSavedPeerReview,owner:NativeDocumentLifetime,
         completion:@escaping @MainActor (Result<[String:Any],Error>)->Void){
-        guard owner.active,review.core==ObjectIdentifier(self),review.consume() else{completion(.failure(OmniFailure.message("Phiên duyệt đã kết thúc. Hãy duyệt lại ghép đôi.")));return}
+        guard owner.active,review.localRole=="client",review.core==ObjectIdentifier(self),review.consume() else{completion(.failure(OmniFailure.message("Phiên duyệt đã kết thúc. Hãy duyệt lại ghép đôi.")));return}
         do{
             var input=try JSONSerialization.data(withJSONObject:["address":review.address,"expected_revision":review.revision,"reviewed_grant_hash":review.hash])
             pairingClient(.activate,input:&input,owner:owner,admission:{review.admitted},completion:completion)

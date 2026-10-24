@@ -559,8 +559,11 @@ final class GameHubViewController: UIViewController, WKNavigationDelegate, WKUID
         let alert=UIAlertController(title:"Chi tiết Remote Play",message:message,preferredStyle:.alert);pairingAlert=alert
         alert.addAction(UIAlertAction(title:"Đóng",style:.cancel){[weak self]_ in self?.cancelPairingIdentity()})
         if !snapshot.namespaceProvenanceMissing && !record.isIdentity && record.phase=="material_ready" && !record.sessionRecoveryRequired{
-            alert.addAction(UIAlertAction(title:"Duyệt lại ghép đôi đã lưu",style:.default){[weak self,weak alert]_ in
+            alert.addAction(UIAlertAction(title:"Duyệt lại cặp với vai trò client",style:.default){[weak self,weak alert]_ in
                 alert?.dismiss(animated:false){[weak self] in self?.reviewSavedPeer(record,snapshot:snapshot,owner:owner)}
+            })
+            alert.addAction(UIAlertAction(title:"Duyệt lại cặp với vai trò host",style:.default){[weak self,weak alert]_ in
+                alert?.dismiss(animated:false){[weak self] in self?.reviewSavedPeer(record,snapshot:snapshot,owner:owner,host:true)}
             })
         }
         if canAdvance{
@@ -575,9 +578,9 @@ final class GameHubViewController: UIViewController, WKNavigationDelegate, WKUID
         }
         present(alert,animated:true)
     }
-    private func reviewSavedPeer(_ record:NativeRecoveryRecord,snapshot:NativeRecoverySnapshot,owner:NativeDocumentLifetime){
+    private func reviewSavedPeer(_ record:NativeRecoveryRecord,snapshot:NativeRecoverySnapshot,owner:NativeDocumentLifetime,host:Bool=false){
         guard peerReviewAvailable(owner),DispatchTime.now()<snapshot.expires else{cancelPairingIdentity();return}
-        core.reviewSavedPeer(record,snapshot:snapshot,owner:owner){[weak self] result in
+        let completed:@MainActor (Result<NativeSavedPeerReview,Error>)->Void = {[weak self] result in
             guard let self=self,self.pairingFlow === owner,owner.active else{return}
             guard self.peerReviewAvailable(owner) else{self.cancelPairingIdentity();return}
             switch result{
@@ -585,29 +588,35 @@ final class GameHubViewController: UIViewController, WKNavigationDelegate, WKUID
             case .success(let review):
                 guard DispatchTime.now()<review.expires else{self.cancelPairingIdentity();return}
                 self.pairingExpiry?.cancel()
-                let alert=UIAlertController(title:"Xác minh lại host",message:"Khóa host:\n\(review.hostPublicKey)\nFingerprint:\n\(review.hostFingerprint)\nDịch vụ: \(review.audience)\nCặp: \(review.pairID)\n\nMã đối chiếu cũ không còn khả dụng. Hãy xác minh độc lập khóa host một lần nữa trước khi tiếp tục.",preferredStyle:.alert);self.pairingAlert=alert
+                let key=host ? review.clientPublicKey:review.hostPublicKey,fingerprint=host ? review.clientFingerprint:review.hostFingerprint
+                let alert=UIAlertController(title:host ? "Xác minh lại peer nhận":"Xác minh lại host",message:"Khóa peer:\n\(key)\nFingerprint:\n\(fingerprint)\nDịch vụ: \(review.audience)\nCặp: \(review.pairID)\n\nMã đối chiếu cũ không còn khả dụng. Hãy xác minh độc lập khóa peer một lần nữa trước khi tiếp tục.",preferredStyle:.alert);self.pairingAlert=alert
                 alert.addAction(UIAlertAction(title:"Để sau",style:.cancel){[weak self]_ in self?.cancelPairingIdentity()})
-                alert.addAction(UIAlertAction(title:"Đã xác minh độc lập khóa host",style:.default){[weak self,weak alert]_ in
+                alert.addAction(UIAlertAction(title:"Đã xác minh độc lập khóa peer",style:.default){[weak self,weak alert]_ in
                     alert?.dismiss(animated:false){[weak self] in self?.showSavedPeerPermission(review,owner:owner)}
                 })
                 let expiry=DispatchWorkItem{[weak self] in guard let self=self,self.pairingFlow === owner else{return};self.cancelPairingIdentity()}
                 self.pairingExpiry=expiry;DispatchQueue.main.asyncAfter(deadline:review.expires,execute:expiry);self.present(alert,animated:true)
             }
         }
+        if host{core.reviewSavedHostPeer(record,snapshot:snapshot,owner:owner,completion:completed)}
+        else{core.reviewSavedPeer(record,snapshot:snapshot,owner:owner,completion:completed)}
     }
     private func showSavedPeerPermission(_ review:NativeSavedPeerReview,owner:NativeDocumentLifetime){
         guard peerReviewAvailable(owner),DispatchTime.now()<review.expires else{cancelPairingIdentity();return}
         let permission=review.inputAllowed ? "Cho phép điều khiển đầu vào":"Không cho phép điều khiển đầu vào"
         let expiry=DateFormatter.localizedString(from:review.grantExpiresAt,dateStyle:.medium,timeStyle:.short)
-        let alert=UIAlertController(title:"Kích hoạt ghép đôi đã lưu?",message:"Host: \(review.hostFingerprint)\nCặp: \(review.pairID)\nThế hệ: \(review.generation)\nQuyền: \(permission)\nHạn dùng: \(expiry)\n\nĐồng ý quyền hiển thị và xác nhận lại trên dịch vụ để kích hoạt. Bước này chưa mở kết nối.",preferredStyle:.alert);pairingAlert=alert
+        let fingerprint=review.localRole=="host" ? review.clientFingerprint:review.hostFingerprint
+        let alert=UIAlertController(title:"Kích hoạt ghép đôi đã lưu?",message:"Vai trò thiết bị này: \(review.localRole)\nPeer: \(fingerprint)\nCặp: \(review.pairID)\nThế hệ: \(review.generation)\nQuyền: \(permission)\nHạn dùng: \(expiry)\n\nĐồng ý quyền hiển thị và xác nhận lại trên dịch vụ để kích hoạt. Bước này chưa mở kết nối.",preferredStyle:.alert);pairingAlert=alert
         alert.addAction(UIAlertAction(title:"Để sau",style:.cancel){[weak self]_ in self?.cancelPairingIdentity()})
         alert.addAction(UIAlertAction(title:"Đồng ý quyền và kích hoạt",style:.default){[weak self,weak alert]_ in
             alert?.dismiss(animated:false){[weak self] in
                 guard let self=self,self.peerReviewAvailable(owner),DispatchTime.now()<review.expires else{self?.cancelPairingIdentity();return}
-                self.core.activateSavedPeer(review,owner:owner){[weak self] result in
+                let completed:@MainActor (Result<[String:Any],Error>)->Void = {[weak self] result in
                     guard let self=self,self.pairingFlow === owner,owner.active else{return};self.cancelPairingIdentity()
                     switch result{case .success:self.pairingNotice("Đã kích hoạt ghép đôi đã lưu. Chưa mở kết nối; hãy xem lại trạng thái.");case .failure:self.pairingNotice("Chưa xác nhận được kích hoạt. Hãy đọc lại trạng thái trước khi thử lại.")}
                 }
+                if review.localRole=="host"{self.core.activateSavedHostPeer(review,owner:owner,completion:completed)}
+                else{self.core.activateSavedPeer(review,owner:owner,completion:completed)}
             }
         })
         present(alert,animated:true)

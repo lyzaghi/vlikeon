@@ -2,6 +2,8 @@
 
 ## Current sequence — 1–109 outstanding tasks
 
+Source checkpoint: iOS recovery UI now exposes separate host/client re-review actions for material-ready pairs. Host re-review reloads through native candidate action 1, binds the originating record/public identity and exact journal revision, and displays the recipient key/fingerprint for fresh independent verification. Activation requires separate permission confirmation and a one-use review, then validates the exact address/grant hash/advanced revision. Old comparison codes are not recreated. Build/test and device restart qualification remain deferred.
+
 Source checkpoint: iOS host permission flow now explicitly selects view-only/control and 1-hour/24-hour/7-day lifetime, confirms independent comparison, persists the exact reviewed hello, then separately offers activation bound to the returned address/revision/grant hash. Typed one-use activation validates native receipts and retains the original review deadline. Activation does not start streaming. Re-review/activation of saved host candidates after UI dismissal or restart remains open. Build/test remain deferred; none of this is runtime-qualified.
 
 Source checkpoint: iOS host manual polling now produces typed, owner/fence-bound peer reviews with an original 30-second deadline. Native UI lists untrusted peer labels, shows public keys and comparison codes, and requires a separate confirmation before declining the exact reviewed hello. Decline consumes the review once, shares bounded native admission, and validates the matching relay receipt before reporting success. No permission persistence or activation UI was added in this checkpoint; those remain open. Build/test are deferred by user instruction.
