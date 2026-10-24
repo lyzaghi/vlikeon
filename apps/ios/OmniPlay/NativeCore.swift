@@ -92,7 +92,24 @@ struct NativeRecoverySnapshot {
     let relayRetirementAvailable:Bool
     let namespaceProvenanceMissing:Bool
     let pendingClientTicket:String?
+    let pairingOrigins:[String]
     var needsAttention:Bool{namespaceProvenanceMissing || records.contains{$0.sessionRecoveryRequired || ($0.nextStep != nil && $0.nextStep != "revalidate_before_use")}}
+}
+/// Trusted native begin context. It contains public metadata, never invite proof.
+final class NativeClientSetup {
+    let relayOrigins:[String],identityKey:String,expires:DispatchTime
+    fileprivate let origin:ObjectIdentifier,identity:[String:Any],revision:UInt64
+    private let lock=NSLock();private var consumed=false
+    private let current:()->Bool
+    fileprivate init(core:NativeCore,identity:NativeRecoveryRecord,revision:UInt64,origins:[String],expires:DispatchTime,current:@escaping ()->Bool){
+        origin=ObjectIdentifier(core);self.identity=identity.address;identityKey=identity.publicKey
+        self.revision=revision;relayOrigins=origins;self.expires=expires;self.current=current
+    }
+    fileprivate func consume()->Bool{
+        lock.lock();defer{lock.unlock()}
+        guard !consumed,DispatchTime.now()<expires,current() else{return false};consumed=true;return true
+    }
+    fileprivate var admitted:Bool{DispatchTime.now()<expires&&current()}
 }
 
 /// Only this native object can call path-bearing authorization APIs. Each profile's
@@ -243,7 +260,7 @@ final class NativeCore {
     /// Trusted native UI only. The UI independently confirms host key and
     /// comparison/input consent before persistAfterPeerConsent. No renderer
     /// request may call this or receive its raw replies/tickets.
-    func pairingClient(_ action:NativeClientPairingAction,input:inout Data,owner:NativeDocumentLifetime,
+    func pairingClient(_ action:NativeClientPairingAction,input:inout Data,owner:NativeDocumentLifetime,admission:@escaping ()->Bool={true},
         completion:@escaping @MainActor (Result<[String:Any],Error>)->Void){
         let owned=NativePairingInput(taking:&input)
         let fail:(String)->Void={message in
@@ -276,7 +293,7 @@ final class NativeCore {
                     }
                 }
                 let now=DispatchTime.now()
-                guard self.handle != 0,now<deadline,(action == .cancel || (self.pairingClientDeliveryFence.admits(deliveryToken)&&owner.active&&self.pairingAttached)) else{throw OmniFailure.message("Phiên ghép đôi đã kết thúc. Hãy mở lại trạng thái.")}
+                guard self.handle != 0,now<deadline,(action == .cancel || (admission()&&self.pairingClientDeliveryFence.admits(deliveryToken)&&owner.active&&self.pairingAttached)) else{throw OmniFailure.message("Phiên ghép đôi đã kết thúc. Hãy mở lại trạng thái.")}
                 let remaining=(deadline.uptimeNanoseconds-now.uptimeNanoseconds)/1_000_000
                 guard remaining>=1000 else{throw OmniFailure.message("Yêu cầu ghép đôi đã hết hạn trong hàng đợi.")}
                 let budget=UInt32(min(25_000,remaining))
@@ -303,7 +320,7 @@ final class NativeCore {
                           let id=UUID(uuidString:ticket),id.uuidString.lowercased()==ticket,
                           id != UUID(uuid:(0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0)),expectedTicket==nil || expectedTicket==ticket else{throw OmniFailure.message("Kết quả không khớp ticket ghép đôi.")}
                 }
-                guard DispatchTime.now()<deadline,(action == .cancel || (self.pairingClientDeliveryFence.admits(deliveryToken)&&owner.active)) else{throw OmniFailure.message("Kết quả ghép đôi đã cũ. Hãy mở lại trạng thái trước khi tiếp tục.")}
+                guard DispatchTime.now()<deadline,(action == .cancel || (admission()&&self.pairingClientDeliveryFence.admits(deliveryToken)&&owner.active)) else{throw OmniFailure.message("Kết quả ghép đôi đã cũ. Hãy mở lại trạng thái trước khi tiếp tục.")}
                 func exactBool(_ object:Any?,_ expected:Bool)->Bool{
                     guard let number=object as? NSNumber,CFGetTypeID(number)==CFBooleanGetTypeID() else{return false}
                     return number.boolValue==expected
@@ -340,11 +357,38 @@ final class NativeCore {
                     guard exactBool(value["cancelled"],true),exactBool(value["remote_revoked"],false) else{throw OmniFailure.message("Kết quả hủy local không hợp lệ.")}
                 }
                 DispatchQueue.main.async{
-                    guard DispatchTime.now()<deadline,(action == .cancel || (self.pairingClientDeliveryFence.admits(deliveryToken)&&owner.active)) else{completion(.failure(OmniFailure.message("Kết quả ghép đôi đã cũ. Hãy mở lại trạng thái.")));return}
+                    guard DispatchTime.now()<deadline,(action == .cancel || (admission()&&self.pairingClientDeliveryFence.admits(deliveryToken)&&owner.active)) else{completion(.failure(OmniFailure.message("Kết quả ghép đôi đã cũ. Hãy mở lại trạng thái.")));return}
                     completion(.success(value))
                 }
             }catch{DispatchQueue.main.async{completion(.failure(error))}}
         }
+    }
+    @MainActor func clientPairingSetup(owner:NativeDocumentLifetime,completion:@escaping @MainActor (Result<NativeClientSetup,Error>)->Void){
+        let token=pairingClientDeliveryFence.capture(cancel:false),deadline=DispatchTime.now()+30
+        pairingRecoveryStatus(owner:owner){result in
+            do{
+                let snapshot=try result.get(),identities=snapshot.records.filter{$0.isIdentity&&$0.phase != "retired"}
+                guard owner.active,self.pairingClientDeliveryFence.admits(token),DispatchTime.now()<deadline,
+                      !snapshot.namespaceProvenanceMissing,snapshot.pendingClientTicket==nil,!snapshot.pairingOrigins.isEmpty,
+                      identities.count==1,let identity=identities.first,identity.phase=="active",!identity.sessionRecoveryRequired else{throw OmniFailure.message("Chưa thể ghép đôi. Kiểm tra danh tính Active, phiên chờ và dịch vụ được cấu hình.")}
+                let setup=NativeClientSetup(core:self,identity:identity,revision:snapshot.revision,origins:snapshot.pairingOrigins,
+                    expires:min(deadline,snapshot.expires),current:{[weak self] in owner.active&&self?.pairingClientDeliveryFence.admits(token)==true})
+                completion(.success(setup))
+            }catch{completion(.failure(error))}
+        }
+    }
+    /// UI independently pins host and clears its invitation field after call.
+    /// Immutable Swift/UIKit/JSON string aliases are outside wipe guarantees.
+    @MainActor func beginPairingClient(_ setup:NativeClientSetup,code:String,host:String,audience:String,label:String,owner:NativeDocumentLifetime,
+        completion:@escaping @MainActor (Result<[String:Any],Error>)->Void){
+        guard owner.active,setup.origin==ObjectIdentifier(self),setup.relayOrigins.contains(audience),!code.isEmpty,code.utf8.count<=8192,setup.consume() else{completion(.failure(OmniFailure.message("Phiên chuẩn bị đã kết thúc. Hãy mở lại ghép đôi.")));return}
+        do{
+            var input=try JSONSerialization.data(withJSONObject:["identity":setup.identity,"expected_revision":setup.revision,"code":code,"host_public_key":host,"audience":audience,"label":label])
+            pairingClient(.begin,input:&input,owner:owner,admission:{setup.admitted}){result in
+                guard setup.admitted else{completion(.failure(OmniFailure.message("Kết quả chuẩn bị đã cũ. Hãy kiểm tra trạng thái native.")));return}
+                completion(result)
+            }
+        }catch{completion(.failure(error))}
     }
     /// Poll once; only a validated approved response yields a consent snapshot.
     @MainActor func reviewPairingPeer(ticket:String,owner:NativeDocumentLifetime,
@@ -378,7 +422,7 @@ final class NativeCore {
         guard owner.active,review.origin==ObjectIdentifier(self),review.consume() else{completion(.failure(OmniFailure.message("Phiên xác nhận đã kết thúc. Hãy duyệt lại grant hiện tại.")));return}
         do{
             var input=try JSONSerialization.data(withJSONObject:["ticket":review.ticket,"reviewed_grant_hash":review.grantHash])
-            pairingClient(.persistAfterPeerConsent,input:&input,owner:owner){result in
+            pairingClient(.persistAfterPeerConsent,input:&input,owner:owner,admission:{review.admitted}){result in
                 guard review.admitted else{completion(.failure(OmniFailure.message("Kết quả xác nhận đã cũ. Hãy kiểm tra trạng thái native.")));return}
                 completion(result)
             }
@@ -429,7 +473,11 @@ final class NativeCore {
                           let expiry=pending["expires_at_ms"] as? NSNumber else{throw OmniFailure.message("Phiên ghép đôi chờ không hợp lệ.")}
                     if !expired && expiry.doubleValue>Date().timeIntervalSince1970*1000{pendingTicket=ticket}
                 }
-                let snapshot=NativeRecoverySnapshot(revision:revision.uint64Value,device:device,records:parsed,expires:expires,relayRetirementAvailable:relayAvailable,namespaceProvenanceMissing:namespaceMissing,pendingClientTicket:pendingTicket)
+                guard let origins=value["pairing_origins"] as? [String],origins.count<=8,Set(origins).count==origins.count else{throw OmniFailure.message("Cấu hình relay không hợp lệ.")}
+                for origin in origins{
+                    guard let url=URLComponents(string:origin),url.scheme=="https",let host=url.host,!host.isEmpty,url.user==nil,url.password==nil,url.query==nil,url.fragment==nil,url.path.isEmpty else{throw OmniFailure.message("Relay nằm ngoài cấu hình HTTPS hợp lệ.")}
+                }
+                let snapshot=NativeRecoverySnapshot(revision:revision.uint64Value,device:device,records:parsed,expires:expires,relayRetirementAvailable:relayAvailable,namespaceProvenanceMissing:namespaceMissing,pendingClientTicket:pendingTicket,pairingOrigins:origins)
                 DispatchQueue.main.async{completion(.success(snapshot))}
             }catch{DispatchQueue.main.async{completion(.failure(error))}}
         }

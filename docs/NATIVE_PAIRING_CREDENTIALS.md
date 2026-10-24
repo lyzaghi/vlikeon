@@ -1840,6 +1840,17 @@ this checkpoint.
 
 ## Remaining implementation and qualification
 
+iOS now prepares a native-only one-use ClientSetup from validated status: exactly
+one nonretired Active identity, verified storage provenance, no live pending
+client and bounded installed HTTPS origins. It retains original identity/revision,
+core/owner/cancel binding and queue-inclusive 30-second setup deadline. Begin
+serializes only retained scope plus UI-confirmed host/invitation/origin/label;
+Swift/UIKit/JSON string copies remain outside wipe guarantees. Setup and peer
+snapshot predicates are checked before ABI and at post-response/main admission.
+An already-issued operation can still commit before late rejection; reconcile
+status rather than assuming rollback. No build/test ran; iOS setup UI/join,
+activation and full product qualification remain unfinished.
+
 Android's native hub menu now wires ClientSetup to an invitation/independent
 host-key/device-label form and installed relay selector. Input is length bounded,
 invitation field uses password input, disables state saving/autofill and clears

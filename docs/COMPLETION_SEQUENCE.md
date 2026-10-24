@@ -2,6 +2,10 @@
 
 ## Current sequence — 1–109 outstanding tasks
 
+Item 58 iOS now has immutable one-use setup from validated native Active identity
+and installed relay origins. Setup/peer snapshot admission is rechecked before
+ABI and response delivery. Source-only; setup UI/join/activation and build/test due.
+
 Item 58 Android native menu now authors client setup form, independent host-key
 confirmation, installed relay selection, bounded invitation input, explicit join
 and manual approval polling. Code field clears on send/dismiss; ordinary strings
