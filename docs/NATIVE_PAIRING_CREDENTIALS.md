@@ -1431,6 +1431,36 @@ crash-proof cleanup. No broker/helper/native/thread operation, compiler, build o
 test ran. Actual owner aggregation, deadline propagation and qualification remain
 unfinished, as does the original 51–109 objective.
 
+## Native client invitation transcript preparation
+
+NativeClientPairing now authors the missing client-side preparation from an
+`OPRP1` invitation code. It bounds/decodes the outer document, refuses unknown
+fields, verifies the signed invite against a separately pinned host/audience,
+admits its lifetime/UUID and checks the canonical 32-byte invitation secret hash.
+Only then does it generate its own ephemeral exchange/nonce and sign ClientHello
+with the supplied native identity. Product code must load that identity through
+the existing Active/scoped vault path; this primitive does not do that admission.
+
+The pending object retains the exact invite, signed hello, exchange and pinned
+peer/audience. Its six-digit comparison code uses the browser's JSON array of
+domain/invite-payload/hello-payload and the first SHA-256 word modulo one million.
+The original remaining invite lifetime is bounded by a monotonic deadline as well
+as native wall time; preparation/finishing cannot renew it. Finish consumes this
+exact transcript and the existing authenticated ECDH/KDF admission, including on
+rejection. It does not accept a replacement hello from the caller.
+
+Invitation proof is kept in a zeroizing owner with no Debug/Clone/Serialize or
+secret getter. Decoded outer bytes and raw secret bytes also use zeroizing owners;
+the successfully parsed temporary secret is explicitly cleared on Drop. Caller
+input, parser partial allocations and library-internal copies are outside that
+zeroization guarantee. Native UI must clear its own scanned/pasted code storage.
+
+This sends no request and supplies no peer approval. Native relay JoinInvite,
+comparison-code consent UI, grant collection, pair writer activation and host-side
+invitation controller remain unfinished. No parse/crypto/native/vault/network
+operation, compiler, build or test ran. Source review compared the format with
+the checked-in browser pairing.js; runtime interoperability is not proven.
+
 ## Remaining implementation and qualification
 
 - Journal/executor/lease/writer product integration, authority epochs, actual native owner

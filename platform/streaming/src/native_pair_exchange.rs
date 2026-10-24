@@ -7,7 +7,75 @@ use base64::{Engine,engine::general_purpose::URL_SAFE_NO_PAD};
 use ring::{agreement,hkdf,rand::SystemRandom};
 use sha2::{Digest,Sha256};
 use std::time::{Duration,Instant};
-use zeroize::Zeroizing;
+use zeroize::{Zeroize,Zeroizing};
+use serde::Deserialize;
+
+#[derive(Deserialize)]#[serde(deny_unknown_fields)]
+struct InvitationCode{invite:SignedDocument,secret:String}
+impl Drop for InvitationCode{fn drop(&mut self){self.secret.zeroize();}}
+
+/// Native pending client transcript, not peer approval or an active pair.
+/// No Clone/Debug/Serialize; keeps the exact exchange, invite and signed hello.
+/// The trusted controller must still submit JoinInvite proof and obtain local
+/// comparison-code consent before accepting/activating an approved grant.
+pub struct NativeClientPairing{
+    exchange:NativePairExchange,invite:SignedDocument,hello:SignedDocument,
+    expected_host:String,audience:String,comparison:String,deadline:Instant,expires:u64,
+    _secret:Zeroizing<String>,
+}
+impl NativeClientPairing{
+    /// expected_host and audience must be pinned by trusted native policy/UI,
+    /// never inferred as authorized solely from the scanned invitation itself.
+    /// This validates the invitation secret locally but sends nothing to relay.
+    pub fn from_invitation_code(identity:&crate::native_credentials::NativeSigningIdentity,
+        code:&str,expected_host:&str,audience:&str,label:&str,now:u64)->Result<Self>{
+        let started=Instant::now();validate_audience(audience)?;key(expected_host)?;
+        let encoded=code.strip_prefix("OPRP1.").ok_or_else(invalid)?;
+        let bytes=Zeroizing::new(decode(encoded,8192)?);
+        let mut invitation:InvitationCode=serde_json::from_slice(&bytes).map_err(|_|invalid())?;
+        let invite:Invite=verify(expected_host,INVITE_DOMAIN,&invitation.invite,4096)?;
+        invite.validate(audience,now)?;
+        let local_public=identity.public_key();
+        if invite.id.is_nil()||invite.host_public_key!=expected_host||local_public==expected_host||
+            now>9_007_199_254_740_991||invite.expires_at_ms>9_007_199_254_740_991{return Err(unauthorized());}
+        let secret=Zeroizing::new(decode(&invitation.secret,32)?);
+        if secret.len()!=32||format!("{:x}",Sha256::digest(&secret[..]))!=invite.secret_hash.0{return Err(unauthorized());}
+        if label.is_empty()||label.len()>120||label.chars().any(char::is_control){return Err(invalid());}
+        let deadline=started.checked_add(Duration::from_millis(invite.expires_at_ms-now)).ok_or_else(invalid)?;
+        // Exchange and nonce belong to this one pending transcript. The signed
+        // hello cannot later be substituted by a caller when finishing it.
+        let exchange=NativePairExchange::new(&local_public)?;
+        let body=ClientHello{schema_version:1,invite_id:invite.id,client_public_key:local_public,
+            client_ecdh:exchange.public_key().into(),client_nonce:exchange.nonce().into(),label:label.into(),created_at_ms:now};
+        body.validate(invite.id,now)?;
+        let hello=identity.sign(crate::native_credentials::SigningDomain::Hello,&serde_json::to_vec(&body).map_err(|_|invalid())?)?;
+        let transcript=serde_json::to_vec(&["omniplay.streaming.pair-code.v1",invitation.invite.payload.as_str(),hello.payload.as_str()]).map_err(|_|invalid())?;
+        let hash=Sha256::digest(&transcript);
+        let number=u32::from_be_bytes([hash[0],hash[1],hash[2],hash[3]])%1_000_000;
+        let comparison=format!("{number:06}");
+        let current=elapsed_now(now,started)?;invite.validate(audience,current)?;
+        if started.elapsed()>=MAX_EXCHANGE_AGE||Instant::now()>=deadline{return Err(unauthorized());}
+        // Retain opaque proof for future native relay submission. Never expose
+        // it via metadata getters/Debug/Serialize or leave its String on drop.
+        let retained_secret=Zeroizing::new(std::mem::take(&mut invitation.secret));
+        Ok(Self{exchange,invite:invitation.invite.clone(),hello,expected_host:expected_host.into(),audience:audience.into(),comparison,deadline,expires:invite.expires_at_ms,_secret:retained_secret})
+    }
+    pub fn signed_invite(&self)->&SignedDocument{&self.invite}
+    pub fn signed_hello(&self)->&SignedDocument{&self.hello}
+    pub fn comparison_code(&self)->&str{&self.comparison}
+    pub fn expires_at_ms(&self)->u64{self.expires}
+    /// Native controller calls only after actual local peer comparison/approval.
+    /// Finishing consumes this pending transcript even if the grant is rejected.
+    pub fn finish_after_local_consent(self,grant:&SignedDocument,now:u64)->Result<NativePairKey>{
+        let started=Instant::now();
+        if Instant::now()>=self.deadline||now>=self.expires{return Err(unauthorized());}
+        let material=self.exchange.finish_client(&self.expected_host,&self.invite,&self.hello,grant,&self.audience,elapsed_now(now,started)?)?;
+        if Instant::now()>=self.deadline{return Err(unauthorized());}Ok(material)
+    }
+}
+fn elapsed_now(now:u64,started:Instant)->Result<u64>{
+    now.checked_add(u64::try_from(started.elapsed().as_millis()).map_err(|_|invalid())?).ok_or_else(invalid)
+}
 
 const MAX_EXCHANGE_AGE:Duration=Duration::from_secs(300);
 const INFO:&[u8]=b"omniplay.streaming.signal-key.v1";

@@ -2,6 +2,14 @@
 
 ## Current sequence — 1–109 outstanding tasks
 
+Item 58 now authors NativeClientPairing preparation from a bounded OPRP1 code,
+separately pinned signed invite/secret admission, native exchange-bound signed
+hello and browser-layout comparison code. Exact transcript and original invite
+deadline remain owned until consumed finish; proof has no public export getter.
+No parse/crypto/native/vault/HTTP/compiler/build/test ran. Relay join, native peer
+consent UI, grant collection/activation and host controller remain due; full
+original scope stays open.
+
 Item 58 broker review now retains uncertain input workers and artifact/process
 witnesses in CleanupRequired, including close and terminal-status/error paths.
 Actual terminal input receipts are preserved separately from helper/I/O exit;
