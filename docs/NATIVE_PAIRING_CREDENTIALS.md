@@ -758,6 +758,34 @@ once attached. Actual JNI/Keystore/classloader/exception/release/build/device
 qualification, mobile core lease and iOS attachment caller remain due. No Java
 startup, JNI/native callback, vault, crypto, build or test was executed.
 
+## iOS attachment and protected-data caller source
+
+`NativeCore.swift` now attempts the dedicated pairing attachment after native
+host open, on its serialized queue. It reads profile/device scope from Rust,
+requires the exact canonical profile and nonzero canonical device UUID, and
+constructs the retained Keychain callback table immediately inside its consuming
+native call. Attachment result must match ABI 1. Failure leaves the local
+attached flag false without failing local play, substituting sync credentials,
+reading keys or advertising streaming. A response parsing failure can occur
+after native attachment already succeeded; retry is not automatic and close/
+recovery must reconcile that retained context.
+
+`BackgroundSync.swift` now initializes the separate pairing protected-data flag
+from UIApplication and forwards protected-data unavailable/available events.
+The pairing provider increments a nonwrapping access epoch on every event and
+checks the same epoch across actual Keychain calls. A lock/unlock cycle during
+read/write/remove cannot make the old result valid again. Failed late reads
+clear output; uncertain writes/deletes retain native lifecycle debt. This flag
+does not replace foreground, native consent, session authority or journal gates.
+
+`PairingCredentials.swift` is now referenced by the checked-in Xcode source
+group/build phase with the same deterministic identifiers as the existing source
+assembly recipe. Only its source-membership changes belong to this checkpoint;
+other scheme/build-setting work is preserved. No Xcode generation, compilation,
+UIKit notification, host open, callback, Keychain or test was executed. Actual
+device lock/unlock/background/close/ABI behavior, core mobile lease and LocalHost
+pairing-controller consumption remain missing. Streaming policy stays disabled.
+
 ## Remaining implementation and qualification
 
 - Journal/executor/lease/writer product integration, authority epochs, actual native owner
@@ -768,7 +796,7 @@ startup, JNI/native callback, vault, crypto, build or test was executed.
   compatible with the current signed protocol; no secret IPC export.
 - Broker operations and document-scoped native capabilities, with explicit
   native opt-in and locking/background/expiry behavior.
-- Android attachment device qualification, iOS candidate target/bridge/protected-data wiring,
+- Android/iOS attachment and protected-data device qualification,
   scoped callback consumption and mobile lease/product lifecycle. Existing
   save-sync callbacks are not reused as pairing storage.
 - Device-lock, protected-data, backup/restore/reinstall, profile deletion,

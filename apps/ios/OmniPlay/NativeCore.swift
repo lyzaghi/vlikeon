@@ -43,6 +43,7 @@ final class NativeCore {
     private var lifecycleNeedsCancel = false
     private var lifecycleRevision: UInt64 = 0
     private var detachQueued=false
+    private var pairingAttached=false
     private var handle: UInt64 {
         get { stateLock.lock(); defer { stateLock.unlock() }; return storedHandle }
         set { stateLock.lock(); storedHandle = newValue; stateLock.unlock() }
@@ -79,7 +80,22 @@ final class NativeCore {
                 })
                 guard let number = value["handle"] as? NSNumber, number.uint64Value != 0 else { throw OmniFailure.message("The local profile did not open.") }
                 self.handle = number.uint64Value
+                // Attachment does not read/create credentials or advertise
+                // streaming. Local play remains usable if this provider fails.
+                self.pairingAttached = (try? self.attachPairingProvider()) ?? false
                 self.refreshLifecycle()
+    }
+    private func attachPairingProvider() throws -> Bool {
+        let scope=try unwrap(consume(om_mobile_pairing_scope(handle)))
+        guard scope["profile_id"] as? String == profileID.uuidString.lowercased(),
+              let deviceText=scope["device_id"] as? String,let device=UUID(uuidString:deviceText),
+              device.uuidString.lowercased()==deviceText,
+              device != UUID(uuid:(0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0)) else { return false }
+        // Construct the retained table only inside the consuming call. Rust
+        // owns/retires its context on every result, including rejection.
+        let result=try unwrap(consume(om_mobile_attach_pairing_credentials_v1(handle,
+            PairingCredentials.callbacks(profile:profileID,device:device))))
+        return result["attached"] as? Bool == true && (result["credential_abi"] as? NSNumber)?.uint32Value == 1
     }
     func open(completion: @escaping (Result<Void, Error>) -> Void) {
         queue.async {

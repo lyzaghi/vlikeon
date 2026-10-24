@@ -2,6 +2,13 @@
 
 ## Current sequence — 1–109 outstanding tasks
 
+Item 58 now connects iOS host-open source to scoped Keychain attachment and
+protected-data events with a nonwrapping epoch across calls. The provider source
+is included in the checked-in Xcode target; unrelated settings are preserved.
+No generation/build/test, UIKit/Keychain/native callback or runtime was executed.
+Core mobile lease, pairing controller and full device verification remain due;
+item 58 and original 51–109 scope remain unfinished.
+
 Item 58 now connects Android host-open source to dedicated native scope/provider
 attachment, with canonical native profile/device checks and separate failure
 state. JNI authors explicit UUID/kind byte encoding, exact bounded secret arrays,

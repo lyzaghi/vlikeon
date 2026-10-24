@@ -8,6 +8,7 @@ final class PairingCredentials {
     private static let service = "org.vlikeon.remote-play.credentials.v1"
     private static let accessLock = NSLock()
     private static var protectedDataAvailable = false
+    private static var accessEpoch: UInt64 = 1
     private static let nilID = UUID(uuidString: "00000000-0000-0000-0000-000000000000")!
     private let profile: UUID
     private let device: UUID
@@ -16,10 +17,18 @@ final class PairingCredentials {
 
     init(profile: UUID, device: UUID) { self.profile = profile; self.device = device }
     static func setProtectedDataAvailable(_ value: Bool) {
-        accessLock.lock(); protectedDataAvailable = value; accessLock.unlock()
+        accessLock.lock(); defer { accessLock.unlock() }
+        guard accessEpoch < UInt64.max else { protectedDataAvailable=false; return }
+        accessEpoch += 1; protectedDataAvailable = value
     }
     private static func unlocked() -> Bool {
         accessLock.lock(); defer { accessLock.unlock() }; return protectedDataAvailable
+    }
+    private static func accessToken() -> UInt64? {
+        accessLock.lock(); defer { accessLock.unlock() }; return protectedDataAvailable ? accessEpoch : nil
+    }
+    private static func permits(_ epoch: UInt64) -> Bool {
+        accessLock.lock(); defer { accessLock.unlock() }; return protectedDataAvailable && accessEpoch == epoch
     }
     private func scope(_ pointer: UnsafePointer<OmniPairingAddress>?) -> (account: String, prefix: [UInt8])? {
         guard let pointer = pointer else { return nil }
@@ -54,13 +63,14 @@ final class PairingCredentials {
     }
     private func read(_ address: UnsafePointer<OmniPairingAddress>?, output: UnsafeMutablePointer<UInt8>?, capacity: Int) -> Int64 {
         guard let scope = scope(address), let output = output, capacity == Self.recordBytes else { return -3 }
-        lock.lock(); defer { lock.unlock() }; guard Self.unlocked() else { return -2 }
+        lock.lock(); defer { lock.unlock() }; guard let epoch=Self.accessToken() else { return -2 }
         var request = query(scope.account)
         request[kSecReturnData as String] = true
         request[kSecReturnAttributes as String] = true
         request[kSecMatchLimit as String] = kSecMatchLimitOne
         var result: CFTypeRef?
         let reply = SecItemCopyMatching(request as CFDictionary, &result)
+        guard Self.permits(epoch) else { return -2 }
         guard reply == errSecSuccess else { return Int64(status(reply)) }
         guard let attributes = result as? [String: Any],
               attributes[kSecAttrService as String] as? String == Self.service,
@@ -70,13 +80,14 @@ final class PairingCredentials {
         // Best effort for this Data owner; Swift/OS internal copies are outside
         // the application's guaranteed zeroization boundary.
         defer { data.resetBytes(in: 0..<data.count) }
-        guard data.count == Self.recordBytes, data.starts(with: scope.prefix), Self.unlocked() else { return Self.unlocked() ? -3 : -2 }
+        guard data.count == Self.recordBytes, data.starts(with: scope.prefix), Self.permits(epoch) else { return Self.permits(epoch) ? -3 : -2 }
         data.copyBytes(to: output, count: Self.recordBytes)
-        return Self.unlocked() ? Int64(Self.recordBytes) : -2
+        guard Self.permits(epoch) else { for index in 0..<Self.recordBytes { output[index]=0 }; return -2 }
+        return Int64(Self.recordBytes)
     }
     private func write(_ address: UnsafePointer<OmniPairingAddress>?, secret: UnsafePointer<UInt8>?, length: Int) -> Int32 {
         guard let scope = scope(address), let secret = secret, length == Self.recordBytes else { return -3 }
-        lock.lock(); defer { lock.unlock() }; guard Self.unlocked() else { return -2 }
+        lock.lock(); defer { lock.unlock() }; guard let epoch=Self.accessToken() else { return -2 }
         var data = Data(bytes: secret, count: length)
         defer { data.resetBytes(in: 0..<data.count) }
         guard data.starts(with: scope.prefix) else { return -3 }
@@ -86,13 +97,13 @@ final class PairingCredentials {
         // New generation only. A duplicate is an error, never an update of old
         // or uncertain material. Rust performs matching read-back separately.
         let reply = SecItemAdd(item as CFDictionary, nil)
-        return Self.unlocked() ? status(reply) : -2
+        return Self.permits(epoch) ? status(reply) : -2
     }
     private func remove(_ address: UnsafePointer<OmniPairingAddress>?) -> Int32 {
         guard let scope = scope(address) else { return -3 }
-        lock.lock(); defer { lock.unlock() }; guard Self.unlocked() else { return -2 }
+        lock.lock(); defer { lock.unlock() }; guard let epoch=Self.accessToken() else { return -2 }
         let reply = SecItemDelete(query(scope.account) as CFDictionary)
-        return Self.unlocked() ? status(reply) : -2
+        return Self.permits(epoch) ? status(reply) : -2
     }
     /// Native-only factory. Rust consumes retained context even on rejection.
     static func callbacks(profile: UUID, device: UUID) -> OmniPairingCredentialCallbacks {

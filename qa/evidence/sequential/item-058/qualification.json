@@ -44,7 +44,9 @@
     "Native mobile scope/attachment ABI takes actual open-host profile/device, consumes context on every return and refuses duplicate/closing attachment",
     "Mobile foreground/terminal-close access gates use nonwrapping transition epochs so resumed foreground cannot publish an older in-flight provider result",
     "Android private native scope/attach caller source checks actual profile/device and attaches the separate provider after host open without enabling streaming",
-    "Dedicated JNI pairing callback adapter encodes big-endian kind explicitly, bounds/wipes Java secret arrays and transfers retained provider ownership to Rust; native signatures retained for shrinking"
+    "Dedicated JNI pairing callback adapter encodes big-endian kind explicitly, bounds/wipes Java secret arrays and transfers retained provider ownership to Rust; native signatures retained for shrinking",
+    "iOS host-open source consumes dedicated scoped Keychain attachment table; source added to Xcode target with deterministic identifiers",
+    "iOS protected-data events update separate nonwrapping provider epoch; a lock/unlock cycle cannot publish an earlier in-flight Keychain result"
   ],
   "build_executed": false,
   "tests_executed": false,
@@ -57,7 +59,7 @@
     "Journal/executor/lease/writer product integration, native consent/session owner, copied-profile coordination, startup dispatch and authenticated relay approval/revocation",
     "Native origin/document/session hook and consent/invitation-secret/approval controller integration, abandoned receiver ownership recovery, ICE/backend refresh/stop and retirement dispatch, upgraded relay deployment and WebCrypto/native interoperability",
     "Native broker authority and document/session capability integration",
-    "Android JNI/device qualification, iOS candidate target/attachment/protected-data hooks, LocalHost pairing-controller consumption and mobile lease/app integration",
+    "Android/iOS attachment/protected-data/ABI device qualification, LocalHost pairing-controller consumption and mobile lease/app integration",
     "Lock, restore, rotation, profile/device deletion and explicit browser-to-native re-pairing",
     "All build, test, vault and platform runtime verification"
   ]

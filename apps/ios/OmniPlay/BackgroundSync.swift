@@ -47,11 +47,16 @@ final class BackgroundSync {
 
     func register() {
         SecureCredentials.setProtectedDataAvailable(UIApplication.shared.isProtectedDataAvailable)
+        PairingCredentials.setProtectedDataAvailable(UIApplication.shared.isProtectedDataAvailable)
         observers.append(NotificationCenter.default.addObserver(forName:UIApplication.protectedDataWillBecomeUnavailableNotification,object:nil,queue:.main){ [weak self] _ in
             SecureCredentials.setProtectedDataAvailable(false)
+            PairingCredentials.setProtectedDataAvailable(false)
             Task { @MainActor in if let task = self?.task { self?.finish(task,success:false) } }
         })
-        observers.append(NotificationCenter.default.addObserver(forName:UIApplication.protectedDataDidBecomeAvailableNotification,object:nil,queue:.main){ _ in SecureCredentials.setProtectedDataAvailable(true) })
+        observers.append(NotificationCenter.default.addObserver(forName:UIApplication.protectedDataDidBecomeAvailableNotification,object:nil,queue:.main){ _ in
+            SecureCredentials.setProtectedDataAvailable(true)
+            PairingCredentials.setProtectedDataAvailable(true)
+        })
         observers.append(NotificationCenter.default.addObserver(forName:UIApplication.willEnterForegroundNotification,object:nil,queue:.main){ [weak self] _ in
             Task { @MainActor in if let task = self?.task { self?.finish(task,success:false) } }
         })
