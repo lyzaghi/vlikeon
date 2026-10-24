@@ -1,5 +1,15 @@
 # Native ordered RTP to decoder bridge — item 56
 
+WinsockDatagrams now implements the atomic receive adapter: resolves WSARecvMsg,
+configures RX SIO_TIMESTAMPING, reads byte/control data together and extracts one
+bounded SO_TIMESTAMP ancillary value before conservative QPC conversion. Missing,
+duplicate, truncated or invalid control data fails without a dequeue-time fallback.
+It requires a current native software-timestamp interface/route source before and
+after receiving; that provenance provider remains to be implemented, so hardware
+counter units cannot be silently treated as QPC. No system timestamp setting is
+changed by this source-only work. Actual crypto/ICE, interface provenance and
+runtime/device qualification remain open; build/test stay deferred.
+
 Native datagram receive now requires atomic byte/ancillary-receipt retrieval,
 replacing the unusable post-recv timestamp lookup contract. DecoderReceipt adds
 software-QPC ingress conversion: local/boot clocks are sampled before current
