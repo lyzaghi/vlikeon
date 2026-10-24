@@ -14,3 +14,14 @@ base64.workspace = true
 ed25519-dalek.workspace = true
 uuid.workspace = true
 url.workspace = true
+zeroize.workspace = true
+getrandom.workspace = true
+
+[target.'cfg(target_os = "windows")'.dependencies]
+keyring = { version = "=3.6.3", features = ["windows-native"] }
+
+[target.'cfg(target_os = "macos")'.dependencies]
+keyring = { version = "=3.6.3", features = ["apple-native"] }
+
+[target.'cfg(target_os = "linux")'.dependencies]
+keyring = { version = "=3.6.3", features = ["linux-native-sync-persistent","crypto-rust"] }

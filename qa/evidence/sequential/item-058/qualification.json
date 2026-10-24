@@ -1,0 +1,28 @@
+{
+  "item": 58,
+  "status": "incomplete_source_authored_verification_deferred",
+  "owner_steering": "Build and test later; continue source work",
+  "source_scope": [
+    "Separate native Remote Play provider namespace with profile/device/kind/item/generation addresses",
+    "Fixed binary secret records with exact identity and signed-grant bindings and zeroizing secret buffers",
+    "Ed25519 identity generation, pinned-public reload checks and bounded existing-domain native signing primitive",
+    "Pair candidate load/store verifies signed grant, audience, local participant and expiry after vault I/O",
+    "Candidate write/read-back and exact-generation material deletion; no lifecycle activation/revocation inferred",
+    "Desktop binary keyring provider candidates; mobile refuses until separate scoped provider integration"
+  ],
+  "build_executed": false,
+  "tests_executed": false,
+  "vault_api_executed": false,
+  "passed_cases": [],
+  "native_product_integrated": false,
+  "mobile_provider_integrated": false,
+  "durable_lifecycle_integrated": false,
+  "remaining": [
+    "Durable lifecycle journal, startup reconciliation and candidate/cleanup/relay revocation debt",
+    "Authenticated native key exchange and encrypted signaling sequence/replay lifecycle",
+    "Native broker authority and document/session capability integration",
+    "Separate Android/iOS credential provider ABI and app integration",
+    "Lock, restore, rotation, profile/device deletion and explicit browser-to-native re-pairing",
+    "All build, test, vault and platform runtime verification"
+  ]
+}

@@ -2,6 +2,15 @@
 
 ## Current sequence — 1–109 outstanding tasks
 
+Source work now also reaches item 58: a separate native Remote Play secret-store
+candidate authors generation/profile/device bindings, pinned Ed25519 identities,
+signed-grant-bound pair material, read-back admission and desktop keyring binary
+providers. Vault deletion is not lifecycle revocation; durable journal, native
+pairing/authority, mobile providers and product wiring remain absent. See
+`NATIVE_PAIRING_CREDENTIALS.md`. No vault/crypto/native API, build or test was
+executed. Item 57 qualification and all original incomplete 51–109 work remain
+open; streaming policy stays disabled and build/test execution remains deferred.
+
 On the owner's explicit "build and test later; next" steering, source work moves
 to item 57 while all incomplete item-53–56 obligations remain open. Windows
 installed launch now authors creation-time job ownership, group-drain lifetime

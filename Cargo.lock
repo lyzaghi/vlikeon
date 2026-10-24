@@ -1535,12 +1535,15 @@ version = "0.1.0"
 dependencies = [
  "base64 0.22.1",
  "ed25519-dalek",
+ "getrandom 0.2.17",
+ "keyring",
  "omniplay-contracts",
  "serde",
  "serde_json",
  "sha2",
  "url",
  "uuid",
+ "zeroize",
 ]
 
 [[package]]
