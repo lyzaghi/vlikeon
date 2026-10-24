@@ -2,6 +2,8 @@
 
 ## Current sequence — 1–109 outstanding tasks
 
+Source checkpoint: receive-bridge pending frames now retain original AU metadata plus a native admission proof. A required provider recheck runs before each decoder attempt/retry, followed by original-age and decoder-authority checks. It must not repeat DPB/reference mutations or revive replaced parameter versions. No admission provider, transport enablement or runtime qualification is supplied; build/test remain deferred.
+
 Source checkpoint: native video receiver now forwards caller retirement deadlines into the decoder and allows explicit reaping retries of its same CleanupRequired owner. Buffered data is fenced first and never reopened; only a timely confirmed Stop/process/I/O result publishes Revoked. This integrates the previously authored decoder deadline at the receive-bridge boundary, not aggregate session retirement. Build/test remain deferred.
 
 Source checkpoint: H.264 primary-picture header grouping now rejects mixed picture/parameter identities, conflicting reference-marking/FMO/SP state, duplicate starts and inconsistent slice-type/IDR metadata. It checks in-band parameter bytes against retained versions. This is header consistency only, not complete AU coverage, entropy/DPB or decoder admission; redundant/separate-plane pictures need a later coordinator. `NATIVE_H264_PICTURE_HEADERS.md` records limitations. Build/test remain deferred.

@@ -1,5 +1,17 @@
 # Native ordered RTP to decoder bridge — item 56
 
+Queued compressed units now retain their original ReceivedAccessUnit metadata
+and an admission-provider-specific native proof. `NativeH264Admission` requires
+an explicit read-only `recheck` before every submit, including S_FALSE retries.
+That check must bind the exact AU, parameter/negotiated versions, native owner
+and decode/reference order without advancing reference state a second time.
+The receiver checks original receipt age and decoder authority again after the
+recheck. No byte copy or refreshed receipt is created, and any error fences and
+retires the generation. Proof implementations must remain bounded and avoid a
+second compressed-frame allocation. There is still no actual admission provider
+or default-success implementation. Build/test and runtime qualification remain
+deferred; this closes a queue-boundary contract gap, not full codec admission.
+
 Receiver retirement now accepts an original caller deadline through
 `revoke_until`, fences ordered/pending data before decoder cleanup, and passes
 that deadline into the existing decoder/worker retirement path. A positive,

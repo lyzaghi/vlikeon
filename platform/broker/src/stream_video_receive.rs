@@ -10,7 +10,16 @@ use std::{collections::VecDeque,time::{Duration,Instant}};
 /// profile/level/resolution/VUI/dependencies and negotiated owner/codec. Existing
 /// NAL layout checks do not implement this. No implementation blindly admits.
 pub trait NativeH264Admission{
-    fn admit(&mut self,owner:VideoOwner,frame:&ReceivedAccessUnit)->Result<()>;
+    /// Bounded native-only proof tied to this exact AU, parameter versions,
+    /// negotiated generation and reference/decode order. Never serialize it or
+    /// retain another compressed-frame copy in it; queue capacity is four.
+    type Proof;
+    fn admit(&mut self,owner:VideoOwner,frame:&ReceivedAccessUnit)->Result<Self::Proof>;
+    /// Read-only revalidation of the SAME admitted frame before each submit,
+    /// including S_FALSE retries. Must not advance DPB/reference/parameter state
+    /// again, renew receive age or turn stale parameters into a fresh proof.
+    /// No default-success implementation: caller supplies actual native state.
+    fn recheck(&mut self,owner:VideoOwner,frame:&ReceivedAccessUnit,proof:&Self::Proof)->Result<()>;
 }
 fn unavailable()->PlatformError{PlatformError::new(ErrorCode::RuntimeUnavailable,"The native receive generation is unavailable or requires recovery")}
 #[derive(Default)]
@@ -25,12 +34,12 @@ impl Timeline{
         self.last=Some(timestamp);self.ticks=ticks;Ok(time)
     }
 }
-struct Pending{bytes:Vec<u8>,timestamp:i64,receipt:DecoderReceipt}
+struct Pending<P>{frame:ReceivedAccessUnit,proof:P,timestamp:i64,receipt:DecoderReceipt}
 #[derive(Clone,Copy,Debug,PartialEq,Eq)]
 pub enum ReceiveState{Active,Revoked,CleanupRequired}
 pub struct NativeVideoReceiver<A:NativeH264Admission>{
     ordered:OrderedReceiver<DecoderReceipt>,decoder:WindowsVideoDecoder,admission:A,
-    owner:VideoOwner,pending:VecDeque<Pending>,timeline:Timeline,state:ReceiveState,
+    owner:VideoOwner,pending:VecDeque<Pending<A::Proof>>,timeline:Timeline,state:ReceiveState,
 }
 impl<A:NativeH264Admission> NativeVideoReceiver<A>{
     pub fn new(ordered:OrderedReceiver<DecoderReceipt>,decoder:WindowsVideoDecoder,admission:A)->Self{
@@ -47,11 +56,11 @@ impl<A:NativeH264Admission> NativeVideoReceiver<A>{
             let frames=self.ordered.push_stamped(bytes,receipt.local_received_at(),receipt)?;
             for value in frames{
                 if self.pending.len()>=4||value.frame.received_at!=value.metadata.local_received_at()||!value.metadata.within_receive_age(){return Err(unavailable());}
-                self.admission.admit(self.owner,&value.frame)?;
+                let proof=self.admission.admit(self.owner,&value.frame)?;
                 // Slow parameter-set/native checks do not start a new age budget.
                 if !value.metadata.within_receive_age(){return Err(unavailable());}
                 let timestamp=self.timeline.advance(value.frame.timestamp)?;
-                self.pending.push_back(Pending{bytes:value.frame.annex_b,timestamp,receipt:value.metadata});
+                self.pending.push_back(Pending{frame:value.frame,proof,timestamp,receipt:value.metadata});
             }
             self.pump_inner()
         })();if result.is_err(){self.retire();}result
@@ -60,7 +69,12 @@ impl<A:NativeH264Admission> NativeVideoReceiver<A>{
         self.decoder.check_authority()?;self.ordered.tick()?;
         while let Some(frame)=self.pending.front(){
             if !frame.receipt.within_receive_age(){return Err(unavailable());}
-            if !self.decoder.submit_admitted_borrowed(&frame.bytes,frame.timestamp,frame.receipt)?{break;}
+            self.admission.recheck(self.owner,&frame.frame,&frame.proof)?;
+            // Revalidation can block on native state; it must not extend either
+            // ingress age or decoder authority before this immediate handoff.
+            if !frame.receipt.within_receive_age(){return Err(unavailable());}
+            self.decoder.check_authority()?;
+            if !self.decoder.submit_admitted_borrowed(&frame.frame.annex_b,frame.timestamp,frame.receipt)?{break;}
             self.pending.pop_front();
         }Ok(())
     }
