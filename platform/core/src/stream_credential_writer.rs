@@ -62,6 +62,8 @@ impl<'a> NativeCredentialWriter<'a>{
         ->Result<omniplay_streaming::native_pair_exchange::NativeHostInvitation>{
         let started=begin(deadline)?;
         crate::stream_signal_authority::require_installed_host_grant(audience,false)?;
+        let snapshot=journal::load_scoped(self.database,&self.lease,self.profile)?;
+        if snapshot.revision()!=expected||!snapshot.host_invitations().is_empty(){return Err(PlatformError::new(ErrorCode::Busy,"Finish retained host invitation cleanup before creating another invitation"));}
         let signer=self.active_signer(expected,address)?;check(deadline)?;
         let invitation=omniplay_streaming::native_pair_exchange::NativeHostInvitation::create(&signer,audience,label,elapsed_now(now,started)?)?;
         self.lease.check(self.database,self.profile)?;check(deadline)?;Ok(invitation)

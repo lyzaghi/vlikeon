@@ -152,10 +152,12 @@ struct NativeRecoverySnapshot {
 /// Trusted native begin context. It contains public metadata, never invite proof.
 final class NativeClientSetup {
     let relayOrigins:[String],identityKey:String,expires:DispatchTime
+    fileprivate let hostCleanupPending:Bool
     fileprivate let origin:ObjectIdentifier,identity:[String:Any],revision:UInt64
     private let lock=NSLock();private var consumed=false
     private let current:()->Bool
-    fileprivate init(core:NativeCore,identity:NativeRecoveryRecord,revision:UInt64,origins:[String],expires:DispatchTime,current:@escaping ()->Bool){
+    fileprivate init(core:NativeCore,identity:NativeRecoveryRecord,revision:UInt64,origins:[String],hostCleanupPending:Bool,expires:DispatchTime,current:@escaping ()->Bool){
+        self.hostCleanupPending=hostCleanupPending
         origin=ObjectIdentifier(core);self.identity=identity.address;identityKey=identity.publicKey
         self.revision=revision;relayOrigins=origins;self.expires=expires;self.current=current
     }
@@ -572,6 +574,7 @@ final class NativeCore {
                       !snapshot.namespaceProvenanceMissing,snapshot.pendingClientTicket==nil,snapshot.pendingHostTicket==nil,!snapshot.pairingOrigins.isEmpty,
                       identities.count==1,let identity=identities.first,identity.phase=="active",!identity.sessionRecoveryRequired else{throw OmniFailure.message("Chưa thể ghép đôi. Kiểm tra danh tính Active, phiên chờ và dịch vụ được cấu hình.")}
                 let setup=NativeClientSetup(core:self,identity:identity,revision:snapshot.revision,origins:snapshot.pairingOrigins,
+                    hostCleanupPending:snapshot.hostInvitationCleanupCount>0,
                     expires:min(deadline,snapshot.expires),current:{[weak self] in owner.active&&self?.pairingClientDeliveryFence.admits(token)==true})
                 completion(.success(setup))
             }catch{completion(.failure(error))}
@@ -579,6 +582,7 @@ final class NativeCore {
     }
     @MainActor func beginPairingHost(_ setup:NativeClientSetup,audience:String,label:String,owner:NativeDocumentLifetime,
         completion:@escaping @MainActor (Result<[String:Any],Error>)->Void){
+        guard !setup.hostCleanupPending else{completion(.failure(OmniFailure.message("Hoàn tất cleanup lời mời host trong trạng thái trước khi tạo lời mời mới.")));return}
         guard owner.active,setup.origin==ObjectIdentifier(self),setup.relayOrigins.contains(audience),!label.isEmpty,label.utf8.count<=120,
               !label.unicodeScalars.contains(where:{CharacterSet.controlCharacters.contains($0)}),setup.consume() else{completion(.failure(OmniFailure.message("Phiên chuẩn bị host đã kết thúc. Hãy mở lại.")));return}
         guard pairingClientPermit.wait(timeout:.now()) == .success else{completion(.failure(OmniFailure.message("Thao tác ghép đôi trước đang kết thúc.")));return}

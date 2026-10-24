@@ -2,6 +2,11 @@
 
 ## Current sequence — 1–109 outstanding tasks
 
+Item 58 new host creation now refuses retained durable invitation cleanup under
+the scoped lease, including after process restart. Both mobile host-begin helpers
+surface the same gate before consuming setup; client setup remains usable.
+Source-only; no build/test/runtime operation ran.
+
 Item 58 both mobile durable-cleanup views now allow explicit expired invitation
 reconciliation through the native receipt branch. UI expiry only selects wording;
 server-bound evidence remains required to clear intent. Source-only; no build/

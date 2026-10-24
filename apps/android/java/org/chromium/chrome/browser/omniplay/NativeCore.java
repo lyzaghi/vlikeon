@@ -342,9 +342,11 @@ public final class NativeCore {
     interface ClientSetupReply { void accept(ClientSetup setup,String error); }
     static final class ClientSetup {
         final java.util.List<String> relayOrigins;final String identityKey;final long expires;
+        private final boolean hostCleanupPending;
         private final RecoveryRecord identity;private final long revision;private final Object fence;
         private final java.util.concurrent.atomic.AtomicBoolean consumed=new java.util.concurrent.atomic.AtomicBoolean();
-        private ClientSetup(RecoveryRecord identity,long revision,java.util.List<String> origins,long expires,Object fence){
+        private ClientSetup(RecoveryRecord identity,long revision,java.util.List<String> origins,long expires,Object fence,boolean hostCleanupPending){
+            this.hostCleanupPending=hostCleanupPending;
             this.identity=identity;this.revision=revision;this.relayOrigins=java.util.Collections.unmodifiableList(origins);
             identityKey=identity.key;this.expires=expires;this.fence=fence;
         }
@@ -372,7 +374,7 @@ public final class NativeCore {
                 if(!"https".equals(uri.getScheme())||uri.getHost()==null||uri.getRawUserInfo()!=null||uri.getRawQuery()!=null||uri.getRawFragment()!=null||!uri.getRawPath().isEmpty()||origins.contains(origin))throw new IllegalStateException();
                 origins.add(origin);
             }
-            prepared.set(new ClientSetup(identity,snapshot.revision,origins,deadline,fence));return response;
+            prepared.set(new ClientSetup(identity,snapshot.revision,origins,deadline,fence,snapshot.hostInvitationCleanupCount>0));return response;
         },response->{
             ClientSetup setup=prepared.get();
             if(setup!=null&&alive.getAsBoolean()&&mPairingClientDeliveryFence.get()==fence&&android.os.SystemClock.elapsedRealtime()<deadline)reply.accept(setup,null);
@@ -381,6 +383,7 @@ public final class NativeCore {
     }
     /** Explicit native host creation only; registration/sharing are separate. */
     void beginPairingHost(ClientSetup setup,String audience,String label,java.util.function.BooleanSupplier alive,Reply reply){
+        if(setup!=null&&setup.hostCleanupPending){reply.accept(failure("","busy","Finish retained host invitation cleanup in status before creating another invitation."));return;}
         if(setup==null||!alive.getAsBoolean()||mPairingClientDeliveryFence.get()!=setup.fence||android.os.SystemClock.elapsedRealtime()>=setup.expires
                 ||!setup.relayOrigins.contains(audience)||label==null||label.isEmpty()||label.getBytes(StandardCharsets.UTF_8).length>120||!setup.consumed.compareAndSet(false,true)){
             reply.accept(failure("","cancelled","Host setup ended. Reopen setup."));return;

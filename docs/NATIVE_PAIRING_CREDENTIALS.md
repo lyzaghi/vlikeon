@@ -1840,6 +1840,15 @@ this checkpoint.
 
 ## Remaining implementation and qualification
 
+New host invitation creation now checks the current scoped journal under its
+retained lease and refuses any durable invitation cleanup debt before generating
+proof or signing an invite. Mobile setup snapshots retain this advisory state
+and host-begin helpers direct users to cleanup before consuming their one-use
+setup. Client pairing is not blocked by this host-specific flag. Native revision
+and journal checks remain authoritative if state changes after setup. This closes
+the restart gap where missing transient owner previously allowed new host invites
+despite old durable debt. No build/test/runtime operation ran.
+
 Android/iOS durable cleanup callers no longer reject expired records solely by
 local time. Confirmation views label expiry reconciliation explicitly and state
 that the service must confirm expiry/live absence; unsupported/error responses
