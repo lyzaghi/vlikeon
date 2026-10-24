@@ -1840,6 +1840,16 @@ this checkpoint.
 
 ## Remaining implementation and qualification
 
+iOS explicit share caller now owns the raw Rust allocation in a dedicated buffer
+object instead of copying through String/JSON/Data responses. It validates bounded
+OPRP1/base64url bytes, shares existing admission/deadline/owner/cancel fencing and
+offers a synchronous UnsafeBufferPointer borrow only within the main callback.
+Finally/deinit frees the Rust allocation through its wiping destructor. Consumers
+must not retain that pointer. Pending main delivery still retains the allocation;
+close fences delivery but does not synchronously erase it. No clipboard/OS share
+UI or guarantee over future copies is introduced. No build/test/runtime operation
+ran; native sharing views and end-to-end qualification remain unfinished.
+
 Android explicit host-share caller now keeps proof as byte[] through its bounded
 serialized lane, validates OPRP1/base64url form and checks owner/fence/deadline
 before queue and main delivery. Native reply bytes are borrowed only during the

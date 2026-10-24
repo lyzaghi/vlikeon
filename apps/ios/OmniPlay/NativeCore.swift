@@ -110,6 +110,16 @@ private enum NativePairingText {
 }
 /// Consumes the caller's Data variable; Swift/OS aliases are outside this
 /// owner's best-effort wipe guarantee. Never log or forward to WebKit.
+/// Owns a Rust share allocation; borrows never escape their synchronous callback.
+private final class NativeHostShareBuffer {
+    private var value:OmniBuffer
+    init(_ value:OmniBuffer){self.value=value}
+    func clear(){om_mobile_free(value);value=OmniBuffer(data:nil,length:0)}
+    deinit{clear()}
+    func withBytes<T>(_ body:(UnsafeBufferPointer<UInt8>)->T)->T{
+        body(UnsafeBufferPointer(start:value.data,count:value.length))
+    }
+}
 private final class NativePairingInput {
     var bytes:Data
     init(taking source:inout Data){bytes=Data();swap(&bytes,&source)}
@@ -296,6 +306,37 @@ final class NativeCore {
     /// Trusted native UI only. The UI independently confirms host key and
     /// comparison/input consent before persistAfterPeerConsent. No renderer
     /// request may call this or receive its raw replies/tickets.
+    /// Explicit native share; bytes are valid only for the callback invocation.
+    @MainActor func sharePairingHost(ticket:String,owner:NativeDocumentLifetime,
+        completion:@escaping @MainActor (UnsafeBufferPointer<UInt8>?,String?)->Void){
+        guard let id=UUID(uuidString:ticket),id.uuidString.lowercased()==ticket,id != UUID(uuid:(0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0)),owner.active else{completion(nil,"Ticket chia sẻ host không hợp lệ.");return}
+        guard pairingClientPermit.wait(timeout:.now()) == .success else{completion(nil,"Thao tác ghép đôi trước đang kết thúc.");return}
+        guard pairingClientQueuePermit.wait(timeout:.now()) == .success else{pairingClientPermit.signal();completion(nil,"Hàng đợi chia sẻ đang bận.");return}
+        let deadline=DispatchTime.now()+25,token=pairingClientDeliveryFence.capture(cancel:false)
+        queue.async{
+            defer{self.pairingClientPermit.signal();self.pairingClientQueuePermit.signal()}
+            do{
+                let now=DispatchTime.now()
+                guard now<deadline,self.handle != 0,self.pairingAttached,owner.active,self.pairingClientDeliveryFence.admits(token) else{throw OmniFailure.message("Phiên chia sẻ host đã kết thúc.")}
+                let remaining=(deadline.uptimeNanoseconds-now.uptimeNanoseconds)/1_000_000
+                guard remaining>=1000 else{throw OmniFailure.message("Chia sẻ hết hạn trong hàng đợi.")}
+                var input=try JSONSerialization.data(withJSONObject:["ticket":ticket]);defer{input.resetBytes(in:0..<input.count)}
+                let proof=NativeHostShareBuffer(input.withUnsafeBytes{raw in om_mobile_pairing_host_share_v1(self.handle,raw.bindMemory(to:UInt8.self).baseAddress,raw.count,UInt32(min(25_000,remaining)))})
+                let valid=proof.withBytes{bytes->Bool in
+                    guard bytes.count>6,bytes.count<=8192 else{return false}
+                    let prefix:[UInt8]=[79,80,82,80,49,46]
+                    guard bytes.prefix(6).elementsEqual(prefix) else{return false}
+                    return bytes.dropFirst(6).allSatisfy{(65...90).contains($0)||(97...122).contains($0)||(48...57).contains($0)||$0==45||$0==95}
+                }
+                guard valid,owner.active,DispatchTime.now()<deadline,self.pairingClientDeliveryFence.admits(token) else{proof.clear();throw OmniFailure.message("Mã chia sẻ không khả dụng hoặc đã cũ. Hãy xem trạng thái.")}
+                DispatchQueue.main.async{
+                    defer{proof.clear()}
+                    guard owner.active,DispatchTime.now()<deadline,self.pairingClientDeliveryFence.admits(token) else{completion(nil,"Mã chia sẻ đã cũ. Hãy xem trạng thái.");return}
+                    proof.withBytes{completion($0,nil)}
+                }
+            }catch{DispatchQueue.main.async{completion(nil,"Chưa lấy được mã chia sẻ. Hãy kiểm tra trạng thái trước khi thử lại.")}}
+        }
+    }
     @MainActor func pairingHostTicket(_ action:NativeHostTicketAction,ticket:String,owner:NativeDocumentLifetime,
         completion:@escaping @MainActor (Result<[String:Any],Error>)->Void){
         guard let id=UUID(uuidString:ticket),id.uuidString.lowercased()==ticket,id != UUID(uuid:(0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0)) else{completion(.failure(OmniFailure.message("Ticket host không hợp lệ.")));return}

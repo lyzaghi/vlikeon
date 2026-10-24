@@ -2,6 +2,10 @@
 
 ## Current sequence — 1–109 outstanding tasks
 
+Item 58 iOS now authors explicit raw host-share caller retaining the Rust buffer
+until a scoped UI byte borrow, then wiping/freeing it. Queue/deadline/owner/cancel
+admission applies. Source-only; actual sharing UI/OS copy lifecycle/build/test due.
+
 Item 58 Android now authors explicit raw-share caller with bounded queue/deadline,
 owner/cancel admission and callback-borrowed proof wiped after UI callback.
 Source-only; actual share UI/OS copy lifecycle and build/test remain due.
