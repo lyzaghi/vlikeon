@@ -33,7 +33,7 @@ rfd = "=0.17.2"
 libc = "=0.2.191"
 
 [target.'cfg(windows)'.dependencies]
-windows-sys = {version="=0.61.2",features=["Win32_Networking_WinSock","Win32_System_IO"]}
+windows-sys = {version="=0.61.2",features=["Win32_Networking_WinSock","Win32_System_IO","Win32_NetworkManagement_IpHelper","Win32_NetworkManagement_Ndis"]}
 
 [[bin]]
 name = "omniplay-broker"

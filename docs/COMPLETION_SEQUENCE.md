@@ -2,6 +2,8 @@
 
 ## Current sequence — 1–109 outstanding tasks
 
+Source checkpoint: Windows interface timestamp source now queries active driver capabilities, rejects hardware/missing software timestamps, pins socket/LUID and permanently fences changed bindings. The native exclusive receive-interface binding implementation and ICE/DTLS/SRTP engine remain unfinished. Build/test remain deferred; this checkpoint is not runtime qualification.
+
 Source checkpoint: atomic Winsock WSARecvMsg/SO_TIMESTAMP adapter now implements the UDP receive contract with bounded ancillary parsing and software-QPC conversion. Native interface timestamp provenance provider and actual ICE/DTLS/SRTP remain unfinished; build/test stay deferred.
 
 Source checkpoint: UDP receipt API now receives bytes and timestamp atomically; Windows software-QPC timestamp conversion preserves original queue age in decoder receipt clocks. Actual Winsock ancillary receive/configuration and crypto engine remain open; build/test stay deferred.
