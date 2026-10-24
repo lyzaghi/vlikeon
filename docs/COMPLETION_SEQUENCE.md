@@ -2,6 +2,11 @@
 
 ## Current sequence — 1–109 outstanding tasks
 
+Item 58 leased host writer now authors exact-peer decline and live invitation
+close. Close uses configured retirement origins so disabled new-session policy
+does not alone block cleanup. Active identity/revision still required; crash and
+revoking-identity cleanup remain due. Source-only; no build/test/network run.
+
 Item 58 now authors leased explicit host request polling using exact Active
 identity/revision and installed host/origin admission, with post-network lease,
 deadline/cancel checks. No approval inferred; host controller/UI and build/test due.

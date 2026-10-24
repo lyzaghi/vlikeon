@@ -1840,6 +1840,17 @@ this checkpoint.
 
 ## Remaining implementation and qualification
 
+Leased writer now provides decline_host_peer and close_host around retained
+invitation state and exact Active identity/revision. Decline requires enabled
+host/origin policy and uses the existing local-before-remote peer decline fence.
+Close uses installed retirement origins (new-session enablement is not required)
+and existing terminal local close/proof clearing before remote close admission.
+Both recheck lease/deadline/cancellation before reporting success. Caller must
+retain uncertain invitation state for exact retries; close does not revoke pairs.
+These are live Active-identity paths, not crash/revoking-identity recovery. No
+build/test, vault/crypto/network operation ran. Host controller/UI and durable
+invitation cleanup remain unfinished.
+
 Writer poll_host now reloads the exact Active signing identity under its retained
 lease and requires installed host/origin policy before one bounded invitation
 poll. Existing native invitation code verifies signed request snapshots and

@@ -91,6 +91,31 @@ impl<'a> NativeCredentialWriter<'a>{
         self.lease.check(self.database,self.profile)?;check(deadline)?;
         if cancel.load(std::sync::atomic::Ordering::Acquire){return Err(conflict());}Ok(reviews)
     }
+    /// Exact retained request only; uncertainty must retain local decline fence.
+    pub fn decline_host_peer(&self,expected:u64,address:CredentialAddress,invitation:&mut omniplay_streaming::native_pair_exchange::NativeHostInvitation,
+        client:&str,relay:&omniplay_streaming::native_relay::NativePairRelay,now:u64,deadline:Instant,cancel:&std::sync::atomic::AtomicBool)->Result<()>{
+        let started=begin(deadline)?;
+        let metadata:omniplay_streaming::Invite=omniplay_streaming::inspect(invitation.signed_invite(),4096)?;
+        crate::stream_signal_authority::require_installed_host_grant(&metadata.audience,false)?;
+        if cancel.load(std::sync::atomic::Ordering::Acquire){return Err(conflict());}
+        let signer=self.active_signer(expected,address)?;check(deadline)?;
+        invitation.decline_client(relay,&signer,client,elapsed_now(now,started)?,deadline,cancel)?;
+        self.lease.check(self.database,self.profile)?;check(deadline)?;
+        if cancel.load(std::sync::atomic::Ordering::Acquire){return Err(conflict());}Ok(())
+    }
+    /// Live Active-identity close path; retain the invitation on uncertain reply.
+    /// Does not revoke approved pairs or implement crash/revoking-identity cleanup.
+    pub fn close_host(&self,expected:u64,address:CredentialAddress,invitation:&mut omniplay_streaming::native_pair_exchange::NativeHostInvitation,
+        relay:&omniplay_streaming::native_relay::NativePairRelay,now:u64,deadline:Instant,cancel:&std::sync::atomic::AtomicBool)->Result<()>{
+        let started=begin(deadline)?;
+        let metadata:omniplay_streaming::Invite=omniplay_streaming::inspect(invitation.signed_invite(),4096)?;
+        if !crate::stream_signal_authority::installed_retirement_origins()?.contains(&metadata.audience){return Err(conflict());}
+        let signer=self.active_signer(expected,address)?;check(deadline)?;
+        // close() fences locally before remote cancellation/deadline admission.
+        invitation.close(relay,&signer,elapsed_now(now,started)?,deadline,cancel)?;
+        self.lease.check(self.database,self.profile)?;check(deadline)?;
+        if cancel.load(std::sync::atomic::Ordering::Acquire){return Err(conflict());}Ok(())
+    }
     pub fn join_client(&self,expected:u64,address:CredentialAddress,pending:&mut omniplay_streaming::native_pair_exchange::NativeClientPairing,
         relay:&omniplay_streaming::native_relay::NativePairRelay,now:u64,deadline:Instant,cancel:&std::sync::atomic::AtomicBool)->Result<()>{
         let started=begin(deadline)?;let signer=self.active_signer(expected,address)?;check(deadline)?;
