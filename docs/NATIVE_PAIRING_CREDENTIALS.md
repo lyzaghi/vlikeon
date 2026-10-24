@@ -116,6 +116,39 @@ after every transition/side effect: a plan is a snapshot, not an authority lease
 or executor. Vault lock, unknown writer and failed relay requests keep debt;
 elapsed time alone does not acknowledge writer or session retirement.
 
+## One-step recovery executor source
+
+`stream_credential_recovery.rs` now authors `advance`, which reloads the bounded
+journal, checks the expected revision/address/profile/device, obtains the
+current plan and executes at most one step. A candidate is durably fenced before
+any cleanup. Active records return RevalidationRequired and are not silently
+opened/used. Waiting on pair debt does not claim cleanup progress. There is no
+retry loop, detached thread, automatic key regeneration or renderer endpoint.
+
+The vault-removal step connects to `delete_material`, including exact-generation
+removal and read-back absence, then records the observation using the original
+journal revision. Writer/local/relay steps call a required `NativeRecoveryOwner`
+and record only explicit Confirmed results. Pending, backend error, deadline
+expiry, owner-loss or revision conflict leaves the fence/debt in place. Unknown
+SQL commit requires reload and idempotent re-observation; deletion is not rolled
+back or inferred successful from a failed/unknown metadata commit.
+
+The supplied native owner must hold real cross-process exclusion against all
+credential writers/recovery workers throughout each call, including vault I/O
+and the final commit. Its check is repeated before effects and receipt commit.
+The trait has no default implementation; a mutable Rust borrow does not prove
+that exclusion. Actual OS exclusion, writer containment, local-session ownership
+and authenticated relay revocation providers are still missing. Consequently
+this executor has no product/startup caller yet and has not performed an action.
+
+An original monotonic deadline of at most 30 seconds is required and checked
+between operations. The owner receives that deadline for cancellable backend
+work. Synchronous vault calls and SQLite/OS calls may block beyond it; no hard
+wall-clock termination is claimed. A backend result received after the deadline
+is not positively published as a cleanup observation. Journal fence/finalization
+commits can themselves block and may already be durable when a caller times out;
+the next operation must reload rather than retry with a stale revision.
+
 ## Required durable ordering and integration
 
 The journal authors the state transitions below. Their external effects and
@@ -144,7 +177,8 @@ The caller must fence and retire writers first. Failed cleanup keeps debt.
 
 ## Remaining implementation and qualification
 
-- Journal product integration, authority epochs, actual startup recovery execution,
+- Journal/executor product integration, authority epochs, actual native owner
+  and startup recovery execution,
   rotation/re-pair and local/relay revocation orchestration.
 - Native authenticated ECDH/HKDF pairing and encrypted signaling sequence/replay
   lifecycle compatible with the current signed protocol; no secret IPC export.

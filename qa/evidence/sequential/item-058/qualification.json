@@ -13,7 +13,9 @@
     "Reserved/writing/material-ready/active states and permanent local revocation fences; identity revocation atomically fences all pairs",
     "Separate native cleanup observations for writer, material, local and relay retirement; identity retirement waits for pair retirement",
     "Durable signed-grant and canonical relay-audience recovery metadata with signature, participant, UUID, hash and expiry admission",
-    "Read-only restart action planning for incomplete/expired generations and ordered cleanup; identity material absence is refused while pair debt remains"
+    "Read-only restart action planning for incomplete/expired generations and ordered cleanup; identity material absence is refused while pair debt remains",
+    "One-step native recovery executor source with current revision/plan admission, required exclusive-owner checks and explicit pending/confirmed producer receipts",
+    "Recovery executor connects exact-generation vault removal/read-back to revision-checked cleanup observation; no current startup caller or owner implementation"
   ],
   "build_executed": false,
   "tests_executed": false,
@@ -23,7 +25,7 @@
   "mobile_provider_integrated": false,
   "durable_lifecycle_integrated": false,
   "remaining": [
-    "Journal product integration, actual restart action execution, candidate/cleanup producers and relay revocation orchestration",
+    "Journal/executor product integration, real cross-process exclusive owner, startup dispatch, candidate/cleanup producers and authenticated relay revocation",
     "Authenticated native key exchange and encrypted signaling sequence/replay lifecycle",
     "Native broker authority and document/session capability integration",
     "Separate Android/iOS credential provider ABI and app integration",

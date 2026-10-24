@@ -2,6 +2,14 @@
 
 ## Current sequence — 1–109 outstanding tasks
 
+Item 58 now also authors a one-step recovery executor connecting current journal
+plans/revisions to required native writer/local/relay receipts and exact-vault
+delete/read-back. Pending/unknown/late backend outcomes retain cleanup debt;
+active records require separate revalidation. Real cross-process exclusion and
+owner implementations plus startup/product dispatch are absent, so no recovery
+operation has run. No SQL/vault/network/native API, build or test was executed;
+the full item-58 and original 51–109 scope remain unfinished.
+
 The next item-58 source checkpoint retains signed grant/audience recovery
 metadata with signature and exact record-binding checks, including historical
 admission of expired grants without reviving permission. A bounded read-only
