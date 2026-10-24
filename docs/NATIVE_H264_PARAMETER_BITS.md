@@ -1,5 +1,10 @@
 # Bounded native H.264 SPS/PPS bit reader — item 56
 
+The next source layer, `native_h264_sps.rs`, now parses bounded ordinary SPS and
+VUI/HRD metadata using this reader. See `NATIVE_H264_SPS.md` for exact scope. It
+does not complete semantic validation, PPS/slice admission or bridge integration;
+the remaining requirements below still apply.
+
 Source only. Build/test, parser execution and decoder/network operations remain
 deferred by the owner. This is not a `NativeH264Admission` implementation.
 

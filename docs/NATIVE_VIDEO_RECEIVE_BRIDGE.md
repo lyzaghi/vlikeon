@@ -1,5 +1,10 @@
 # Native ordered RTP to decoder bridge — item 56
 
+Ordinary SPS/VUI/HRD metadata now has the bounded parser described in
+`NATIVE_H264_SPS.md`. Parameter-set dependencies, full semantic/negotiation
+admission and the actual receiver implementation remain outstanding. No current
+bridge path calls the parser or uses it as implicit decoder authority.
+
 Parameter-set parsing source now has the bounded RBSP reader described in
 `NATIVE_H264_PARAMETER_BITS.md`. Full SPS/PPS/VUI semantics, dependency/negotiation
 checks and the actual NativeH264Admission implementation remain missing. The
