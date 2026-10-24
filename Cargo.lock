@@ -1422,6 +1422,7 @@ dependencies = [
  "libc",
  "omniplay-contracts",
  "omniplay-stream-input",
+ "omniplay-streaming",
  "rusqlite",
  "semver",
  "serde",

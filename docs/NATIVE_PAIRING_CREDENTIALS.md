@@ -54,9 +54,50 @@ to absence. Locked, denied, malformed-length and other failures remain errors;
 no plaintext-file or renderer fallback exists. Android/iOS default desktop
 provider calls refuse until a scoped native mobile provider is supplied.
 
+## Durable metadata journal source
+
+`platform/core/src/stream_credentials.rs` now authors a profile/device-bound
+journal in the existing SQLite preferences table, with no schema migration or
+key bytes in SQL. Each transition runs inside an immediate transaction, compares
+the complete journal revision and commits a bounded replacement. Read admission
+checks the SQL byte length before fetching JSON, its version/bindings, unique
+generations, public keys, states and active-pair identity invariant. Limits are
+128 retained generations, 192 KiB and ten million revisions; exhaustion refuses
+new work. Tombstones are not discarded by age or silently reused.
+
+Reserved -> Writing is committed before any vault writer may start. The trusted
+native owner may record MaterialReady only after exact vault read-back and
+actual writer retirement, then Active after native opt-in and, for pairs,
+authenticated relay approval. These are native metadata APIs, not implementations
+of those external operations or verifiable receipts. Pair reservation verifies
+the signed grant and pins its hash/expiry and the active local identity. The
+same pair UUID cannot be reserved again, even after retirement. Grant expiry
+is rechecked after SQL-lock waiting on reservation/activation; orchestration
+must still recheck authority after commit before publishing or using a key.
+
+Revocation commits Revoking before side effects. Revoking an identity atomically
+fences all its pairs. Writing generations keep their writer debt; repeating a
+revocation does not clear previous cleanup observations. An already retired
+identity cannot be used to revoke a later identity generation. Separate native
+observations track writer retirement, material absence, local session retirement
+and relay retirement. Material absence is refused while a writer is unretired.
+All four are required for Retired, and identity retirement additionally waits
+for every pair tombstone to retire. No rollback to Active exists. Uncertain SQL
+commit requires reloading the authoritative revision rather than repeating
+side effects under an old state.
+
+This journal has no current product caller, startup recovery worker or vault/
+network orchestration. Loading metadata is not a live authority lease. Existing
+in-memory key objects are not yet fenced by journal changes. A native owner must
+serialize side effects, retire all old writers before declaring cleanup, keep
+the grant required for relay revocation and enforce current epochs across
+processes. The journal stores only the grant hash/expiry, so a durable signed-
+grant metadata record and relay-revocation integration are still required.
+
 ## Required durable ordering and integration
 
-The following is required work, not implemented lifecycle behavior:
+The journal authors the state transitions below. Their external effects and
+product/recovery integration remain required work:
 
 1. Persist a reserved generation and expected public/grant binding in a durable
    profile/device journal before writing material. Bound pair count and serialize
@@ -81,8 +122,8 @@ The caller must fence and retire writers first. Failed cleanup keeps debt.
 
 ## Remaining implementation and qualification
 
-- Native durable identity/pair lifecycle journal, authority epochs, startup
-  reconciliation, rotation/re-pair and local/relay revocation orchestration.
+- Journal product integration, authority epochs, startup reconciliation,
+  rotation/re-pair and local/relay revocation orchestration.
 - Native authenticated ECDH/HKDF pairing and encrypted signaling sequence/replay
   lifecycle compatible with the current signed protocol; no secret IPC export.
 - Broker operations and document-scoped native capabilities, with explicit

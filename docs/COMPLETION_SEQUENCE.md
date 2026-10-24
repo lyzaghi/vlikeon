@@ -2,6 +2,15 @@
 
 ## Current sequence — 1–109 outstanding tasks
 
+The subsequent item-58 checkpoint authors a bounded SQLite generation journal
+with immediate/revision-checked transitions, write intent before vault I/O,
+permanent revocation fences and separate writer/material/local/relay cleanup
+observations. Identity revocation fences every pair atomically; retirement waits
+for pair cleanup. No external operation or receipt is implemented by these
+metadata calls: product authority, durable grant metadata, startup reconciliation
+and actual vault/relay/mobile integration remain due. No SQL/vault/build/test
+was executed for this checkpoint and item 58 remains unfinished.
+
 Source work now also reaches item 58: a separate native Remote Play secret-store
 candidate authors generation/profile/device bindings, pinned Ed25519 identities,
 signed-grant-bound pair material, read-back admission and desktop keyring binary
