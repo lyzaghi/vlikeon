@@ -1840,6 +1840,17 @@ this checkpoint.
 
 ## Remaining implementation and qualification
 
+LocalHost now authors host_begin and host_register around one retained invitation
+with native ticket, identity/revision/epoch and original monotonic lifetime.
+Begin creates locally only; register reloads the exact identity under lease and
+retains the invitation on uncertain outcomes. A second begin refuses while any
+host invitation remains, rather than silently replacing possible relay ownership.
+No share proof is returned by these entries. Detach/close currently drops this
+transient owner; durable remote close/recovery is not implemented, so controller
+registration must not be exposed as a finished product flow yet. No ABI/UI calls
+or build/test/runtime operations ran. Close/reconciliation and durable invitation
+ownership recovery remain required before accepting full host integration.
+
 prepare_reviewed_host_peer now connects exact retained hello review to host grant
 creation and candidate persistence under one lease. It checks reviewed hello
 hash, installed host/input/audience policy, Active identity/revision, cancellation

@@ -2,6 +2,11 @@
 
 ## Current sequence — 1–109 outstanding tasks
 
+Item 58 LocalHost now retains a native host invitation with exact ticket,
+identity/revision/epoch and explicit registration. No silent replacement or
+automatic sharing/approval. Source-only; close/reconcile controller, ABI/UI and
+durable remote ownership recovery remain unfinished. No build/test ran.
+
 Item 58 leased host writer now binds consented grant creation/persistence to the
 exact retained polled hello hash, Active identity and installed input policy.
 One lease spans the operation; uncertainty never authorizes grant regeneration.

@@ -31,6 +31,7 @@ impl NativeHostInvitation{
         Ok(Self{document,secret:Zeroizing::new(URL_SAFE_NO_PAD.encode(&raw[..])),host:identity.public_key(),audience:audience.into(),deadline,attempted:std::collections::BTreeSet::new(),registered:false,requests:std::collections::BTreeMap::new(),declined:std::collections::BTreeSet::new(),closed:false,close_confirmed:false})
     }
     pub fn signed_invite(&self)->&SignedDocument{&self.document}
+    pub fn native_deadline(&self)->Instant{self.deadline}
     pub fn share_code(&self,now:u64)->Result<Zeroizing<String>>{
         self.live(now)?;if !self.registered{return Err(unauthorized());}
         #[derive(Serialize)]struct Share<'a>{invite:&'a SignedDocument,secret:&'a str}

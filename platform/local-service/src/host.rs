@@ -8,6 +8,8 @@ struct NativeIdentityReview{ id:Uuid,address:omniplay_streaming::native_credenti
     revision:u64,provider_epoch:u64,deadline:std::time::Instant }
 struct NativePendingClient{id:Uuid,identity:omniplay_streaming::native_credentials::CredentialAddress,revision:u64,epoch:u64,
     pairing:omniplay_streaming::native_pair_exchange::NativeClientPairing}
+struct NativePendingHost{id:Uuid,identity:omniplay_streaming::native_credentials::CredentialAddress,revision:u64,epoch:u64,
+    invitation:omniplay_streaming::native_pair_exchange::NativeHostInvitation}
 /// Trusted native UI supplies file capabilities. WebView requests contain UUIDs,
 /// never arbitrary filesystem paths or native executable locations.
 pub struct LocalHost {
@@ -20,6 +22,7 @@ pub struct LocalHost {
     sessions:WebSessions,assistant:Assistant,results:HashMap<Uuid,(Vec<u8>,Response)>,order:VecDeque<Uuid>,
     identity_review:Option<NativeIdentityReview>,
     pairing_client:Option<NativePendingClient>,
+    pairing_host:Option<NativePendingHost>,
 }
 impl LocalHost {
     pub fn open(root:&Path,profile_id:Uuid)->Result<Self>{
@@ -31,7 +34,7 @@ impl LocalHost {
     fn open_inner(root:&Path,profile_id:Uuid,credentials:Option<Arc<dyn omniplay_sync_client::CredentialStore>>)->Result<Self>{
         let database=Database::open(root)?;SessionManager::recover_interrupted(&database)?;
         let lifecycle=Arc::new(crate::SyncLifecycle::default());
-        Ok(Self{profile_id,database,credentials,sync_jobs:crate::sync_jobs::SyncJobs::new(lifecycle.clone()),lifecycle,owner:Uuid::new_v4(),closed:false,asset_ranges:Arc::new(crate::asset_ranges::AssetRanges::default()),permissions:PermissionBroker::default(),directories:DirectoryGrants::default(),transfers:crate::transfers::Transfers::default(),imports:crate::import_jobs::ImportJobs::default(),device_probe:omniplay_device_info::DeviceProbe::default(),sessions:WebSessions::default(),assistant:Assistant::default(),results:HashMap::new(),order:VecDeque::new(),identity_review:None,pairing_client:None})
+        Ok(Self{profile_id,database,credentials,sync_jobs:crate::sync_jobs::SyncJobs::new(lifecycle.clone()),lifecycle,owner:Uuid::new_v4(),closed:false,asset_ranges:Arc::new(crate::asset_ranges::AssetRanges::default()),permissions:PermissionBroker::default(),directories:DirectoryGrants::default(),transfers:crate::transfers::Transfers::default(),imports:crate::import_jobs::ImportJobs::default(),device_probe:omniplay_device_info::DeviceProbe::default(),sessions:WebSessions::default(),assistant:Assistant::default(),results:HashMap::new(),order:VecDeque::new(),identity_review:None,pairing_client:None,pairing_host:None})
     }
     pub fn credential_store(&self)->Option<Arc<dyn omniplay_sync_client::CredentialStore>>{self.credentials.clone()}
     fn ensure_open(&self)->Result<()>{if self.closed{Err(PlatformError::new(ErrorCode::NotFound,"Mobile profile is closed"))}else{Ok(())}}
@@ -177,6 +180,33 @@ impl LocalHost {
         Ok(json!({"credential_protocol":1,"address":review.address,"revision":revision,"phase":"active","approves_remote_peer":false}))
     }
     pub fn native_pairing_cancel_identity_review(&mut self){self.identity_review=None;}
+    /// Native-only local host invitation. This performs no remote registration.
+    pub fn native_pairing_host_begin(&mut self,store:&dyn omniplay_streaming::native_credentials::PairingSecretStore,
+        identity:omniplay_streaming::native_credentials::CredentialAddress,expected:u64,epoch:u64,audience:&str,label:&str,
+        deadline:std::time::Instant)->Result<Value>{
+        self.ensure_open()?;
+        if epoch==0||std::time::Instant::now()>=deadline{return Err(PlatformError::new(ErrorCode::PermissionDenied,"Native host epoch/deadline is unavailable"));}
+        // Never replace a possibly registered invitation silently. The explicit
+        // close/reconciliation path must dispose of its remote ownership first.
+        if self.pairing_host.is_some(){return Err(PlatformError::new(ErrorCode::Busy,"Close the current native host invitation before creating another"));}
+        let writer=omniplay_core::stream_credential_writer::NativeCredentialWriter::open(&self.database,self.profile_id,store)?;
+        let invitation=writer.begin_host(expected,identity,audience,label,omniplay_core::now_ms(),deadline)?;
+        let metadata:omniplay_streaming::Invite=omniplay_streaming::inspect(invitation.signed_invite(),4096)?;
+        let id=Uuid::new_v4();let value=json!({"pairing_protocol":1,"ticket":id,"invite_id":metadata.id,
+            "host_public_key":metadata.host_public_key,"expires_at_ms":metadata.expires_at_ms,"revision":expected,
+            "registered":false,"share_available":false});
+        self.pairing_host=Some(NativePendingHost{id,identity,revision:expected,epoch,invitation});Ok(value)
+    }
+    pub fn native_pairing_host_register(&mut self,store:&dyn omniplay_streaming::native_credentials::PairingSecretStore,
+        ticket:Uuid,epoch:u64,deadline:std::time::Instant,cancel:&std::sync::atomic::AtomicBool)->Result<Value>{
+        self.ensure_open()?;
+        let pending=self.pairing_host.as_mut().ok_or_else(||PlatformError::new(ErrorCode::NotFound,"Native host invitation is absent"))?;
+        if pending.id!=ticket||epoch==0||pending.epoch!=epoch||std::time::Instant::now()>=deadline.min(pending.invitation.native_deadline())||cancel.load(std::sync::atomic::Ordering::Acquire){return Err(PlatformError::new(ErrorCode::Cancelled,"Native host invitation expired or changed lifecycle"));}
+        let relay=omniplay_streaming::native_relay::NativePairRelay::new(omniplay_core::stream_signal_authority::installed_pairing_origins()?)?;
+        let writer=omniplay_core::stream_credential_writer::NativeCredentialWriter::open(&self.database,self.profile_id,store)?;
+        writer.register_host(pending.revision,pending.identity,&mut pending.invitation,&relay,omniplay_core::now_ms(),deadline,cancel)?;
+        Ok(json!({"pairing_protocol":1,"ticket":ticket,"registered":true,"share_available":true,"approves_peer":false}))
+    }
     /// Expired transient exchange/proof is no longer needed for status or retry.
     /// Dropping it does not retire a persisted candidate or revoke relay state.
     fn expire_native_pairing_client(&mut self){
@@ -449,7 +479,7 @@ impl LocalHost {
             _=>Err(PlatformError::new(ErrorCode::UnsupportedCapability,"This operation is not enabled by the current mobile platform policy")),
         }
     }
-    fn clear_transient(&mut self){self.identity_review=None;self.pairing_client=None;self.asset_ranges.close_owner(self.owner);self.sync_jobs.cancel_all();self.sync_jobs.abandon_actions(self.owner);self.imports.cancel_all();self.sessions.close(&self.database);self.transfers.clear();self.permissions.revoke_owner(self.owner);self.directories.revoke_owner(self.owner);}
+    fn clear_transient(&mut self){self.identity_review=None;self.pairing_client=None;self.pairing_host=None;self.asset_ranges.close_owner(self.owner);self.sync_jobs.cancel_all();self.sync_jobs.abandon_actions(self.owner);self.imports.cancel_all();self.sessions.close(&self.database);self.transfers.clear();self.permissions.revoke_owner(self.owner);self.directories.revoke_owner(self.owner);}
     pub fn close(&mut self){self.closed=true;self.lifecycle.set_foreground(false);self.clear_transient();}
     pub fn detach(&mut self){self.clear_transient();self.owner=Uuid::new_v4();self.transfers=crate::transfers::Transfers::default();self.results.clear();self.order.clear();}
     pub fn suspend(&mut self)->Result<()>{let ids=self.sessions.list().into_iter().filter(|s|s.state==SessionState::Running).map(|s|s.id).collect::<Vec<_>>();for id in ids{self.sessions.heartbeat(&self.database,id,SessionState::Paused)?;}Ok(())}
