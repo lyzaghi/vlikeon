@@ -27,6 +27,24 @@ pub struct VideoPacket{pub timestamp_100ns:i64,pub keyframe:bool,pub source_sequ
 #[derive(Clone,Copy)]
 pub struct DecoderReceipt{tick:u64,local:Instant}
 impl DecoderReceipt{
+    /// Native Winsock software SO_TIMESTAMP uses QPC ticks. Capture a fresh QPC
+    /// AFTER the local/boot clocks, then subtract rounded-up elapsed time from
+    /// both clocks; queued packets never gain a fresh 100-ms receive lifetime.
+    /// Caller must have proved SOFTWARE timestamp provenance, not NIC hardware
+    /// counter units. This conversion does not configure or authenticate socket IO.
+    pub fn from_software_qpc_ingress(received:i64)->Result<Self>{
+        let mut frequency=0i64;let mut current=0i64;
+        let tick=unsafe{windows_sys::Win32::System::SystemInformation::GetTickCount64()};let local=Instant::now();
+        if received<0||unsafe{windows_sys::Win32::System::Performance::QueryPerformanceFrequency(&mut frequency)}==0||frequency<=0||
+            unsafe{windows_sys::Win32::System::Performance::QueryPerformanceCounter(&mut current)}==0||current<received{return Err(failure());}
+        let delta=(current-received)as u128;let frequency=frequency as u128;
+        let nanos=delta.checked_mul(1_000_000_000).and_then(|n|n.checked_add(frequency-1)).ok_or_else(failure)?/frequency;
+        if nanos>100_000_000{return Err(failure());}
+        let millis=nanos.div_ceil(1_000_000);
+        let local=local.checked_sub(Duration::from_nanos(nanos as u64)).ok_or_else(failure)?;
+        let tick=tick.checked_sub(millis as u64).ok_or_else(failure)?;
+        let receipt=Self{tick,local};if !receipt.live(){return Err(failure());}Ok(receipt)
+    }
     pub fn local_received_at(self)->Instant{self.local}
     pub fn within_receive_age(self)->bool{self.live()}
     pub fn at_native_ingress()->Self{

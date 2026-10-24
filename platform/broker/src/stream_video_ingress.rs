@@ -4,7 +4,7 @@
 use crate::stream_video_registry::{ReceiveRegistry,ReceiveDocument};
 use omniplay_contracts::{ErrorCode,PlatformError,Result};
 use omniplay_stream_input::video_client::{DecoderReceipt,VideoOwner};
-use std::{time::Instant,net::{UdpSocket,SocketAddr},io::ErrorKind};
+use std::{time::Instant,net::{UdpSocket,SocketAddr}};
 
 pub trait NativeSrtpReceiver{
     /// Exact authorized negotiated media generation retained by this engine.
@@ -58,7 +58,10 @@ fn denied()->PlatformError{PlatformError::new(ErrorCode::PermissionDenied,"The a
 /// (including kernel queue residence), not capture a new clock after dequeue.
 /// Windows ancillary timestamp/correlation implementation is still required.
 pub trait NativeDatagramReceipt{
-    fn received(&mut self,socket:&UdpSocket,datagram:&[u8])->Result<DecoderReceipt>;
+    /// One nonblocking recvmsg operation supplies BOTH bytes and ancillary
+    /// receipt. None means WouldBlock. Reject truncation/missing timestamps;
+    /// do not perform recv() followed by a separate timestamp lookup.
+    fn receive(&mut self,socket:&UdpSocket,buffer:&mut[u8])->Result<Option<(usize,DecoderReceipt)>>;
 }
 /// Owns an already connected ICE-selected socket, never binds/connects to a
 /// renderer-provided address. Fixed peer checks are not SRTP authentication.
@@ -82,14 +85,8 @@ impl<T:NativeSrtpReceiver,C:NativeDatagramReceipt> UdpVideoIngress<T,C>{
             // truncated prefix as a different authenticated SRTP packet.
             let mut buffer=[0u8;65_536];let mut count=0;
             while count<32&&Instant::now()<deadline{
-                let length=match socket.recv(&mut buffer){
-                    Ok(length)=>length,
-                    Err(error)if error.kind()==ErrorKind::WouldBlock=>break,
-                    Err(error)if error.kind()==ErrorKind::Interrupted=>continue,
-                    Err(_)=>return Err(denied()),
-                };
-                if length==0||length>2048{return Err(denied());}
-                let receipt=self.clock.received(socket,&buffer[..length])?;
+                let Some((length,receipt))=self.clock.receive(socket,&mut buffer)?else{break};
+                if length==0||length>2048||length>buffer.len(){return Err(denied());}
                 if Instant::now()>=deadline{return Err(denied());}
                 self.ingress.receive(registry,document,&buffer[..length],receipt)?;count+=1;
             }Ok(count)

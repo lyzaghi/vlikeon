@@ -1,5 +1,14 @@
 # Native ordered RTP to decoder bridge — item 56
 
+Native datagram receive now requires atomic byte/ancillary-receipt retrieval,
+replacing the unusable post-recv timestamp lookup contract. DecoderReceipt adds
+software-QPC ingress conversion: local/boot clocks are sampled before current
+QPC, elapsed queue age is rounded conservatively and subtracted from both clock
+domains. Future/stale/invalid counters fail. The native caller still must prove
+software timestamp provenance; hardware timestamp units cannot use this method.
+Actual Winsock recvmsg timestamp configuration/ancillary parsing remains open.
+See Microsoft Winsock timestamping documentation. No build/test/socket operation ran.
+
 Broker now retains a native TransportSlot alongside its receive registry. Native
 attachment requires a matching active video owner; idle/request maintenance polls
 the connected UDP adapter and ticks the receiver. Poll/lifetime failures seal
