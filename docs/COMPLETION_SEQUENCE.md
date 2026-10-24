@@ -2,6 +2,12 @@
 
 ## Current sequence — 1–109 outstanding tasks
 
+Item 58 iOS now authors installed-relay selection, bounded invitation/host/label
+form, explicit host verification, begin, explicit join and manual approval checks.
+Code fields clear on submit/dismiss/lifecycle cleanup; string aliases cannot be
+guaranteed wiped. Source-only; no build/test/UI/network run. Activation, native
+host product flow, recovery ownership and full qualification remain incomplete.
+
 Item 58 iOS now has immutable one-use setup from validated native Active identity
 and installed relay origins. Setup/peer snapshot admission is rechecked before
 ABI and response delivery. Source-only; setup UI/join/activation and build/test due.

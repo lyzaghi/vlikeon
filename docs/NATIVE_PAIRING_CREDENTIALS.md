@@ -1840,6 +1840,17 @@ this checkpoint.
 
 ## Remaining implementation and qualification
 
+iOS native menu now wires installed-relay selection and invitation/independently
+verified host-key/device-label entry to ClientSetup. UITextField delegate bounds
+UTF-8 input; invitation uses secure text entry with correction/spelling disabled.
+Fields clear on submit/cancel/lifecycle dismissal; Swift/UIKit/IME/JSON aliases
+remain outside guaranteed erasure. Explicit host-verification action precedes
+begin, and another action sends join. The waiting view checks approval only on
+user request and retains the flow for unconfirmed poll outcomes; local cancel
+remains available. Original setup and invitation/review timers remain in effect.
+No build/test, UI render, vault/crypto or network operation ran. Activation,
+native host product flow, producer/recovery ownership and qualification remain.
+
 iOS now prepares a native-only one-use ClientSetup from validated status: exactly
 one nonretired Active identity, verified storage provenance, no live pending
 client and bounded installed HTTPS origins. It retains original identity/revision,

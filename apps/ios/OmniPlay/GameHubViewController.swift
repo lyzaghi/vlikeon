@@ -3,7 +3,7 @@ import WebKit
 import AVFAudio
 
 @MainActor
-final class GameHubViewController: UIViewController, WKNavigationDelegate, WKUIDelegate {
+final class GameHubViewController: UIViewController, WKNavigationDelegate, WKUIDelegate, UITextFieldDelegate {
     private let core: NativeCore
     private var server: AssetServer?
     private var bridge: HubBridge?
@@ -36,7 +36,7 @@ final class GameHubViewController: UIViewController, WKNavigationDelegate, WKUID
         pairingButton.translatesAutoresizingMaskIntoConstraints=false;view.addSubview(pairingButton)
         pairingButtonHeight=pairingButton.heightAnchor.constraint(equalToConstant:44)
         NSLayoutConstraint.activate([pairingButton.leadingAnchor.constraint(equalTo:view.safeAreaLayoutGuide.leadingAnchor,constant:16),pairingButton.trailingAnchor.constraint(equalTo:view.safeAreaLayoutGuide.trailingAnchor,constant:-16),pairingButton.topAnchor.constraint(equalTo:view.safeAreaLayoutGuide.topAnchor),pairingButtonHeight!])
-        pairingButton.menu=UIMenu(children:[UIAction(title:"Thiết lập danh tính"){[weak self]_ in self?.beginPairingIdentity()},UIAction(title:"Trạng thái và phục hồi"){[weak self]_ in self?.beginPairingRecovery()}]);pairingButton.showsMenuAsPrimaryAction=true
+        pairingButton.menu=UIMenu(children:[UIAction(title:"Thiết lập danh tính"){[weak self]_ in self?.beginPairingIdentity()},UIAction(title:"Trạng thái và phục hồi"){[weak self]_ in self?.beginPairingRecovery()},UIAction(title:"Ghép đôi với host"){[weak self]_ in self?.beginClientPairing()}]);pairingButton.showsMenuAsPrimaryAction=true
         status.text="Đang chuẩn bị thư viện…";status.textColor = .white;status.numberOfLines=0;status.textAlignment = .center;status.translatesAutoresizingMaskIntoConstraints=false;view.addSubview(status)
         NSLayoutConstraint.activate([status.leadingAnchor.constraint(equalTo:view.safeAreaLayoutGuide.leadingAnchor,constant:24),status.trailingAnchor.constraint(equalTo:view.safeAreaLayoutGuide.trailingAnchor,constant:-24),status.centerYAnchor.constraint(equalTo:view.centerYAnchor)])
         NotificationCenter.default.addObserver(self,selector:#selector(willResign),name:UIApplication.willResignActiveNotification,object:nil)
@@ -88,6 +88,89 @@ final class GameHubViewController: UIViewController, WKNavigationDelegate, WKUID
     func webView(_ webView:WKWebView,createWebViewWith configuration:WKWebViewConfiguration,for navigationAction:WKNavigationAction,windowFeatures:WKWindowFeatures)->WKWebView?{if let url=navigationAction.request.url,["https","http"].contains(url.scheme?.lowercased() ?? ""){openWebsite?(url)};return nil}
     func webView(_ webView:WKWebView,runJavaScriptAlertPanelWithMessage message:String,initiatedByFrame frame:WKFrameInfo,completionHandler:@escaping()->Void){let alert=UIAlertController(title:"OmniPlay",message:String(message.prefix(2000)),preferredStyle:.alert);alert.addAction(UIAlertAction(title:"OK",style:.default){_ in completionHandler()});present(alert,animated:true)}
     func webView(_ webView:WKWebView,runJavaScriptConfirmPanelWithMessage message:String,initiatedByFrame frame:WKFrameInfo,completionHandler:@escaping(Bool)->Void){let alert=UIAlertController(title:"OmniPlay",message:String(message.prefix(2000)),preferredStyle:.alert);alert.addAction(UIAlertAction(title:"Hủy",style:.cancel){_ in completionHandler(false)});alert.addAction(UIAlertAction(title:"Tiếp tục",style:.default){_ in completionHandler(true)});present(alert,animated:true)}
+    private func beginClientPairing(){
+        guard pairingFlow==nil,presentedViewController==nil,hubVisible,!fullScreenGame,!pendingSuspend,UIApplication.shared.applicationState == .active,UIApplication.shared.isProtectedDataAvailable else{return}
+        let owner=NativeDocumentLifetime();pairingFlow=owner;pairingButton.isEnabled=false
+        core.clientPairingSetup(owner:owner){[weak self] result in
+            guard let self=self,self.pairingFlow === owner,owner.active else{return}
+            guard self.peerReviewAvailable(owner) else{self.cancelPairingIdentity();return}
+            switch result{
+            case .failure(let error):self.cancelPairingIdentity();self.pairingNotice(error.localizedDescription)
+            case .success(let setup):
+                let sheet=UIAlertController(title:"Chọn dịch vụ ghép đôi",message:"Chỉ chọn relay được cấu hình trong ứng dụng. Phiên chuẩn bị hết hạn sau 30 giây.",preferredStyle:.actionSheet);self.pairingAlert=sheet
+                for origin in setup.relayOrigins{
+                    sheet.addAction(UIAlertAction(title:origin,style:.default){[weak self,weak sheet]_ in sheet?.dismiss(animated:false){[weak self] in self?.showClientInvitation(setup,origin:origin,owner:owner)}})
+                }
+                sheet.addAction(UIAlertAction(title:"Đóng",style:.cancel){[weak self]_ in self?.cancelPairingIdentity()})
+                sheet.popoverPresentationController?.sourceView=self.pairingButton;sheet.popoverPresentationController?.sourceRect=self.pairingButton.bounds
+                let expiry=DispatchWorkItem{[weak self] in guard let self=self,self.pairingFlow === owner else{return};self.cancelPairingIdentity()}
+                self.pairingExpiry=expiry;DispatchQueue.main.asyncAfter(deadline:setup.expires,execute:expiry);self.present(sheet,animated:true)
+            }
+        }
+    }
+    private func showClientInvitation(_ setup:NativeClientSetup,origin:String,owner:NativeDocumentLifetime){
+        guard peerReviewAvailable(owner),DispatchTime.now()<setup.expires else{cancelPairingIdentity();return}
+        let alert=UIAlertController(title:"Nhập lời mời của host",message:"Dịch vụ: \(origin)\nNhập mã mời, khóa host đã xác minh độc lập và nhãn thiết bị. Không lấy sự tin cậy của khóa chỉ từ mã mời.",preferredStyle:.alert);pairingAlert=alert
+        alert.addTextField{[weak self] field in field.delegate=self;field.tag=8192;field.placeholder="Mã mời";field.isSecureTextEntry=true;field.autocorrectionType = .no;field.autocapitalizationType = .none;field.spellCheckingType = .no;field.textContentType = nil}
+        alert.addTextField{[weak self] field in field.delegate=self;field.tag=43;field.placeholder="Khóa công khai host đã xác minh";field.autocorrectionType = .no;field.autocapitalizationType = .none;field.spellCheckingType = .no}
+        alert.addTextField{[weak self] field in field.delegate=self;field.tag=64;field.placeholder="Nhãn thiết bị này";field.autocorrectionType = .no}
+        alert.addAction(UIAlertAction(title:"Đóng",style:.cancel){[weak self,weak alert]_ in alert?.textFields?.forEach{$0.text=nil};self?.cancelPairingIdentity()})
+        alert.addAction(UIAlertAction(title:"Đã xác minh khóa host, chuẩn bị",style:.default){[weak self,weak alert]_ in
+            guard let self=self,self.pairingFlow === owner,owner.active,DispatchTime.now()<setup.expires,
+                  let fields=alert?.textFields,fields.count==3 else{self?.cancelPairingIdentity();return}
+            let code=fields[0].text ?? "",host=fields[1].text ?? "",label=fields[2].text ?? "";fields.forEach{$0.text=nil}
+            guard !code.isEmpty,code.utf8.count<=8192,host.utf8.count==43,!label.isEmpty,label.utf8.count<=64 else{self.cancelPairingIdentity();self.pairingNotice("Thông tin không hợp lệ. Mở lại ghép đôi và nhập mã, khóa host, nhãn thiết bị trong giới hạn.");return}
+            alert?.dismiss(animated:false){[weak self] in
+                guard let self=self,self.peerReviewAvailable(owner) else{self?.cancelPairingIdentity();return}
+                self.pairingExpiry?.cancel();self.pairingExpiry=nil
+                self.core.beginPairingClient(setup,code:code,host:host,audience:origin,label:label,owner:owner){[weak self] result in
+                    guard let self=self,self.pairingFlow === owner,owner.active else{return}
+                    guard self.peerReviewAvailable(owner) else{self.cancelPairingIdentity();return}
+                    do{
+                        let value=try result.get()
+                        guard let ticket=value["ticket"] as? String,let comparison=value["comparison_code"] as? String,let expiry=value["expires_at_ms"] as? NSNumber else{throw OmniFailure.message("Kết quả chuẩn bị không hợp lệ.")}
+                        let remaining=min(300_000,expiry.doubleValue-Date().timeIntervalSince1970*1000)
+                        guard remaining>0 else{throw OmniFailure.message("Lời mời đã hết hạn.")}
+                        let expiryWork=DispatchWorkItem{[weak self] in guard let self=self,self.pairingFlow === owner else{return};self.cancelPairingIdentity()}
+                        self.pairingExpiry=expiryWork;DispatchQueue.main.asyncAfter(deadline:.now() + .milliseconds(Int(remaining)),execute:expiryWork)
+                        self.showClientJoin(ticket:ticket,comparison:comparison,owner:owner)
+                    }catch{self.cancelPairingIdentity();self.pairingNotice("Chưa xác nhận được chuẩn bị ghép đôi. Mở lại trạng thái trước khi thử lại.")}
+                }
+            }
+        })
+        present(alert,animated:true)
+    }
+    private func showClientJoin(ticket:String,comparison:String,owner:NativeDocumentLifetime){
+        guard peerReviewAvailable(owner) else{cancelPairingIdentity();return}
+        let alert=UIAlertController(title:"Gửi yêu cầu ghép đôi?",message:"Mã đối chiếu: \(comparison)\nGửi yêu cầu rồi so sánh mã trên host. Gửi yêu cầu chưa cấp quyền peer hoặc điều khiển.",preferredStyle:.alert);pairingAlert=alert
+        alert.addAction(UIAlertAction(title:"Đóng",style:.cancel){[weak self]_ in self?.cancelPairingIdentity()})
+        alert.addAction(UIAlertAction(title:"Gửi yêu cầu",style:.default){[weak self,weak alert]_ in
+            alert?.dismiss(animated:false){[weak self] in
+                guard let self=self,self.peerReviewAvailable(owner) else{self?.cancelPairingIdentity();return}
+                do{
+                    var input=try JSONSerialization.data(withJSONObject:["ticket":ticket])
+                    self.core.pairingClient(.join,input:&input,owner:owner){[weak self] result in
+                        guard let self=self,self.pairingFlow === owner,owner.active else{return}
+                        switch result{case .success:self.showClientWaiting(ticket:ticket,owner:owner);case .failure:self.cancelPairingIdentity();self.pairingNotice("Chưa xác nhận được kết quả gửi. Mở lại trạng thái trước khi tiếp tục.")}
+                    }
+                }catch{self.cancelPairingIdentity();self.pairingNotice("Không gửi được yêu cầu. Hãy kiểm tra trạng thái.")}
+            }
+        })
+        present(alert,animated:true)
+    }
+    func textField(_ textField:UITextField,shouldChangeCharactersIn range:NSRange,replacementString string:String)->Bool{
+        guard [43,64,8192].contains(textField.tag) else{return true}
+        let current=textField.text ?? ""
+        guard let selection=Range(range,in:current) else{return false}
+        return current.replacingCharacters(in:selection,with:string).utf8.count<=textField.tag
+    }
+    private func showClientWaiting(ticket:String,owner:NativeDocumentLifetime){
+        guard peerReviewAvailable(owner) else{cancelPairingIdentity();return}
+        let alert=UIAlertController(title:"Kiểm tra duyệt từ host",message:"Chưa xác nhận được grant hiện tại tại đây. Đối chiếu mã và duyệt trên host, rồi kiểm tra lại hoặc hủy cục bộ. Chỉ kiểm tra khi bạn yêu cầu.",preferredStyle:.alert);pairingAlert=alert
+        alert.addAction(UIAlertAction(title:"Hủy cục bộ",style:.destructive){[weak self,weak alert]_ in alert?.dismiss(animated:false){[weak self] in self?.cancelPendingPeer(ticket:ticket,owner:owner)}})
+        alert.addAction(UIAlertAction(title:"Kiểm tra host duyệt",style:.default){[weak self,weak alert]_ in alert?.dismiss(animated:false){[weak self] in self?.showPeerApproval(ticket:ticket,owner:owner)}})
+        present(alert,animated:true)
+    }
     private func beginPairingIdentity(){
         guard pairingFlow==nil,presentedViewController==nil,hubVisible,!fullScreenGame,!pendingSuspend,
               UIApplication.shared.applicationState == .active,UIApplication.shared.isProtectedDataAvailable else{return}
@@ -179,7 +262,7 @@ final class GameHubViewController: UIViewController, WKNavigationDelegate, WKUID
             guard let self=self,self.pairingFlow === owner,owner.active else{return}
             guard self.peerReviewAvailable(owner) else{self.cancelPairingIdentity();return}
             switch result{
-            case .failure(let error):self.cancelPairingIdentity();self.pairingNotice(error.localizedDescription)
+            case .failure:self.showClientWaiting(ticket:ticket,owner:owner)
             case .success(let review):
                 guard DispatchTime.now()<review.expires else{self.cancelPairingIdentity();return}
                 self.pairingExpiry?.cancel()
@@ -240,7 +323,7 @@ final class GameHubViewController: UIViewController, WKNavigationDelegate, WKUID
     @objc private func cancelPairingIdentity(){
         guard let owner=pairingFlow else{return};owner.invalidate();pairingFlow=nil
         pairingExpiry?.cancel();pairingExpiry=nil;pairingButton.isEnabled=true
-        pairingAlert?.dismiss(animated:false);pairingAlert=nil;core.cancelPairingIdentityReview()
+        pairingAlert?.textFields?.forEach{$0.text=nil};pairingAlert?.dismiss(animated:false);pairingAlert=nil;core.cancelPairingIdentityReview()
     }
     private func pairingNotice(_ message:String){
         guard hubVisible,presentedViewController==nil,UIApplication.shared.applicationState == .active else{return}
