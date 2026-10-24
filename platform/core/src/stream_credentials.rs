@@ -1,6 +1,7 @@
 //! Native-only pairing lifecycle metadata. No key material or renderer API.
 //! Every transition commits before its corresponding vault/network side effect.
 use crate::{Database,util::storage_error};
+use crate::stream_credential_lease::CredentialLease;
 use omniplay_contracts::{ErrorCode,PlatformError,Result};
 use omniplay_streaming::{key,document_hash,verify_grant,verify,inspect,validate_audience,PairGrant,GRANT_DOMAIN,SignedDocument,
     native_credentials::{CredentialAddress,SecretKind}};
@@ -118,8 +119,8 @@ impl RecoveryAction{
     pub fn address(&self)->CredentialAddress{self.address}
     pub fn step(&self)->RecoveryStep{self.step}
 }
-pub fn finalize_retirement(database:&Database,profile:Uuid,expected:u64,address:CredentialAddress)->Result<Journal>{
-    update(database,profile,expected,|journal|{
+pub fn finalize_retirement(database:&Database,lease:&CredentialLease,profile:Uuid,expected:u64,address:CredentialAddress)->Result<Journal>{
+    update(database,lease,profile,expected,|journal|{
         if address.kind()==SecretKind::DeviceSigning&&journal.records.iter().any(|pair|pair.address.kind()==SecretKind::PairEncryption&&pair.phase!=Phase::Retired){return Err(conflict());}
         let record=selected(journal,address)?;
         if record.phase!=Phase::Revoking||!record.writer_retired||!record.material_absent||!record.local_retired||!record.relay_retired{return Err(conflict());}
@@ -141,7 +142,11 @@ pub fn load(database:&Database,profile:Uuid)->Result<Journal>{
     let tx=Transaction::new_unchecked(&database.connection,TransactionBehavior::Deferred).map_err(storage_error)?;
     let journal=read(&tx,profile,database.device_id)?;tx.commit().map_err(storage_error)?;Ok(journal)
 }
-fn update(database:&Database,profile:Uuid,expected:u64,change:impl FnOnce(&mut Journal)->Result<()>)->Result<Journal>{
+fn update(database:&Database,lease:&CredentialLease,profile:Uuid,expected:u64,change:impl FnOnce(&mut Journal)->Result<()>)->Result<Journal>{
+    lease.check(database,profile)?;
+    let mode:String=database.connection.query_row("PRAGMA journal_mode",[],|row|row.get(0)).map_err(storage_error)?;
+    let synchronous:u32=database.connection.query_row("PRAGMA synchronous",[],|row|row.get(0)).map_err(storage_error)?;
+    if !database.connection.is_autocommit()||mode!="wal"||!matches!(synchronous,2|3){return Err(invalid());}
     let tx=Transaction::new_unchecked(&database.connection,TransactionBehavior::Immediate).map_err(storage_error)?;
     let mut journal=read(&tx,profile,database.device_id)?;
     if journal.revision!=expected||expected>=MAX_REVISION{return Err(conflict());}
@@ -149,7 +154,7 @@ fn update(database:&Database,profile:Uuid,expected:u64,change:impl FnOnce(&mut J
     let json=serde_json::to_string(&journal).map_err(storage_error)?;
     if json.len()>MAX_BYTES{return Err(PlatformError::new(ErrorCode::ResourceLimit,"Native pairing cleanup records exceed the profile bound"));}
     tx.execute("INSERT INTO preferences(key,value) VALUES(?1,?2) ON CONFLICT(key) DO UPDATE SET value=excluded.value",params![KEY,json]).map_err(storage_error)?;
-    tx.commit().map_err(storage_error)?;Ok(journal)
+    lease.check(database,profile)?;tx.commit().map_err(storage_error)?;Ok(journal)
 }
 fn selected(journal:&mut Journal,address:CredentialAddress)->Result<&mut Record>{
     journal.records.iter_mut().find(|record|record.address==address).ok_or_else(conflict)
@@ -163,18 +168,18 @@ fn add(journal:&mut Journal,address:CredentialAddress,public_key:String,grant_ha
     journal.records.push(Record{address,public_key,grant_hash,expires_at_ms,grant,phase:Phase::Reserved,
         writer_retired:true,material_absent:false,local_retired:false,relay_retired:false});Ok(())
 }
-pub fn reserve_identity(database:&Database,profile:Uuid,expected:u64,address:CredentialAddress,public_key:String)->Result<Journal>{
+pub fn reserve_identity(database:&Database,lease:&CredentialLease,profile:Uuid,expected:u64,address:CredentialAddress,public_key:String)->Result<Journal>{
     if address.kind()!=SecretKind::DeviceSigning{return Err(invalid());}
-    update(database,profile,expected,|journal|add(journal,address,public_key,None,None,None))
+    update(database,lease,profile,expected,|journal|add(journal,address,public_key,None,None,None))
 }
-pub fn reserve_pair(database:&Database,profile:Uuid,expected:u64,address:CredentialAddress,local_public:String,document:&SignedDocument,audience:&str,now:u64)->Result<Journal>{
+pub fn reserve_pair(database:&Database,lease:&CredentialLease,profile:Uuid,expected:u64,address:CredentialAddress,local_public:String,document:&SignedDocument,audience:&str,now:u64)->Result<Journal>{
     let started=Instant::now();
     if address.kind()!=SecretKind::PairEncryption{return Err(invalid());}
     validate_audience(audience)?;
     let grant=verify_grant(document,audience,now)?;
     if grant.id!=address.id()||(grant.host_public_key!=local_public&&grant.client_public_key!=local_public){return Err(invalid());}
     let hash=document_hash(document)?;
-    update(database,profile,expected,|journal|{
+    update(database,lease,profile,expected,|journal|{
         verify_grant(document,audience,after_wait(now,started)?)?;
         if !journal.records.iter().any(|record|record.address.kind()==SecretKind::DeviceSigning&&record.phase==Phase::Active&&record.public_key==local_public){return Err(conflict());}
         // A given grant ID never becomes usable again after local revocation.
@@ -184,29 +189,29 @@ pub fn reserve_pair(database:&Database,profile:Uuid,expected:u64,address:Credent
 }
 /// Commit BEFORE starting a single serialized vault writer. Restart recovery
 /// must retire/contain that producer before recording writer retirement.
-pub fn begin_write(database:&Database,profile:Uuid,expected:u64,address:CredentialAddress)->Result<Journal>{
-    update(database,profile,expected,|journal|{let record=selected(journal,address)?;
+pub fn begin_write(database:&Database,lease:&CredentialLease,profile:Uuid,expected:u64,address:CredentialAddress)->Result<Journal>{
+    update(database,lease,profile,expected,|journal|{let record=selected(journal,address)?;
         if record.phase!=Phase::Reserved{return Err(conflict());}record.phase=Phase::Writing;record.writer_retired=false;Ok(())})
 }
 /// Trusted native orchestrator calls only after exact material read-back AND
 /// actual writer retirement. Caller observations are not cryptographic receipts.
-pub fn material_ready(database:&Database,profile:Uuid,expected:u64,address:CredentialAddress)->Result<Journal>{
-    update(database,profile,expected,|journal|{let record=selected(journal,address)?;
+pub fn material_ready(database:&Database,lease:&CredentialLease,profile:Uuid,expected:u64,address:CredentialAddress)->Result<Journal>{
+    update(database,lease,profile,expected,|journal|{let record=selected(journal,address)?;
         if record.phase!=Phase::Writing{return Err(conflict());}record.phase=Phase::MaterialReady;record.writer_retired=true;Ok(())})
 }
 /// Identity requires native opt-in; a pair additionally requires authenticated
 /// relay approval. This metadata transition does not perform either operation.
-pub fn activate(database:&Database,profile:Uuid,expected:u64,address:CredentialAddress,now:u64)->Result<Journal>{
+pub fn activate(database:&Database,lease:&CredentialLease,profile:Uuid,expected:u64,address:CredentialAddress,now:u64)->Result<Journal>{
     let started=Instant::now();
-    update(database,profile,expected,|journal|{let record=selected(journal,address)?;
+    update(database,lease,profile,expected,|journal|{let record=selected(journal,address)?;
         let current=after_wait(now,started)?;
         if record.phase!=Phase::MaterialReady||record.expires_at_ms.is_some_and(|expiry|expiry<=current){return Err(conflict());}
         record.phase=Phase::Active;Ok(())})
 }
 /// Durable fence first. Identity revocation atomically fences every pair too.
 /// Repeating a fence never clears already retained cleanup observations.
-pub fn revoke(database:&Database,profile:Uuid,expected:u64,address:CredentialAddress)->Result<Journal>{
-    update(database,profile,expected,|journal|{
+pub fn revoke(database:&Database,lease:&CredentialLease,profile:Uuid,expected:u64,address:CredentialAddress)->Result<Journal>{
+    update(database,lease,profile,expected,|journal|{
         let target=selected(journal,address)?;
         if target.phase==Phase::Retired{return Err(conflict());}
         let identity=target.address.kind()==SecretKind::DeviceSigning;
@@ -221,8 +226,8 @@ pub fn revoke(database:&Database,profile:Uuid,expected:u64,address:CredentialAdd
 #[derive(Clone,Copy)]pub enum CleanupObservation{WriterRetired,MaterialAbsent,LocalRetired,RelayRetired}
 /// Evidence must come from native producer/vault/session/relay owners. There is
 /// no renderer endpoint and no timestamp-as-retirement inference here.
-pub fn observe_cleanup(database:&Database,profile:Uuid,expected:u64,address:CredentialAddress,observation:CleanupObservation)->Result<Journal>{
-    update(database,profile,expected,|journal|{
+pub fn observe_cleanup(database:&Database,lease:&CredentialLease,profile:Uuid,expected:u64,address:CredentialAddress,observation:CleanupObservation)->Result<Journal>{
+    update(database,lease,profile,expected,|journal|{
         // Identity material is needed to authenticate outstanding relay
         // revocations. Do not acknowledge its removal while pair debt remains.
         if matches!(observation,CleanupObservation::MaterialAbsent)&&address.kind()==SecretKind::DeviceSigning&&

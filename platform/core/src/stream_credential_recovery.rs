@@ -1,6 +1,7 @@
 //! One-step native pairing cleanup orchestration. No startup/product caller or
 //! default owner implementation exists yet. Never dispatch from renderer IPC.
 use crate::{Database,stream_credentials::{self as journal,Record,RecoveryStep,CleanupObservation}};
+use crate::stream_credential_lease::CredentialLease;
 use omniplay_contracts::{ErrorCode,PlatformError,Result};
 use omniplay_streaming::native_credentials::{CredentialAddress,PairingSecretStore,delete_material};
 use std::time::{Duration,Instant};
@@ -50,9 +51,10 @@ fn checked_now(now:u64,started:Instant)->Result<u64>{
 /// worker. Caller provides trusted native time, an admitted scoped vault and
 /// the real exclusive owner. Side effects are not rolled back on failed/unknown
 /// SQL commit; retain the durable fence and reload/re-observe on the next call.
-pub fn advance(database:&Database,profile:Uuid,address:CredentialAddress,expected_revision:u64,
+pub fn advance(database:&Database,lease:&CredentialLease,profile:Uuid,address:CredentialAddress,expected_revision:u64,
     store:&dyn PairingSecretStore,owner:&mut dyn NativeRecoveryOwner,now:u64,deadline:Instant)->Result<StepOutcome>{
     let started=Instant::now();check_deadline(deadline)?;
+    lease.check(database,profile)?;
     if deadline.saturating_duration_since(started)>Duration::from_secs(30){
         return Err(PlatformError::new(ErrorCode::InvalidRequest,"Native pairing recovery requires a bounded operation deadline"));
     }
@@ -67,13 +69,13 @@ pub fn advance(database:&Database,profile:Uuid,address:CredentialAddress,expecte
     owner.check_exclusive(profile,database.device_id)?;check_deadline(deadline)?;
     let observation=match action.step(){
         RecoveryStep::FenceGeneration=>{
-            let updated=journal::revoke(database,profile,expected_revision,address)?;
+            let updated=journal::revoke(database,lease,profile,expected_revision,address)?;
             return Ok(StepOutcome::Committed{revision:updated.revision()});
         },
         RecoveryStep::RevalidateBeforeUse=>return Ok(StepOutcome::RevalidationRequired),
         RecoveryStep::WaitForPairCleanup=>return Ok(StepOutcome::Pending),
         RecoveryStep::FinalizeRetirement=>{
-            let updated=journal::finalize_retirement(database,profile,expected_revision,address)?;
+            let updated=journal::finalize_retirement(database,lease,profile,expected_revision,address)?;
             return Ok(StepOutcome::Committed{revision:updated.revision()});
         },
         RecoveryStep::RetireWriter=>match owner.retire_writer(record,deadline)?{
@@ -98,6 +100,7 @@ pub fn advance(database:&Database,profile:Uuid,address:CredentialAddress,expecte
     // A slow/failed/uncertain backend never receives a positive journal receipt.
     // Its idempotent retirement or deletion can be re-observed after reload.
     check_deadline(deadline)?;owner.check_exclusive(profile,database.device_id)?;check_deadline(deadline)?;
-    let updated=journal::observe_cleanup(database,profile,expected_revision,address,observation)?;
+    lease.check(database,profile)?;
+    let updated=journal::observe_cleanup(database,lease,profile,expected_revision,address,observation)?;
     Ok(StepOutcome::Committed{revision:updated.revision()})
 }

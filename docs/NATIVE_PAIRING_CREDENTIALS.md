@@ -59,7 +59,8 @@ provider calls refuse until a scoped native mobile provider is supplied.
 `platform/core/src/stream_credentials.rs` now authors a profile/device-bound
 journal in the existing SQLite preferences table, with no schema migration or
 key bytes in SQL. Each transition runs inside an immediate transaction, compares
-the complete journal revision and commits a bounded replacement. Read admission
+the complete journal revision and commits a bounded replacement. Mutations
+require WAL and FULL/EXTRA synchronous mode with no enclosing transaction. Read admission
 checks the SQL byte length before fetching JSON, its version/bindings, unique
 generations, public keys, states and active-pair identity invariant. Limits are
 128 retained generations, 192 KiB and ten million revisions; exhaustion refuses
@@ -137,8 +138,9 @@ The supplied native owner must hold real cross-process exclusion against all
 credential writers/recovery workers throughout each call, including vault I/O
 and the final commit. Its check is repeated before effects and receipt commit.
 The trait has no default implementation; a mutable Rust borrow does not prove
-that exclusion. Actual OS exclusion, writer containment, local-session ownership
-and authenticated relay revocation providers are still missing. Consequently
+that exclusion. The Windows cooperative lease below now supplies the retained
+OS lock in source, but writer containment, local-session ownership and
+authenticated relay revocation providers are still missing. Consequently
 this executor has no product/startup caller yet and has not performed an action.
 
 An original monotonic deadline of at most 30 seconds is required and checked
@@ -148,6 +150,34 @@ wall-clock termination is claimed. A backend result received after the deadline
 is not positively published as a cleanup observation. Journal fence/finalization
 commits can themselves block and may already be durable when a caller times out;
 the next operation must reload rather than retry with a stale revision.
+
+## Windows cooperative writer lease source
+
+`stream_credential_lease.rs` now authors a `CredentialLease` required by every
+journal mutation and by the one-step recovery executor. The caller must retain
+the same lease across write-intent commit, vault write/read-back, publication or
+cleanup receipt commit; reacquiring separately between these operations is not
+equivalent. The private lease owns its file/directories, profile/device/root
+binding and has no Clone, serialized constructor or handle/unlock export.
+
+On Windows it opens a fixed zero-byte profile-root lock file with no truncate
+and uses nonblocking `File::try_lock`. WouldBlock reports Busy. Reparse points,
+symlinks, non-regular files, nonzero lock contents, relative/parent-traversal and
+UNC-shaped roots are refused. Root ancestors are opened and retained without
+FILE_SHARE_DELETE before the lock file is opened, keeping that admitted path
+namespace from being renamed/replaced during the lease. The lock remains until
+the owned file is dropped; release/crash does not clear journal cleanup debt.
+
+This is cooperative exclusion for admitted native processes sharing that same
+profile root. It does not prove filesystem ACL provenance, an entire machine's
+absence of other writers, or that a mapped drive has qualified local locking
+semantics. Copied/restored profile roots with duplicated vault addresses still
+need coordinated admission/recovery; separate path lock files do not arbitrate
+those copies. Raw secret-provider APIs remain internal primitives whose callers
+must honor the lease contract. Provider/native owner integration and real Windows
+lock/reparse/contender/crash qualification are still due. Other platforms refuse
+lease acquisition until their scoped provider is implemented; no plaintext or
+process-local mutex fallback is supplied.
 
 ## Required durable ordering and integration
 
@@ -177,7 +207,7 @@ The caller must fence and retire writers first. Failed cleanup keeps debt.
 
 ## Remaining implementation and qualification
 
-- Journal/executor product integration, authority epochs, actual native owner
+- Journal/executor/lease product integration, authority epochs, actual native owner
   and startup recovery execution,
   rotation/re-pair and local/relay revocation orchestration.
 - Native authenticated ECDH/HKDF pairing and encrypted signaling sequence/replay

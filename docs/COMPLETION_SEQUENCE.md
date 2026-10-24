@@ -2,6 +2,14 @@
 
 ## Current sequence — 1–109 outstanding tasks
 
+Item 58 now authors a Windows cooperative credential lease with a fixed zero-
+byte nonblocking lock file, retained non-reparse ancestor handles and exact
+profile/device/root binding. Every journal mutation and recovery step requires
+that retained lease; mutations also admit WAL/FULL durability. Actual writers,
+copied-profile admission, non-Windows leases and product/startup integration are
+still missing. No file lock, SQL/vault/native call, build or test was executed;
+the source candidate does not complete item 58 or the original 51–109 objective.
+
 Item 58 now also authors a one-step recovery executor connecting current journal
 plans/revisions to required native writer/local/relay receipts and exact-vault
 delete/read-back. Pending/unknown/late backend outcomes retain cleanup debt;
