@@ -2,6 +2,11 @@
 
 ## Current sequence — 1–109 outstanding tasks
 
+Item 58 Android status now retains typed immutable durable invitation cleanup
+metadata with exact local signing-generation binding, configured-shape HTTPS
+audience and integral expiry admission. No action authority inferred. Source-only;
+cleanup action UI and build/test remain due.
+
 Item 58 registration retry now recognizes an exact durable invitation intent
 without writing another revision. It can reconcile one potentially committed
 intent revision only, while reloading the original Active signer. Arbitrary later

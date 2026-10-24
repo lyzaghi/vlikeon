@@ -1840,6 +1840,15 @@ this checkpoint.
 
 ## Remaining implementation and qualification
 
+Android recovery snapshots now retain immutable durable host cleanup records,
+not just a count. Each validates invite/hash, integral bounded expiry, actual
+expiry flag, HTTPS origin shape and exact five-field local DeviceSigning address.
+After credential parsing, the address must match a nonretired identity in the same
+snapshot. The list is immutable and contains no proof or activation capability.
+Origin format is not network authorization; native installed retirement policy
+still controls cleanup destinations. No build/test/runtime operation ran. The
+explicit durable-cleanup caller/UI and equivalent iOS record model remain due.
+
 Host registration retry now matches existing durable intent by invite ID, exact
 signed-document hash, identity generation and audience under the scoped lease.
 Matching intent is reused without another journal mutation. The expected revision

@@ -605,6 +605,28 @@ public final class NativeCore {
         }
         private JSONObject address() throws Exception{return new JSONObject().put("profile",profile).put("device",device).put("kind",kind).put("id",item).put("generation",generation);}
     }
+    /** Durable public cleanup metadata; never a share or approval capability. */
+    static final class HostInvitationCleanup {
+        final String inviteId,inviteHash,audience,identityGeneration;
+        final long expiresAt;final boolean expired;
+        private final String identity;
+        private HostInvitationCleanup(JSONObject value,String profile,String device) throws Exception{
+            inviteId=value.getString("invite_id");inviteHash=value.getString("invite_hash");audience=value.getString("audience");
+            JSONObject address=value.getJSONObject("identity");identityGeneration=address.getString("generation");identity=address.toString();
+            Object expiry=value.get("expires_at_ms");
+            if(!canonicalPairingId(inviteId)||!inviteHash.matches("[0-9a-f]{64}")||address.length()!=5
+                    ||!profile.equals(address.getString("profile"))||!device.equals(address.getString("device"))||!device.equals(address.getString("id"))
+                    ||!"device_signing".equals(address.getString("kind"))||!canonicalPairingId(identityGeneration)
+                    ||!(value.get("expired") instanceof Boolean)||!(expiry instanceof Number)
+                    ||((Number)expiry).doubleValue()!=((Number)expiry).longValue()||((Number)expiry).longValue()<1||((Number)expiry).longValue()>9_007_199_254_740_991L)throw new IllegalStateException();
+            java.net.URI origin=new java.net.URI(audience);
+            if(!"https".equals(origin.getScheme())||origin.getHost()==null||origin.getRawUserInfo()!=null||origin.getRawQuery()!=null||origin.getRawFragment()!=null||!origin.getRawPath().isEmpty())throw new IllegalStateException();
+            expiresAt=((Number)expiry).longValue();expired=value.getBoolean("expired");
+        }
+        private boolean matches(RecoveryRecord record) throws Exception{
+            return record.isIdentity()&&record.matchesAddress(new JSONObject(identity))&&!"retired".equals(record.phase);
+        }
+    }
     static final class RecoverySnapshot {
         final long revision,expires;final java.util.List<RecoveryRecord> records;
         final boolean relayRetirementAvailable;
@@ -612,6 +634,7 @@ public final class NativeCore {
         final String pendingClientTicket;
         final String pendingHostTicket;
         final int hostInvitationCleanupCount;
+        final java.util.List<HostInvitationCleanup> hostInvitationCleanup;
         boolean needsAttention(){if(namespaceProvenanceMissing||pendingHostTicket!=null||hostInvitationCleanupCount>0)return true;for(RecoveryRecord record:records)if(record.sessionRecoveryRequired||(record.nextStep!=null&&!"revalidate_before_use".equals(record.nextStep)))return true;return false;}
         private RecoverySnapshot(JSONObject status,String profile,long deadline) throws Exception {
             if(status.getInt("credential_protocol")!=1||status.getInt("recovery_protocol")!=1||!profile.equals(status.getString("profile_id"))||!canonicalPairingId(status.getString("device_id")))throw new IllegalStateException();
@@ -633,9 +656,11 @@ public final class NativeCore {
             org.json.JSONArray invitations=status.getJSONArray("host_invitation_cleanup");
             if(invitations.length()>8)throw new IllegalStateException();
             java.util.HashSet<String> ids=new java.util.HashSet<>();
+            java.util.ArrayList<HostInvitationCleanup> cleanup=new java.util.ArrayList<>();
             for(int i=0;i<invitations.length();i++){
                 JSONObject invitation=invitations.getJSONObject(i);String id=invitation.getString("invite_id");
                 if(!canonicalPairingId(id)||!ids.add(id)||!invitation.getString("invite_hash").matches("[0-9a-f]{64}")||!(invitation.get("expired") instanceof Boolean))throw new IllegalStateException();
+                cleanup.add(new HostInvitationCleanup(invitation,profile,status.getString("device_id")));
             }
             hostInvitationCleanupCount=invitations.length();
             if(revision<0||revision>10_000_000||android.os.SystemClock.elapsedRealtime()>=expires)throw new IllegalStateException();
@@ -653,6 +678,12 @@ public final class NativeCore {
                 parsed.add(new RecoveryRecord(row,profile,status.getString("device_id"),pending.remove(generation)));
             }
             if(!pending.isEmpty())throw new IllegalStateException();records=java.util.Collections.unmodifiableList(parsed);
+            for(HostInvitationCleanup invitation:cleanup){
+                boolean found=false;
+                for(RecoveryRecord record:records)if(invitation.matches(record)){found=true;break;}
+                if(!found)throw new IllegalStateException();
+            }
+            hostInvitationCleanup=java.util.Collections.unmodifiableList(cleanup);
         }
     }
     /** Read only, including when installed streaming policy is disabled. */
