@@ -2,6 +2,8 @@
 
 ## Current sequence — 1–109 outstanding tasks
 
+Source checkpoint: receiver admission now has a concrete parameter/syntax pipeline joining Annex B, wire-order SPS/PPS installation, versioned dependency resolution, picture/slice/auxiliary parsing and exact queued-AU proof binding. The native backend's negotiated codec/DPB/owner implementation remains mandatory and unfinished; there is no default-success route. Build/test remain deferred.
+
 Source checkpoint: primary-picture parsing now consumes actual auxiliary NAL syntax instead of skipping it. AUD type is matched to slices, SEI envelopes retain bounded payloads, filler/end-marker syntax and picture ordering are enforced. SEI semantics, DPB, actual decoder admission and product transport integration remain open. Build/test stay deferred.
 
 Source checkpoint: receive-bridge pending frames now retain original AU metadata plus a native admission proof. A required provider recheck runs before each decoder attempt/retry, followed by original-age and decoder-authority checks. It must not repeat DPB/reference mutations or revive replaced parameter versions. No admission provider, transport enablement or runtime qualification is supplied; build/test remain deferred.

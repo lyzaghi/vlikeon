@@ -5,6 +5,8 @@ use omniplay_contracts::{ErrorCode,PlatformError,Result};
 use omniplay_stream_input::video_client::{DecoderReceipt,VideoOwner};
 use omniplay_streaming::{native_h264_receive::ReceivedAccessUnit,native_rtp_reorder::OrderedReceiver};
 use std::{collections::VecDeque,time::{Duration,Instant}};
+use omniplay_streaming::{native_h264_rtp::{AccessUnit,Framing},native_h264_parameters::{ParameterSets,ParameterBinding,ResolvedParameters},native_h264_picture::PrimaryPictureHeaders};
+use sha2::{Digest,Sha256};
 
 /// Mandatory installed native receiver check of the ACTUAL parameter sets,
 /// profile/level/resolution/VUI/dependencies and negotiated owner/codec. Existing
@@ -20,6 +22,56 @@ pub trait NativeH264Admission{
     /// again, renew receive age or turn stale parameters into a fresh proof.
     /// No default-success implementation: caller supplies actual native state.
     fn recheck(&mut self,owner:VideoOwner,frame:&ReceivedAccessUnit,proof:&Self::Proof)->Result<()>;
+}
+/// Installed codec/native backend supplies the remaining negotiated profile,
+/// colour, DPB/reference and current-owner checks. Syntax parsing is handled by
+/// ParameterAdmission, never delegated to a renderer or a remote declaration.
+pub trait NativePictureBackend{
+    type Proof;
+    fn prepare(&mut self,owner:VideoOwner,frame:&ReceivedAccessUnit,picture:&PrimaryPictureHeaders,parameters:&ResolvedParameters<'_>)->Result<Self::Proof>;
+    fn recheck(&mut self,owner:VideoOwner,frame:&ReceivedAccessUnit,parameters:&ResolvedParameters<'_>,proof:&Self::Proof)->Result<()>;
+}
+pub struct ParameterAdmission<B:NativePictureBackend>{owner:VideoOwner,parameters:ParameterSets,backend:B,closed:bool}
+pub struct ParameterAdmissionProof<P>{binding:ParameterBinding,backend:P,hash:[u8;32],timestamp:u32,received:Instant,idr:bool}
+impl<B:NativePictureBackend> ParameterAdmission<B>{
+    pub fn new(owner:VideoOwner,backend:B)->Self{Self{owner,parameters:ParameterSets::new(),backend,closed:false}}
+    fn fence(&mut self){self.closed=true;self.parameters.close();}
+}
+impl<B:NativePictureBackend> NativeH264Admission for ParameterAdmission<B>{
+    type Proof=ParameterAdmissionProof<B::Proof>;
+    fn admit(&mut self,owner:VideoOwner,frame:&ReceivedAccessUnit)->Result<Self::Proof>{
+        let result=(||{
+            if self.closed||owner!=self.owner{return Err(unavailable());}
+            let unit=AccessUnit::parse(&frame.annex_b,Framing::AnnexB)?;
+            if unit.has_idr()!=frame.has_idr{return Err(unavailable());}
+            let mut slices=false;
+            // Process parameter NALs in actual wire order. A PPS before its SPS
+            // needs an already retained dependency; do not reorder the stream.
+            for nal in unit.nals(){
+                match nal[0]&31{
+                    1|5=>slices=true,
+                    7=>{if slices{return Err(unavailable());}self.parameters.install_sps(nal)?;},
+                    8=>{if slices{return Err(unavailable());}self.parameters.install_pps(nal)?;},
+                    _=>{},
+                }
+            }
+            let picture=PrimaryPictureHeaders::parse(&unit,&self.parameters)?;
+            let binding=picture.identity().parameters().clone();
+            let parameters=self.parameters.check(&binding)?;
+            let backend=self.backend.prepare(owner,frame,&picture,&parameters)?;
+            Ok(ParameterAdmissionProof{binding,backend,hash:Sha256::digest(&frame.annex_b).into(),timestamp:frame.timestamp,received:frame.received_at,idr:frame.has_idr})
+        })();
+        // Partial parameter changes cannot leak into another frame after error.
+        if result.is_err(){self.fence();}result
+    }
+    fn recheck(&mut self,owner:VideoOwner,frame:&ReceivedAccessUnit,proof:&Self::Proof)->Result<()>{
+        let result=(||{
+            if self.closed||owner!=self.owner||frame.timestamp!=proof.timestamp||frame.received_at!=proof.received||frame.has_idr!=proof.idr||
+                <[u8;32]>::from(Sha256::digest(&frame.annex_b))!=proof.hash{return Err(unavailable());}
+            let parameters=self.parameters.check(&proof.binding)?;
+            self.backend.recheck(owner,frame,&parameters,&proof.backend)
+        })();if result.is_err(){self.fence();}result
+    }
 }
 fn unavailable()->PlatformError{PlatformError::new(ErrorCode::RuntimeUnavailable,"The native receive generation is unavailable or requires recovery")}
 #[derive(Default)]

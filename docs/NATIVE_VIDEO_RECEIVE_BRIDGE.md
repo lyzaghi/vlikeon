@@ -1,5 +1,16 @@
 # Native ordered RTP to decoder bridge — item 56
 
+`ParameterAdmission<B>` now implements the receiver admission contract by
+processing actual Annex B parameter NALs in wire order, retaining SPS/PPS versions,
+parsing picture/slice/auxiliary headers and binding the exact AU hash, RTP stamp,
+original receipt and IDR flag into its queued proof. Retry revalidates that same
+proof and parameter binding; any failed/partial operation closes the parameter
+generation. A mandatory `NativePictureBackend` still supplies actual negotiated
+codec/colour, DPB/reference and native-owner checks; there is no permissive default
+or installed product caller. This connects the authored syntax modules to a real
+receiver admission implementation without claiming full backend completion.
+Build/test and end-to-end decoder/device qualification remain deferred.
+
 Queued compressed units now retain their original ReceivedAccessUnit metadata
 and an admission-provider-specific native proof. `NativeH264Admission` requires
 an explicit read-only `recheck` before every submit, including S_FALSE retries.
