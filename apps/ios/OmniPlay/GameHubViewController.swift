@@ -558,12 +558,9 @@ final class GameHubViewController: UIViewController, WKNavigationDelegate, WKUID
         if snapshot.namespaceProvenanceMissing{message += "\n\nHồ sơ này chưa có thông tin xác thực vùng lưu trữ khóa. Cần phục hồi hồ sơ được kiểm tra trước khi thay đổi khóa hoặc trạng thái."}
         let alert=UIAlertController(title:"Chi tiết Remote Play",message:message,preferredStyle:.alert);pairingAlert=alert
         alert.addAction(UIAlertAction(title:"Đóng",style:.cancel){[weak self]_ in self?.cancelPairingIdentity()})
-        if !snapshot.namespaceProvenanceMissing && !record.isIdentity && record.phase=="material_ready" && !record.sessionRecoveryRequired{
-            alert.addAction(UIAlertAction(title:"Duyệt lại cặp với vai trò client",style:.default){[weak self,weak alert]_ in
-                alert?.dismiss(animated:false){[weak self] in self?.reviewSavedPeer(record,snapshot:snapshot,owner:owner)}
-            })
-            alert.addAction(UIAlertAction(title:"Duyệt lại cặp với vai trò host",style:.default){[weak self,weak alert]_ in
-                alert?.dismiss(animated:false){[weak self] in self?.reviewSavedPeer(record,snapshot:snapshot,owner:owner,host:true)}
+        if !snapshot.namespaceProvenanceMissing && !record.isIdentity && record.phase=="material_ready" && !record.sessionRecoveryRequired,let role=record.localRole{
+            alert.addAction(UIAlertAction(title:"Duyệt lại cặp đã lưu (\(role))",style:.default){[weak self,weak alert]_ in
+                alert?.dismiss(animated:false){[weak self] in self?.reviewSavedPeer(record,snapshot:snapshot,owner:owner,host:role=="host")}
             })
         }
         if canAdvance{

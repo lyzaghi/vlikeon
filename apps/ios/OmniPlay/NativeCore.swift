@@ -153,6 +153,7 @@ private final class NativePairingInput {
 }
 struct NativeRecoveryRecord {
     let address:[String:Any],phase:String,publicKey:String,nextStep:String?
+    let localRole:String?
     let sessionRecoveryRequired:Bool
     var generation:String{address["generation"] as? String ?? ""}
     var isIdentity:Bool{address["kind"] as? String == "device_signing"}
@@ -785,7 +786,7 @@ final class NativeCore {
     }
     @MainActor func reviewSavedHostPeer(_ record:NativeRecoveryRecord,snapshot:NativeRecoverySnapshot,owner:NativeDocumentLifetime,completion:@escaping @MainActor (Result<NativeSavedPeerReview,Error>)->Void){
         let token=pairingClientDeliveryFence.capture(cancel:false),deadline=min(snapshot.expires,DispatchTime.now()+25)
-        guard owner.active,DispatchTime.now()<deadline,!snapshot.namespaceProvenanceMissing,!record.isIdentity,record.phase=="material_ready",!record.sessionRecoveryRequired,
+        guard owner.active,record.localRole=="host",DispatchTime.now()<deadline,!snapshot.namespaceProvenanceMissing,!record.isIdentity,record.phase=="material_ready",!record.sessionRecoveryRequired,
               snapshot.records.contains(where:{NSDictionary(dictionary:$0.address).isEqual(to:record.address)&&$0.phase==record.phase&&$0.publicKey==record.publicKey}) else{completion(.failure(OmniFailure.message("Hãy đọc lại trạng thái trước khi duyệt cặp host đã lưu.")));return}
         savedHostCandidate(address:record.address,revision:snapshot.revision,hash:nil,owner:owner,deadline:deadline,admission:{DispatchTime.now()<snapshot.expires}){result in
             do{
@@ -844,7 +845,7 @@ final class NativeCore {
     @MainActor func reviewSavedPeer(_ record:NativeRecoveryRecord,snapshot:NativeRecoverySnapshot,owner:NativeDocumentLifetime,
         completion:@escaping @MainActor (Result<NativeSavedPeerReview,Error>)->Void){
         let token=pairingClientDeliveryFence.capture(cancel:false)
-        guard owner.active,DispatchTime.now()<snapshot.expires,!snapshot.namespaceProvenanceMissing,!record.isIdentity,record.phase=="material_ready",!record.sessionRecoveryRequired,
+        guard owner.active,record.localRole=="client",DispatchTime.now()<snapshot.expires,!snapshot.namespaceProvenanceMissing,!record.isIdentity,record.phase=="material_ready",!record.sessionRecoveryRequired,
               snapshot.records.contains(where:{NSDictionary(dictionary:$0.address).isEqual(to:record.address)&&$0.phase==record.phase&&$0.publicKey==record.publicKey}) else{completion(.failure(OmniFailure.message("Hãy đọc lại trạng thái trước khi duyệt ghép đôi đã lưu.")));return}
         do{
             var input=try JSONSerialization.data(withJSONObject:["address":record.address,"expected_revision":snapshot.revision])
@@ -926,7 +927,10 @@ final class NativeCore {
                     if let action=action{
                         guard phase != "retired",NSDictionary(dictionary:action.0).isEqual(to:address) else{throw OmniFailure.message("Bản ghi và kế hoạch phục hồi không khớp.")}
                     }else if phase != "retired"{throw OmniFailure.message("Thiếu kế hoạch phục hồi cho bản ghi hiện tại.")}
-                    parsed.append(NativeRecoveryRecord(address:address,phase:phase,publicKey:key,nextStep:action?.1,sessionRecoveryRequired:sessionRecoveryRequired))
+                    let localRole=record["local_role"] as? String
+                    if let role=localRole{guard kind=="pair_encryption",["host","client"].contains(role) else{throw OmniFailure.message("Vai trò cặp đã lưu không hợp lệ.")}}
+                    else if let raw=record["local_role"],!(raw is NSNull){throw OmniFailure.message("Vai trò cặp đã lưu không hợp lệ.")}
+                    parsed.append(NativeRecoveryRecord(address:address,phase:phase,publicKey:key,nextStep:action?.1,localRole:localRole,sessionRecoveryRequired:sessionRecoveryRequired))
                 }
                 guard next.isEmpty,owner.active,DispatchTime.now()<expires else{throw OmniFailure.message("Trạng thái phục hồi đã hết hạn.")}
                 var pendingTicket:String?

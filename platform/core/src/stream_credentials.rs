@@ -54,6 +54,17 @@ impl Record{
     pub fn expires_at_ms(&self)->Option<u64>{self.expires_at_ms}
     /// Native recovery metadata only. Grant presence never revives authority.
     pub fn grant(&self)->Option<&GrantMetadata>{self.grant.as_ref()}
+    /// Historical signed metadata for native recovery presentation only.
+    /// A role never admits activation, transport, or use of an expired grant.
+    pub fn local_pair_role(&self)->Result<Option<&'static str>>{
+        let Some(metadata)=self.grant.as_ref() else{return Ok(None)};
+        if self.address.kind()!=SecretKind::PairEncryption{return Err(invalid());}
+        let grant=metadata.historical_grant()?;
+        if grant.id!=self.address.id()||self.grant_hash.as_deref()!=Some(document_hash(metadata.document())?.as_str()){return Err(invalid());}
+        match (grant.host_public_key==self.public_key,grant.client_public_key==self.public_key){
+            (true,false)=>Ok(Some("host")),(false,true)=>Ok(Some("client")),_=>Err(invalid())
+        }
+    }
     pub fn send_sequence(&self)->u64{self.send_sequence}
     pub fn receive_sequence(&self)->u64{self.receive_sequence}
     pub fn receive_cursor(&self)->u64{self.receive_cursor}

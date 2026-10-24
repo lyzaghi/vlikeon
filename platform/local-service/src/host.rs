@@ -60,12 +60,13 @@ impl LocalHost {
         let pairing_origins=omniplay_core::stream_signal_authority::installed_pairing_origins().unwrap_or_default();
         let recovery:Vec<_>=snapshot.recovery_plan(observed_at_ms)?.iter().map(|action|
             json!({"address":action.address(),"next_step":action.step()})).collect();
-        let records:Vec<_>=snapshot.records().iter().map(|record|json!({
+        let records:Vec<_>=snapshot.records().iter().map(|record|Ok(json!({
             "address":record.address(),"phase":record.phase(),"public_key":record.public_key(),
+            "local_role":record.local_pair_role()?,
             "writer_retired":record.writer_retired(),"material_absent":record.material_absent(),
             "local_retired":record.local_retired(),"relay_retired":record.relay_retired(),
             "session_recovery_required":record.signal_session().is_some()
-        })).collect();
+        }))).collect::<Result<Vec<_>>>()?;
         let mut invitation_cleanup=Vec::with_capacity(snapshot.host_invitations().len());
         for entry in snapshot.host_invitations(){
             let invite:omniplay_streaming::Invite=omniplay_streaming::inspect(entry.document(),4096)?;

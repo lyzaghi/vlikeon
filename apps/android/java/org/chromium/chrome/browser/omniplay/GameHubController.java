@@ -594,17 +594,10 @@ public final class GameHubController implements AutoCloseable {
                 identityNotice("ok".equals(response.optString("status"))?"Open status and recovery again to inspect the current result and next step.":"The result could not be confirmed. Open status and recovery again before continuing.");
             });
         });
-        if(!snapshot.namespaceProvenanceMissing&&!record.isIdentity()&&"material_ready".equals(record.phase)&&!record.sessionRecoveryRequired){
-            builder.setNeutralButton("Review saved pairing",(dialog,which)->{mIdentityDialog=null;chooseSavedPairRole(snapshot,record,owner);});
+        if(!snapshot.namespaceProvenanceMissing&&!record.isIdentity()&&"material_ready".equals(record.phase)&&!record.sessionRecoveryRequired&&record.localRole!=null){
+            builder.setNeutralButton("Review saved "+record.localRole+" pairing",(dialog,which)->{mIdentityDialog=null;reviewSavedPeer(snapshot,record,owner,"host".equals(record.localRole));});
         }
         AlertDialog alert=builder.create();mIdentityDialog=alert;alert.setOnCancelListener(dialog->cancelIdentityReview());alert.show();
-    }
-    private void chooseSavedPairRole(NativeCore.RecoverySnapshot snapshot,NativeCore.RecoveryRecord record,java.util.concurrent.atomic.AtomicBoolean owner){
-        if(mIdentityFlow!=owner||!owner.get()||!identityUiAvailable()||android.os.SystemClock.elapsedRealtime()>=snapshot.expires){cancelIdentityReview();return;}
-        AlertDialog alert=new AlertDialog.Builder(mActivity).setTitle("This device's pairing role")
-                .setItems(new String[]{"Client — verify the host","Host — verify the receiving peer"},(dialog,which)->{mIdentityDialog=null;reviewSavedPeer(snapshot,record,owner,which==1);})
-                .setNegativeButton("Later",(dialog,which)->cancelIdentityReview()).create();
-        mIdentityDialog=alert;alert.setOnCancelListener(dialog->cancelIdentityReview());alert.show();
     }
     private void reviewSavedPeer(NativeCore.RecoverySnapshot snapshot,NativeCore.RecoveryRecord record,java.util.concurrent.atomic.AtomicBoolean owner,boolean hostRole){
         if(mIdentityFlow!=owner||!owner.get()||!identityUiAvailable()){cancelIdentityReview();return;}

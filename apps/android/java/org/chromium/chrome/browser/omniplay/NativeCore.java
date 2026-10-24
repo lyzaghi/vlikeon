@@ -592,7 +592,7 @@ public final class NativeCore {
     }
     void reviewSavedPeer(RecoverySnapshot snapshot,RecoveryRecord record,boolean host,java.util.function.BooleanSupplier alive,SavedPeerReply reply){
         final Object fence=mPairingClientDeliveryFence.get();
-        if(!alive.getAsBoolean()||snapshot.namespaceProvenanceMissing||!snapshot.records.contains(record)||record.isIdentity()
+        if(!alive.getAsBoolean()||!(host?"host":"client").equals(record.localRole)||snapshot.namespaceProvenanceMissing||!snapshot.records.contains(record)||record.isIdentity()
                 ||!"material_ready".equals(record.phase)||record.sessionRecoveryRequired||android.os.SystemClock.elapsedRealtime()>=snapshot.expires){reply.accept(null,"Reload native status before reviewing this saved pairing.");return;}
         try{
             byte[] request=new JSONObject().put("address",record.address()).put("expected_revision",snapshot.revision).toString().getBytes(StandardCharsets.UTF_8);
@@ -800,12 +800,15 @@ public final class NativeCore {
     interface RecoveryReply { void accept(RecoverySnapshot snapshot,String error); }
     static final class RecoveryRecord {
         final String profile,device,kind,item,generation,phase,key,nextStep;
+        final String localRole;
         final boolean sessionRecoveryRequired;
         private RecoveryRecord(JSONObject record,String expectedProfile,String expectedDevice,JSONObject action) throws Exception {
             JSONObject address=record.getJSONObject("address");profile=address.getString("profile");device=address.getString("device");
             kind=address.getString("kind");item=address.getString("id");generation=address.getString("generation");phase=record.getString("phase");key=record.getString("public_key");
             nextStep=action==null?null:action.getString("next_step");
             sessionRecoveryRequired=record.getBoolean("session_recovery_required");
+            localRole=record.isNull("local_role")?null:record.getString("local_role");
+            if(localRole!=null&&(!"pair_encryption".equals(kind)||!("host".equals(localRole)||"client".equals(localRole))))throw new IllegalStateException();
             if(!profile.equals(expectedProfile)||!device.equals(expectedDevice)||!canonicalPairingId(profile)||!canonicalPairingId(device)||!canonicalPairingId(item)||!canonicalPairingId(generation)
                     ||!("device_signing".equals(kind)||"pair_encryption".equals(kind))||("device_signing".equals(kind)&&!item.equals(device))
                     ||!java.util.Arrays.asList("reserved","writing","material_ready","active","revoking","retired").contains(phase)||!key.matches("[A-Za-z0-9_-]{43}")
