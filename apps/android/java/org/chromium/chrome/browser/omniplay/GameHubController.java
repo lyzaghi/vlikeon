@@ -595,13 +595,20 @@ public final class GameHubController implements AutoCloseable {
             });
         });
         if(!snapshot.namespaceProvenanceMissing&&!record.isIdentity()&&"material_ready".equals(record.phase)&&!record.sessionRecoveryRequired){
-            builder.setNeutralButton("Review saved pairing",(dialog,which)->{mIdentityDialog=null;reviewSavedPeer(snapshot,record,owner);});
+            builder.setNeutralButton("Review saved pairing",(dialog,which)->{mIdentityDialog=null;chooseSavedPairRole(snapshot,record,owner);});
         }
         AlertDialog alert=builder.create();mIdentityDialog=alert;alert.setOnCancelListener(dialog->cancelIdentityReview());alert.show();
     }
-    private void reviewSavedPeer(NativeCore.RecoverySnapshot snapshot,NativeCore.RecoveryRecord record,java.util.concurrent.atomic.AtomicBoolean owner){
+    private void chooseSavedPairRole(NativeCore.RecoverySnapshot snapshot,NativeCore.RecoveryRecord record,java.util.concurrent.atomic.AtomicBoolean owner){
+        if(mIdentityFlow!=owner||!owner.get()||!identityUiAvailable()||android.os.SystemClock.elapsedRealtime()>=snapshot.expires){cancelIdentityReview();return;}
+        AlertDialog alert=new AlertDialog.Builder(mActivity).setTitle("This device's pairing role")
+                .setItems(new String[]{"Client — verify the host","Host — verify the receiving peer"},(dialog,which)->{mIdentityDialog=null;reviewSavedPeer(snapshot,record,owner,which==1);})
+                .setNegativeButton("Later",(dialog,which)->cancelIdentityReview()).create();
+        mIdentityDialog=alert;alert.setOnCancelListener(dialog->cancelIdentityReview());alert.show();
+    }
+    private void reviewSavedPeer(NativeCore.RecoverySnapshot snapshot,NativeCore.RecoveryRecord record,java.util.concurrent.atomic.AtomicBoolean owner,boolean hostRole){
         if(mIdentityFlow!=owner||!owner.get()||!identityUiAvailable()){cancelIdentityReview();return;}
-        mCore.reviewSavedPeer(snapshot,record,owner::get,(review,error)->{
+        mCore.reviewSavedPeer(snapshot,record,hostRole,owner::get,(review,error)->{
             if(mIdentityFlow!=owner||!owner.get())return;
             if(!identityUiAvailable()||review==null){cancelIdentityReview();if(identityUiAvailable())identityNotice(error);return;}
             if(mIdentityExpiry!=null)mMain.removeCallbacks(mIdentityExpiry);
@@ -609,10 +616,10 @@ public final class GameHubController implements AutoCloseable {
             if(remaining<=0){cancelIdentityReview();return;}
             android.widget.LinearLayout checks=new android.widget.LinearLayout(mActivity);checks.setOrientation(android.widget.LinearLayout.VERTICAL);
             android.widget.CheckBox host=new android.widget.CheckBox(mActivity),permission=new android.widget.CheckBox(mActivity);
-            host.setText("I independently verified this host key again.");
+            host.setText("I independently verified this "+(hostRole?"receiving peer":"host")+" key again.");
             permission.setText(review.inputAllowed?"I approve input control for this saved pairing.":"I approve this saved pairing without input control.");checks.addView(host);checks.addView(permission);
             AlertDialog alert=new AlertDialog.Builder(mActivity).setTitle("Review saved pairing")
-                    .setMessage("Host key:\n"+review.hostPublicKey+"\nFingerprint:\n"+review.hostFingerprint+"\nService: "+review.audience+"\nPair: "+review.pairId+"\nGeneration: "+review.generation+"\nInput control: "+(review.inputAllowed?"Allowed":"Not allowed")+"\nPermission expires: "+java.text.DateFormat.getDateTimeInstance().format(new java.util.Date(review.grantExpiresAt))+"\n\nThe original comparison code is unavailable. Verify this host independently again. Activation checks current service approval and does not start a connection.")
+                    .setMessage("Local role: "+review.localRole+"\nPeer key:\n"+(hostRole?review.clientPublicKey:review.hostPublicKey)+"\nFingerprint:\n"+(hostRole?review.clientFingerprint:review.hostFingerprint)+"\nService: "+review.audience+"\nPair: "+review.pairId+"\nGeneration: "+review.generation+"\nInput control: "+(review.inputAllowed?"Allowed":"Not allowed")+"\nPermission expires: "+java.text.DateFormat.getDateTimeInstance().format(new java.util.Date(review.grantExpiresAt))+"\n\nThe original comparison code is unavailable. Verify this peer independently again. Activation checks current service approval and does not start a connection.")
                     .setView(checks).setNegativeButton("Later",(dialog,which)->cancelIdentityReview()).setPositiveButton("Activate verified pairing",null).create();
             mIdentityDialog=alert;alert.setOnCancelListener(dialog->cancelIdentityReview());alert.show();
             android.widget.Button confirm=alert.getButton(AlertDialog.BUTTON_POSITIVE);confirm.setEnabled(false);

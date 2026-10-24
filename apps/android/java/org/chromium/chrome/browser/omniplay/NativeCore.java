@@ -159,7 +159,7 @@ public final class NativeCore {
                     JSONObject value=response.getJSONObject("result");
                     if(action==6){
                         JSONObject address=value.getJSONObject("address"),expected=activation.getJSONObject("address");Object revision=value.get("revision"),expiry=value.get("expires_at_ms");
-                        if(value.getInt("credential_protocol")!=1||!"material_ready".equals(value.getString("phase"))||address.length()!=5
+                        if(value.getInt("credential_protocol")!=1||!"client".equals(value.getString("local_role"))||!"material_ready".equals(value.getString("phase"))||address.length()!=5
                                 ||!Boolean.TRUE.equals(value.get("local_consent_required"))||!Boolean.FALSE.equals(value.get("comparison_available"))
                                 ||!expected.getString("id").equals(value.getString("pair_id"))||!(value.get("input_allowed") instanceof Boolean)
                                 ||!value.getString("grant_hash").matches("[0-9a-f]{64}")||!value.getString("host_public_key").matches("[A-Za-z0-9_-]{42}[AEIMQUYcgkosw048]")
@@ -572,6 +572,7 @@ public final class NativeCore {
     interface SavedPeerReply {void accept(SavedPeerReview review,String error);}
     static final class SavedPeerReview {
         final String hostPublicKey,hostFingerprint,pairId,generation,audience;
+        final String clientPublicKey,clientFingerprint,localRole;
         final boolean inputAllowed;final long grantExpiresAt,expires;
         private final String address,hash;private final long revision;private final Object fence;
         private final java.util.function.BooleanSupplier owner;
@@ -579,25 +580,35 @@ public final class NativeCore {
         private SavedPeerReview(JSONObject value,Object fence,java.util.function.BooleanSupplier owner) throws Exception{
             JSONObject scope=value.getJSONObject("address");address=scope.toString();generation=scope.getString("generation");
             hostPublicKey=value.getString("host_public_key");hostFingerprint=value.getString("host_fingerprint");pairId=value.getString("pair_id");audience=value.getString("audience");
+            clientPublicKey=value.getString("client_public_key");clientFingerprint=value.getString("client_fingerprint");localRole=value.getString("local_role");
+            if(!clientPublicKey.matches("[A-Za-z0-9_-]{42}[AEIMQUYcgkosw048]")||!clientFingerprint.matches("[0-9a-f]{64}")||!("host".equals(localRole)||"client".equals(localRole)))throw new IllegalStateException();
             inputAllowed=value.getBoolean("input_allowed");hash=value.getString("grant_hash");revision=value.getLong("revision");this.fence=fence;this.owner=owner;
             grantExpiresAt=value.getLong("expires_at_ms");long remaining=grantExpiresAt-System.currentTimeMillis();
             if(remaining<=0)throw new IllegalStateException();expires=android.os.SystemClock.elapsedRealtime()+Math.min(60_000,remaining);
         }
     }
     void reviewSavedPeer(RecoverySnapshot snapshot,RecoveryRecord record,java.util.function.BooleanSupplier alive,SavedPeerReply reply){
+        reviewSavedPeer(snapshot,record,false,alive,reply);
+    }
+    void reviewSavedPeer(RecoverySnapshot snapshot,RecoveryRecord record,boolean host,java.util.function.BooleanSupplier alive,SavedPeerReply reply){
         final Object fence=mPairingClientDeliveryFence.get();
         if(!alive.getAsBoolean()||snapshot.namespaceProvenanceMissing||!snapshot.records.contains(record)||record.isIdentity()
                 ||!"material_ready".equals(record.phase)||record.sessionRecoveryRequired||android.os.SystemClock.elapsedRealtime()>=snapshot.expires){reply.accept(null,"Reload native status before reviewing this saved pairing.");return;}
         try{
             byte[] request=new JSONObject().put("address",record.address()).put("expected_revision",snapshot.revision).toString().getBytes(StandardCharsets.UTF_8);
-            pairingClient(request,6,()->alive.getAsBoolean()&&android.os.SystemClock.elapsedRealtime()<snapshot.expires,response->{
+            Reply completed=response->{
                 SavedPeerReview review;
                 try{
                     if(!alive.getAsBoolean()||mPairingClientDeliveryFence.get()!=fence||android.os.SystemClock.elapsedRealtime()>=snapshot.expires)throw new IllegalStateException();
-                    review=new SavedPeerReview(pairingResult(response),fence,alive);
+                    JSONObject value=pairingResult(response);
+                    if(host&&!record.key.equals(value.getString("host_public_key")))throw new IllegalStateException();
+                    review=new SavedPeerReview(value,fence,alive);
                 }catch(Exception error){reply.accept(null,"Saved pairing could not be reviewed. Reload status; no activation was requested.");return;}
                 reply.accept(review,null);
-            });
+            };
+            java.util.function.BooleanSupplier current=()->alive.getAsBoolean()&&android.os.SystemClock.elapsedRealtime()<snapshot.expires;
+            if(host)savedHostCandidate(request,Math.min(snapshot.expires,android.os.SystemClock.elapsedRealtime()+25_000),current,completed);
+            else pairingClient(request,6,current,completed);
         }catch(Exception error){reply.accept(null,"Saved pairing review could not be queued.");}
     }
     /** Fresh independent host/permission consent is required; no old comparison code exists. */
@@ -608,8 +619,54 @@ public final class NativeCore {
         }
         try{
             byte[] request=new JSONObject().put("address",new JSONObject(review.address)).put("expected_revision",review.revision).put("reviewed_grant_hash",review.hash).toString().getBytes(StandardCharsets.UTF_8);
-            pairingClient(request,5,()->alive.getAsBoolean()&&review.owner.getAsBoolean()&&mPairingClientDeliveryFence.get()==review.fence&&android.os.SystemClock.elapsedRealtime()<review.expires,reply);
+            java.util.function.BooleanSupplier current=()->alive.getAsBoolean()&&review.owner.getAsBoolean()&&mPairingClientDeliveryFence.get()==review.fence&&android.os.SystemClock.elapsedRealtime()<review.expires&&System.currentTimeMillis()<review.grantExpiresAt;
+            if("host".equals(review.localRole))savedHostCandidate(request,Math.min(review.expires,android.os.SystemClock.elapsedRealtime()+25_000),current,reply);
+            else pairingClient(request,5,current,reply);
         }catch(Exception error){reply.accept(failure("","runtime_unavailable","Saved pairing activation could not be queued. Inspect status."));}
+    }
+    /** Review or activate one exact saved host candidate; owned request is always wiped. */
+    private void savedHostCandidate(byte[] input,long deadline,java.util.function.BooleanSupplier alive,Reply reply){
+        final Object fence=mPairingClientDeliveryFence.get();
+        if(input==null||input.length==0||input.length>1024||!alive.getAsBoolean()){
+            if(input!=null)java.util.Arrays.fill(input,(byte)0);reply.accept(failure("","cancelled","Reload saved host status."));return;
+        }
+        if(!mPairingClientBusy.compareAndSet(false,true)){java.util.Arrays.fill(input,(byte)0);reply.accept(failure("","busy","Pairing work is still finishing."));return;}
+        if(mWorkPending.incrementAndGet()>32){mWorkPending.decrementAndGet();mPairingClientBusy.set(false);java.util.Arrays.fill(input,(byte)0);reply.accept(failure("","busy","Native queue is full."));return;}
+        try{mIo.execute(()->{
+            JSONObject response;
+            try{
+                long remaining=deadline-android.os.SystemClock.elapsedRealtime();
+                if(mHandle==0||mFailed||!mPairingAttached||remaining<1000||!alive.getAsBoolean()||mPairingClientDeliveryFence.get()!=fence)throw new IllegalStateException();
+                JSONObject request=new JSONObject(new String(input,StandardCharsets.UTF_8)),expected=request.getJSONObject("address");
+                boolean activating=request.has("reviewed_grant_hash");Object previous=request.get("expected_revision");
+                if(request.length()!=(activating?3:2)||expected.length()!=5||!mProfile.equals(expected.getString("profile"))||!"pair_encryption".equals(expected.getString("kind"))
+                        ||!canonicalPairingId(expected.getString("device"))||!canonicalPairingId(expected.getString("id"))||!canonicalPairingId(expected.getString("generation"))
+                        ||!(previous instanceof Number)||((Number)previous).doubleValue()!=((Number)previous).longValue()||((Number)previous).longValue()<1||((Number)previous).longValue()>10_000_000
+                        ||(activating&&!request.getString("reviewed_grant_hash").matches("[0-9a-f]{64}")))throw new IllegalStateException();
+                response=pairingResponse(nativePairingHostV1(mHandle,input,activating?7:6,(int)Math.min(25_000,remaining)));
+                if("ok".equals(response.optString("status"))){
+                    JSONObject value=pairingResult(response),address=value.getJSONObject("address");Object revision=value.get("revision");
+                    if(value.getInt("credential_protocol")!=1||address.length()!=5||!(revision instanceof Number)||((Number)revision).doubleValue()!=((Number)revision).longValue()
+                            ||((Number)revision).longValue()<1||((Number)revision).longValue()>10_000_000)throw new IllegalStateException();
+                    for(String field:new String[]{"profile","device","kind","id","generation"})if(!expected.getString(field).equals(address.getString(field)))throw new IllegalStateException();
+                    if(activating){
+                        if(!"active".equals(value.getString("phase"))||!request.getString("reviewed_grant_hash").equals(value.getString("grant_hash"))||!Boolean.TRUE.equals(value.get("reload_required"))||((Number)revision).longValue()<=((Number)previous).longValue())throw new IllegalStateException();
+                    }else{
+                        Object expiry=value.get("expires_at_ms");android.net.Uri audience=android.net.Uri.parse(value.getString("audience"));
+                        if(!"material_ready".equals(value.getString("phase"))||!"host".equals(value.getString("local_role"))||((Number)revision).longValue()!=((Number)previous).longValue()
+                                ||!expected.getString("id").equals(value.getString("pair_id"))||!Boolean.TRUE.equals(value.get("local_consent_required"))||!Boolean.FALSE.equals(value.get("comparison_available"))||!(value.get("input_allowed") instanceof Boolean)
+                                ||!value.getString("grant_hash").matches("[0-9a-f]{64}")||!value.getString("host_public_key").matches("[A-Za-z0-9_-]{42}[AEIMQUYcgkosw048]")||!value.getString("client_public_key").matches("[A-Za-z0-9_-]{42}[AEIMQUYcgkosw048]")
+                                ||!value.getString("host_fingerprint").matches("[0-9a-f]{64}")||!value.getString("client_fingerprint").matches("[0-9a-f]{64}")
+                                ||!"https".equals(audience.getScheme())||audience.getHost()==null||audience.getUserInfo()!=null||audience.getQuery()!=null||audience.getFragment()!=null
+                                ||!(expiry instanceof Number)||((Number)expiry).doubleValue()!=((Number)expiry).longValue()||((Number)expiry).longValue()<=System.currentTimeMillis()||((Number)expiry).longValue()>9_007_199_254_740_991L)throw new IllegalStateException();
+                    }
+                }
+            }catch(Exception|LinkageError error){response=failure("","runtime_unavailable","Saved host result is uncertain. Reload native status.");}
+            finally{java.util.Arrays.fill(input,(byte)0);mWorkPending.decrementAndGet();mPairingClientBusy.set(false);}
+            final JSONObject completed=response;mMain.post(()->{
+                if(!alive.getAsBoolean()||mPairingClientDeliveryFence.get()!=fence||android.os.SystemClock.elapsedRealtime()>=deadline)reply.accept(failure("","cancelled","Saved host result became stale. Reload status."));else reply.accept(completed);
+            });
+        });}catch(java.util.concurrent.RejectedExecutionException error){java.util.Arrays.fill(input,(byte)0);mWorkPending.decrementAndGet();mPairingClientBusy.set(false);reply.accept(failure("","busy","Saved host queue is unavailable."));}
     }
     static final class PeerActivation {
         final PeerApproval peer;final String generation;final long expires;
