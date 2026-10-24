@@ -1,5 +1,17 @@
 # Native ordered RTP to decoder bridge — item 56
 
+ParameterAdmission now owns FrameDecodeState and puts the staged POC/reference
+plan in each admission proof. Its matched-output callback commits that plan
+after backend completion checks. The progressive FIFO receiver defers admission
+until a picture reaches the queue head and has only one uncommitted decoder
+picture in flight; S_FALSE retains the same plan. Later dependent pictures are
+planned after the previous picture's confirmed metadata commit. Original age
+and the combined four-unit queue limit remain unchanged. This is wiring for the
+existing low-delay progressive FIFO candidate, not completed general B-frame
+reorder, field/MBAFF, gap recovery or full codec coverage/negotiation admission.
+The installed native codec/owner backend, actual transport/service caller and
+device qualification remain open. No build/test ran.
+
 The private Windows client now creates an opaque DecodedPictureReceipt only
 after output matches an accepted input's timestamp/profile/original receipt.
 Receiver moves accepted inputs/proofs to an in-flight queue, correlates output

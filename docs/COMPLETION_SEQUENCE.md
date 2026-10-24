@@ -2,6 +2,8 @@
 
 ## Current sequence — 1–109 outstanding tasks
 
+Source checkpoint: matched decoder output now commits the concrete POC/DPB plan owned by ParameterAdmission. Progressive FIFO scheduling defers plan preparation until queue head, preserves plans on S_FALSE and waits for prior completion before planning dependencies. General reorder/fields/gaps, complete codec/owner backend and product transport wiring remain unfinished; build/test stay deferred.
+
 Source checkpoint: Windows decoder output now produces a native-only matched-picture receipt; receiver retains accepted proofs until exact output correlation and calls consuming admission/backend completion. Combined pending/in-flight remains bounded. POC/DPB backend callback implementation and full negotiated/general reorder support remain unfinished; build/test stay deferred.
 
 Source checkpoint: one staged progressive decode plan now joins POC, all slice reference lists and reference marking, with read-only retry checks and joint preflight/commit. Native exact-picture decode completion/correlation and receiver/backend caller still need integration. Build/test stay deferred.

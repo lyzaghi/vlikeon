@@ -7,6 +7,7 @@ use omniplay_streaming::{native_h264_receive::ReceivedAccessUnit,native_rtp_reor
 use std::{collections::VecDeque,time::{Duration,Instant}};
 use omniplay_streaming::{native_h264_rtp::{AccessUnit,Framing},native_h264_parameters::{ParameterSets,ParameterBinding,ResolvedParameters},native_h264_picture::PrimaryPictureHeaders};
 use sha2::{Digest,Sha256};
+use omniplay_streaming::native_h264_decode_state::{FrameDecodeState,FrameDecodePlan};
 
 /// Mandatory installed native receiver check of the ACTUAL parameter sets,
 /// profile/level/resolution/VUI/dependencies and negotiated owner/codec. Existing
@@ -27,7 +28,7 @@ pub trait NativeH264Admission{
     fn decoded(&mut self,owner:VideoOwner,frame:&ReceivedAccessUnit,proof:Self::Proof,completion:&DecodedPictureReceipt)->Result<()>;
 }
 /// Installed codec/native backend supplies the remaining negotiated profile,
-/// colour, DPB/reference and current-owner checks. Syntax parsing is handled by
+/// colour, complete-picture and current-owner checks. Syntax parsing is handled by
 /// ParameterAdmission, never delegated to a renderer or a remote declaration.
 pub trait NativePictureBackend{
     type Proof;
@@ -35,11 +36,11 @@ pub trait NativePictureBackend{
     fn recheck(&mut self,owner:VideoOwner,frame:&ReceivedAccessUnit,parameters:&ResolvedParameters<'_>,proof:&Self::Proof)->Result<()>;
     fn decoded(&mut self,owner:VideoOwner,frame:&ReceivedAccessUnit,parameters:&ResolvedParameters<'_>,proof:Self::Proof,completion:&DecodedPictureReceipt)->Result<()>;
 }
-pub struct ParameterAdmission<B:NativePictureBackend>{owner:VideoOwner,parameters:ParameterSets,backend:B,closed:bool}
-pub struct ParameterAdmissionProof<P>{binding:ParameterBinding,backend:P,hash:[u8;32],timestamp:u32,received:Instant,idr:bool}
+pub struct ParameterAdmission<B:NativePictureBackend>{owner:VideoOwner,parameters:ParameterSets,decode:FrameDecodeState,backend:B,closed:bool}
+pub struct ParameterAdmissionProof<P>{binding:ParameterBinding,plan:FrameDecodePlan,backend:P,hash:[u8;32],timestamp:u32,received:Instant,idr:bool}
 impl<B:NativePictureBackend> ParameterAdmission<B>{
-    pub fn new(owner:VideoOwner,backend:B)->Self{Self{owner,parameters:ParameterSets::new(),backend,closed:false}}
-    fn fence(&mut self){self.closed=true;self.parameters.close();}
+    pub fn new(owner:VideoOwner,backend:B)->Self{Self{owner,parameters:ParameterSets::new(),decode:FrameDecodeState::new(),backend,closed:false}}
+    fn fence(&mut self){self.closed=true;self.parameters.close();self.decode.close();}
 }
 impl<B:NativePictureBackend> NativeH264Admission for ParameterAdmission<B>{
     type Proof=ParameterAdmissionProof<B::Proof>;
@@ -61,9 +62,10 @@ impl<B:NativePictureBackend> NativeH264Admission for ParameterAdmission<B>{
             }
             let picture=PrimaryPictureHeaders::parse(&unit,&self.parameters)?;
             let binding=picture.identity().parameters().clone();
+            let plan=self.decode.prepare(&picture,&self.parameters)?;
             let parameters=self.parameters.check(&binding)?;
             let backend=self.backend.prepare(owner,frame,&picture,&parameters)?;
-            Ok(ParameterAdmissionProof{binding,backend,hash:Sha256::digest(&frame.annex_b).into(),timestamp:frame.timestamp,received:frame.received_at,idr:frame.has_idr})
+            Ok(ParameterAdmissionProof{binding,plan,backend,hash:Sha256::digest(&frame.annex_b).into(),timestamp:frame.timestamp,received:frame.received_at,idr:frame.has_idr})
         })();
         // Partial parameter changes cannot leak into another frame after error.
         if result.is_err(){self.fence();}result
@@ -73,6 +75,7 @@ impl<B:NativePictureBackend> NativeH264Admission for ParameterAdmission<B>{
             if self.closed||owner!=self.owner||frame.timestamp!=proof.timestamp||frame.received_at!=proof.received||frame.has_idr!=proof.idr||
                 <[u8;32]>::from(Sha256::digest(&frame.annex_b))!=proof.hash{return Err(unavailable());}
             let parameters=self.parameters.check(&proof.binding)?;
+            self.decode.recheck(&proof.plan,&self.parameters)?;
             self.backend.recheck(owner,frame,&parameters,&proof.backend)
         })();if result.is_err(){self.fence();}result
     }
@@ -80,7 +83,8 @@ impl<B:NativePictureBackend> NativeH264Admission for ParameterAdmission<B>{
         let result=(||{
             self.recheck(owner,frame,&proof)?;
             let parameters=self.parameters.check(&proof.binding)?;
-            self.backend.decoded(owner,frame,&parameters,proof.backend,completion)
+            self.backend.decoded(owner,frame,&parameters,proof.backend,completion)?;
+            self.decode.commit_decoded(proof.plan,&self.parameters)
         })();if result.is_err(){self.fence();}result
     }
 }
@@ -97,7 +101,7 @@ impl Timeline{
         self.last=Some(timestamp);self.ticks=ticks;Ok(time)
     }
 }
-struct Pending<P>{frame:ReceivedAccessUnit,proof:P,timestamp:i64,receipt:DecoderReceipt}
+struct Pending<P>{frame:ReceivedAccessUnit,proof:Option<P>,timestamp:i64,receipt:DecoderReceipt}
 #[derive(Clone,Copy,Debug,PartialEq,Eq)]
 pub enum ReceiveState{Active,Revoked,CleanupRequired}
 pub struct NativeVideoReceiver<A:NativeH264Admission>{
@@ -119,11 +123,8 @@ impl<A:NativeH264Admission> NativeVideoReceiver<A>{
             let frames=self.ordered.push_stamped(bytes,receipt.local_received_at(),receipt)?;
             for value in frames{
                 if self.pending.len()+self.in_flight.len()>=4||value.frame.received_at!=value.metadata.local_received_at()||!value.metadata.within_receive_age(){return Err(unavailable());}
-                let proof=self.admission.admit(self.owner,&value.frame)?;
-                // Slow parameter-set/native checks do not start a new age budget.
-                if !value.metadata.within_receive_age(){return Err(unavailable());}
                 let timestamp=self.timeline.advance(value.frame.timestamp)?;
-                self.pending.push_back(Pending{frame:value.frame,proof,timestamp,receipt:value.metadata});
+                self.pending.push_back(Pending{frame:value.frame,proof:None,timestamp,receipt:value.metadata});
             }
             self.pump_inner()
         })();if result.is_err(){self.retire();}result
@@ -131,14 +132,19 @@ impl<A:NativeH264Admission> NativeVideoReceiver<A>{
     fn pump_inner(&mut self)->Result<()>{
         self.decoder.check_authority()?;self.ordered.tick()?;
         if self.in_flight.front().is_some_and(|frame|!frame.receipt.within_receive_age()){return Err(unavailable());}
-        while let Some(frame)=self.pending.front(){
+        // Current synchronous decoder-v3 path correlates FIFO output. Keep one
+        // staged progressive picture until its completion commits POC/DPB; do
+        // not plan dependent pictures against uncommitted reference metadata.
+        if !self.in_flight.is_empty(){return Ok(());}
+        if let Some(frame)=self.pending.front_mut(){
             if !frame.receipt.within_receive_age(){return Err(unavailable());}
-            self.admission.recheck(self.owner,&frame.frame,&frame.proof)?;
+            if frame.proof.is_none(){frame.proof=Some(self.admission.admit(self.owner,&frame.frame)?);}
+            self.admission.recheck(self.owner,&frame.frame,frame.proof.as_ref().ok_or_else(unavailable)?)?;
             // Revalidation can block on native state; it must not extend either
             // ingress age or decoder authority before this immediate handoff.
             if !frame.receipt.within_receive_age(){return Err(unavailable());}
             self.decoder.check_authority()?;
-            if !self.decoder.submit_admitted_borrowed(&frame.frame.annex_b,frame.timestamp,frame.receipt)?{break;}
+            if !self.decoder.submit_admitted_borrowed(&frame.frame.annex_b,frame.timestamp,frame.receipt)?{return Ok(());}
             let accepted=self.pending.pop_front().ok_or_else(unavailable)?;
             self.in_flight.push_back(accepted);
         }Ok(())
@@ -155,7 +161,7 @@ impl<A:NativeH264Admission> NativeVideoReceiver<A>{
             let accepted=self.in_flight.pop_front().ok_or_else(unavailable)?;
             if output.owner!=self.owner||!output.frame.within_receive_age()||
                 !output.frame.completed_picture().matches(self.owner,accepted.timestamp,accepted.frame.received_at){return Err(unavailable());}
-            self.admission.decoded(self.owner,&accepted.frame,accepted.proof,output.frame.completed_picture())?;
+            self.admission.decoded(self.owner,&accepted.frame,accepted.proof.ok_or_else(unavailable)?,output.frame.completed_picture())?;
             if !output.frame.within_receive_age(){return Err(unavailable());}
             self.decoder.check_authority()?;Ok(Some(output))
         })();
