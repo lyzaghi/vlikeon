@@ -1840,6 +1840,12 @@ this checkpoint.
 
 ## Remaining implementation and qualification
 
+Android client cancel now checks the boolean native epoch invalidation result
+before queuing local ticket cleanup. A missing handle or refused acknowledgment
+clears owned input and reports that status reconciliation is required. A queued
+cleanup failure still cannot undo an already acknowledged epoch invalidation.
+This source change aligns with iOS; runtime cancellation qualification is pending.
+
 Client candidate responses now include `pairing_ticket` from the exact consumed
 pending controller entry. Android/iOS require this to match the requested ticket
 before accepting MaterialReady metadata. This correlation does not imply relay

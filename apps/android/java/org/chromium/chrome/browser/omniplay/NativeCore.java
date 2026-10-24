@@ -113,7 +113,13 @@ public final class NativeCore {
             if(ownedInput!=null)java.util.Arrays.fill(ownedInput,(byte)0);reply.accept(failure("","invalid_request","Native pairing request is invalid."));return;
         }
         // Cancel signals native in-flight work before waiting for serialized I/O.
-        if(action==4)try{if(mHandle!=0)nativePairingInvalidateEpoch(mHandle);}catch(LinkageError unavailable){java.util.Arrays.fill(ownedInput,(byte)0);reply.accept(failure("","unsupported_capability","Native pairing is unavailable."));return;}
+        if(action==4)try{
+            long current=mHandle;
+            if(current==0||!nativePairingInvalidateEpoch(current)){
+                java.util.Arrays.fill(ownedInput,(byte)0);
+                reply.accept(failure("","runtime_unavailable","Cancellation was not acknowledged. Inspect native status before continuing."));return;
+            }
+        }catch(LinkageError unavailable){java.util.Arrays.fill(ownedInput,(byte)0);reply.accept(failure("","unsupported_capability","Native pairing is unavailable."));return;}
         boolean reserved=action==4?false:mPairingClientBusy.compareAndSet(false,true);
         if(action!=4&&!reserved){java.util.Arrays.fill(ownedInput,(byte)0);reply.accept(failure("","busy","Native pairing work is still finishing."));return;}
         if(mWorkPending.incrementAndGet()>32){mWorkPending.decrementAndGet();if(reserved)mPairingClientBusy.set(false);java.util.Arrays.fill(ownedInput,(byte)0);reply.accept(failure("","busy","Native work is still finishing."));return;}

@@ -2,6 +2,11 @@
 
 ## Current sequence — 1–109 outstanding tasks
 
+Item 58 Android cancellation now requires the immediate native epoch invalidation
+acknowledgment before queuing ticket cleanup, matching the iOS caller contract.
+Missing handles/refused invalidation return uncertain-state guidance and clear
+owned input. Source-only change; no build/test or cancellation qualification ran.
+
 Item 58 persisted client candidate responses now carry the consumed pairing
 ticket; both mobile callers require the exact requested ticket before admitting
 the candidate metadata. This closes the previously missing response correlation.
