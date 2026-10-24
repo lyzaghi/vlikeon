@@ -1,8 +1,10 @@
-# Task 5 — macOS ARM64 preparation, awaiting Mac connection
+# Task 5 — macOS ARM64 host connected, storage provisioning pending
 
 On 2026-10-24 the owner requested preparing task 5 while task 4 continues its
 actual Linux build. The owner confirmed an Apple Silicon Mac is available and
-asked how much storage to provision. No Mac SSH endpoint has been supplied yet.
+asked how much storage to provision. The owner subsequently supplied a Mac
+endpoint; Codex connected using Tailscale SSH with coordination-server host-key
+verification. No password was entered, stored or published.
 Task 5 remains open: no Mac dependency hook, GN invocation, compiler or acceptance
 test has executed. Windows preparation and Linux compilation cannot prove it.
 
@@ -12,13 +14,44 @@ The [instructions at the pinned Chromium revision](https://chromium.googlesource
 require a Mac, Xcode/macOS SDK and an APFS build volume. This project's selected
 target is native ARM64 on Apple Silicon. Exact OS, CPU, RAM, storage and Xcode
 must be read from the actual host before provisioning; user confirmation of a
-Mac does not establish those values.
+Mac does not establish those values. The actual connected host reports macOS
+15.7 (24G217), native ARM64, 16 GiB RAM and eight logical CPUs. The USB external
+disk is writable ExFAT, 4,000,769,376,256 bytes with 3,938,676,899,840 bytes free
+at inventory. The system APFS volume has approximately 20 GiB free.
 
 Codex recommended reserving **250 GB free SSD space after macOS and Xcode** for
 source, dependency downloads, objects and outputs. For a newly provisioned disk,
 **350 GB or more total** leaves room for the OS/tools. These are project planning
 budgets, not a claimed official minimum in the upstream Mac instructions.
 Actual available capacity must be recorded and monitored during the build.
+
+The owner subsequently selected an external 4 TB HDD for build storage.
+`qa/macos/prepare-external-build.sh` is an authored setup helper: it verifies
+an external mounted volume and at least 250 GB free, refuses existing target
+paths, and creates a new 350 GiB maximum sparse bundle containing an APFS volume.
+The sparse bundle and its setup temporary directory remain on the selected HDD;
+it does not repartition, convert or erase that disk. This supports an existing
+writable exFAT volume without treating exFAT itself as the Chromium filesystem.
+The mounted build path `/Volumes/VlikeonBuild/work` has no spaces even if the
+external drive's name does. Source, projects, logs and configured temporary/
+language-package caches use that workspace. The generated `env.sh` must be
+sourced by every actual bootstrap/build supervisor; it does not change global
+shell profiles, relocate Xcode or move macOS swap/system writes. Both the APFS
+image capacity and physical backing HDD free bytes must be monitored.
+
+Antigravity executed a nonexecuting Bash parser check, exit 0, with no output.
+Codex then invoked the helper on the actual Mac. The native diskutil/plutil
+external-device, mountpoint and free-space admission completed. The helper is
+stopped after waiting in its first mkdir on the external disk; no successful APFS
+creation or cache placement has been established. A read-only macOS TCC log
+attributes removable-volume access checks to tailscaled and records an AllFiles
+policy denial; this does not by itself prove why mkdir is waiting. The owner
+has been asked to inspect a possible removable-volume consent prompt. No
+privacy setting was changed or access restriction bypassed. Codex terminated
+the exact owned setup and diagnostic processes and verified their absence.
+Inspect any partial setup paths after consent before a new run; do not overwrite
+them or assume the native setup completed. Existing setup paths are never
+overwritten. Final native behavior and storage placement still need inspection.
 
 For this exact Chromium pin, `build/config/mac/mac_sdk_overrides.gni` declares
 `mac_sdk_min = "15"`; `mac_sdk.gni` records SDK `26.5`/build `25F70` for official
@@ -29,8 +62,11 @@ required Xcode license acceptance; no agreement was accepted by this task.
 
 `qa/macos/build-host-preflight.sh` is an authored read-only inventory of OS,
 architecture, RAM, CPU count, build filesystem/free space, selected Xcode and SDK,
-Git and Python. It takes an existing build-parent directory. It has not been
-executed or qualified on a Mac; it does not install tools or modify settings.
+Git and Python. It takes an existing build-parent directory. The helper has not
+been executed or qualified on a Mac; equivalent direct read-only inventory
+commands established the host values above. Only Command Line Tools are selected
+and no full Xcode was found in the checked application locations. The helper
+does not install tools or modify settings.
 
 ## Frozen source and transfer
 
