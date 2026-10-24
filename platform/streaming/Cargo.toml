@@ -16,6 +16,7 @@ uuid.workspace = true
 url.workspace = true
 zeroize.workspace = true
 getrandom.workspace = true
+ring = "=0.17.14"
 
 [target.'cfg(target_os = "windows")'.dependencies]
 keyring = { version = "=3.6.3", features = ["windows-native"] }

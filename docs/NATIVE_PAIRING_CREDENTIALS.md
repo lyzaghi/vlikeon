@@ -37,8 +37,9 @@ UUID must equal the address item UUID. A monotonic elapsed-time adjustment
 rechecks expiry after synchronous vault work, so slow I/O cannot publish a pair
 key using only the earlier timestamp. The caller must still supply native
 current time, its own pinned identity and durable active-generation authority.
-`from_derived` is only an internal/native material wrapper: it is not proof of
-an authenticated ECDH exchange, which remains to be implemented/integrated.
+The raw derived-key constructor is now crate-private. The public native exchange
+below produces the wrapper after signed-transcript admission; loaded vault keys
+remain subject to their separate grant/journal authority admission.
 
 Candidate storage first refuses an already present address, writes, then reads
 back the exact record before returning. The keyring is not a CAS store; a
@@ -214,6 +215,47 @@ action. OS/SQLite/provider calls may block beyond a deadline and still need
 runtime supervision/qualification. Current APIs are native-only source with no
 broker/startup/UI/mobile caller; no key, vault or SQL operation was executed.
 
+## Native signed-transcript exchange source
+
+`native_pair_exchange.rs` now authors a P-256 ephemeral exchange using pinned
+`ring` 0.17.14, already present in the lockfile. Each instance generates its own
+public point and 32-byte nonce, pins the local Ed25519 public identity and
+expires after five minutes of original monotonic time. It exposes public
+exchange/nonce metadata, has no Clone/serialization/private-key export, and
+consumes its private scalar on finish even if validation fails.
+
+Host and client finish methods require the expected peer public key from the
+native consent/pairing controller. Invite, hello and grant signatures are
+verified under their respective pinned endpoint keys. Their IDs, audiences,
+participant identities, hello-document hash, ECDH points and nonces must match
+the signed transcript; the local point/nonce must equal this exact exchange.
+The selected peer point must be uncompressed 65-byte P-256, different from the
+local point; `ring` performs curve/point validation during agreement. Grant/hello
+times are checked against the original invitation, and invite/grant validity
+is rechecked after derivation using elapsed native time. No peer key is accepted
+merely because a received grant claims it.
+
+The KDF follows the existing browser source: 256-bit ECDH shared material,
+HKDF-SHA256 with salt SHA256 of the exact `{payload,signature}` signed-document
+JSON and info `omniplay.streaming.signal-key.v1`, yielding 32 bytes. It does not
+substitute parsed/reserialized grant payloads for that document. Shared material
+is passed directly from the agreement callback into HKDF; the owned output is
+zeroizing. No claim is made that backend internals make no transient copies.
+
+This is source compatibility, not evidence of matching browser/native output.
+It does not show comparison-code consent, prove the relay invitation secret,
+implement invitation/hello HTTP requests or confirm relay approval. Those
+controller steps and native encrypted signaling remain unfinished. Native
+candidate storage can accept the resulting opaque key; product orchestration,
+mutual WebCrypto/native vectors, wrong-peer/transcript/nonce/point/time cases,
+single-use rejection and platform qualification are still required.
+
+API review follows the pinned package's
+[agreement contract](https://docs.rs/ring/0.17.14/ring/agreement/fn.agree_ephemeral.html),
+[P-256 exchange API](https://docs.rs/ring/0.17.14/ring/agreement/index.html)
+and [HKDF API](https://docs.rs/ring/0.17.14/ring/hkdf/index.html).
+No RNG, agreement, HKDF, signing, vault or native API was executed here.
+
 ## Required durable ordering and integration
 
 The journal authors the state transitions below. Their external effects and
@@ -245,8 +287,9 @@ The caller must fence and retire writers first. Failed cleanup keeps debt.
 - Journal/executor/lease/writer product integration, authority epochs, actual native owner
   and startup recovery execution,
   rotation/re-pair and local/relay revocation orchestration.
-- Native authenticated ECDH/HKDF pairing and encrypted signaling sequence/replay
-  lifecycle compatible with the current signed protocol; no secret IPC export.
+- Native pairing-controller integration of the authored ECDH/HKDF transcript
+  exchange, plus encrypted signaling sequence/replay lifecycle compatible with
+  the current signed protocol; no secret IPC export.
 - Broker operations and document-scoped native capabilities, with explicit
   native opt-in and locking/background/expiry behavior.
 - Separate Android Keystore/iOS Keychain provider namespace and scoped callback

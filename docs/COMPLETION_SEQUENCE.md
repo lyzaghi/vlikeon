@@ -2,6 +2,13 @@
 
 ## Current sequence — 1–109 outstanding tasks
 
+Item 58 now authors a consumed-on-finish native P-256/HKDF exchange with pinned
+peer/identity signatures and exact invite/hello/grant, ECDH/nonce/hash/lifetime
+checks, matching the browser KDF layout in source. Raw pair-key construction is
+crate-private. Relay invitation-secret proof, comparison consent, native pairing
+controller and signaling remain missing; no interoperability or crypto API was
+executed. Build/test still deferred and full original completion scope stays open.
+
 Item 58 now connects native candidate preparation through one retained writer
 lease, durable reserve/write intent, actual vault API calls in source and exact
 read-back before MaterialReady publication. Identity activation reloads its

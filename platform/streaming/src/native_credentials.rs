@@ -104,7 +104,7 @@ fn validate_object(body:&[u8])->Result<()>{
 /// Created only by the future native authenticated key exchange. This wrapper
 /// cannot serialize, clone, debug-print or export its key to the renderer.
 pub struct NativePairKey{bytes:Zeroizing<[u8;32]>}
-impl NativePairKey{pub fn from_derived(bytes:Zeroizing<[u8;32]>)->Self{Self{bytes}}}
+impl NativePairKey{pub(crate) fn from_derived(bytes:Zeroizing<[u8;32]>)->Self{Self{bytes}}}
 
 fn encode(address:&CredentialAddress,binding:&[u8;32],secret:&[u8;32])->Result<Zeroizing<Vec<u8>>>{
     address.validate()?;let mut record=Zeroizing::new(Vec::with_capacity(SECRET_RECORD_BYTES));
