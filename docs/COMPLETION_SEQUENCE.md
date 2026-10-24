@@ -2,6 +2,13 @@
 
 ## Current sequence — 1–109 outstanding tasks
 
+Item 58 now authors an Android Keystore wrapping provider candidate with separate
+generation namespace, authenticated profile/device address, bounded no-backup
+ciphertext, record locking and durable new-file read-back. Missing, locked and
+orphan/corrupt states differ; failed-read output is cleared. JNI/lifecycle/core
+mobile lease integration and device qualification remain missing. No native,
+crypto, storage, build or test was executed; original 51–109 scope stays open.
+
 Item 58 now authors a separate mobile Remote Play callback ABI/Rust scoped
 provider and unintegrated iOS Keychain candidate, retaining profile/device/
 generation envelopes and missing-vs-locked/error distinction. New source uses

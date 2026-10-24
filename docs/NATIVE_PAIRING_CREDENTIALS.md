@@ -635,6 +635,62 @@ silently replace a peer-pinned identity. No C callback, Swift/Keychain API,
 mobile open, vault/SQL/native operation, build or test was executed. Native
 provider/product lifecycle and device qualification remain incomplete.
 
+## Android Keystore provider candidate source
+
+`apps/android/java/org/chromium/chrome/browser/omniplay/PairingCredentials.java`
+now authors a Remote Play provider separate from save synchronization. Its
+native-only Java address encoding is 68 bytes: four UUID byte arrays followed
+by a big-endian u32 kind. JNI must encode that integer explicitly, not memcpy
+the native C struct's platform-endian bytes. Scope checks require exact native
+profile/device, nonzero UUIDs, valid kind and identity item == device UUID.
+
+Each address hashes to a distinct Keystore alias under
+`org.vlikeon.remote-play.wrap.v1` and a ciphertext file inside the app's
+credential-protected no-backup `VlikeonRemotePlayCredentialsV1` directory. A
+device-protected storage context is refused. AES-256-GCM wraps the 137-byte
+secret envelope with a randomized 12-byte IV and 16-byte tag; AAD binds its
+domain, complete address and wrapping version. The file is exactly 173 bytes.
+Canonical/nonlinked directory/regular-file checks, restrictive permissions,
+bounded no-follow I/O and an exact-generation nonblocking file lock are authored.
+The shared app namespace still requires filesystem/contender qualification; this
+is not a sandbox against compromised same-UID native code or profile rollback.
+
+Reads report absence only when both alias and record are absent. Missing-key
+ciphertext, orphan alias, malformed envelope, authentication failure or storage
+error remain failures rather than regenerating keys. Writes require a fresh
+generation with neither existing file nor alias, create the wrapping alias,
+write a new file without replacement, force/read-back the exact ciphertext and
+sync its parent before success. Crashes may leave alias-only or partial-file
+debt; no automatic rollback/delete or overwrite hides it. The native journal
+must record intent first and keep debt on any uncertain result.
+
+Removal deletes only the addressed alias first, then its ciphertext, verifies
+both absent and syncs the directory. The zero-byte lock file stays named to
+avoid splitting exclusion across concurrent open handles. This is material
+cleanup, not peer revocation or native session retirement. Existing journal
+limits/producer retirement are still required; these Java locks alone are not
+the core mobile profile-wide credential lease.
+
+User/profile unlock and keyguard checks run before/after access. Android 15+
+generation sets `setUnlockedDeviceRequired(true)`; earlier supported versions
+use explicit app checks because Android documents unlock/key-loss issues on
+older releases. No hardware-backed or immediate hard-cancellation guarantee is
+claimed. Plaintext/temporary byte arrays are cleared best effort; failed reads
+clear their output as well. Java/OS/Keystore internal copies are outside that
+guarantee. Error messages contain no secret, alias or path details.
+
+ProGuard retains the four native callback methods. The Android source assembly
+recipe already includes Java sources dynamically, but has not been run. JNI
+callback ownership, native provider attachment, true device/profile lookup,
+mobile credential lease and lifecycle/backup/reinstall recovery remain missing.
+No Java constructor, filesystem/Keystore/crypto API, JNI call, build or test was
+executed. This source does not enable a Remote Play capability.
+
+The Android
+[unlocked-device-required API documentation](https://developer.android.com/reference/android/security/keystore/KeyGenParameterSpec.Builder#setUnlockedDeviceRequired(boolean))
+informs this candidate; real lock/unlock/invalidation/crash/fault/restore and
+concurrent process qualification remain due.
+
 ## Remaining implementation and qualification
 
 - Journal/executor/lease/writer product integration, authority epochs, actual native owner
@@ -645,7 +701,7 @@ provider/product lifecycle and device qualification remain incomplete.
   compatible with the current signed protocol; no secret IPC export.
 - Broker operations and document-scoped native capabilities, with explicit
   native opt-in and locking/background/expiry behavior.
-- Android Keystore/JNI provider, iOS candidate target/bridge/protected-data wiring,
+- Android candidate JNI/bridge wiring, iOS candidate target/bridge/protected-data wiring,
   scoped callback consumption and mobile lease/product lifecycle. Existing
   save-sync callbacks are not reused as pairing storage.
 - Device-lock, protected-data, backup/restore/reinstall, profile deletion,

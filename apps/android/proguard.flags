@@ -21,3 +21,9 @@
     public int write(byte[], byte[]);
     public int remove(byte[]);
 }
+-keep class org.chromium.chrome.browser.omniplay.PairingCredentials {
+    public int check(byte[]);
+    public int read(byte[], byte[]);
+    public int write(byte[], byte[]);
+    public int remove(byte[]);
+}
