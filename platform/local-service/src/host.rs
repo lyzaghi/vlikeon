@@ -245,6 +245,7 @@ impl LocalHost {
         let pending=self.pairing_client.take().ok_or_else(||PlatformError::new(ErrorCode::NotFound,"Native client pairing is absent"))?;
         let mut value=self.native_pairing_prepare_client_after_local_consent(store,pending.identity,pending.revision,pending.pairing,deadline)?;
         value["pairing_ticket"]=json!(ticket);
+        value["grant_hash"]=json!(reviewed_grant_hash);
         if cancel.load(std::sync::atomic::Ordering::Acquire){return Err(PlatformError::new(ErrorCode::Cancelled,"Native candidate may have committed; reload pairing status"));}Ok(value)
     }
     /// Actual native peer-consent controller must approve the exact candidate.

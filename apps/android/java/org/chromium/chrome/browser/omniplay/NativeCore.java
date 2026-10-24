@@ -132,7 +132,7 @@ public final class NativeCore {
         try{mIo.execute(()->{
             JSONObject response;
             try{
-                String expectedTicket=null;
+                String expectedTicket=null,reviewedHash=null;
                 JSONObject activation=null;
                 if(action==5){
                     activation=new JSONObject(new String(ownedInput,StandardCharsets.UTF_8));
@@ -145,7 +145,7 @@ public final class NativeCore {
                     JSONObject request=new JSONObject(new String(ownedInput,StandardCharsets.UTF_8));
                     expectedTicket=request.getString("ticket");
                     if(request.length()!=(action==3?2:1)||!canonicalPairingId(expectedTicket))throw new IllegalStateException();
-                    if(action==3&&!request.getString("reviewed_grant_hash").matches("[0-9a-f]{64}"))throw new IllegalStateException();
+                    if(action==3){reviewedHash=request.getString("reviewed_grant_hash");if(!reviewedHash.matches("[0-9a-f]{64}"))throw new IllegalStateException();}
                 }
                 long remaining=expires-android.os.SystemClock.elapsedRealtime();
                 if(mHandle==0||mFailed||remaining<1000||(action!=4&&(mPairingClientDeliveryFence.get()!=deliveryFence||!alive.getAsBoolean()||!mPairingAttached)))throw new IllegalStateException();
@@ -161,6 +161,7 @@ public final class NativeCore {
                         for(String field:new String[]{"profile","device","kind","id","generation"})if(!expected.getString(field).equals(address.getString(field)))throw new IllegalStateException();
                     }else if(action==3){
                         if(!expectedTicket.equals(value.getString("pairing_ticket")))throw new IllegalStateException();
+                        if(!reviewedHash.equals(value.getString("grant_hash")))throw new IllegalStateException();
                         JSONObject address=value.getJSONObject("address");
                         if(value.getInt("credential_protocol")!=1||!"material_ready".equals(value.getString("phase"))||!mProfile.equals(address.getString("profile"))||!"pair_encryption".equals(address.getString("kind")))throw new IllegalStateException();
                         Object revision=value.get("revision");
@@ -292,6 +293,7 @@ public final class NativeCore {
     PeerActivation activationForPeer(PeerApproval review,JSONObject response) throws Exception{
         if(review==null||!review.consumed.get()||mPairingClientDeliveryFence.get()!=review.deliveryFence||android.os.SystemClock.elapsedRealtime()>=review.expires)throw new IllegalStateException();
         JSONObject value=pairingResult(response),address=value.getJSONObject("address");Object revision=value.get("revision");
+        if(!review.grantHash.equals(value.getString("grant_hash")))throw new IllegalStateException();
         if(value.getInt("credential_protocol")!=1||!"material_ready".equals(value.getString("phase"))||!review.ticket.equals(value.getString("pairing_ticket"))
                 ||address.length()!=5||!mProfile.equals(address.getString("profile"))||!review.pairId.equals(address.getString("id"))||!"pair_encryption".equals(address.getString("kind"))
                 ||!canonicalPairingId(address.getString("device"))||!canonicalPairingId(address.getString("generation"))||!(revision instanceof Number)

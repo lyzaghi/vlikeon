@@ -297,6 +297,7 @@ final class NativeCore {
             defer{owned.clear();self.pairingClientQueuePermit.signal();if reservesOperation{self.pairingClientPermit.signal()}}
             do{
                 var expectedTicket:String?
+                var reviewedHash:String?
                 var activation:[String:Any]?
                 if action == .activate{
                     guard let request=try JSONSerialization.jsonObject(with:owned.bytes) as? [String:Any],request.count==3,
@@ -315,6 +316,7 @@ final class NativeCore {
                     expectedTicket=ticket
                     if action == .persistAfterPeerConsent{
                         guard let hash=request["reviewed_grant_hash"] as? String,NativePairingText.fingerprint(hash) else{throw OmniFailure.message("Thiếu grant đã được người dùng duyệt.")}
+                        reviewedHash=hash
                     }
                 }
                 let now=DispatchTime.now()
@@ -338,6 +340,7 @@ final class NativeCore {
                           revision.doubleValue>previous.doubleValue,revision.doubleValue<=10_000_000,revision.doubleValue==Double(revision.uint64Value) else{throw OmniFailure.message("Kết quả kích hoạt không khớp candidate đã duyệt. Hãy đọc lại trạng thái.")}
                 }else if action == .persistAfterPeerConsent{
                     guard let ticket=value["pairing_ticket"] as? String,ticket==expectedTicket else{throw OmniFailure.message("Candidate không khớp ticket ghép đôi.")}
+                    guard let hash=value["grant_hash"] as? String,hash==reviewedHash else{throw OmniFailure.message("Grant đã lưu không khớp phiên duyệt.")}
                     guard (value["credential_protocol"] as? NSNumber)?.uint32Value==1,value["phase"] as? String=="material_ready",
                           let address=value["address"] as? [String:Any],address["profile"] as? String==self.profileID.uuidString.lowercased(),
                           address["kind"] as? String=="pair_encryption" else{throw OmniFailure.message("Kết quả candidate không hợp lệ. Hãy đọc lại trạng thái.")}
@@ -463,6 +466,7 @@ final class NativeCore {
     }
     @MainActor func activationForPeer(_ review:NativePeerApproval,value:[String:Any]) throws->NativePeerActivation{
         guard review.origin==ObjectIdentifier(self),review.admitted,
+              value["grant_hash"] as? String==review.grantHash,
               (value["credential_protocol"] as? NSNumber)?.uint32Value==1,value["phase"] as? String=="material_ready",value["pairing_ticket"] as? String==review.ticket,
               let address=value["address"] as? [String:Any],address.count==5,address["profile"] as? String==profileID.uuidString.lowercased(),address["kind"] as? String=="pair_encryption",address["id"] as? String==review.pairID,
               let generation=address["generation"] as? String,let revision=value["revision"] as? NSNumber,CFGetTypeID(revision) != CFBooleanGetTypeID(),revision.doubleValue>=1,revision.doubleValue<10_000_000,revision.doubleValue==Double(revision.uint64Value) else{throw OmniFailure.message("Candidate đã lưu không khớp phiên duyệt. Hãy kiểm tra trạng thái.")}

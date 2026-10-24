@@ -1840,6 +1840,14 @@ this checkpoint.
 
 ## Remaining implementation and qualification
 
+Consented client persistence now returns grant_hash alongside pairing_ticket.
+LocalHost sources it from the reviewed hash already checked against the retained
+signed grant before exchange consumption. Both mobile lanes require exact request
+hash equality; activation factories additionally compare the result to their
+original peer snapshot. This closes reply correlation across poll, persistence
+and activation preparation, without adding consent or transport authority.
+No build/test or native runtime operation ran for this follow-up.
+
 iOS successful peer persistence now issues at most one activation snapshot from
 the consumed peer review, checking exact ticket/pair/profile, candidate generation,
 MaterialReady phase and bounded revision. Snapshot retains copied address/revision

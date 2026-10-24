@@ -2,6 +2,11 @@
 
 ## Current sequence — 1–109 outstanding tasks
 
+Item 58 client persistence replies now return the exact reviewed grant hash.
+Both mobile lanes and activation snapshot factories require it to match the
+retained consent hash before accepting the saved candidate. Source-only;
+build/test, interrupted-candidate recovery and full integration remain due.
+
 Item 58 iOS now authors one-use activation snapshots from exact successful peer
 persistence and an explicit activation dialog. Original peer owner/core/fence/
 expiry and exact candidate/revision/grant are retained. No transport starts.
