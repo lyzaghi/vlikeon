@@ -1,5 +1,10 @@
 # Native ordered RTP to decoder bridge — item 56
 
+Retained parameter versions now exist as described in
+`NATIVE_H264_PARAMETER_VERSIONS.md`. The actual access-unit/slice consumer,
+parameter-change/IDR recovery, full negotiation checks and decoder bridge
+integration remain outstanding; the bridge still has no default admission.
+
 Ordinary PPS metadata parsing now exists as described in `NATIVE_H264_PPS.md`.
 The actual bitstream/negotiation admission implementation, retained parameter
 versions and slice/reference checks remain unfinished. No bridge caller invokes
