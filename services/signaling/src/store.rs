@@ -93,8 +93,22 @@ impl Store {
                 tx.execute("INSERT INTO pairs(id,host,client,invite,expires,grant_hash,document) VALUES(?1,?2,?3,?4,?5,?6,?7)",params![grant.id.to_string(),sender,client_public_key,invite_id.to_string(),grant.expires_at_ms,document_hash(&document).map_err(|_|ApiError::invalid())?,text(&document)?]).map_err(|_|ApiError::conflict())?;
                 tx.execute("UPDATE joins SET state='approved' WHERE invite=?1 AND client=?2",params![invite_id.to_string(),client_public_key]).map_err(sql)?;Ok(receipt)
             }
-            RelayOperation::DeclinePair{invite_id,client_public_key}=>{invite_row(tx,&invite_id.to_string(),Some(sender))?;tx.execute("UPDATE joins SET state='declined' WHERE invite=?1 AND client=?2 AND state='pending'",params![invite_id.to_string(),client_public_key]).map_err(sql)?;Ok(json!({"declined":true}))}
-            RelayOperation::CloseInvite{invite_id}=>{invite_row(tx,&invite_id.to_string(),Some(sender))?;tx.execute("DELETE FROM invites WHERE id=?1",[invite_id.to_string()]).map_err(sql)?;Ok(json!({"closed":true}))}
+            RelayOperation::DeclinePair{invite_id,client_public_key}=>{
+                invite_row(tx,&invite_id.to_string(),Some(sender))?;
+                let row:Option<(String,String)>=tx.query_row("SELECT state,hello FROM joins WHERE invite=?1 AND client=?2",params![invite_id.to_string(),client_public_key],|row|Ok((row.get(0)?,row.get(1)?))).optional().map_err(sql)?;
+                let Some((state,hello))=row else{return Err(ApiError::not_found());};
+                if !matches!(state.as_str(),"pending"|"declined"){return Err(ApiError::conflict());}
+                let hello:SignedDocument=serde_json::from_str(&hello).map_err(sql)?;
+                if state=="pending"&&tx.execute("UPDATE joins SET state='declined' WHERE invite=?1 AND client=?2 AND state='pending'",params![invite_id.to_string(),client_public_key]).map_err(sql)?!=1{return Err(ApiError::conflict());}
+                Ok(json!({"declined":true,"decline_protocol":1,"invite_id":invite_id,"client_public_key":client_public_key,"hello_hash":document_hash(&hello).map_err(|_|ApiError::invalid())?}))
+            }
+            RelayOperation::CloseInvite{invite_id}=>{
+                invite_row(tx,&invite_id.to_string(),Some(sender))?;
+                let document:String=tx.query_row("SELECT document FROM invites WHERE id=?1",[invite_id.to_string()],|row|row.get(0)).map_err(sql)?;
+                let document:SignedDocument=serde_json::from_str(&document).map_err(sql)?;
+                if tx.execute("DELETE FROM invites WHERE id=?1",[invite_id.to_string()]).map_err(sql)?!=1{return Err(ApiError::conflict());}
+                Ok(json!({"closed":true,"close_protocol":1,"invite_id":invite_id,"host_public_key":sender,"invite_hash":document_hash(&document).map_err(|_|ApiError::invalid())?}))
+            }
             RelayOperation::Send{grant:document,message_id,session_id,sequence,expires_at_ms,iv,ciphertext}=>{
                 let grant=pair(tx,sender,&document,audience,now)?;let pair_id=grant.id.to_string();
                 let previous:Option<(String,String,u64,u64,String,String,u64,String)>=tx.query_row("SELECT pair,session,sequence,expires,iv,ciphertext,cursor,sender FROM messages WHERE message_id=?1",[message_id.to_string()],|r|Ok((r.get(0)?,r.get(1)?,r.get(2)?,r.get(3)?,r.get(4)?,r.get(5)?,r.get(6)?,r.get(7)?))).optional().map_err(sql)?;

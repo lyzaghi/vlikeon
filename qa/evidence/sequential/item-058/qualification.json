@@ -111,7 +111,9 @@
     "Host candidate activation source reconciles exact existing relay grant or approves only the retained persisted grant, requires bound approval receipt and fresh ConfirmPair before journal Active",
     "Server source binds first/identical host approval receipts to pair/grant/invite/client; LocalHost host/client activation shares enabled-policy, scoped vault/revision/deadline gates with no deployment or runtime qualification",
     "Host invite registration requires exact protocol receipt before sharing; server source permits identical signed-invite retry and refuses conflicting IDs",
-    "Host polling validates bound invite/host/hash receipt and at most eight unique signed hellos before replacing the snapshot; approval preparation requires its exact stored signed request"
+    "Host polling validates bound invite/host/hash receipt and at most eight unique signed hellos before replacing the snapshot; approval preparation requires its exact stored signed request",
+    "Host decline fences local approval before dispatch, retains bounded exact hello retry evidence and requires bound receipt; server refuses missing/approved joins instead of false positive acknowledgment",
+    "Native invite close clears proof and terminally fences local use, requiring exact owned-deletion receipt without treating NotFound or lost response as confirmation; durable crash/post-expiry reconciliation remains unfinished"
   ],
   "build_executed": false,
   "tests_executed": false,

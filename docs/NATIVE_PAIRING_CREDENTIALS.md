@@ -1663,6 +1663,38 @@ Host decline/close handling, Active-identity/foreground controller ownership,
 native sharing/peer UI and durable crash reconciliation remain unfinished. Server
 receipt changes need deployment and browser/native interoperability qualification.
 
+## Native host decline and terminal invite close
+
+Host pending state now fences a client from local approval before dispatching
+decline. It requires the exact polled hello and refuses decline once this object
+has prepared a grant for that client; approved pairs instead need revocation.
+An explicit retry keeps the same signed hello, including across polls that omit
+a remotely declined request. Retained pending/decline evidence stays bounded to
+eight clients and conflicting hello replacement is refused.
+
+Server decline now reads the actual join state in the transaction: pending is
+changed to declined, identical declined requests are acknowledged, missing joins
+return NotFound and approved/unknown states return Conflict. Previously its
+conditional UPDATE was already pending-only, but a zero-row update still returned
+declined:true. The new protocol-1 receipt binds invite/client/exact hello hash;
+native requires that binding before reporting remote decline confirmation.
+
+Explicit close immediately fences the native invite, clears bearer proof and
+pending requests, and prevents subsequent registration/share/poll/approval through
+that object. Its authenticated CloseInvite request requires a protocol-1 receipt
+binding the exact invite/host/hash. Server verifies owner and actual deletion
+before acknowledging. Existing approved pair rows are unaffected by invite close.
+
+Lost close responses or missing/expired invite rows are not converted into a
+positive acknowledgment. The local object stays closed and can attempt bounded
+reconciliation only while its original invite is live; durable close receipts,
+post-expiry reconciliation and process-crash tracking remain unfinished. Native
+terminal state does not prove remote cleanup or stop any live transport backend.
+
+No relay/SQL/native/crypto/parser operation, deployment, compiler, build or test
+ran. Real controller/UI/foreground wiring, receipt persistence and qualification
+remain required; item 58 and the original full objective remain open.
+
 ## Remaining implementation and qualification
 
 - Journal/executor/lease/writer product integration, authority epochs, actual native owner

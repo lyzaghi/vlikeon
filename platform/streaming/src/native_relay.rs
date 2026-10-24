@@ -182,6 +182,26 @@ impl NativePairRelay{
         if receipt.poll_protocol!=1||receipt.invite_id!=invite.id||receipt.host_public_key!=identity.public_key()||receipt.invite_hash!=crate::document_hash(document)?||receipt.requests.len()>8{return Err(denied());}
         let _=pending.relay_material(identity,elapsed_now(now,started)?)?;check(deadline,cancel)?;Ok(receipt.requests)
     }
+    pub(crate) fn decline_invitation_peer(&self,identity:&NativeSigningIdentity,pending:&crate::native_pair_exchange::NativeHostInvitation,
+        client:&str,hello:&crate::SignedDocument,now:u64,deadline:Instant,cancel:&AtomicBool)->Result<()>{
+        let started=Instant::now();let(audience,_,invite)=pending.relay_material(identity,now)?;
+        let response=self.signed_control(identity,audience,RelayOperation::DeclinePair{invite_id:invite.id,client_public_key:client.into()},now,deadline,cancel)?;
+        #[derive(serde::Deserialize)]#[serde(deny_unknown_fields)]
+        struct Receipt{decline_protocol:u32,declined:bool,invite_id:Uuid,client_public_key:String,hello_hash:String}
+        let receipt:Receipt=serde_json::from_value(response).map_err(|_|network())?;
+        if receipt.decline_protocol!=1||!receipt.declined||receipt.invite_id!=invite.id||receipt.client_public_key!=client||receipt.hello_hash!=crate::document_hash(hello)?{return Err(denied());}
+        let _=pending.relay_material(identity,elapsed_now(now,started)?)?;check(deadline,cancel)?;Ok(())
+    }
+    pub(crate) fn close_invitation(&self,identity:&NativeSigningIdentity,pending:&crate::native_pair_exchange::NativeHostInvitation,
+        now:u64,deadline:Instant,cancel:&AtomicBool)->Result<()>{
+        let(audience,document,invite)=pending.close_material(identity,now)?;
+        let response=self.signed_control(identity,audience,RelayOperation::CloseInvite{invite_id:invite.id},now,deadline,cancel)?;
+        #[derive(serde::Deserialize)]#[serde(deny_unknown_fields)]
+        struct Receipt{close_protocol:u32,closed:bool,invite_id:Uuid,host_public_key:String,invite_hash:String}
+        let receipt:Receipt=serde_json::from_value(response).map_err(|_|network())?;
+        if receipt.close_protocol!=1||!receipt.closed||receipt.invite_id!=invite.id||receipt.host_public_key!=identity.public_key()||receipt.invite_hash!=crate::document_hash(document)?{return Err(denied());}
+        check(deadline,cancel)?;Ok(())
+    }
     fn post(&self,audience:&str,bytes:&[u8],deadline:Instant,cancel:&AtomicBool)->Result<Value>{
         let started=Instant::now();check(deadline,cancel)?;validate_audience(audience)?;
         if deadline.saturating_duration_since(started)>Duration::from_secs(30)||!self.allowed.iter().any(|origin|origin==audience){return Err(denied());}

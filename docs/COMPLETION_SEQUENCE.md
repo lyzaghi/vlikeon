@@ -2,6 +2,14 @@
 
 ## Current sequence — 1–109 outstanding tasks
 
+Item 58 now authors host decline with immediate local approval fence and retained
+exact hello evidence, plus terminal native invite close that clears proof. Server
+decline checks actual pending/declined state and no longer acknowledges missing/
+approved joins; close acknowledges exact owned deletion. Bound receipts are
+required and unknown close remains unknown. No HTTP/SQL/native/deployment/compiler/
+build/test ran. Durable receipts, controller/UI and qualification remain due.
+Full original scope remains unfinished.
+
 Item 58 now authors exact host invite registration receipts and idempotent same-
 invite server registration, with sharing gated on acknowledgment. Bounded host
 polling verifies all signed hellos before replacing a snapshot; approval requires
