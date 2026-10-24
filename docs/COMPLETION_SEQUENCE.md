@@ -2,6 +2,11 @@
 
 ## Current sequence — 1–109 outstanding tasks
 
+Item 58 both native status views now offer explicit pending-client local cancel
+with a confirmation explaining remote approvals/candidates are unaffected.
+They use immediate epoch invalidation then exact-ticket cleanup via action 4.
+Source-only; build/test, full begin/join, activation and qualification remain due.
+
 Item 58 iOS native status now links live pending-client tickets to a two-stage
 peer/comparison then input-permission consent flow. It uses the immutable one-use
 snapshot, owner/foreground/protected-data checks and original review expiry.

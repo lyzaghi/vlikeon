@@ -208,15 +208,33 @@ public final class GameHubController implements AutoCloseable {
             long remaining=snapshot.expires-android.os.SystemClock.elapsedRealtime();
             if(remaining<=0){cancelIdentityReview();identityNotice("Recovery status expired. Open it again.");return;}
             if(snapshot.records.isEmpty()&&snapshot.pendingClientTicket==null){cancelIdentityReview();identityNotice("This device has no Remote Play identity or pair records.");return;}
-            String[] titles=new String[snapshot.records.size()+(snapshot.pendingClientTicket==null?0:1)];
+            String[] titles=new String[snapshot.records.size()+(snapshot.pendingClientTicket==null?0:2)];
             for(int i=0;i<snapshot.records.size();i++){NativeCore.RecoveryRecord record=snapshot.records.get(i);titles[i]=(record.isIdentity()?"Identity · ":"Device pair · ")+record.generation;}
-            if(snapshot.pendingClientTicket!=null)titles[titles.length-1]="Review pending host approval";
+            if(snapshot.pendingClientTicket!=null){titles[titles.length-2]="Review pending host approval";titles[titles.length-1]="Cancel pending pairing locally";}
             AlertDialog list=new AlertDialog.Builder(mActivity).setTitle("Remote Play status")
-                    .setItems(titles,(dialog,index)->{mIdentityDialog=null;if(index==snapshot.records.size())showPeerApproval(snapshot.pendingClientTicket,owner);else showPairingRecovery(snapshot,snapshot.records.get(index),owner);})
+                    .setItems(titles,(dialog,index)->{mIdentityDialog=null;if(index==snapshot.records.size())showPeerApproval(snapshot.pendingClientTicket,owner);else if(index>snapshot.records.size())cancelPendingPeer(snapshot.pendingClientTicket,owner);else showPairingRecovery(snapshot,snapshot.records.get(index),owner);})
                     .setNegativeButton(android.R.string.cancel,(dialog,which)->cancelIdentityReview()).create();
             mIdentityDialog=list;list.setOnCancelListener(dialog->cancelIdentityReview());
             mIdentityExpiry=()->{if(mIdentityFlow==owner)cancelIdentityReview();};mMain.postDelayed(mIdentityExpiry,remaining);list.show();
         });
+    }
+    private void cancelPendingPeer(String ticket,java.util.concurrent.atomic.AtomicBoolean owner){
+        if(mIdentityFlow!=owner||!owner.get()||!identityUiAvailable()){cancelIdentityReview();return;}
+        AlertDialog alert=new AlertDialog.Builder(mActivity).setTitle("Cancel pending pairing?")
+                .setMessage("Discard this device's pending exchange. This does not revoke a pair already approved on the connection service or delete a saved candidate.")
+                .setNegativeButton("Close",(dialog,which)->cancelIdentityReview())
+                .setPositiveButton("Cancel locally",(dialog,which)->{
+                    mIdentityDialog=null;
+                    if(mIdentityFlow!=owner||!owner.get()||!identityUiAvailable()){cancelIdentityReview();return;}
+                    try{
+                        byte[] request=new JSONObject().put("ticket",ticket).toString().getBytes(StandardCharsets.UTF_8);
+                        mCore.pairingClient(request,4,owner::get,response->{
+                            if(mIdentityFlow!=owner||!owner.get())return;cancelIdentityReview();
+                            if(identityUiAvailable())identityNotice("ok".equals(response.optString("status"))?"Pending pairing cancelled locally. Remote approvals were not revoked.":"Cancellation could not be confirmed. Reopen status before continuing.");
+                        });
+                    }catch(Exception error){cancelIdentityReview();identityNotice("Cancellation could not be queued. Reopen status.");}
+                }).create();
+        mIdentityDialog=alert;alert.setOnCancelListener(dialog->cancelIdentityReview());alert.show();
     }
     private void showPeerApproval(String ticket,java.util.concurrent.atomic.AtomicBoolean owner){
         if(mIdentityFlow!=owner||!owner.get()||!identityUiAvailable()){cancelIdentityReview();return;}

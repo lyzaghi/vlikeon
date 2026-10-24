@@ -136,6 +136,9 @@ final class GameHubViewController: UIViewController, WKNavigationDelegate, WKUID
                     sheet.addAction(UIAlertAction(title:"Duyệt host của phiên đang chờ",style:.default){[weak self,weak sheet]_ in
                         sheet?.dismiss(animated:false){[weak self] in self?.showPeerApproval(ticket:ticket,owner:owner)}
                     })
+                    sheet.addAction(UIAlertAction(title:"Hủy ghép đôi đang chờ tại thiết bị",style:.destructive){[weak self,weak sheet]_ in
+                        sheet?.dismiss(animated:false){[weak self] in self?.cancelPendingPeer(ticket:ticket,owner:owner)}
+                    })
                 }
                 for record in snapshot.records{
                     let title="\(record.isIdentity ? "Danh tính":"Cặp thiết bị") · \(record.generation)"
@@ -149,6 +152,23 @@ final class GameHubViewController: UIViewController, WKNavigationDelegate, WKUID
                 self.pairingExpiry=expiry;DispatchQueue.main.asyncAfter(deadline:snapshot.expires,execute:expiry);self.present(sheet,animated:true)
             }
         }
+    }
+    private func cancelPendingPeer(ticket:String,owner:NativeDocumentLifetime){
+        guard peerReviewAvailable(owner) else{cancelPairingIdentity();return}
+        let alert=UIAlertController(title:"Hủy phiên ghép đôi tại thiết bị?",message:"Bỏ phiên trao đổi đang chờ trên thiết bị này. Thao tác không thu hồi cặp đã được dịch vụ duyệt và không xóa candidate đã lưu.",preferredStyle:.alert)
+        pairingAlert=alert
+        alert.addAction(UIAlertAction(title:"Đóng",style:.cancel){[weak self]_ in self?.cancelPairingIdentity()})
+        alert.addAction(UIAlertAction(title:"Hủy cục bộ",style:.destructive){[weak self]_ in
+            guard let self=self,self.pairingFlow === owner,owner.active,self.hubVisible,!self.pendingSuspend,UIApplication.shared.applicationState == .active else{self?.cancelPairingIdentity();return}
+            do{
+                var input=try JSONSerialization.data(withJSONObject:["ticket":ticket])
+                self.core.pairingClient(.cancel,input:&input,owner:owner){[weak self] result in
+                    guard let self=self,self.pairingFlow === owner,owner.active else{return};self.cancelPairingIdentity()
+                    switch result{case .success:self.pairingNotice("Đã hủy phiên chờ tại thiết bị. Không thu hồi quyền đã duyệt trên dịch vụ.");case .failure:self.pairingNotice("Chưa xác nhận được thao tác hủy. Mở lại trạng thái trước khi tiếp tục.")}
+                }
+            }catch{self.cancelPairingIdentity();self.pairingNotice("Không gửi được thao tác hủy. Hãy mở lại trạng thái.")}
+        })
+        present(alert,animated:true)
     }
     private func peerReviewAvailable(_ owner:NativeDocumentLifetime)->Bool{
         pairingFlow === owner && owner.active && hubVisible && !fullScreenGame && !pendingSuspend && presentedViewController==nil && UIApplication.shared.applicationState == .active && UIApplication.shared.isProtectedDataAvailable

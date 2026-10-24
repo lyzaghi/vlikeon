@@ -1840,6 +1840,14 @@ this checkpoint.
 
 ## Remaining implementation and qualification
 
+Android/iOS native status menus now offer explicit local cancellation of the
+pending ticket, with a separate confirmation that remote-approved pairs and
+saved candidates are not revoked/deleted. Confirming invokes the existing
+immediate epoch invalidation and queued exact-ticket cancel path. A missing or
+uncertain result directs the user back to status. Existing flow expiry/lifecycle
+dismissal remains; closing a dialog is not a remote revocation receipt. No build,
+test or runtime UI operation ran for this source checkpoint.
+
 iOS status now retains an unexpired pending client ticket and offers a native
 review action. A fresh approved poll opens host key/fingerprint/comparison/pair
 review; an explicit verification action proceeds to a separate input-permission
