@@ -138,8 +138,9 @@ struct NativeRecoverySnapshot {
     let namespaceProvenanceMissing:Bool
     let pendingClientTicket:String?
     let pendingHostTicket:String?
+    let hostInvitationCleanupCount:Int
     let pairingOrigins:[String]
-    var needsAttention:Bool{namespaceProvenanceMissing || pendingHostTicket != nil || records.contains{$0.sessionRecoveryRequired || ($0.nextStep != nil && $0.nextStep != "revalidate_before_use")}}
+    var needsAttention:Bool{namespaceProvenanceMissing || pendingHostTicket != nil || hostInvitationCleanupCount>0 || records.contains{$0.sessionRecoveryRequired || ($0.nextStep != nil && $0.nextStep != "revalidate_before_use")}}
 }
 /// Trusted native begin context. It contains public metadata, never invite proof.
 final class NativeClientSetup {
@@ -729,7 +730,15 @@ final class NativeCore {
                     }
                     hostTicket=ticket
                 }
-                let snapshot=NativeRecoverySnapshot(revision:revision.uint64Value,device:device,records:parsed,expires:expires,relayRetirementAvailable:relayAvailable,namespaceProvenanceMissing:namespaceMissing,pendingClientTicket:pendingTicket,pendingHostTicket:hostTicket,pairingOrigins:origins)
+                guard let invitations=value["host_invitation_cleanup"] as? [[String:Any]],invitations.count<=8 else{throw OmniFailure.message("Danh sách cleanup lời mời không hợp lệ.")}
+                var invitationIds=Set<String>()
+                for invitation in invitations{
+                    guard let text=invitation["invite_id"] as? String,let id=UUID(uuidString:text),id.uuidString.lowercased()==text,
+                          id != UUID(uuid:(0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0)),invitationIds.insert(text).inserted,
+                          let hash=invitation["invite_hash"] as? String,NativePairingText.fingerprint(hash),
+                          let expired=invitation["expired"] as? NSNumber,CFGetTypeID(expired)==CFBooleanGetTypeID() else{throw OmniFailure.message("Metadata cleanup lời mời không hợp lệ.")}
+                }
+                let snapshot=NativeRecoverySnapshot(revision:revision.uint64Value,device:device,records:parsed,expires:expires,relayRetirementAvailable:relayAvailable,namespaceProvenanceMissing:namespaceMissing,pendingClientTicket:pendingTicket,pendingHostTicket:hostTicket,hostInvitationCleanupCount:invitations.count,pairingOrigins:origins)
                 DispatchQueue.main.async{completion(.success(snapshot))}
             }catch{DispatchQueue.main.async{completion(.failure(error))}}
         }

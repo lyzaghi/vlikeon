@@ -611,7 +611,8 @@ public final class NativeCore {
         final boolean namespaceProvenanceMissing;
         final String pendingClientTicket;
         final String pendingHostTicket;
-        boolean needsAttention(){if(namespaceProvenanceMissing||pendingHostTicket!=null)return true;for(RecoveryRecord record:records)if(record.sessionRecoveryRequired||(record.nextStep!=null&&!"revalidate_before_use".equals(record.nextStep)))return true;return false;}
+        final int hostInvitationCleanupCount;
+        boolean needsAttention(){if(namespaceProvenanceMissing||pendingHostTicket!=null||hostInvitationCleanupCount>0)return true;for(RecoveryRecord record:records)if(record.sessionRecoveryRequired||(record.nextStep!=null&&!"revalidate_before_use".equals(record.nextStep)))return true;return false;}
         private RecoverySnapshot(JSONObject status,String profile,long deadline) throws Exception {
             if(status.getInt("credential_protocol")!=1||status.getInt("recovery_protocol")!=1||!profile.equals(status.getString("profile_id"))||!canonicalPairingId(status.getString("device_id")))throw new IllegalStateException();
             revision=status.getLong("revision");expires=deadline;
@@ -629,6 +630,14 @@ public final class NativeCore {
                 if(!canonicalPairingId(hostTicket)||!(host.get("expired") instanceof Boolean)||!(host.get("locally_closed") instanceof Boolean)||!(host.get("remote_close_required") instanceof Boolean))throw new IllegalStateException();
             }
             pendingHostTicket=hostTicket;
+            org.json.JSONArray invitations=status.getJSONArray("host_invitation_cleanup");
+            if(invitations.length()>8)throw new IllegalStateException();
+            java.util.HashSet<String> ids=new java.util.HashSet<>();
+            for(int i=0;i<invitations.length();i++){
+                JSONObject invitation=invitations.getJSONObject(i);String id=invitation.getString("invite_id");
+                if(!canonicalPairingId(id)||!ids.add(id)||!invitation.getString("invite_hash").matches("[0-9a-f]{64}")||!(invitation.get("expired") instanceof Boolean))throw new IllegalStateException();
+            }
+            hostInvitationCleanupCount=invitations.length();
             if(revision<0||revision>10_000_000||android.os.SystemClock.elapsedRealtime()>=expires)throw new IllegalStateException();
             org.json.JSONArray rows=status.getJSONArray("records"),actions=status.getJSONArray("recovery");
             if(rows.length()>128||actions.length()>128)throw new IllegalStateException();

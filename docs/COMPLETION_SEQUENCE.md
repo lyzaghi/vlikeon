@@ -2,6 +2,10 @@
 
 ## Current sequence — 1–109 outstanding tasks
 
+Item 58 mobile status attention now includes durable invitation cleanup entries
+after restart, even without a transient host ticket. Bounded unique invite IDs,
+hashes and expiry booleans are admitted. Source-only; cleanup UI/build/test due.
+
 Item 58 native status now publishes bounded durable invitation cleanup metadata;
 LocalHost/mobile ABI expose exact invite/revision restart close without resuming
 pairing. Source-only; expired invites, mobile recovery UI and build/test remain due.

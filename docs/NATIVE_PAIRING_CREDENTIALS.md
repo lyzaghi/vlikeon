@@ -1840,6 +1840,12 @@ this checkpoint.
 
 ## Remaining implementation and qualification
 
+Android/iOS snapshots now count at most eight durable invitation cleanup entries,
+checking canonical nonzero unique invite IDs, hash text and actual expiry flags.
+Any entry triggers native status attention independently of transient host state.
+This does not imply cleanup or automatic network activity; full action metadata
+and recovery UI remain unwired. No build/test/runtime operation ran.
+
 Native status now exposes durable host_invitation_cleanup metadata (invite ID,
 identity generation, audience, signed-document hash, expiry), never proof. Explicit
 LocalHost/mobile recovery close uses exact invite ID/expected journal revision,
