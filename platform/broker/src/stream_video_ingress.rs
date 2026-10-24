@@ -64,6 +64,7 @@ pub trait NativeDatagramReceipt{
 /// renderer-provided address. Fixed peer checks are not SRTP authentication.
 pub struct UdpVideoIngress<T:NativeSrtpReceiver,C:NativeDatagramReceipt>{socket:Option<UdpSocket>,peer:SocketAddr,ingress:VideoIngress<T>,clock:C,closed:bool}
 impl<T:NativeSrtpReceiver,C:NativeDatagramReceipt> UdpVideoIngress<T,C>{
+    pub fn owner(&self)->VideoOwner{self.ingress.owner}
     pub fn from_selected_socket(socket:UdpSocket,expected_peer:SocketAddr,owner:VideoOwner,transport:T,clock:C)->Result<Self>{
         if socket.peer_addr().map_err(|_|denied())?!=expected_peer||expected_peer.port()==0||expected_peer.ip().is_unspecified()||expected_peer.ip().is_multicast(){return Err(denied());}
         socket.set_nonblocking(true).map_err(|_|denied())?;
@@ -97,5 +98,41 @@ impl<T:NativeSrtpReceiver,C:NativeDatagramReceipt> UdpVideoIngress<T,C>{
     }
     pub fn retire_until(&mut self,registry:&mut ReceiveRegistry,document:&ReceiveDocument,deadline:Instant)->Result<()>{
         self.closed=true;self.socket.take();self.ingress.retire_until(registry,document,deadline)
+    }
+}
+trait PollingTransport{
+    fn owner(&self)->VideoOwner;
+    fn poll(&mut self,registry:&mut ReceiveRegistry,document:&ReceiveDocument,deadline:Instant)->Result<usize>;
+    fn retire(&mut self,registry:&mut ReceiveRegistry,document:&ReceiveDocument,deadline:Instant)->Result<()>;
+}
+impl<T:NativeSrtpReceiver,C:NativeDatagramReceipt> PollingTransport for UdpVideoIngress<T,C>{
+    fn owner(&self)->VideoOwner{UdpVideoIngress::owner(self)}
+    fn poll(&mut self,registry:&mut ReceiveRegistry,document:&ReceiveDocument,deadline:Instant)->Result<usize>{UdpVideoIngress::poll(self,registry,document,deadline)}
+    fn retire(&mut self,registry:&mut ReceiveRegistry,document:&ReceiveDocument,deadline:Instant)->Result<()>{self.retire_until(registry,document,deadline)}
+}
+/// Broker retains socket/crypto cleanup ownership independently from decoder
+/// retirement. Failed poll seals the slot; only successful cleanup removes it.
+#[derive(Default)]
+pub struct TransportSlot{entry:Option<Box<dyn PollingTransport>>,sealed:bool,closed:bool}
+impl TransportSlot{
+    pub fn occupied(&self)->bool{self.entry.is_some()}
+    pub fn attach<T:NativeSrtpReceiver+'static,C:NativeDatagramReceipt+'static>(&mut self,transport:UdpVideoIngress<T,C>,registry:&ReceiveRegistry,document:&ReceiveDocument)->Result<()>{
+        if self.closed||self.entry.is_some(){return Err(PlatformError::new(ErrorCode::Busy,"The native transport slot still requires retirement"));}
+        if registry.state(document.id(),transport.owner())?!=crate::stream_video_receive::ReceiveState::Active{return Err(denied());}
+        self.entry=Some(Box::new(transport));self.sealed=false;Ok(())
+    }
+    pub fn maintain(&mut self,registry:&mut ReceiveRegistry,document:&ReceiveDocument,deadline:Instant)->Result<()>{
+        let Some(entry)=self.entry.as_mut()else{return Ok(())};
+        if !registry.state(document.id(),entry.owner()).is_ok_and(|state|state==crate::stream_video_receive::ReceiveState::Active){self.sealed=true;}
+        if !self.sealed&&!self.closed{
+            if entry.poll(registry,document,deadline).is_err(){self.sealed=true;}
+            if !self.sealed&&registry.tick(document,entry.owner()).is_err(){self.sealed=true;}
+        }
+        if self.sealed||self.closed{
+            entry.retire(registry,document,deadline)?;self.entry.take();
+        }Ok(())
+    }
+    pub fn close_until(&mut self,registry:&mut ReceiveRegistry,document:&ReceiveDocument,deadline:Instant)->Result<()>{
+        self.closed=true;self.sealed=true;self.maintain(registry,document,deadline)
     }
 }

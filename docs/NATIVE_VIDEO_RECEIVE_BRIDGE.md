@@ -1,5 +1,15 @@
 # Native ordered RTP to decoder bridge — item 56
 
+Broker now retains a native TransportSlot alongside its receive registry. Native
+attachment requires a matching active video owner; idle/request maintenance polls
+the connected UDP adapter and ticks the receiver. Poll/lifetime failures seal
+the slot and jointly retire transport/video; failed cleanup retains the slot
+instead of replacing it. While occupied, it owns video cleanup ordering so a
+separate registry pass cannot erase its retirement target. Shutdown closes the
+document before coordinated cleanup. Actual SRTP/ICE and OS ingress timestamp
+providers still need implementations and the admitted negotiation caller must
+attach them. No network/helper/build/test operation ran.
+
 UdpVideoIngress now owns an already connected ICE-selected UDP socket and polls
 up to 32 datagrams without blocking, forwarding through VideoIngress to the
 registry. A full UDP-sized buffer detects oversize instead of accepting truncated
