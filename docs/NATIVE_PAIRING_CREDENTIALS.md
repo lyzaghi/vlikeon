@@ -486,6 +486,58 @@ absence. Its success is a material-cleanup observation, not confirmation of
 relay revocation, active session retirement or absence of concurrent writers.
 The caller must fence and retire writers first. Failed cleanup keeps debt.
 
+## Bound native ICE admission source
+
+`native_ice.rs` now admits the current relay's temporary TURN credentials.
+Signaling responses add `ice_protocol:1`, exact pair UUID and signed-grant hash
+alongside existing ICE fields. The native admission requires those bindings,
+the local participant, at most eight server entries/32 total distinct URLs,
+canonical configured URL allowlist, live pair lifetime and at most ten minutes
+remaining credential lifetime. Older unbound responses are refused by this path.
+Existing browser consumers can ignore the added response fields.
+
+The current TURN REST format is checked explicitly: username must equal the
+integral-second expiry plus this native identity's SHA-256 fingerprint, password
+type must be `password`, and credential must be canonical base64 of a 20-byte
+HMAC-SHA1 output. This validates the configured service's shape/bindings, not the
+HMAC itself: the client does not possess the TURN shared secret. Effective native
+expiry is rounded down to username seconds, never extended by that conversion.
+Secrets have no Serialize/Clone/Debug export and owned username/password buffers
+are zeroizing; native ICE adapters may read them solely to configure ICE.
+
+The shared TURN URI admission deliberately supports a bounded canonical subset
+of [RFC 7065](https://www.rfc-editor.org/rfc/rfc7065.html): `turn`/`turns`, lower-case
+DNS labels or canonical IPv4/bracketed IPv6, optional nonzero u16 port, and only
+`transport=udp`/`transport=tcp`. Userinfo, paths, fragments, percent escapes,
+trailing/empty labels, arbitrary transport extensions and noncanonical ports/IPs
+are refused. It does not feed these opaque URIs into a hierarchical URL parser.
+The service's startup configuration now uses the same validator. Backend support
+for TLS/DTLS/transports still needs actual platform qualification; syntax alone
+does not prove a TURN allocation will work. See also
+[RFC 7350](https://www.rfc-editor.org/rfc/rfc7350.html) for secure UDP semantics.
+
+`stream_signal_operations::request_ice` connects the exact active pair/revision,
+retained profile lease, pinned identity vault reload and signed HTTPS ICE request.
+TURN URL policy and relay-only preference come from the trusted native caller;
+the relay cannot broaden that URL allowlist. Native authority, certificate,
+credential expiry, cancellation and deadline are checked after network/admission.
+Relay unavailable with a relay-only requirement is refused, never downgraded to
+direct networking. A correctly bound response with no servers can describe an
+explicit direct-capable configuration when local policy permits it.
+
+Returned configuration is bound to credential generation/session/epoch and
+requires a live timestamp on native adapter access. The adapter must also
+observe live authority, refresh/restart ICE before expiry and retire existing
+allocations on revocation. Already-issued TURN allocations are not erased merely
+by deleting pairing material or receiving relay retirement; real backend stop
+and TURN lifetime/credential rotation policy remain required.
+
+No ICE adapter, allocation, DNS lookup, client, network request, signing/vault/SQL,
+build or test was executed. Native authority/controller, WebRTC configuration,
+background/refresh/stop behavior, mobile integration, actual URI/credential fault
+qualification and item-59 TURN deployment remain unfinished. Streaming stays
+disabled and original 51–109 completion scope remains open.
+
 ## Remaining implementation and qualification
 
 - Journal/executor/lease/writer product integration, authority epochs, actual native owner

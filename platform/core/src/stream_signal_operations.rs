@@ -11,6 +11,17 @@ use serde::Deserialize;
 use std::sync::atomic::{AtomicBool,Ordering};
 use std::collections::BTreeSet;
 use zeroize::Zeroizing;
+use omniplay_streaming::native_ice::{self,NativeIceConfiguration};
+
+pub struct PreparedIce{address:CredentialAddress,session:Uuid,epoch:u64,configuration:NativeIceConfiguration}
+impl PreparedIce{
+    /// Native ICE adapter must additionally recheck its live authority immediately
+    /// before use and retire allocations on session/pair/epoch revocation.
+    pub fn for_session(&self,address:CredentialAddress,session:Uuid,epoch:u64,now:u64)->Result<&NativeIceConfiguration>{
+        if self.address!=address||self.session!=session||self.epoch!=epoch{return Err(denied());}
+        self.configuration.require_live(now)?;Ok(&self.configuration)
+    }
+}
 
 /// Native observations must retain their original observation time. No serde
 /// constructor, remote assertion or default authorized observation exists.
@@ -213,4 +224,27 @@ pub fn poll_received(database:&Database,profile:Uuid,address:CredentialAddress,s
     active(&snapshot,address,expected,clock.current()?)?;
     if cancel.load(Ordering::Acquire){return Err(PlatformError::new(ErrorCode::Cancelled,"Native signaling receive was cancelled"));}
     Ok(PolledSignals{address,epoch,revision:expected,deadline,packets:response.packets,next:0})
+}
+
+/// TURN URLs and relay-only requirement come from the admitted native policy/
+/// local setting, not the remote endpoint. No ICE agent is created by this call.
+pub fn request_ice(database:&Database,profile:Uuid,address:CredentialAddress,session:Uuid,epoch:u64,expected:u64,
+    store:&dyn PairingSecretStore,owner:&mut dyn NativeSignalAuthority,relay:&NativePairRelay,allowed_turn_urls:&[String],
+    require_relay:bool,now:u64,deadline:Instant,cancel:&AtomicBool)->Result<PreparedIce>{
+    let clock=Clock::new(now,deadline)?;
+    if allowed_turn_urls.len()>32||require_relay&&allowed_turn_urls.is_empty(){return Err(denied());}
+    for url in allowed_turn_urls{native_ice::validate_turn_uri(url)?;}
+    let lease=CredentialLease::acquire(database,profile)?;clock.authority(owner,address,session,epoch)?;
+    let snapshot=journal::load(database,profile)?;let record=active(&snapshot,address,expected,clock.current()?)?;
+    let grant=record.grant().ok_or_else(denied)?;
+    let identity_record=snapshot.records().iter().find(|identity|identity.address().kind()==SecretKind::DeviceSigning&&identity.phase()==Phase::Active&&identity.public_key()==record.public_key()).ok_or_else(denied)?;
+    let identity=load_identity(store,&identity_record.address(),identity_record.public_key())?;
+    clock.authority(owner,address,session,epoch)?;lease.check(database,profile)?;
+    let response=relay.request(&identity,grant.audience(),RelayOperation::IceCredentials{grant:grant.document().clone()},clock.current()?,deadline,cancel)?;
+    let configuration=native_ice::admit(response,grant.document(),grant.audience(),record.public_key(),allowed_turn_urls,clock.current()?)?;
+    if require_relay&&!configuration.relay_available(){return Err(PlatformError::new(ErrorCode::UnsupportedCapability,"The configured native relay cannot provide the required TURN service"));}
+    clock.authority(owner,address,session,epoch)?;lease.check(database,profile)?;
+    let current=clock.current()?;active(&snapshot,address,expected,current)?;configuration.require_live(current)?;
+    if cancel.load(Ordering::Acquire){return Err(PlatformError::new(ErrorCode::Cancelled,"Native ICE authorization was cancelled"));}
+    Ok(PreparedIce{address,session,epoch,configuration})
 }

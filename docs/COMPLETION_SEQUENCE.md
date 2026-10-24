@@ -2,6 +2,13 @@
 
 ## Current sequence — 1–109 outstanding tasks
 
+Item 58 now authors exact pair/grant-bound ICE responses, shared canonical TURN
+URI admission and temporary-credential/fingerprint/allowlist validation. Native
+ICE request source connects retained lease/vault signing, post-network authority
+and original certificate/credential expiry, refusing relay-only downgrade. No
+ICE agent/connection, relay deployment, network/crypto/SQL/vault/build/test was
+run. Actual native controller/backend/mobile integration and full scope stay open.
+
 Item 58 now authors retirement-only historical grant admission, a relay
 transaction response bound to exact pair/grant hash, and concrete native remote
 retirement-to-journal orchestration after prior writer/local retirement. Absent

@@ -65,7 +65,12 @@ async fn relay(State(service):State<Shared>,headers:HeaderMap,body:Json<RelayEnv
         service.rates.lock().await.identity(signer.clone())?;
         let needs_ice=matches!(&request.operation,RelayOperation::IceCredentials{..});
         let value=service.store.lock().await.execute(&body.public_key,request,&service.audience,now_ms())?;
-        if needs_ice{let expires=value["expires_at_ms"].as_u64().ok_or_else(ApiError::invalid)?;return Ok(Json(match &service.turn{Some(turn)=>turn.credentials(&signer,expires)?,None=>serde_json::json!({"ice_servers":[],"expires_at_ms":expires,"relay_available":false})}).into_response());}
+        if needs_ice{
+            let expires=value["expires_at_ms"].as_u64().ok_or_else(ApiError::invalid)?;
+            let mut reply=match &service.turn{Some(turn)=>turn.credentials(&signer,expires)?,None=>serde_json::json!({"ice_servers":[],"expires_at_ms":expires,"relay_available":false})};
+            reply["ice_protocol"]=serde_json::json!(1);reply["pair_id"]=value["pair_id"].clone();reply["grant_hash"]=value["grant_hash"].clone();
+            return Ok(Json(reply).into_response());
+        }
         Ok::<_,ApiError>(Json(value).into_response())
     }.await;
     cors(result.unwrap_or_else(IntoResponse::into_response),allowed)

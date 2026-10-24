@@ -4,6 +4,7 @@ use hmac::{Hmac,Mac};
 use sha1::Sha1;
 use zeroize::Zeroizing;
 use serde_json::{Value,json};
+use std::collections::BTreeSet;
 
 pub struct Turn{urls:Vec<String>,secret:Zeroizing<String>}
 impl Turn{
@@ -11,7 +12,7 @@ impl Turn{
         let urls=std::env::var("OMNIPLAY_RELAY_TURN_URLS").ok();let secret=std::env::var("OMNIPLAY_RELAY_TURN_SECRET").ok();
         match(urls,secret){
             (None,None)=>Ok(None),
-            (Some(urls),Some(secret))=>{let urls:Vec<_>=urls.split(',').map(str::trim).map(str::to_owned).collect();if urls.is_empty()||urls.len()>8||secret.len()<32||secret.len()>256||urls.iter().any(|v|!valid_url(v)){return Err(ApiError::invalid());}Ok(Some(Self{urls,secret:Zeroizing::new(secret)}))},
+            (Some(urls),Some(secret))=>{let urls:Vec<_>=urls.split(',').map(str::trim).map(str::to_owned).collect();if urls.is_empty()||urls.len()>8||secret.len()<32||secret.len()>256||urls.iter().any(|v|!valid_url(v))||urls.iter().collect::<BTreeSet<_>>().len()!=urls.len(){return Err(ApiError::invalid());}Ok(Some(Self{urls,secret:Zeroizing::new(secret)}))},
             _=>Err(ApiError::invalid()),
         }
     }
@@ -22,8 +23,5 @@ impl Turn{
     }
 }
 fn valid_url(value:&str)->bool{
-    if value.len()>256||!value.is_ascii()||value.bytes().any(|b|b.is_ascii_control()||b.is_ascii_whitespace()||[b'@',b'#',b'/',b'\\'].contains(&b)){return false;}
-    let Some((scheme,rest))=value.split_once(':')else{return false;};if !["turn","turns"].contains(&scheme)||rest.is_empty(){return false;}
-    let(host,query)=rest.split_once('?').unwrap_or((rest,""));if !query.is_empty()&&query!="transport=udp"&&query!="transport=tcp"{return false;}
-    !host.is_empty()&&host.bytes().all(|b|b.is_ascii_alphanumeric()||b".-:[]".contains(&b))
+    omniplay_streaming::native_ice::validate_turn_uri(value).is_ok()
 }

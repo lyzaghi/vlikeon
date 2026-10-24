@@ -9,6 +9,7 @@ pub mod native_credentials;
 pub mod native_pair_exchange;
 pub mod native_signal;
 pub mod native_relay;
+pub mod native_ice;
 pub use protocol::*;
 
 use omniplay_contracts::{ErrorCode,PlatformError,Result};
