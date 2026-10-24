@@ -2,6 +2,11 @@
 
 ## Current sequence — 1–109 outstanding tasks
 
+Item 58 now authors leased host invitation create/register writer methods using
+the exact Active identity/revision and installed host/origin policy. Invitation
+sharing remains separate; registration keeps caller-owned state on uncertainty.
+Source-only; host controller/ABI/UI and build/test remain due.
+
 Item 58 host candidate persistence and host activation now enforce installed
 hosting/input policy and configured grant audience, in addition to native consent.
 Source-only; policy remains disabled and no build/test/network operation ran.

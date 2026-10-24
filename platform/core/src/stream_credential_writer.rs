@@ -57,6 +57,27 @@ impl<'a> NativeCredentialWriter<'a>{
         let pending=omniplay_streaming::native_pair_exchange::NativeClientPairing::from_invitation_code(&signer,code,host,audience,label,elapsed_now(now,started)?)?;
         self.lease.check(self.database,self.profile)?;check(deadline)?;Ok(pending)
     }
+    /// Local invitation creation only. Registration and sharing remain explicit.
+    pub fn begin_host(&self,expected:u64,address:CredentialAddress,audience:&str,label:&str,now:u64,deadline:Instant)
+        ->Result<omniplay_streaming::native_pair_exchange::NativeHostInvitation>{
+        let started=begin(deadline)?;
+        crate::stream_signal_authority::require_installed_host_grant(audience,false)?;
+        let signer=self.active_signer(expected,address)?;check(deadline)?;
+        let invitation=omniplay_streaming::native_pair_exchange::NativeHostInvitation::create(&signer,audience,label,elapsed_now(now,started)?)?;
+        self.lease.check(self.database,self.profile)?;check(deadline)?;Ok(invitation)
+    }
+    /// Caller retains the invitation even on uncertain registration outcomes.
+    pub fn register_host(&self,expected:u64,address:CredentialAddress,invitation:&mut omniplay_streaming::native_pair_exchange::NativeHostInvitation,
+        relay:&omniplay_streaming::native_relay::NativePairRelay,now:u64,deadline:Instant,cancel:&std::sync::atomic::AtomicBool)->Result<()>{
+        let started=begin(deadline)?;
+        let metadata:omniplay_streaming::Invite=omniplay_streaming::inspect(invitation.signed_invite(),4096)?;
+        crate::stream_signal_authority::require_installed_host_grant(&metadata.audience,false)?;
+        if cancel.load(std::sync::atomic::Ordering::Acquire){return Err(conflict());}
+        let signer=self.active_signer(expected,address)?;check(deadline)?;
+        invitation.register(relay,&signer,elapsed_now(now,started)?,deadline,cancel)?;
+        self.lease.check(self.database,self.profile)?;check(deadline)?;
+        if cancel.load(std::sync::atomic::Ordering::Acquire){return Err(conflict());}Ok(())
+    }
     pub fn join_client(&self,expected:u64,address:CredentialAddress,pending:&mut omniplay_streaming::native_pair_exchange::NativeClientPairing,
         relay:&omniplay_streaming::native_relay::NativePairRelay,now:u64,deadline:Instant,cancel:&std::sync::atomic::AtomicBool)->Result<()>{
         let started=begin(deadline)?;let signer=self.active_signer(expected,address)?;check(deadline)?;

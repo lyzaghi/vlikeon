@@ -1840,6 +1840,16 @@ this checkpoint.
 
 ## Remaining implementation and qualification
 
+NativeCredentialWriter now provides begin_host and register_host under its
+retained profile lease. Creation requires installed hosting/origin policy and
+exact Active identity/revision, then signs a local invitation without network or
+sharing. Explicit registration reloads that identity, checks installed audience,
+cancellation and original deadline around relay registration and lease checks.
+Caller retains the invitation on uncertain outcomes; share_code still requires
+actual registration state. These methods create no peer/input consent or Active
+pair. No build/test, crypto/vault/HTTP operation ran. Product host controller,
+ABI/UI and qualification remain unfinished.
+
 Host candidate persistence and host activation now require enabled installed
 hosting policy, installed grant audience and remote-input permission when the
 signed grant includes input_allowed. Refusal occurs before exchange consumption/
