@@ -74,7 +74,9 @@ public final class NativeCore {
                     }
                     if (!temporary.renameTo(identity)) throw new IllegalStateException();
                 }
-                mRoot = new File(mBase, mProfile);
+                // Resolve trusted OS storage aliases before the Rust profile/
+                // credential lease pins its canonical directory identity.
+                mRoot = new File(mBase, mProfile).getCanonicalFile();
                 try { pruneStaging(mRoot); } catch (java.io.IOException ignored) { /* Retry bounded private staging cleanup on a later launch. */ }
                 byte[] openRequest = new JSONObject().put("data_root", mRoot.getAbsolutePath()).put("profile_id", mProfile).toString().getBytes(StandardCharsets.UTF_8);
                 byte[] openReply = null; JSONObject opened;

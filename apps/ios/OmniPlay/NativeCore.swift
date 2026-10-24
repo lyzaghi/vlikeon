@@ -72,10 +72,12 @@ final class NativeCore {
     private func openNow() throws {
                 if handle != 0 { return }
                 try FileManager.default.createDirectory(at: self.root, withIntermediateDirectories: true, attributes: [.protectionKey: FileProtectionType.completeUntilFirstUserAuthentication])
-                var location = self.root
+                // Trusted native container paths may contain /var aliases;
+                // resolve before Rust pins the profile lease namespace.
+                var location = self.root.resolvingSymlinksInPath().standardizedFileURL
                 var attributes = URLResourceValues(); attributes.isExcludedFromBackup = true
                 try location.setResourceValues(attributes)
-                let value = try self.unwrap(self.call(["data_root": self.root.path, "profile_id": self.profileID.uuidString.lowercased()]) { data, length in
+                let value = try self.unwrap(self.call(["data_root": location.path, "profile_id": self.profileID.uuidString.lowercased()]) { data, length in
                     om_mobile_open_with_credentials_v2(data, length, SecureCredentials.callbacks(profile: self.profileID))
                 })
                 guard let number = value["handle"] as? NSNumber, number.uint64Value != 0 else { throw OmniFailure.message("The local profile did not open.") }

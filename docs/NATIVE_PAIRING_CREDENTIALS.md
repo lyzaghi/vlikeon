@@ -176,9 +176,9 @@ semantics. Copied/restored profile roots with duplicated vault addresses still
 need coordinated admission/recovery; separate path lock files do not arbitrate
 those copies. Raw secret-provider APIs remain internal primitives whose callers
 must honor the lease contract. Provider/native owner integration and real Windows
-lock/reparse/contender/crash qualification are still due. Other platforms refuse
-lease acquisition until their scoped provider is implemented; no plaintext or
-process-local mutex fallback is supplied.
+lock/reparse/contender/crash qualification are still due. A Unix candidate is
+now authored below; other unsupported platforms refuse acquisition. No plaintext
+or process-local mutex fallback is supplied.
 
 ## Candidate writer orchestration source
 
@@ -786,6 +786,47 @@ UIKit notification, host open, callback, Keychain or test was executed. Actual
 device lock/unlock/background/close/ABI behavior, core mobile lease and LocalHost
 pairing-controller consumption remain missing. Streaming policy stays disabled.
 
+## Unix/mobile credential lease source
+
+`CredentialLease` now also authors a Unix branch used by Android/iOS/macOS/Linux
+targets, retaining the same required lease type for journal/writer/recovery/
+signal operations. It requires an admitted absolute canonical profile root,
+nonzero native profile/device and bounded path depth. The root directory opens
+without following its final symlink and must be private (no group/other mode
+bits). A fixed zero-byte lock file is created with create-new or opened existing-
+only if creation reports AlreadyExists. Existing names are checked before open;
+no-follow/close-on-exec/nonblocking flags are retained and no truncate/unlink or
+create fallback after disappearance is used. Only single-link regular zero-byte
+files owned by the profile-directory owner and with private mode are admitted.
+
+Nonblocking `File::try_lock` reports Busy for a live contender. The held file
+and root-directory descriptors remain inside the noncloneable lease. Each
+admission compares held/named device, inode, owner, file kind, length, link count
+and private mode, and rechecks the canonical root. Path replacement or unlink
+detected at these checks refuses further journal publication. Root permissions
+are admitted, not automatically weakened/repaired by this lease.
+
+Unlike Windows deny-delete handles, Unix open descriptors do not prohibit
+rename/unlink. The protocol is cooperative inside the admitted app-private
+namespace; it does not claim atomic exclusion against hostile same-UID or
+privileged namespace mutation between checks. Copied profile/vault addresses,
+network filesystem locking, sandbox/provider permissions and root provenance
+still need their separate admission/qualification. No existing owner is reclaimed
+by age and dropping a lease never removes durable session/cleanup debt.
+
+Android's trusted host now resolves its OS storage aliases before passing the
+profile root to Rust. iOS resolves/standardizes its native container URL after
+directory creation and passes that path to open. Renderer paths cannot opt into
+this normalization. This avoids treating normal Android/iOS storage aliases as
+an admitted final symlink or opening split lock namespaces.
+
+The implementation follows the documented
+[Rust file-lock contract](https://doc.rust-lang.org/std/fs/struct.File.html#method.try_lock)
+available since the project's Rust 1.89 minimum. No Unix file, lock, path, native
+host, vault, SQL, build or test was executed. Actual Android/iOS filesystem,
+contender/crash/replacement/permissions tests, LocalHost pairing-controller
+consumption and native runtime qualification remain unfinished.
+
 ## Remaining implementation and qualification
 
 - Journal/executor/lease/writer product integration, authority epochs, actual native owner
@@ -797,7 +838,7 @@ pairing-controller consumption remain missing. Streaming policy stays disabled.
 - Broker operations and document-scoped native capabilities, with explicit
   native opt-in and locking/background/expiry behavior.
 - Android/iOS attachment and protected-data device qualification,
-  scoped callback consumption and mobile lease/product lifecycle. Existing
+  scoped callback consumption and mobile lease/product lifecycle qualification. Existing
   save-sync callbacks are not reused as pairing storage.
 - Device-lock, protected-data, backup/restore/reinstall, profile deletion,
   missing vault and lost-key behavior. Native identity recovery must not silently

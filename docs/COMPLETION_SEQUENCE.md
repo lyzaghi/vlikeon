@@ -2,6 +2,13 @@
 
 ## Current sequence — 1–109 outstanding tasks
 
+Item 58 now authors a Unix/mobile credential lease using a canonical private
+profile root, bounded no-follow lock-file admission and nonblocking exclusion,
+with held/named inode/device/owner checks. Trusted Android/iOS open paths resolve
+OS container aliases before Rust admission. No filesystem/lock/native/vault/SQL,
+build or test was executed; actual platform qualification and LocalHost pairing
+controller remain due. Full original objective and item 58 stay incomplete.
+
 Item 58 now connects iOS host-open source to scoped Keychain attachment and
 protected-data events with a nonwrapping epoch across calls. The provider source
 is included in the checked-in Xcode target; unrelated settings are preserved.
