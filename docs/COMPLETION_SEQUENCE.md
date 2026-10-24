@@ -2,6 +2,8 @@
 
 ## Current sequence — 1–109 outstanding tasks
 
+Source checkpoint: Winsock now requires packet-info ancillary interface identity alongside each original ingress timestamp, converts the received interface index to LUID and matches the native binding. IPv4/IPv6 packet-info options are configured, with IPv4 additionally enabled for dual-stack sockets. Missing/duplicate/mismatched interface metadata fences ingress. Native binding issuer and crypto/product wiring remain open; build/test are deferred.
+
 Source checkpoint: Windows interface timestamp source now queries active driver capabilities, rejects hardware/missing software timestamps, pins socket/LUID and permanently fences changed bindings. The native exclusive receive-interface binding implementation and ICE/DTLS/SRTP engine remain unfinished. Build/test remain deferred; this checkpoint is not runtime qualification.
 
 Source checkpoint: atomic Winsock WSARecvMsg/SO_TIMESTAMP adapter now implements the UDP receive contract with bounded ancillary parsing and software-QPC conversion. Native interface timestamp provenance provider and actual ICE/DTLS/SRTP remain unfinished; build/test stay deferred.

@@ -5,13 +5,15 @@ use omniplay_contracts::{ErrorCode,PlatformError,Result};
 use omniplay_stream_input::video_client::DecoderReceipt;
 use std::{net::UdpSocket,os::windows::io::AsRawSocket,mem::{size_of,size_of_val,zeroed}};
 use windows_sys::Win32::Networking::WinSock::*;
-use windows_sys::Win32::NetworkManagement::{IpHelper::{GetInterfaceActiveTimestampCapabilities,INTERFACE_TIMESTAMP_CAPABILITIES},Ndis::NET_LUID_LH};
+use windows_sys::Win32::NetworkManagement::{IpHelper::{ConvertInterfaceIndexToLuid,GetInterfaceActiveTimestampCapabilities,INTERFACE_TIMESTAMP_CAPABILITIES},Ndis::NET_LUID_LH};
 
 fn denied()->PlatformError{PlatformError::new(ErrorCode::UnsupportedCapability,"Native Winsock software ingress timestamp is unavailable")}
 /// Native route/interface owner must recheck active SOFTWARE timestamp source,
 /// including route/interface changes. No renderer boolean or default success.
 pub trait SoftwareTimestampSource{
     fn require_current(&mut self,socket:&UdpSocket)->Result<()>;
+    /// Interface index comes from this datagram's native packet-info cmsg.
+    fn require_received_interface(&mut self,socket:&UdpSocket,index:u32)->Result<()>;
 }
 /// Native ICE/socket owner must establish the actual receive interface, not an
 /// outbound route guess. Wildcard/multi-interface reception is not admissible.
@@ -32,6 +34,13 @@ impl<B:NativeReceiveInterface> InterfaceSoftwareTimestamp<B>{
     }
 }
 impl<B:NativeReceiveInterface> SoftwareTimestampSource for InterfaceSoftwareTimestamp<B>{
+    fn require_received_interface(&mut self,socket:&UdpSocket,index:u32)->Result<()>{
+        let mut luid:NET_LUID_LH=unsafe{zeroed()};
+        if index==0||unsafe{ConvertInterfaceIndexToLuid(index,&mut luid)}!=0||unsafe{luid.Value}!=self.luid{
+            self.closed=true;return Err(denied());
+        }
+        self.require_current(socket)
+    }
     fn require_current(&mut self,socket:&UdpSocket)->Result<()>{
         let result=(||{
             if self.closed||socket.as_raw_socket()as usize!=self.socket||self.binding.current_receive_luid(socket)?!=self.luid{return Err(denied());}
@@ -56,6 +65,18 @@ impl<S:SoftwareTimestampSource> WinsockDatagrams<S>{
     pub fn configure(socket:&UdpSocket,mut source:S)->Result<Self>{
         source.require_current(socket)?;socket.set_nonblocking(true).map_err(|_|denied())?;
         let native=socket.as_raw_socket()as usize;
+        let enabled=1i32;
+        let ipv4=socket.local_addr().map_err(|_|denied())?.is_ipv4();
+        let (level,option)=if ipv4{(IPPROTO_IP,IP_PKTINFO)}else{(IPPROTO_IPV6,IPV6_PKTINFO)};
+        if unsafe{setsockopt(native,level,option,(&enabled as *const i32).cast(),size_of::<i32>()as i32)}==SOCKET_ERROR{return Err(denied());}
+        // IPv4-mapped traffic on a dual-stack IPv6 socket needs IPv4 packet info
+        // as well. Failure is fatal rather than silently accepting unstamped NICs.
+        if !ipv4{
+            let mut only=0i32;let mut length=size_of::<i32>()as i32;
+            if unsafe{getsockopt(native,IPPROTO_IPV6,IPV6_V6ONLY,(&mut only as *mut i32).cast(),&mut length)}==SOCKET_ERROR
+                ||length!=size_of::<i32>()as i32{return Err(denied());}
+            if only==0&&unsafe{setsockopt(native,IPPROTO_IP,IP_PKTINFO,(&enabled as *const i32).cast(),size_of::<i32>()as i32)}==SOCKET_ERROR{return Err(denied());}
+        }
         let mut recv:LPFN_WSARECVMSG=None;let mut bytes=0u32;let mut id=WSAID_WSARECVMSG;
         let result=unsafe{WSAIoctl(native,SIO_GET_EXTENSION_FUNCTION_POINTER,(&mut id as *mut _).cast(),size_of_val(&id)as u32,
             (&mut recv as *mut _).cast(),size_of::<LPFN_WSARECVMSG>()as u32,&mut bytes,std::ptr::null_mut(),None)};
@@ -88,7 +109,7 @@ impl<S:SoftwareTimestampSource> NativeDatagramReceipt for WinsockDatagrams<S>{
             if message.dwFlags!=0||received==0||received as usize>buffer.len()||message.Control.len as usize>capacity{return Err(denied());}
             let length=message.Control.len as usize;let header=size_of::<WSACMSGHDR>();let alignment=size_of::<usize>();
             let aligned=|value:usize|value.checked_add(alignment-1).map(|v|v&!(alignment-1)).ok_or_else(denied);
-            let mut offset=0usize;let mut stamp=None;
+            let mut offset=0usize;let mut stamp=None;let mut interface=None;
             while offset<length{
                 if length-offset<header{return Err(denied());}
                 let pointer=unsafe{control.as_ptr().cast::<u8>().add(offset)};
@@ -100,10 +121,22 @@ impl<S:SoftwareTimestampSource> NativeDatagramReceipt for WinsockDatagrams<S>{
                     if stamp.is_some()||size!=payload+size_of::<u64>(){return Err(denied());}
                     stamp=Some(unsafe{std::ptr::read_unaligned(pointer.add(payload).cast::<u64>())});
                 }
+                if cmsg.cmsg_level==IPPROTO_IP&&cmsg.cmsg_type==IP_PKTINFO{
+                    let payload=aligned(header)?;
+                    if interface.is_some()||size!=payload+size_of::<IN_PKTINFO>(){return Err(denied());}
+                    let info=unsafe{std::ptr::read_unaligned(pointer.add(payload).cast::<IN_PKTINFO>())};
+                    interface=Some(info.ipi_ifindex);
+                }
+                if cmsg.cmsg_level==IPPROTO_IPV6&&cmsg.cmsg_type==IPV6_PKTINFO{
+                    let payload=aligned(header)?;
+                    if interface.is_some()||size!=payload+size_of::<IN6_PKTINFO>(){return Err(denied());}
+                    let info=unsafe{std::ptr::read_unaligned(pointer.add(payload).cast::<IN6_PKTINFO>())};
+                    interface=Some(info.ipi6_ifindex);
+                }
                 let next=aligned(size)?;
                 if next>length-offset{if size!=length-offset{return Err(denied());}offset=length;}else{offset+=next;}
             }
-            self.source.require_current(socket)?;
+            self.source.require_received_interface(socket,interface.ok_or_else(denied)?)?;
             let stamp=i64::try_from(stamp.ok_or_else(denied)?).map_err(|_|denied())?;
             let receipt=DecoderReceipt::from_software_qpc_ingress(stamp)?;
             Ok(Some((received as usize,receipt)))
