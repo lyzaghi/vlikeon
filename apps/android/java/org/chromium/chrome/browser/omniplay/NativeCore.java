@@ -268,6 +268,7 @@ public final class NativeCore {
         final String pairId,grantHash,hostPublicKey,hostFingerprint,comparisonCode;final boolean inputAllowed;final long expires,grantExpiresAt;
         private final String ticket;private final Object deliveryFence;
         private final java.util.concurrent.atomic.AtomicBoolean consumed=new java.util.concurrent.atomic.AtomicBoolean();
+        private final java.util.concurrent.atomic.AtomicBoolean activationIssued=new java.util.concurrent.atomic.AtomicBoolean();
         private PeerApproval(JSONObject value,Object fence) throws Exception {
             JSONObject status=value.getJSONObject("status");
             if(!"approved".equals(status.getString("state")))throw new IllegalStateException();
@@ -278,6 +279,36 @@ public final class NativeCore {
             if(remaining<=0)throw new IllegalStateException();
             expires=android.os.SystemClock.elapsedRealtime()+Math.min(60_000,remaining);
         }
+    }
+    static final class PeerActivation {
+        final PeerApproval peer;final String generation;final long expires;
+        private final String address;private final long revision;
+        private final java.util.concurrent.atomic.AtomicBoolean consumed=new java.util.concurrent.atomic.AtomicBoolean();
+        private PeerActivation(PeerApproval peer,JSONObject address,long revision) throws Exception{
+            this.peer=peer;this.address=address.toString();this.revision=revision;generation=address.getString("generation");expires=peer.expires;
+        }
+    }
+    /** Only the exact successful persistence reply of a consumed peer review. */
+    PeerActivation activationForPeer(PeerApproval review,JSONObject response) throws Exception{
+        if(review==null||!review.consumed.get()||mPairingClientDeliveryFence.get()!=review.deliveryFence||android.os.SystemClock.elapsedRealtime()>=review.expires)throw new IllegalStateException();
+        JSONObject value=pairingResult(response),address=value.getJSONObject("address");Object revision=value.get("revision");
+        if(value.getInt("credential_protocol")!=1||!"material_ready".equals(value.getString("phase"))||!review.ticket.equals(value.getString("pairing_ticket"))
+                ||address.length()!=5||!mProfile.equals(address.getString("profile"))||!review.pairId.equals(address.getString("id"))||!"pair_encryption".equals(address.getString("kind"))
+                ||!canonicalPairingId(address.getString("device"))||!canonicalPairingId(address.getString("generation"))||!(revision instanceof Number)
+                ||((Number)revision).doubleValue()!=((Number)revision).longValue()||((Number)revision).longValue()<1||((Number)revision).longValue()>=10_000_000)throw new IllegalStateException();
+        if(!review.activationIssued.compareAndSet(false,true))throw new IllegalStateException();
+        return new PeerActivation(review,address,((Number)revision).longValue());
+    }
+    void activatePairingPeer(PeerActivation activation,java.util.function.BooleanSupplier alive,Reply reply){
+        if(activation==null||!alive.getAsBoolean()||mPairingClientDeliveryFence.get()!=activation.peer.deliveryFence
+                ||android.os.SystemClock.elapsedRealtime()>=activation.expires||!activation.consumed.compareAndSet(false,true)){
+            reply.accept(failure("","cancelled","Activation review ended. Inspect native pairing status."));return;
+        }
+        try{
+            byte[] request=new JSONObject().put("address",new JSONObject(activation.address)).put("expected_revision",activation.revision)
+                    .put("reviewed_grant_hash",activation.peer.grantHash).toString().getBytes(StandardCharsets.UTF_8);
+            pairingClient(request,5,()->alive.getAsBoolean()&&mPairingClientDeliveryFence.get()==activation.peer.deliveryFence&&android.os.SystemClock.elapsedRealtime()<activation.expires,reply);
+        }catch(Exception error){reply.accept(failure("","runtime_unavailable","Activation could not be queued. Inspect status."));}
     }
     /** Poll explicitly; pending/declined is not an approvable snapshot. */
     void reviewPairingPeer(String ticket,java.util.function.BooleanSupplier alive,PeerApprovalReply reply){

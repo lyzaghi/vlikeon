@@ -334,12 +334,30 @@ public final class GameHubController implements AutoCloseable {
                 if(!peer.isChecked()||!permission.isChecked()||mIdentityFlow!=owner||!owner.get()||!identityUiAvailable()||android.os.SystemClock.elapsedRealtime()>=review.expires){cancelIdentityReview();return;}
                 confirm.setEnabled(false);alert.dismiss();mIdentityDialog=null;
                 mCore.confirmPairingPeer(review,owner::get,response->{
-                    if(mIdentityFlow!=owner||!owner.get())return;cancelIdentityReview();
-                    if(identityUiAvailable())identityNotice("ok".equals(response.optString("status"))?"Verified pairing saved. Open status to inspect it; no connection was started.":"Pairing result is uncertain. Open status before continuing.");
+                    if(mIdentityFlow!=owner||!owner.get())return;
+                    if(!identityUiAvailable()){cancelIdentityReview();return;}
+                    try{showPeerActivation(mCore.activationForPeer(review,response),owner);}
+                    catch(Exception error){cancelIdentityReview();identityNotice("Pairing result is uncertain or its review expired. Open status before continuing.");}
                 });
             });
             mIdentityExpiry=()->{if(mIdentityFlow==owner)cancelIdentityReview();};mMain.postDelayed(mIdentityExpiry,remaining);
         });
+    }
+    private void showPeerActivation(NativeCore.PeerActivation activation,java.util.concurrent.atomic.AtomicBoolean owner){
+        if(mIdentityFlow!=owner||!owner.get()||!identityUiAvailable()||android.os.SystemClock.elapsedRealtime()>=activation.expires){cancelIdentityReview();return;}
+        NativeCore.PeerApproval peer=activation.peer;
+        AlertDialog alert=new AlertDialog.Builder(mActivity).setTitle("Activate verified pairing?")
+                .setMessage("Host: "+peer.hostFingerprint+"\nPair: "+peer.pairId+"\nGeneration: "+activation.generation+"\nInput control: "+(peer.inputAllowed?"Allowed":"Not allowed")+"\nPermission expires: "+java.text.DateFormat.getDateTimeInstance().format(new java.util.Date(peer.grantExpiresAt))+"\n\nConfirm current service approval and activate this saved pairing. This does not start a connection.")
+                .setNegativeButton("Later",(dialog,which)->cancelIdentityReview())
+                .setPositiveButton("Activate pairing",(dialog,which)->{
+                    mIdentityDialog=null;
+                    if(mIdentityFlow!=owner||!owner.get()||!identityUiAvailable()){cancelIdentityReview();return;}
+                    mCore.activatePairingPeer(activation,owner::get,response->{
+                        if(mIdentityFlow!=owner||!owner.get())return;cancelIdentityReview();
+                        if(identityUiAvailable())identityNotice("ok".equals(response.optString("status"))?"Pairing activated. No connection was started. Open status to inspect it.":"Activation could not be confirmed. Inspect status before retrying.");
+                    });
+                }).create();
+        mIdentityDialog=alert;alert.setOnCancelListener(dialog->cancelIdentityReview());alert.show();
     }
     private static String recoveryPhase(String phase){
         switch(phase){case "reserved":return "Reserved";case "writing":return "Key write not confirmed";case "material_ready":return "Awaiting identity approval";case "active":return "Active";case "revoking":return "Being revoked";case "retired":return "Cleanup complete";default:return "Unknown";}

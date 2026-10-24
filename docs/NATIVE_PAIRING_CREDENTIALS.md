@@ -1840,6 +1840,16 @@ this checkpoint.
 
 ## Remaining implementation and qualification
 
+Android successful peer persistence now creates at most one immutable activation
+snapshot from the consumed peer review. Factory checks exact ticket/pair/profile,
+candidate generation, MaterialReady phase and bounded revision; the snapshot
+retains copied address/revision and original reviewed grant/fence/expiry. Native
+UI explicitly displays host/pair/generation/input/permission expiry and asks for
+activation. Only the positive action consumes its one-use activation capability
+and invokes JNI action 5. Later/dismissal leaves persisted state for reconciliation,
+not automatic activation. No transport starts. No build/test or runtime operation
+ran. iOS activation and rereview/resume of saved candidates remain unfinished.
+
 Android private pairing JNI action 5 now calls the separate reviewed activation
 ABI with <=1024-byte input, retaining the existing wipe-on-return native vector.
 The Java native-only lane validates request scope/canonical IDs/hash/integral

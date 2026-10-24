@@ -2,6 +2,12 @@
 
 ## Current sequence — 1–109 outstanding tasks
 
+Item 58 Android now authors one-use activation snapshots from exact successful
+peer persistence replies and an explicit activation dialog. It retains reviewed
+host/pair/input/expiry, candidate address/revision/hash and original review fence.
+Active does not start transport. Source-only; build/test, iOS equivalent and
+re-review of saved candidates after interruption remain due.
+
 Item 58 Android private JNI/caller now dispatches reviewed client activation
 through its bounded serialized lane. Caller checks exact scoped address, grant
 hash, Active phase and advancing bounded revision in successful replies. No
