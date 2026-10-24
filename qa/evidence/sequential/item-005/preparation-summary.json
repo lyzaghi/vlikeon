@@ -1,0 +1,23 @@
+{
+  "schema_version": 1,
+  "item": 5,
+  "status": "source_prepared_awaiting_mac_connection",
+  "target": "macos-aarch64",
+  "development_only": true,
+  "source_commit": "4d3003b93bbe3e359f8232ab1af5e54ecc2fe0c6",
+  "source_git_tree": "a06d2d607fead2d412a5bbab29a4d5977dc7684e",
+  "source_archive_sha256": "e833e121ed59f733cad0993eef835601f6edb73eb8fe8d7b24a63253625bac6d",
+  "preparation_sha256": "dd9776d0bb8300894311d53788d3529b646382408ca75fb6abce5ae2b8f9bbc8",
+  "transfer_archive_sha256": "d9b7dda20d8a0963e2050e50df8ded5b2a3586efe5340c489b8e9bd4a8b3144e",
+  "source_files": 141,
+  "source_bytes": 1362744,
+  "upstream_revision": "0e66b94549a8bd85f03fbdf189b752d6e7b63c32",
+  "intended_depot_tools_revision": "4be4e4628e093c4ad50210db5dcfa05a88280bda",
+  "configuration": "not_started",
+  "compiler": "not_started",
+  "browser": "not_started",
+  "verification": "not_run",
+  "distribution_approved": false,
+  "host_owner_confirmation": "Apple Silicon Mac available; connection and actual host qualification pending",
+  "capacity_plan": "250 GB available for the project after OS/Xcode; planning guidance, not an official upstream minimum"
+}

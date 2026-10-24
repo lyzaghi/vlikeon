@@ -12,6 +12,12 @@ The owner subsequently deferred macOS build/test and requested the next step:
 item 55 source work. All new build/test execution stays deferred, including
 Antigravity batches, while source work continues. Items 53 and 54 remain open.
 
+Owner steering on 2026-10-24 for the desktop-build chat: keep task 4 running on
+the supplied Linux host and prepare task 5 in parallel, reporting task 4 when
+it is actually accepted. The owner confirmed an Apple Silicon Mac is available;
+its SSH endpoint and host qualification are still pending. This does not close
+either build task or change the separate source fork's item-53/54/55 deferrals.
+
 1. [x] Tích hợp các thay đổi mã nguồn đang nằm ngoài commit thành các phiên bản thống nhất, có thể tái tạo. Bằng chứng và giới hạn: `SOURCE_INTEGRATION.md`.
 2. [x] Đồng bộ README, roadmap và tài liệu trạng thái với kết quả phát triển, kiểm thử thực tế. Đối chiếu: `DOCUMENTATION_ALIGNMENT.md`.
 3. [x] Build trình duyệt Chromium Vlikeon hoàn chỉnh trên Windows. Bằng chứng build x64 và giới hạn kiểm chứng: `WINDOWS_CHROMIUM_BUILD.md`.
