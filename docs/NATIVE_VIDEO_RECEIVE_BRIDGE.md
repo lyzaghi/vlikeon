@@ -1,5 +1,16 @@
 # Native ordered RTP to decoder bridge — item 56
 
+Frame reference marking now has source implementation in
+`native_h264_frame_references.rs`: bounded short/long-term entries, frame-number
+wrap, IDR reset, sliding-window eviction and ordered MMCO 1–6 effects. Updates
+are staged without changing retained state, then committed once against both
+the original reference-table version and still-current SPS/PPS binding. Wrong
+targets, long-term limits, capacity and stale/cross-table commits fail. This
+component covers progressive frame pictures; fields/MBAFF need the remaining
+complementary-field coordinator. It does not establish reference-list existence,
+POC/output order, frame-number-gap recovery, entropy validity or actual decoder
+completion. No backend/receiver caller invokes it yet; build/test remain deferred.
+
 `ParameterAdmission<B>` now implements the receiver admission contract by
 processing actual Annex B parameter NALs in wire order, retaining SPS/PPS versions,
 parsing picture/slice/auxiliary headers and binding the exact AU hash, RTP stamp,

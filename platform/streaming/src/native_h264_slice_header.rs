@@ -9,7 +9,7 @@ pub enum ListEdit{SubtractShort(u32),AddShort(u32),LongTerm(u32)}
 pub struct WeightedReference{pub luma:Option<(i16,i16)>,pub chroma:Option<[(i16,i16);2]>}
 #[derive(Clone,Debug,PartialEq,Eq)]
 pub struct Weights{pub luma_denom:u8,pub chroma_denom:Option<u8>,pub list0:Vec<WeightedReference>,pub list1:Vec<WeightedReference>}
-#[derive(Clone,Debug,PartialEq,Eq)]
+#[derive(Clone,Copy,Debug,PartialEq,Eq)]
 pub enum MemoryEdit{ForgetShort(u32),ForgetLong(u32),MakeLong{difference:u32,index:u8},LimitLong(u8),Reset,CurrentLong(u8)}
 #[derive(Clone,Debug,PartialEq,Eq)]
 pub enum ReferenceMarking{NonReference,Idr{discard_prior:bool,long_term:bool},Sliding,Adaptive(Vec<MemoryEdit>)}
