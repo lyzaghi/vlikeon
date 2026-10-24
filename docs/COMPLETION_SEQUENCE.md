@@ -2,6 +2,11 @@
 
 ## Current sequence — 1–109 outstanding tasks
 
+Item 58 mobile candidate admission now validates canonical nonzero device/pair/
+generation UUIDs, bounded integral journal revision and canonical 32-byte public
+key text. iOS explicitly refuses JSON booleans as revisions. Source review and
+diff whitespace checks only; build/test and actual product UI remain pending.
+
 Item 58 Android cancellation now requires the immediate native epoch invalidation
 acknowledgment before queuing ticket cleanup, matching the iOS caller contract.
 Missing handles/refused invalidation return uncertain-state guidance and clear

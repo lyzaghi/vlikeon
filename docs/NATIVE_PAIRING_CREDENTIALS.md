@@ -1840,6 +1840,13 @@ this checkpoint.
 
 ## Remaining implementation and qualification
 
+Mobile candidate reply admission additionally checks canonical nonzero address
+UUIDs, integral revision 1..10,000,000 and unpadded canonical base64url text for
+the 32-byte public key (including final-character pad-bit constraints). These
+format checks do not establish expected device/pair/key identity: the eventual
+typed consent controller must bind those values to the reviewed transcript.
+No compiler/build/test was run for this source-only follow-up.
+
 Android client cancel now checks the boolean native epoch invalidation result
 before queuing local ticket cleanup. A missing handle or refused acknowledgment
 clears owned input and reports that status reconciliation is required. A queued

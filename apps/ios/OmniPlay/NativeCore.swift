@@ -1,4 +1,5 @@
 import Foundation
+import CoreFoundation
 
 enum OmniFailure: Error, LocalizedError {
     case message(String)
@@ -232,6 +233,13 @@ final class NativeCore {
                     guard (value["credential_protocol"] as? NSNumber)?.uint32Value==1,value["phase"] as? String=="material_ready",
                           let address=value["address"] as? [String:Any],address["profile"] as? String==self.profileID.uuidString.lowercased(),
                           address["kind"] as? String=="pair_encryption" else{throw OmniFailure.message("Kết quả candidate không hợp lệ. Hãy đọc lại trạng thái.")}
+                    guard let revision=value["revision"] as? NSNumber,CFGetTypeID(revision) != CFBooleanGetTypeID(),
+                          revision.doubleValue>=1,revision.doubleValue<=10_000_000,revision.doubleValue==Double(revision.uint64Value),
+                          let key=value["public_key"] as? String,key.range(of:"^[A-Za-z0-9_-]{42}[AEIMQUYcgkosw048]$",options:.regularExpression) != nil else{throw OmniFailure.message("Metadata candidate không hợp lệ.")}
+                    for field in ["device","id","generation"]{
+                        guard let text=address[field] as? String,let id=UUID(uuidString:text),id.uuidString.lowercased()==text,
+                              id != UUID(uuid:(0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0)) else{throw OmniFailure.message("Địa chỉ candidate không hợp lệ.")}
+                    }
                 }else{
                     guard (value["pairing_protocol"] as? NSNumber)?.uint32Value==1,let ticket=value["ticket"] as? String,
                           let id=UUID(uuidString:ticket),id.uuidString.lowercased()==ticket,

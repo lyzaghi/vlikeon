@@ -142,6 +142,11 @@ public final class NativeCore {
                         if(!expectedTicket.equals(value.getString("pairing_ticket")))throw new IllegalStateException();
                         JSONObject address=value.getJSONObject("address");
                         if(value.getInt("credential_protocol")!=1||!"material_ready".equals(value.getString("phase"))||!mProfile.equals(address.getString("profile"))||!"pair_encryption".equals(address.getString("kind")))throw new IllegalStateException();
+                        Object revision=value.get("revision");
+                        if(!(revision instanceof Number)||((Number)revision).doubleValue()!=((Number)revision).longValue()
+                                ||((Number)revision).longValue()<1||((Number)revision).longValue()>10_000_000
+                                ||!canonicalPairingId(address.getString("device"))||!canonicalPairingId(address.getString("id"))
+                                ||!canonicalPairingId(address.getString("generation"))||!value.getString("public_key").matches("[A-Za-z0-9_-]{42}[AEIMQUYcgkosw048]"))throw new IllegalStateException();
                     }else if(value.getInt("pairing_protocol")!=1||!canonicalPairingId(value.getString("ticket"))||(expectedTicket!=null&&!expectedTicket.equals(value.getString("ticket"))))throw new IllegalStateException();
                 }
                 if(action!=4&&!alive.getAsBoolean())response=failure("","cancelled","Pairing response became stale. Inspect native status before continuing.");
