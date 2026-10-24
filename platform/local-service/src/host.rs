@@ -602,7 +602,16 @@ impl LocalHost {
             _=>Err(PlatformError::new(ErrorCode::UnsupportedCapability,"This operation is not enabled by the current mobile platform policy")),
         }
     }
-    fn clear_transient(&mut self){self.identity_review=None;self.pairing_client=None;self.pairing_host=None;self.asset_ranges.close_owner(self.owner);self.sync_jobs.cancel_all();self.sync_jobs.abandon_actions(self.owner);self.imports.cancel_all();self.sessions.close(&self.database);self.transfers.clear();self.permissions.revoke_owner(self.owner);self.directories.revoke_owner(self.owner);}
+    fn clear_transient(&mut self){
+        self.identity_review=None;self.pairing_client=None;
+        if let Some(pending)=self.pairing_host.as_mut(){
+            pending.invitation.fence_closed();
+            // A new document cannot resume sharing/approval. Keep only the
+            // potentially remote cleanup owner for exact close on this host.
+            if !pending.registration_attempted{self.pairing_host=None;}
+        }
+        self.asset_ranges.close_owner(self.owner);self.sync_jobs.cancel_all();self.sync_jobs.abandon_actions(self.owner);self.imports.cancel_all();self.sessions.close(&self.database);self.transfers.clear();self.permissions.revoke_owner(self.owner);self.directories.revoke_owner(self.owner);
+    }
     pub fn close(&mut self){self.closed=true;self.lifecycle.set_foreground(false);self.clear_transient();}
     pub fn detach(&mut self){self.clear_transient();self.owner=Uuid::new_v4();self.transfers=crate::transfers::Transfers::default();self.results.clear();self.order.clear();}
     pub fn suspend(&mut self)->Result<()>{let ids=self.sessions.list().into_iter().filter(|s|s.state==SessionState::Running).map(|s|s.id).collect::<Vec<_>>();for id in ids{self.sessions.heartbeat(&self.database,id,SessionState::Paused)?;}Ok(())}

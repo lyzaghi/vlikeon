@@ -2,6 +2,11 @@
 
 ## Current sequence — 1–109 outstanding tasks
 
+Item 58 detach now fences host proof/reviews but retains possibly registered
+cleanup ownership inside the same LocalHost, preserving signer-removal guard.
+Never-attempted invitations drop. Process/terminal-host loss still needs durable
+recovery. Source-only; no build/test/runtime qualification ran.
+
 Item 58 LocalHost identity material removal now refuses while a retained host
 invitation may require that exact signer. Both mobile status attention predicates
 include pending host cleanup. Source-only; durable cross-crash retention and

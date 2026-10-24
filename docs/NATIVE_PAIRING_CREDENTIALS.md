@@ -1840,6 +1840,15 @@ this checkpoint.
 
 ## Remaining implementation and qualification
 
+LocalHost transient cleanup on detach now fences host invitations and clears
+proof/request snapshots, while retaining possibly registered public cleanup
+ownership in the same object. A new document cannot resume share/approval, but
+can inspect status and explicitly close the retained ticket; signer-removal guard
+still applies. Never-attempted invitations drop. Terminal close also fences but
+closed-host admission prevents further calls; final object/process loss remains
+unrecoverable without the unfinished durable invitation journal. No automatic
+network cleanup or crash recovery is claimed. No build/test/runtime operation ran.
+
 LocalHost exact material removal now refuses an identity generation referenced
 by a retained possibly-registered host invitation. Closing the invitation first
 preserves its cleanup signer; new-session policy need not be enabled for close.
