@@ -240,3 +240,18 @@ the native bridge, reproducibility, code-signing identity, notarization or
 production distribution. Those gates remain separate tasks. Task 5 is accepted
 only after actual full-target success, final receipt, independently executed
 checks and Codex review of the raw results.
+
+## Resumed batch 005-build-b
+
+The first batch stopped after dependency sync: the read-only pinned Git diff
+for wasm_corpus exceeded the 90-second admission timeout. Its result and logs
+remain intact. After verifying no live build children or lock, Codex reran the
+exact comparison; it exited 0 in 71.10 seconds. No source or timeout changes
+were required.
+
+Batch 005-build-b resumes the same frozen project from its synced journal under
+a new durable supervisor, with two jobs, external cache/temp/output directories
+and the same Xcode. Its supervisor admits the prior failed result, unchanged
+preparation inventory and successful comparison receipt before calling the
+original recipe. The original batch is not relabeled as passing. Full build
+and subsequent ARM64 acceptance remain pending.

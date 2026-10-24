@@ -18,8 +18,10 @@ it is actually accepted. The owner confirmed an Apple Silicon Mac is available;
 its SSH endpoint was subsequently provided and native host inventory completed.
 The owner installed Xcode 16.4 on the external HDD and explicitly authorized
 starting task 5 independently while moving to task 6. Mac batch `005-build-a` completed dependency sync but failed dependency
-verification when a read-only Git diff exceeded its 90-second timeout on HDD;
-no Mac compiler pass is established. This does not close either build task
+verification when a read-only Git diff exceeded its 90-second timeout on HDD.
+The exact comparison subsequently passed in 71.10 seconds without source
+changes. Batch `005-build-b` resumes the unchanged frozen recipe; no Mac
+compiler pass is established. This does not close either build task
 or change the separate source fork's item-53/54/55 deferrals.
 
 1. [x] Tích hợp các thay đổi mã nguồn đang nằm ngoài commit thành các phiên bản thống nhất, có thể tái tạo. Bằng chứng và giới hạn: `SOURCE_INTEGRATION.md`.
