@@ -2,6 +2,14 @@
 
 ## Current sequence — 1–109 outstanding tasks
 
+Item 58 writer-retirement review keeps unresolved OS-service work as recovery
+debt. iOS cleanup now authors an exact public retirement marker retained in the
+same Keychain account, add/update without a delete/add gap and exact read-back;
+normal candidate writers remain add-only. No WriterRetired/session receipt is
+inferred from this. No compiler/Keychain/native/build/test was executed. Actual
+race qualification, provider fence/owner integration and Android/desktop late
+write containment remain due; original scope stays open.
+
 Item 58 now authors a cooperative lease namespace binding in fresh journal
 history, admitted before all mutations and scoped writer/recovery/signal/ICE
 loads. Existing copied/moved or legacy unbound histories are not silently rebound;

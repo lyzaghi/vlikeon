@@ -82,6 +82,11 @@ final class PairingCredentials {
     private func check(_ address: UnsafePointer<OmniPairingAddress>?) -> Int32 {
         guard scope(address) != nil else { return -3 }; return Self.unlocked() ? 0 : -2
     }
+    private func retirementMarker(_ prefix:[UInt8])->Data {
+        // Public generation-bound tombstone, not a secret envelope. Keeping the
+        // same account occupied prevents an old add-only writer recreating it.
+        Data(Array("VLKRF001".utf8)+Array(prefix.dropFirst(8)))
+    }
     private func read(_ address: UnsafePointer<OmniPairingAddress>?, output: UnsafeMutablePointer<UInt8>?, capacity: Int) -> Int64 {
         guard let scope = scope(address), let output = output, capacity == Self.recordBytes else { return -3 }
         lock.lock(); defer { lock.unlock() }; guard let epoch=Self.accessToken() else { return -2 }
@@ -101,6 +106,7 @@ final class PairingCredentials {
         // Best effort for this Data owner; Swift/OS internal copies are outside
         // the application's guaranteed zeroization boundary.
         defer { data.resetBytes(in: 0..<data.count) }
+        if data==retirementMarker(scope.prefix){return Self.permits(epoch) ? -1:-2}
         guard data.count == Self.recordBytes, data.starts(with: scope.prefix), Self.permits(epoch) else { return Self.permits(epoch) ? -3 : -2 }
         data.copyBytes(to: output, count: Self.recordBytes)
         guard Self.permits(epoch) else { for index in 0..<Self.recordBytes { output[index]=0 }; return -2 }
@@ -123,8 +129,31 @@ final class PairingCredentials {
     private func remove(_ address: UnsafePointer<OmniPairingAddress>?) -> Int32 {
         guard let scope = scope(address) else { return -3 }
         lock.lock(); defer { lock.unlock() }; guard let epoch=Self.accessToken() else { return -2 }
-        let reply = SecItemDelete(query(scope.account) as CFDictionary)
-        return Self.permits(epoch) ? status(reply) : -2
+        let marker=retirementMarker(scope.prefix)
+        var item=query(scope.account);item[kSecValueData as String]=marker
+        item[kSecAttrAccessible as String]=kSecAttrAccessibleWhenUnlockedThisDeviceOnly
+        // No delete/add gap. Normal writers remain SecItemAdd-only. If an old
+        // add wins first, update its value in place; if the marker wins first,
+        // the old add is a duplicate. Never report NotFound as a sealed fence.
+        var reply=SecItemAdd(item as CFDictionary,nil)
+        guard Self.permits(epoch) else{return -2}
+        if reply==errSecDuplicateItem{
+            let update:[String:Any]=[kSecValueData as String:marker,kSecAttrAccessible as String:kSecAttrAccessibleWhenUnlockedThisDeviceOnly]
+            reply=SecItemUpdate(query(scope.account) as CFDictionary,update as CFDictionary)
+        }
+        guard Self.permits(epoch) else{return -2}
+        guard reply==errSecSuccess else{return reply==errSecItemNotFound ? -3:status(reply)}
+        var verify=query(scope.account);verify[kSecReturnData as String]=true
+        verify[kSecReturnAttributes as String]=true;verify[kSecMatchLimit as String]=kSecMatchLimitOne
+        var result:CFTypeRef?;let observed=SecItemCopyMatching(verify as CFDictionary,&result)
+        guard Self.permits(epoch) else{return -2}
+        guard observed==errSecSuccess else{return observed==errSecItemNotFound ? -3:status(observed)}
+        guard let attributes=result as? [String:Any],attributes[kSecAttrService as String] as? String==Self.service,
+              attributes[kSecAttrAccount as String] as? String==scope.account,
+              attributes[kSecAttrAccessible as String] as? String==(kSecAttrAccessibleWhenUnlockedThisDeviceOnly as String),
+              var data=attributes[kSecValueData as String] as? Data else{return -3}
+        defer{data.resetBytes(in:0..<data.count)}
+        guard data==marker else{return -3};return Self.permits(epoch) ? 0:-2
     }
     /// Native-only factory. Rust consumes retained context even on rejection.
     static func callbacks(profile: UUID, device: UUID, nativeHandle:UInt64) -> OmniPairingCredentialCallbacks {

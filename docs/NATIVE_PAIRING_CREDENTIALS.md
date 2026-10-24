@@ -1237,6 +1237,45 @@ No hashing/metadata/lease/SQL/native/key operation, compiler, build or test was
 executed. Only source review and whitespace inspection were performed. Actual
 writer/session retirement owners and all original scope remain unfinished.
 
+## iOS retained retirement marker instead of delete/add gap
+
+Writer-retirement review identified that a process-owned file lease alone is not
+an OS-service completion receipt. An unresolved Keychain request is treated as
+potential late work; this threat assumption is not evidence that such a race was
+observed on a device. No WriterRetired receipt is added by this change.
+
+iOS cleanup now retains a public generation-bound `VLKRF001` marker in the same
+non-synchronizing device-only account instead of deleting that account. The
+marker is 73 bytes: a distinct eight-byte tag followed by the existing public
+kind/profile/device/item/generation prefix. It contains no key/seed or grant.
+Normal secret writes remain SecItemAdd-only and never update existing accounts.
+
+Cleanup first attempts to add the marker. A duplicate updates the exact account's
+value in place to the marker, with the required accessibility policy. It never
+deletes and re-adds. It then reads the account back and admits exact service,
+account, policy and marker bytes. NotFound during this sealing operation is an
+error, not a positive retirement fence. Lock/epoch/OS errors retain uncertainty.
+
+This ordering is intended to keep the account occupied against a late add-only
+candidate: an add winning first is overwritten by cleanup, while an add arriving
+after the retained marker is a duplicate. This relies on the admitted native
+provider's add-only protocol and Keychain primary-account semantics, not on
+arbitrary external writers respecting an application flag. Actual race behavior
+and synchronization still require qualification.
+
+Provider reads report no secret material only for an exact admitted marker or
+normal missing item; malformed markers remain errors. The generic store contract
+now clarifies that material absence does not require absence of a public OS
+tombstone. This is logical secret removal, not a forensic media-erasure claim.
+Marker retention/profile-maintenance policy and owner/fence integration remain
+unfinished; no native tombstones were created or deleted in this source turn.
+
+The API choice follows Apple's documented
+[same-account update and duplicate-add behavior](https://developer.apple.com/documentation/security/updating-and-deleting-keychain-items).
+No Swift compiler, Keychain call, OS operation, build or test was executed.
+Android/desktop late-write containment and all producer retirement proof remain
+open; item 58 is not complete.
+
 ## Remaining implementation and qualification
 
 - Journal/executor/lease/writer product integration, authority epochs, actual native owner

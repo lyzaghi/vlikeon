@@ -51,6 +51,8 @@ impl CredentialAddress{
 
 /// Trusted native provider only. Missing is explicit; a locked/failed/corrupt
 /// vault must return an error, never None. Writes must persist before success.
+/// None means no secret material, not necessarily no OS account: a provider may
+/// retain an exact public retirement tombstone that blocks late candidate adds.
 /// No implementation may fall back to renderer storage or a plaintext file.
 pub trait PairingSecretStore:Send+Sync{
     fn read(&self,address:&CredentialAddress)->Result<Option<Zeroizing<Vec<u8>>>>;
