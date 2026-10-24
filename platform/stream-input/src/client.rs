@@ -51,7 +51,13 @@ impl InputWorker{
         if self.closed||self.shared.process.exited()?{return Err(failure());}
         self.sequence=self.sequence.checked_add(1).ok_or_else(failure)?;let(reply,receive)=mpsc::sync_channel(1);let request=Request{protocol:1,id:self.sequence,grant_id:self.grant_id,session_id:self.session_id,action};
         self.sender.as_ref().ok_or_else(failure)?.try_send(Call{request,reply}).map_err(|_|failure())?;
-        receive.recv_timeout(timeout).map_err(|_|failure())?
+        let observation=receive.recv_timeout(timeout).map_err(|_|failure())??;
+        // Preserve a real terminal release observation even if the helper exits
+        // before a later Stop RPC. Process/I/O retirement is checked separately.
+        if observation.state=="revoked"&&observation.reason.as_deref()!=Some("release_failed"){
+            self.stop_observation=Some(observation.clone());
+        }
+        Ok(observation)
     }
     pub fn input(&mut self,sequence:u64,frame:RemoteInputFrame)->Result<Observation>{frame.validate()?;self.call(Action::Input{sequence,frame},Duration::from_millis(750))}
     pub fn status(&mut self)->Result<Observation>{self.call(Action::Status,Duration::from_millis(750))}

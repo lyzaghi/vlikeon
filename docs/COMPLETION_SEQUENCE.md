@@ -2,6 +2,13 @@
 
 ## Current sequence — 1–109 outstanding tasks
 
+Item 58 broker review now retains uncertain input workers and artifact/process
+witnesses in CleanupRequired, including close and terminal-status/error paths.
+Actual terminal input receipts are preserved separately from helper/I/O exit;
+video revoke permits reaping its retained closed worker. No broker/helper/native/
+thread/compiler/build/test ran. Process-crash recovery, owner aggregation and
+deadline qualification remain due; full scope stays incomplete.
+
 Item 58 backend review found Windows worker stop could succeed before all owned
 I/O threads retired. Input/video/gamepad now require completed successful joins,
 retain panic failure and preserve only actual input/video Stop receipts for later

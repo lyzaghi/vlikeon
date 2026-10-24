@@ -56,7 +56,6 @@ impl WindowsVideoFrames{
         }
     }
     pub fn revoke(&mut self)->Result<()>{
-        if self.closed{return Err(unavailable());}
         self.closed=true;let mailbox=self.mailbox.close();let stopped=self.worker.stop_confirmed();mailbox?;stopped
     }
 }
@@ -83,7 +82,7 @@ impl WindowsOwnedVideo{
         }
     }
     pub fn revoke(&mut self)->Result<()>{
-        if self.closed{return Err(unavailable());}self.closed=true;self.worker.stop_confirmed()
+        self.closed=true;self.worker.stop_confirmed()
     }
 }
 impl Drop for WindowsOwnedVideo{fn drop(&mut self){let _=self.worker.close();}}
@@ -117,7 +116,7 @@ impl WindowsVideoDecoder{
         }
     }
     pub fn revoke(&mut self)->Result<()>{
-        if self.closed{return Err(unavailable());}self.closed=true;self.worker.stop_confirmed()
+        self.closed=true;self.worker.stop_confirmed()
     }
 }
 impl Drop for WindowsVideoDecoder{fn drop(&mut self){let _=self.worker.close();}}

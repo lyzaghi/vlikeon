@@ -91,7 +91,9 @@
     "Session release now requires an explicit actual native backend-retirement owner, original bounded deadline and exact registered Arc/session/epoch/revision admission before crate-private journal release",
     "Closed/expired native registry entries retain cleanup tracking within the existing bound; pending/error retirement does not clear durable session ownership; actual backend owner remains unimplemented",
     "Windows input/video/gamepad client stop now refuses success while owned I/O threads remain unjoined and retains any join panic as terminal failure",
-    "Input/video retain only actual Stop receipts for later thread reaping without resending or inventing acknowledgment; no helper/device/thread runtime was executed"
+    "Input/video retain actual terminal input or Stop receipts for later thread reaping without resending or inventing acknowledgment; no helper/device/thread runtime was executed",
+    "Broker input retains uncertain worker/artifact/process witnesses in CleanupRequired instead of discarding them on terminal observations or close while alive",
+    "Video adapters allow explicit revoke to recheck retained closed workers; dropped/crashed owners still require durable recovery and no actual backend owner aggregation is provided"
   ],
   "build_executed": false,
   "tests_executed": false,

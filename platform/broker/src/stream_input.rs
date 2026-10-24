@@ -155,21 +155,29 @@ impl StreamInputs{
     pub fn release(&mut self,id:Uuid,session:Uuid)->Result<StreamInputStatus>{let active=self.active(id,session)?;if matches!(active.status.state,StreamInputState::Revoked|StreamInputState::CleanupRequired){return Ok(active.status.clone());}let result=active.worker.as_mut().ok_or_else(unavailable)?.release();observe(active,result)}
     pub fn status(&mut self,id:Uuid,session:Uuid)->Result<StreamInputStatus>{let active=self.active(id,session)?;if matches!(active.status.state,StreamInputState::Revoked|StreamInputState::CleanupRequired){return Ok(active.status.clone());}let result=active.worker.as_mut().ok_or_else(unavailable)?.status();observe(active,result)}
     pub fn revoke(&mut self,id:Uuid,session:Uuid)->Result<StreamInputStatus>{let active=self.active(id,session)?;stop_active(active);Ok(active.status.clone())}
-    pub fn close(&mut self){self.active.take();self.capture.take();#[cfg(windows)]{self.choices.take();}}
+    pub fn close(&mut self){
+        if let Some(active)=self.active.as_mut(){stop_active(active);}
+        // Retain uncertain worker/artifact/process witnesses while this owner
+        // remains alive. A later explicit revoke can reap the same worker.
+        if self.active.as_ref().is_some_and(|active|active.status.state==StreamInputState::Revoked&&active.worker.is_none()){self.active.take();}
+        self.capture.take();#[cfg(windows)]{self.choices.take();}
+    }
 }
 impl Drop for StreamInputs{fn drop(&mut self){self.close();}}
 fn stop_active(active:&mut Active){
-    if matches!(active.status.state,StreamInputState::Revoked|StreamInputState::CleanupRequired){return;}
-    let observed=active.worker.take().ok_or_else(unavailable).and_then(|mut worker|worker.stop_confirmed());
+    if active.status.state==StreamInputState::Revoked&&active.worker.is_none(){return;}
+    let observed=active.worker.as_mut().ok_or_else(unavailable).and_then(|worker|worker.stop_confirmed());
     match observed{
-        Ok(value)=>{active.status.state=StreamInputState::Revoked;active.status.reason=value.reason;},
+        Ok(value)=>{active.worker.take();active.status.state=StreamInputState::Revoked;active.status.reason=value.reason;},
         Err(_)=>{active.status.state=StreamInputState::CleanupRequired;active.status.reason=Some("helper_disconnected".into());},
     }
 }
 fn observe(active:&mut Active,result:Result<Observation>)->Result<StreamInputStatus>{
     match result{
-        Ok(value)=>{active.status.state=match value.state.as_str(){"waiting_for_target"=>StreamInputState::WaitingForTarget,"active"=>StreamInputState::Active,"idle"=>StreamInputState::Idle,_=>if value.reason.as_deref()==Some("release_failed"){StreamInputState::CleanupRequired}else{StreamInputState::Revoked}};active.status.reason=value.reason;if matches!(active.status.state,StreamInputState::Revoked|StreamInputState::CleanupRequired){active.worker.take();}Ok(active.status.clone())},
-        Err(error)=>{active.worker.take();active.status.state=StreamInputState::CleanupRequired;active.status.reason=Some("helper_disconnected".into());Err(error)},
+        Ok(value)=>{active.status.state=match value.state.as_str(){"waiting_for_target"=>StreamInputState::WaitingForTarget,"active"=>StreamInputState::Active,"idle"=>StreamInputState::Idle,_=>StreamInputState::CleanupRequired};active.status.reason=value.reason;
+            // A terminal status observation alone is not helper/I/O retirement.
+            if active.status.state==StreamInputState::CleanupRequired{stop_active(active);}Ok(active.status.clone())},
+        Err(error)=>{active.status.state=StreamInputState::CleanupRequired;active.status.reason=Some("helper_disconnected".into());stop_active(active);Err(error)},
     }
 }
 #[cfg(windows)]fn approved_helper()->Result<(PathBuf,File)>{

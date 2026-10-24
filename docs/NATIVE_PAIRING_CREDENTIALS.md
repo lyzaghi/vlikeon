@@ -1408,6 +1408,29 @@ No helper, process/thread cancellation/join, OS input/video/device operation,
 compiler, build or test ran. Only source review/whitespace inspection was done.
 Deadline propagation, full owner aggregation and crash qualification remain due.
 
+## Broker retains uncertain input/video retirement
+
+Broker review found input stop removed its worker before observing the result,
+and terminal status/error paths also discarded it. The broker now retains an
+uncertain worker together with artifact/process witnesses in CleanupRequired.
+Only confirmed released input plus helper/I/O retirement transitions it to
+Revoked and removes the worker. A later explicit revoke can reap that same worker;
+new input/capture admission remains blocked by CleanupRequired. close() attempts
+retirement and retains uncertainty while the broker object is alive.
+
+The input client also preserves an actually received revoked/released observation
+from any matched RPC. This avoids losing a real terminal receipt when the helper
+exits before a subsequent Stop request; it does not substitute process exit for
+the receipt. Pending I/O or panic still refuses confirmation. Video adapters now
+permit repeated explicit revoke on their retained closed worker, allowing the
+worker's existing exact Stop receipt and later completed joins to be rechecked.
+
+Object destruction/process crash can still lose in-memory owner tracking and
+requires the separate durable recovery controller; retention while alive is not
+crash-proof cleanup. No broker/helper/native/thread operation, compiler, build or
+test ran. Actual owner aggregation, deadline propagation and qualification remain
+unfinished, as does the original 51–109 objective.
+
 ## Remaining implementation and qualification
 
 - Journal/executor/lease/writer product integration, authority epochs, actual native owner
