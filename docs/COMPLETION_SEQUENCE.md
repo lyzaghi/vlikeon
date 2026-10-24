@@ -2,6 +2,13 @@
 
 ## Current sequence — 1–109 outstanding tasks
 
+Item 58 now authors a native one-use identity review/confirmation binding with
+exact candidate/revision/foreground epoch and monotonic expiry. Confirmation
+consumes the review before vault work and uses pinned-key activation; cancellation
+only clears transient review state. A token is not consent: actual native dialog
+and Swift/JNI callers remain due. Policy remains disabled; no UI/native/vault/SQL,
+build or test was executed. Item 58 and original 51–109 scope stay incomplete.
+
 Item 58 now connects LocalHost source to native public-status and MaterialReady
 identity-preparation entry points. Mobile operations require the actual foreground
 host/provider, original bounded deadline and lifecycle epoch checks; preparation

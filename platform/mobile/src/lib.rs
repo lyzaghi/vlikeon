@@ -127,6 +127,43 @@ pub extern "C" fn om_mobile_pairing_prepare_identity_v1(handle:u64,expected_revi
     Ok(json!({"credential_protocol":1,"address":candidate.address(),"public_key":candidate.public_key(),"revision":candidate.revision(),"phase":"material_ready"}))
 })())}
 
+/// Metadata for a trusted native confirmation dialog, never renderer dispatch.
+#[no_mangle]
+pub extern "C" fn om_mobile_pairing_review_identity_v1(handle:u64,expected_revision:u64)->OmniBuffer{result((||{
+    let(host,provider,epoch)=pairing_operation(handle)?;
+    let mut host=host.lock().map_err(|_|error(ErrorCode::Internal,"Mobile profile is unavailable"))?;
+    provider.require_operation_epoch(epoch)?;
+    let review=host.native_pairing_review_identity(expected_revision,epoch)?;
+    if let Err(error)=provider.require_operation_epoch(epoch){host.native_pairing_cancel_identity_review();return Err(error);}
+    Ok(review)
+})())}
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]struct PairingIdentityConfirmation{review_id:Uuid}
+/// # Safety
+/// Input is a borrowed readable JSON object (at most 128 bytes). Trusted native
+/// UI calls only after explicit user approval of the corresponding review.
+/// A token does not attest to consent; no renderer may call this entry point.
+#[no_mangle]
+pub unsafe extern "C" fn om_mobile_pairing_confirm_identity_v1(handle:u64,data:*const u8,length:usize,budget_ms:u32)->OmniBuffer{result((||{
+    if !(1000..=25000).contains(&budget_ms)||length>128{return Err(error(ErrorCode::InvalidRequest,"Native identity confirmation arguments exceed their bounds"));}
+    let deadline=std::time::Instant::now()+std::time::Duration::from_millis(u64::from(budget_ms));
+    // SAFETY: caller supplies the bounded synchronous input borrow above.
+    let confirmation:PairingIdentityConfirmation=serde_json::from_slice(unsafe{input(data,length)?}).map_err(|_|error(ErrorCode::InvalidRequest,"Native identity confirmation is invalid"))?;
+    let(host,provider,epoch)=pairing_operation(handle)?;
+    let mut host=host.lock().map_err(|_|error(ErrorCode::Internal,"Mobile profile is unavailable"))?;
+    if let Err(error)=provider.require_operation_epoch(epoch){host.native_pairing_cancel_identity_review();return Err(error);}
+    let value=host.native_pairing_confirm_identity(provider.as_ref(),confirmation.review_id,epoch,deadline)?;
+    provider.require_operation_epoch(epoch)?;
+    if std::time::Instant::now()>=deadline{return Err(error(ErrorCode::DeadlineExceeded,"Native identity activation completed after its deadline; reload journal state"));}
+    Ok(value)
+})())}
+/// Native dialog cancellation; no vault call or durable identity transition.
+#[no_mangle]
+pub extern "C" fn om_mobile_pairing_cancel_identity_review(handle:u64)->OmniBuffer{result((||{
+    host(handle)?.lock().map_err(|_|error(ErrorCode::Internal,"Mobile profile is unavailable"))?.native_pairing_cancel_identity_review();
+    Ok(json!({"cancelled":true}))
+})())}
+
 /// # Safety
 /// The input follows `om_mobile_open`'s borrowed byte contract.
 #[no_mangle]

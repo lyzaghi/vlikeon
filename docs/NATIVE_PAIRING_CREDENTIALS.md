@@ -856,6 +856,38 @@ dispatcher or transport controller is connected to these new entry points yet.
 No endpoint, native callback, vault, SQL, build or test was executed. Only source
 review and whitespace inspection were performed; item 58 remains incomplete.
 
+## Native identity review and confirmation binding
+
+LocalHost now retains at most one pending identity review, bound to the exact
+MaterialReady generation, current journal revision and mobile provider's
+foreground epoch. Replacement, detach and close clear the earlier review. The native ABI
+returns a fresh opaque review ID, exact public key/address and the local-only
+activation action for a trusted native dialog. Review lifetime is at most 60
+seconds on the monotonic clock, including journal read time.
+
+The trusted native UI must show that identity/action and call confirmation only
+after explicit approval. A token does not prove a dialog was shown. These entry
+points are absent from renderer dispatch. Confirmation accepts only a bounded
+review-ID object and a 1–25 second original operation budget; it never accepts a
+caller-selected replacement address or public key. LocalHost consumes its pending
+review before validation/vault work, checks the captured lifecycle epoch and
+original revision, then uses the retained-lease writer to reload the pinned key
+before activation. The review deadline also bounds confirmation. Cancellation
+clears only the transient review; it does not revoke or delete durable material.
+
+Foreground transitions invalidate the review's epoch even after resume. Native
+vault checks still enforce protected-data access during activation; this review
+is not a separate attestation of every OS lock/unlock transition. Lifecycle or
+deadline failure after a committed activation can suppress the response without
+rolling back the journal. Reload status before recovery; do not automatically
+retry, infer absence or silently create another identity. Local activation does
+not approve any remote peer, grant, signaling session or transport capability.
+
+The installed policy remains disabled. Actual Swift/JNI dialog presentation,
+native caller integration and startup/revocation recovery remain unfinished.
+No dialog, ABI endpoint, native callback, vault, SQL, build or test was executed;
+source review and whitespace checks are the only verification of this change.
+
 ## Remaining implementation and qualification
 
 - Journal/executor/lease/writer product integration, authority epochs, actual native owner

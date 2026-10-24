@@ -66,6 +66,18 @@ OmniBuffer om_mobile_attach_pairing_credentials_v1(uint64_t handle,OmniPairingCr
  */
 OmniBuffer om_mobile_pairing_status(uint64_t handle);
 OmniBuffer om_mobile_pairing_prepare_identity_v1(uint64_t handle,uint64_t expected_revision,uint32_t budget_ms);
+/* Native UI must display the returned exact identity/action, then invoke
+ * confirmation ONLY after explicit user approval. Token alone is not consent.
+ * One review per host; replacement/cancel/detach/close consumes it. Review expires
+ * within 60 seconds and is bound to revision, generation and foreground epoch.
+ * confirm input is borrowed JSON {"review_id":"UUID"}, at most 128 bytes;
+ * budget is 1000..25000 ms. Confirmation consumes the review before vault work.
+ * An error after activation requires status reload, never automatic retry.
+ * Activation approves this local identity only, not any remote peer/session.
+ */
+OmniBuffer om_mobile_pairing_review_identity_v1(uint64_t handle,uint64_t expected_revision);
+OmniBuffer om_mobile_pairing_confirm_identity_v1(uint64_t handle,const uint8_t* data,size_t length,uint32_t budget_ms);
+OmniBuffer om_mobile_pairing_cancel_identity_review(uint64_t handle);
 /* Trusted native document-tree reader ABI 1. open receives 16 bound profile
  * bytes and a borrowed normalized relative UTF-8 path (<=2048 bytes, <=8 parts).
  * It must authorize each part within the user-selected tree and return a unique

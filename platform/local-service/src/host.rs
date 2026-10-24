@@ -4,6 +4,8 @@ use serde_json::{Value,json};
 use std::{collections::{HashMap,VecDeque},fs::File,path::Path,sync::Arc};
 use uuid::Uuid;
 
+struct NativeIdentityReview{ id:Uuid,address:omniplay_streaming::native_credentials::CredentialAddress,
+    revision:u64,provider_epoch:u64,deadline:std::time::Instant }
 /// Trusted native UI supplies file capabilities. WebView requests contain UUIDs,
 /// never arbitrary filesystem paths or native executable locations.
 pub struct LocalHost {
@@ -14,6 +16,7 @@ pub struct LocalHost {
     credentials:Option<Arc<dyn omniplay_sync_client::CredentialStore>>,
     sync_jobs:crate::sync_jobs::SyncJobs,lifecycle:Arc<crate::SyncLifecycle>,
     sessions:WebSessions,assistant:Assistant,results:HashMap<Uuid,(Vec<u8>,Response)>,order:VecDeque<Uuid>,
+    identity_review:Option<NativeIdentityReview>,
 }
 impl LocalHost {
     pub fn open(root:&Path,profile_id:Uuid)->Result<Self>{
@@ -25,7 +28,7 @@ impl LocalHost {
     fn open_inner(root:&Path,profile_id:Uuid,credentials:Option<Arc<dyn omniplay_sync_client::CredentialStore>>)->Result<Self>{
         let database=Database::open(root)?;SessionManager::recover_interrupted(&database)?;
         let lifecycle=Arc::new(crate::SyncLifecycle::default());
-        Ok(Self{profile_id,database,credentials,sync_jobs:crate::sync_jobs::SyncJobs::new(lifecycle.clone()),lifecycle,owner:Uuid::new_v4(),closed:false,asset_ranges:Arc::new(crate::asset_ranges::AssetRanges::default()),permissions:PermissionBroker::default(),directories:DirectoryGrants::default(),transfers:crate::transfers::Transfers::default(),imports:crate::import_jobs::ImportJobs::default(),device_probe:omniplay_device_info::DeviceProbe::default(),sessions:WebSessions::default(),assistant:Assistant::default(),results:HashMap::new(),order:VecDeque::new()})
+        Ok(Self{profile_id,database,credentials,sync_jobs:crate::sync_jobs::SyncJobs::new(lifecycle.clone()),lifecycle,owner:Uuid::new_v4(),closed:false,asset_ranges:Arc::new(crate::asset_ranges::AssetRanges::default()),permissions:PermissionBroker::default(),directories:DirectoryGrants::default(),transfers:crate::transfers::Transfers::default(),imports:crate::import_jobs::ImportJobs::default(),device_probe:omniplay_device_info::DeviceProbe::default(),sessions:WebSessions::default(),assistant:Assistant::default(),results:HashMap::new(),order:VecDeque::new(),identity_review:None})
     }
     pub fn credential_store(&self)->Option<Arc<dyn omniplay_sync_client::CredentialStore>>{self.credentials.clone()}
     fn ensure_open(&self)->Result<()>{if self.closed{Err(PlatformError::new(ErrorCode::NotFound,"Mobile profile is closed"))}else{Ok(())}}
@@ -62,6 +65,44 @@ impl LocalHost {
         let mut writer=omniplay_core::stream_credential_writer::NativeCredentialWriter::open(&self.database,self.profile_id,store)?;
         writer.prepare_identity(expected,deadline)
     }
+    /// Native UI obtains this exact candidate before presenting local consent.
+    /// A review token is only a one-use binding, not proof a dialog was shown.
+    pub fn native_pairing_review_identity(&mut self,expected:u64,provider_epoch:u64)->Result<Value>{
+        self.ensure_open()?;self.identity_review=None;
+        omniplay_core::stream_signal_authority::require_installed_pairing_policy()?;
+        if provider_epoch==0{return Err(PlatformError::new(ErrorCode::PermissionDenied,"Native pairing lifecycle is unavailable"));}
+        let deadline=std::time::Instant::now()+std::time::Duration::from_secs(60);
+        let snapshot=omniplay_core::stream_credentials::load(&self.database,self.profile_id)?;
+        if snapshot.revision()!=expected{return Err(PlatformError::new(ErrorCode::Conflict,"Reload native pairing status before reviewing identity"));}
+        let mut identities=snapshot.records().iter().filter(|record|
+            record.address().kind()==omniplay_streaming::native_credentials::SecretKind::DeviceSigning&&
+            record.phase()!=omniplay_core::stream_credentials::Phase::Retired);
+        let record=identities.next().ok_or_else(||PlatformError::new(ErrorCode::Conflict,"Prepare an identity before reviewing activation"))?;
+        if identities.next().is_some()||record.phase()!=omniplay_core::stream_credentials::Phase::MaterialReady||std::time::Instant::now()>=deadline{
+            return Err(PlatformError::new(ErrorCode::Conflict,"Native identity is not ready for review"));
+        }
+        let id=Uuid::new_v4();
+        self.identity_review=Some(NativeIdentityReview{id,address:record.address(),revision:expected,provider_epoch,deadline});
+        Ok(json!({"credential_protocol":1,"review_id":id,"address":record.address(),"public_key":record.public_key(),
+            "revision":expected,"expires_in_ms":deadline.saturating_duration_since(std::time::Instant::now()).as_millis(),
+            "action":"activate_local_identity","approves_remote_peer":false}))
+    }
+    /// Trusted native caller invokes only after explicit approval of its review
+    /// dialog. Always consumes the pending review, including rejected attempts.
+    pub fn native_pairing_confirm_identity(&mut self,store:&dyn omniplay_streaming::native_credentials::PairingSecretStore,
+        review_id:Uuid,provider_epoch:u64,deadline:std::time::Instant)->Result<Value>{
+        self.ensure_open()?;
+        let review=self.identity_review.take().ok_or_else(||PlatformError::new(ErrorCode::PermissionDenied,"Native identity review is missing or consumed"))?;
+        let deadline=deadline.min(review.deadline);
+        if review.id!=review_id||review.provider_epoch!=provider_epoch||std::time::Instant::now()>=deadline{
+            return Err(PlatformError::new(ErrorCode::PermissionDenied,"Native identity review expired or changed lifecycle"));
+        }
+        omniplay_core::stream_signal_authority::require_installed_pairing_policy()?;
+        let mut writer=omniplay_core::stream_credential_writer::NativeCredentialWriter::open(&self.database,self.profile_id,store)?;
+        let revision=writer.activate_identity_after_local_consent(review.address,review.revision,omniplay_core::now_ms(),deadline)?;
+        Ok(json!({"credential_protocol":1,"address":review.address,"revision":revision,"phase":"active","approves_remote_peer":false}))
+    }
+    pub fn native_pairing_cancel_identity_review(&mut self){self.identity_review=None;}
     pub fn background_sync_policy(&self)->Result<Value>{
         self.ensure_open()?;
         let opted_in=self.database.mobile_background_sync()?;
@@ -199,7 +240,7 @@ impl LocalHost {
             _=>Err(PlatformError::new(ErrorCode::UnsupportedCapability,"This operation is not enabled by the current mobile platform policy")),
         }
     }
-    fn clear_transient(&mut self){self.asset_ranges.close_owner(self.owner);self.sync_jobs.cancel_all();self.sync_jobs.abandon_actions(self.owner);self.imports.cancel_all();self.sessions.close(&self.database);self.transfers.clear();self.permissions.revoke_owner(self.owner);self.directories.revoke_owner(self.owner);}
+    fn clear_transient(&mut self){self.identity_review=None;self.asset_ranges.close_owner(self.owner);self.sync_jobs.cancel_all();self.sync_jobs.abandon_actions(self.owner);self.imports.cancel_all();self.sessions.close(&self.database);self.transfers.clear();self.permissions.revoke_owner(self.owner);self.directories.revoke_owner(self.owner);}
     pub fn close(&mut self){self.closed=true;self.lifecycle.set_foreground(false);self.clear_transient();}
     pub fn detach(&mut self){self.clear_transient();self.owner=Uuid::new_v4();self.transfers=crate::transfers::Transfers::default();self.results.clear();self.order.clear();}
     pub fn suspend(&mut self)->Result<()>{let ids=self.sessions.list().into_iter().filter(|s|s.state==SessionState::Running).map(|s|s.id).collect::<Vec<_>>();for id in ids{self.sessions.heartbeat(&self.database,id,SessionState::Paused)?;}Ok(())}

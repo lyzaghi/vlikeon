@@ -50,7 +50,9 @@
     "Unix/mobile cooperative credential lease source uses canonical private profile root, no-follow create-new/existing-only file opens and nonblocking exclusive lock",
     "Unix lease checks held/named inode/device/owner/link count and private mode; trusted Android/iOS host-open source normalizes native storage aliases",
     "LocalHost native-only public journal status and installed-policy-gated identity preparation connect the retained-lease writer without renderer commands or activation",
-    "Mobile C ABI requires attached foreground host/provider, original bounded deadline and transition epoch/access rechecks before publishing MaterialReady public metadata"
+    "Mobile C ABI requires attached foreground host/provider, original bounded deadline and transition epoch/access rechecks before publishing MaterialReady public metadata",
+    "Native identity review source retains one exact generation/revision/foreground epoch with monotonic expiry, replacement and explicit cancellation",
+    "Bounded native confirmation consumes the pending review before pinned-vault-key activation and does not approve remote peers; actual trusted dialog/callers remain unintegrated"
   ],
   "build_executed": false,
   "tests_executed": false,
