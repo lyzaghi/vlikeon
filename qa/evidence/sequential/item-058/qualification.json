@@ -40,7 +40,9 @@
     "Dedicated mobile Remote Play callback ABI and Rust scoped provider validates 68-byte address, exact 137-byte envelopes and native access before/after operations; missing differs from locked/error",
     "Unintegrated iOS device-only non-synchronizing Keychain provider source with generation-only add, exact-scope read/remove and default-closed protected-data flag",
     "Unintegrated Android Keystore AES-GCM wrapping provider source uses per-address generation alias/no-backup ciphertext, authenticated address AAD, nonblocking record locks and write/read-back/directory sync",
-    "Android candidate distinguishes missing from locked/orphan/corrupt state, refuses overwrites and zeroes failed-read output; no JNI or mobile lifecycle caller yet"
+    "Android candidate distinguishes missing from locked/orphan/corrupt state, refuses overwrites and zeroes failed-read output; no JNI caller yet",
+    "Native mobile scope/attachment ABI takes actual open-host profile/device, consumes context on every return and refuses duplicate/closing attachment",
+    "Mobile foreground/terminal-close access gates use nonwrapping transition epochs so resumed foreground cannot publish an older in-flight provider result"
   ],
   "build_executed": false,
   "tests_executed": false,
@@ -53,7 +55,7 @@
     "Journal/executor/lease/writer product integration, native consent/session owner, copied-profile coordination, startup dispatch and authenticated relay approval/revocation",
     "Native origin/document/session hook and consent/invitation-secret/approval controller integration, abandoned receiver ownership recovery, ICE/backend refresh/stop and retirement dispatch, upgraded relay deployment and WebCrypto/native interoperability",
     "Native broker authority and document/session capability integration",
-    "Android candidate JNI/bridge, iOS candidate target/bridge/protected-data hooks, callback consumption and mobile lease/app integration",
+    "Android candidate JNI attachment caller, iOS candidate target/attachment/protected-data hooks, LocalHost pairing-controller consumption and mobile lease/app integration",
     "Lock, restore, rotation, profile/device deletion and explicit browser-to-native re-pairing",
     "All build, test, vault and platform runtime verification"
   ]

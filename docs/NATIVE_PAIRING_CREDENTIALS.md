@@ -691,6 +691,41 @@ The Android
 informs this candidate; real lock/unlock/invalidation/crash/fault/restore and
 concurrent process qualification remain due.
 
+## Native mobile attachment and access lifetime source
+
+The C ABI now has `om_mobile_pairing_scope` and a dedicated
+`om_mobile_attach_pairing_credentials_v1`. Scope is read from the already-open
+native host's actual profile/device. Attachment consumes its retained callback
+context on every return, including stale/closing host, invalid table and duplicate
+attachment. It rechecks host identity after constructing the provider, admits
+only one provider per host and releases rejected/final contexts outside the
+global host-registry lock. No vault/secret callback is invoked by attachment.
+The response describes attachment only, not pairing approval or a streaming
+capability. No renderer command or secret-returning endpoint is added.
+
+Each provider starts unavailable. Native `om_mobile_set_foreground` now updates
+the attached provider access gate alongside existing sync lifecycle notification.
+Closing the native host permanently closes that gate before host teardown; a
+late foreground event cannot reopen it. Every availability transition increments
+an in-memory epoch without wrapping. The before/after callback checks require
+the exact same epoch, so background -> foreground while a vault call was in
+flight cannot make that old result publishable again. Counter exhaustion closes
+the provider. Post-transition write/remove results may already have changed the
+OS vault; their journal debt must still be reconciled, not retried as absent.
+
+Foreground access is not OS unlock, native user consent, document admission or
+active pair/session authority. Swift protected-data hooks and Android Keystore
+checks remain separate. Native operations must retain the provider Arc while
+callbacks are in flight; host close fences results but does not forcibly abort
+an OS call or release a still-owned callback context. Existing close collection
+drops retired native contexts outside the global registry lock.
+
+The app-side Swift/JNI factories do not yet call these new attachment functions,
+and no pairing operation/controller in LocalHost consumes the attached store.
+No attachment, scope query, foreground/close callback, vault/native operation,
+build or test was executed. Mobile core lease, startup recovery, app-side glue
+and actual lifecycle/race/ABI/device qualification remain required.
+
 ## Remaining implementation and qualification
 
 - Journal/executor/lease/writer product integration, authority epochs, actual native owner

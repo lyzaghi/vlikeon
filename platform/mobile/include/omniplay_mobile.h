@@ -50,6 +50,13 @@ typedef struct {
   int32_t (*check)(void *,const OmniPairingAddress *);
   void (*release)(void *);
 } OmniPairingCredentialCallbacks;
+/* Native-only attachment/scope, not a renderer method. Context is consumed on
+ * EVERY attach return, including stale host and duplicate provider. Foreground
+ * gates access; terminal host close cannot be revived by a late callback.
+ * Attached is not a pairing/streaming capability and does not unlock the vault.
+ */
+OmniBuffer om_mobile_pairing_scope(uint64_t handle);
+OmniBuffer om_mobile_attach_pairing_credentials_v1(uint64_t handle,OmniPairingCredentialCallbacks callbacks);
 /* Trusted native document-tree reader ABI 1. open receives 16 bound profile
  * bytes and a borrowed normalized relative UTF-8 path (<=2048 bytes, <=8 parts).
  * It must authorize each part within the user-selected tree and return a unique

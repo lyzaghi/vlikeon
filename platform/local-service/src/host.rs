@@ -38,6 +38,8 @@ impl LocalHost {
         self.asset_ranges.read(self.owner,request.id,sha2::Sha256::digest(raw).into(),*set_id,*asset_index,*offset,*limit,request.deadline_ms)
     }
     pub fn sync_lifecycle(&self)->Arc<crate::SyncLifecycle>{self.lifecycle.clone()}
+    /// Trusted native scope, never a renderer-selected credential identity.
+    pub fn native_device_id(&self)->Uuid{self.database.device_id}
     pub fn background_sync_policy(&self)->Result<Value>{
         self.ensure_open()?;
         let opted_in=self.database.mobile_background_sync()?;

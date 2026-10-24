@@ -15,14 +15,13 @@ pub use pairing_credentials::{OmniPairingAddress,OmniPairingCredentialCallbacks}
 mod media_provider;
 pub use media_provider::{OmniMediaCallbacks,OmniMediaStream};
 
-struct HostEntry{profile_id:Uuid,host:Arc<Mutex<LocalHost>>,lifecycle:Arc<SyncLifecycle>,ranges:Arc<omniplay_local_service::asset_ranges::AssetRanges>,background:Option<omniplay_local_service::SyncJobHandle>,closing:bool}
+struct HostEntry{profile_id:Uuid,device_id:Uuid,host:Arc<Mutex<LocalHost>>,lifecycle:Arc<SyncLifecycle>,ranges:Arc<omniplay_local_service::asset_ranges::AssetRanges>,background:Option<omniplay_local_service::SyncJobHandle>,pairing:Option<Arc<pairing_credentials::NativePairingCredentialStore>>,foreground:bool,closing:bool}
 type Hosts=HashMap<u64,HostEntry>;
 static HOSTS:OnceLock<Mutex<Hosts>>=OnceLock::new();
 static NEXT:AtomicU64=AtomicU64::new(1);
 fn hosts()->&'static Mutex<Hosts>{HOSTS.get_or_init(||Mutex::new(HashMap::new()))}
 fn error(code:ErrorCode,message:&str)->PlatformError{PlatformError::new(code,message)}
 fn host(handle:u64)->Result<Arc<Mutex<LocalHost>>>{hosts().lock().map_err(|_|error(ErrorCode::Internal,"Mobile registry is unavailable"))?.get(&handle).filter(|entry|!entry.closing).map(|entry|entry.host.clone()).ok_or_else(||error(ErrorCode::NotFound,"Mobile profile is not open"))}
-fn lifecycle(handle:u64)->Option<Arc<SyncLifecycle>>{hosts().lock().ok().and_then(|registry|registry.get(&handle).filter(|entry|!entry.closing).map(|entry|entry.lifecycle.clone()))}
 fn collect_closed(){
     let retired=if let Ok(mut registry)=hosts().lock(){let ids=registry.iter().filter(|(_,entry)|entry.closing&&!entry.lifecycle.busy()&&!entry.ranges.busy()).map(|(id,_)|*id).collect::<Vec<_>>();ids.into_iter().filter_map(|id|registry.remove(&id)).collect::<Vec<_>>()}else{Vec::new()};
     // Native callback contexts are released outside the global registry lock.
@@ -65,7 +64,39 @@ fn open_profile(raw:&[u8],credentials:Option<Arc<credentials::NativeCredentialSt
         if registry.len()>=4||registry.values().any(|entry|entry.profile_id==request.profile_id){return Err(error(ErrorCode::Busy,"This profile is already open, finishing synchronization, or the mobile profile limit was reached"));}
         let value=match credentials{Some(provider)=>LocalHost::open_with_credentials(&request.data_root,request.profile_id,provider)?,None=>LocalHost::open(&request.data_root,request.profile_id)?};
         let handle=NEXT.fetch_add(1,Ordering::Relaxed);if handle==0{return Err(error(ErrorCode::ResourceLimit,"Mobile handle limit reached"));}
-        let lifecycle=value.sync_lifecycle();let ranges=value.asset_ranges();registry.insert(handle,HostEntry{profile_id:request.profile_id,host:Arc::new(Mutex::new(value)),lifecycle,ranges,background:None,closing:false});Ok(json!({"handle":handle,"profile_id":request.profile_id}))
+        let device_id=value.native_device_id();let lifecycle=value.sync_lifecycle();let ranges=value.asset_ranges();registry.insert(handle,HostEntry{profile_id:request.profile_id,device_id,host:Arc::new(Mutex::new(value)),lifecycle,ranges,background:None,pairing:None,foreground:false,closing:false});Ok(json!({"handle":handle,"profile_id":request.profile_id}))
+}
+
+/// Native scope for the OS provider factory. No renderer method or secret read.
+#[no_mangle]
+pub extern "C" fn om_mobile_pairing_scope(handle:u64)->OmniBuffer{result((||{
+    let registry=hosts().lock().map_err(|_|error(ErrorCode::Internal,"Mobile registry is unavailable"))?;
+    let entry=registry.get(&handle).filter(|entry|!entry.closing).ok_or_else(||error(ErrorCode::NotFound,"Mobile profile is closing"))?;
+    Ok(json!({"profile_id":entry.profile_id,"device_id":entry.device_id}))
+})())}
+
+/// # Safety
+/// Trusted native callback contract. Context is consumed on EVERY return,
+/// including stale/invalid host, scope or duplicate attachment. No callback or
+/// secret-record operation is performed by attachment itself.
+#[no_mangle]
+pub unsafe extern "C" fn om_mobile_attach_pairing_credentials_v1(handle:u64,callbacks:OmniPairingCredentialCallbacks)->OmniBuffer{
+    let scope=(||{
+        let registry=hosts().lock().map_err(|_|error(ErrorCode::Internal,"Mobile registry is unavailable"))?;
+        let entry=registry.get(&handle).filter(|entry|!entry.closing).ok_or_else(||error(ErrorCode::NotFound,"Mobile profile is closing"))?;
+        Ok::<_,PlatformError>((entry.profile_id,entry.device_id))
+    })();
+    let(profile,device)=scope.as_ref().copied().unwrap_or((Uuid::nil(),Uuid::nil()));
+    // SAFETY: caller transfers the valid native table/context even on rejection.
+    let provider=unsafe{pairing_credentials::NativePairingCredentialStore::take(callbacks,profile,device)};
+    result((||{
+        scope?;let provider=provider?;
+        let mut registry=hosts().lock().map_err(|_|error(ErrorCode::Internal,"Mobile registry is unavailable"))?;
+        let entry=registry.get_mut(&handle).filter(|entry|!entry.closing&&entry.profile_id==profile&&entry.device_id==device).ok_or_else(||error(ErrorCode::NotFound,"Mobile profile is closing"))?;
+        if entry.pairing.is_some(){return Err(error(ErrorCode::Conflict,"Native pairing provider is already attached"));}
+        provider.set_available(entry.foreground);entry.pairing=Some(provider);
+        Ok(json!({"attached":true,"credential_abi":1}))
+    })())
 }
 
 /// # Safety
@@ -110,7 +141,15 @@ pub unsafe extern "C" fn om_mobile_authorize_media(handle:u64,data:*const u8,len
     result((||{let provider=provider?;let raw=unsafe{input(data,length)?};if raw.iter().copied().find(|byte|!byte.is_ascii_whitespace())!=Some(b'{'){return Err(error(ErrorCode::InvalidRequest,"Native folder metadata must be an object"));}let selected:MediaSelection=serde_json::from_slice(raw).map_err(|_|error(ErrorCode::InvalidRequest,"Native folder metadata is invalid"))?;let host=host(handle)?;let mut host=host.lock().map_err(|_|error(ErrorCode::Internal,"Mobile profile is unavailable"))?;provider.bind(host.profile_id)?;host.selected_disc_provider(Arc::new(media_provider::NativeDiscSource(provider)),selected.entries,selected.suggested_title)})())
 }
 #[no_mangle]
-pub extern "C" fn om_mobile_set_foreground(handle:u64,foreground:u8){if foreground<=1{if let Some(value)=lifecycle(handle){value.set_foreground(foreground==1);}}}
+pub extern "C" fn om_mobile_set_foreground(handle:u64,foreground:u8){
+    if foreground>1{return;}
+    let lifecycle=if let Ok(mut registry)=hosts().lock(){registry.get_mut(&handle).map(|entry|{
+        entry.foreground=foreground==1&&!entry.closing;
+        if let Some(provider)=&entry.pairing{provider.set_available(entry.foreground);}
+        (entry.lifecycle.clone(),entry.foreground)
+    })}else{None};
+    if let Some((lifecycle,foreground))=lifecycle{lifecycle.set_foreground(foreground);}
+}
 /// Trusted native scheduler policy, never a renderer-supplied root or account.
 #[no_mangle]
 pub extern "C" fn om_mobile_background_policy(handle:u64)->OmniBuffer{result((||{let host=host(handle)?;let value=host.lock().map_err(|_|error(ErrorCode::Internal,"Mobile profile is unavailable"))?.background_sync_policy();value})())}
@@ -142,7 +181,7 @@ pub extern "C" fn om_mobile_suspend(handle:u64)->OmniBuffer{result((||{let host=
 pub extern "C" fn om_mobile_detach(handle:u64)->OmniBuffer{result((||{let host=host(handle)?;let mut host=host.lock().map_err(|_|error(ErrorCode::Internal,"Mobile profile is unavailable"))?;host.detach();Ok(json!({"detached":true}))})())}
 #[no_mangle]
 pub extern "C" fn om_mobile_close(handle:u64){
-    let value=hosts().lock().ok().and_then(|mut registry|registry.get_mut(&handle).map(|entry|{entry.closing=true;(entry.host.clone(),entry.lifecycle.clone())}));
+    let value=hosts().lock().ok().and_then(|mut registry|registry.get_mut(&handle).map(|entry|{entry.closing=true;entry.foreground=false;if let Some(provider)=&entry.pairing{provider.close();}(entry.host.clone(),entry.lifecycle.clone())}));
     if let Some((host,lifecycle))=value{lifecycle.set_foreground(false);lifecycle.cancel();if let Ok(mut value)=host.lock(){value.close();};}collect_closed();
 }
 

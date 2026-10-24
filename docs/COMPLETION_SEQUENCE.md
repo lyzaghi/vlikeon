@@ -2,6 +2,13 @@
 
 ## Current sequence — 1–109 outstanding tasks
 
+Item 58 now authors native mobile scope/provider attachment tied to the actual
+open host profile/device, with duplicate/closing rejection and consumed callback
+ownership. Foreground/terminal-close provider gates use transition epochs to
+reject stale in-flight results across background/resume. App-side Swift/JNI
+attachment callers, LocalHost pairing controller and mobile lease remain due.
+No native callback/OS/vault/build/test was executed; original scope stays open.
+
 Item 58 now authors an Android Keystore wrapping provider candidate with separate
 generation namespace, authenticated profile/device address, bounded no-backup
 ciphertext, record locking and durable new-file read-back. Missing, locked and
