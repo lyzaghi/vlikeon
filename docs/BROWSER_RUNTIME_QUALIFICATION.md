@@ -18,10 +18,16 @@ worker, but failed by selecting page targets only by chrome-extension URL.
 Both batches/logs are retained; neither is reported as passing or as proof of
 a product defect. A third check inspects the actual DOM/runtime of the startup
 tab even when CDP retains a virtual new-tab URL. Its original Game Hub assertions
-remain required.
+remain required. That third batch subsequently also failed: the selected actual
+startup page DOM remained `about:blank` without an extension runtime ID across
+the bounded observation. Its component background worker was active. The
+failure now reproduces beyond the initial target-URL selection mistake, but
+the cause (startup override, component registration or runtime subprocess
+failure) is not established. Codex must diagnose before changing product code.
 
 Runtime stderr also records a delay-load exception `0xc06d007e` in a subprocess,
-with a user32 delay-load stack, and an AMD video-processor warning. These require
+with a user32 delay-load stack, a network-service crash/restart, and an AMD
+video-processor warning. These require
 diagnosis; launching the main process does not qualify the subprocess/runtime.
 No sandbox disable, extension sideload or mocked native-host success is used.
 
