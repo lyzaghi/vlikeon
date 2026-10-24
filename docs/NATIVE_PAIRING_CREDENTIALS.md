@@ -1840,6 +1840,18 @@ this checkpoint.
 
 ## Remaining implementation and qualification
 
+Android's native hub menu now wires ClientSetup to an invitation/independent
+host-key/device-label form and installed relay selector. Input is length bounded,
+invitation field uses password input, disables state saving/autofill and clears
+on send/dismiss. Java/UI/IME strings are not reliably erasable; no stronger wipe
+claim is made. Explicit host-key verification precedes begin; a second action
+sends JoinInvite. The waiting view polls only on a user action and retains its
+owner for pending/unconfirmed poll results; explicit local cancel is available.
+Original setup/review/invite deadline fences and lifecycle dismissal remain.
+This is authored UI source only: no compilation/build/test, UI render, crypto,
+vault or network operation ran. iOS full setup/begin/join, native host controller,
+activation and end-to-end qualification remain unfinished.
+
 Native status now returns enabled installed pairing_origins, empty when policy
 is disabled/invalid. Android's native-only ClientSetup helper validates status,
 requires exactly one nonretired Active identity, refuses missing storage

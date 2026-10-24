@@ -2,6 +2,12 @@
 
 ## Current sequence — 1–109 outstanding tasks
 
+Item 58 Android native menu now authors client setup form, independent host-key
+confirmation, installed relay selection, bounded invitation input, explicit join
+and manual approval polling. Code field clears on send/dismiss; ordinary strings
+remain outside wipe guarantees. Source-only; no build/test/UI/network run.
+iOS setup/begin/join, activation and end-to-end qualification remain unfinished.
+
 Item 58 native status now exposes enabled installed pairing origins. Android has
 a read-only setup helper selecting one Active identity from validated native
 status, immutable relay choices and a one-use bounded begin helper. Disabled

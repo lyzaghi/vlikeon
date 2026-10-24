@@ -168,9 +168,81 @@ public final class GameHubController implements AutoCloseable {
     private void showNativeHubActions(){
         if(!identityUiAvailable()||mIdentityDialog!=null||mIdentityFlow!=null)return;
         AlertDialog menu=new AlertDialog.Builder(mActivity).setTitle("Vlikeon Game Hub")
-                .setItems(new String[]{"Continue to library","Remote Play identity","Remote Play status and recovery"},(dialog,index)->{mIdentityDialog=null;if(index==1)beginIdentityReview();else if(index==2)beginPairingRecovery();})
+                .setItems(new String[]{"Continue to library","Remote Play identity","Remote Play status and recovery","Pair with a remote host"},(dialog,index)->{mIdentityDialog=null;if(index==1)beginIdentityReview();else if(index==2)beginPairingRecovery();else if(index==3)beginClientPairing();})
                 .setNegativeButton(android.R.string.cancel,(dialog,which)->mIdentityDialog=null).create();
         mIdentityDialog=menu;menu.setOnDismissListener(dialog->{if(mIdentityDialog==menu)mIdentityDialog=null;});menu.show();
+    }
+    private void beginClientPairing(){
+        if(!identityUiAvailable()||mIdentityFlow!=null)return;
+        java.util.concurrent.atomic.AtomicBoolean owner=new java.util.concurrent.atomic.AtomicBoolean(true);mIdentityFlow=owner;
+        mCore.clientPairingSetup(owner::get,(setup,error)->{
+            if(mIdentityFlow!=owner||!owner.get())return;
+            if(!identityUiAvailable()||setup==null){cancelIdentityReview();if(identityUiAvailable())identityNotice(error);return;}
+            android.widget.LinearLayout form=new android.widget.LinearLayout(mActivity);form.setOrientation(android.widget.LinearLayout.VERTICAL);
+            android.widget.EditText code=new android.widget.EditText(mActivity),host=new android.widget.EditText(mActivity),label=new android.widget.EditText(mActivity);
+            code.setHint("Invitation code");code.setSingleLine(true);code.setInputType(android.text.InputType.TYPE_CLASS_TEXT|android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD);
+            code.setFilters(new android.text.InputFilter[]{new android.text.InputFilter.LengthFilter(8192)});code.setSaveEnabled(false);
+            host.setHint("Independently verified host public key");host.setSingleLine(true);host.setFilters(new android.text.InputFilter[]{new android.text.InputFilter.LengthFilter(43)});host.setSaveEnabled(false);
+            label.setHint("This device's label");label.setSingleLine(true);label.setFilters(new android.text.InputFilter[]{new android.text.InputFilter.LengthFilter(64)});label.setSaveEnabled(false);
+            if(android.os.Build.VERSION.SDK_INT>=26){code.setImportantForAutofill(android.view.View.IMPORTANT_FOR_AUTOFILL_NO_EXCLUDE_DESCENDANTS);host.setImportantForAutofill(android.view.View.IMPORTANT_FOR_AUTOFILL_NO_EXCLUDE_DESCENDANTS);}
+            android.widget.Spinner relay=new android.widget.Spinner(mActivity);
+            relay.setAdapter(new android.widget.ArrayAdapter<>(mActivity,android.R.layout.simple_spinner_dropdown_item,setup.relayOrigins));
+            android.widget.CheckBox verified=new android.widget.CheckBox(mActivity);verified.setText("I verified the host key independently of the invitation code.");
+            form.addView(code);form.addView(host);form.addView(label);form.addView(relay);form.addView(verified);
+            AlertDialog alert=new AlertDialog.Builder(mActivity).setTitle("Pair with a remote host")
+                    .setMessage("Use a host invitation and its independently verified public key. Setup expires in 30 seconds; reopen if needed.")
+                    .setView(form).setNegativeButton(android.R.string.cancel,(dialog,which)->cancelIdentityReview()).setPositiveButton("Prepare pairing",null).create();
+            mIdentityDialog=alert;alert.setOnCancelListener(dialog->cancelIdentityReview());
+            alert.setOnDismissListener(dialog->code.setText(""));alert.show();
+            alert.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(button->{
+                if(!verified.isChecked()||!host.getText().toString().matches("[A-Za-z0-9_-]{42}[AEIMQUYcgkosw048]")||code.length()==0||label.length()==0){identityFormError(alert);return;}
+                if(mIdentityFlow!=owner||!owner.get()||!identityUiAvailable()||android.os.SystemClock.elapsedRealtime()>=setup.expires){cancelIdentityReview();return;}
+                String invitation=code.getText().toString(),hostKey=host.getText().toString(),deviceLabel=label.getText().toString(),origin=(String)relay.getSelectedItem();
+                code.setText("");alert.dismiss();mIdentityDialog=null;
+                if(mIdentityExpiry!=null){mMain.removeCallbacks(mIdentityExpiry);mIdentityExpiry=null;}
+                mCore.beginPairingClient(setup,invitation,hostKey,origin,deviceLabel,owner::get,response->{
+                    if(mIdentityFlow!=owner||!owner.get())return;
+                    if(!identityUiAvailable()){cancelIdentityReview();return;}
+                    try{
+                        if(!"ok".equals(response.getString("status")))throw new IllegalStateException();
+                        JSONObject value=response.getJSONObject("result");String ticket=value.getString("ticket");
+                        long remaining=Math.min(300_000,value.getLong("expires_at_ms")-System.currentTimeMillis());
+                        if(remaining<=0)throw new IllegalStateException();
+                        mIdentityExpiry=()->{if(mIdentityFlow==owner)cancelIdentityReview();};mMain.postDelayed(mIdentityExpiry,remaining);
+                        showClientJoin(ticket,value.getString("comparison_code"),owner);
+                    }catch(Exception failure){cancelIdentityReview();identityNotice("Pairing preparation was not confirmed. Inspect status before retrying.");}
+                });
+            });
+            mIdentityExpiry=()->{if(mIdentityFlow==owner)cancelIdentityReview();};mMain.postDelayed(mIdentityExpiry,Math.max(0,setup.expires-android.os.SystemClock.elapsedRealtime()));
+        });
+    }
+    private void identityFormError(AlertDialog alert){alert.setMessage("Enter an invitation, device label and canonical host key, then confirm independent host verification.");}
+    private void showClientJoin(String ticket,String comparison,java.util.concurrent.atomic.AtomicBoolean owner){
+        if(mIdentityFlow!=owner||!owner.get()||!identityUiAvailable()){cancelIdentityReview();return;}
+        AlertDialog alert=new AlertDialog.Builder(mActivity).setTitle("Send pairing request?")
+                .setMessage("Comparison code: "+comparison+"\n\nSend this request to the configured service, then compare this code on the host. Sending does not approve the peer or input control.")
+                .setNegativeButton(android.R.string.cancel,(dialog,which)->cancelIdentityReview())
+                .setPositiveButton("Send request",(dialog,which)->{
+                    mIdentityDialog=null;
+                    if(mIdentityFlow!=owner||!owner.get()||!identityUiAvailable()){cancelIdentityReview();return;}
+                    try{
+                        byte[] request=new JSONObject().put("ticket",ticket).toString().getBytes(StandardCharsets.UTF_8);
+                        mCore.pairingClient(request,1,owner::get,response->{
+                            if(mIdentityFlow!=owner||!owner.get())return;
+                            if("ok".equals(response.optString("status"))&&identityUiAvailable())showClientWaiting(ticket,owner);
+                            else{cancelIdentityReview();identityNotice("Request result is uncertain. Inspect status before continuing.");}
+                        });
+                    }catch(Exception error){cancelIdentityReview();identityNotice("Request could not be sent. Inspect status.");}
+                }).create();
+        mIdentityDialog=alert;alert.setOnCancelListener(dialog->cancelIdentityReview());alert.show();
+    }
+    private void showClientWaiting(String ticket,java.util.concurrent.atomic.AtomicBoolean owner){
+        if(mIdentityFlow!=owner||!owner.get()||!identityUiAvailable()){cancelIdentityReview();return;}
+        AlertDialog alert=new AlertDialog.Builder(mActivity).setTitle("Waiting for host approval")
+                .setMessage("No current approval has been confirmed here. Approve on the host after comparing codes, then check again, or cancel locally. Checks run only when you request them.")
+                .setNegativeButton("Cancel locally",(dialog,which)->{mIdentityDialog=null;cancelPendingPeer(ticket,owner);})
+                .setPositiveButton("Check approval",(dialog,which)->{mIdentityDialog=null;showPeerApproval(ticket,owner);}).create();
+        mIdentityDialog=alert;alert.setOnCancelListener(dialog->cancelIdentityReview());alert.show();
     }
     private void beginIdentityReview(){
         if(!identityUiAvailable()||mIdentityFlow!=null)return;
@@ -240,7 +312,8 @@ public final class GameHubController implements AutoCloseable {
         if(mIdentityFlow!=owner||!owner.get()||!identityUiAvailable()){cancelIdentityReview();return;}
         mCore.reviewPairingPeer(ticket,owner::get,(review,error)->{
             if(mIdentityFlow!=owner||!owner.get())return;
-            if(!identityUiAvailable()||review==null){cancelIdentityReview();if(identityUiAvailable())identityNotice(error);return;}
+            if(!identityUiAvailable()){cancelIdentityReview();return;}
+            if(review==null){showClientWaiting(ticket,owner);return;}
             if(mIdentityExpiry!=null)mMain.removeCallbacks(mIdentityExpiry);
             long remaining=review.expires-android.os.SystemClock.elapsedRealtime();
             if(remaining<=0){cancelIdentityReview();return;}
