@@ -212,9 +212,14 @@ final class GameHubViewController: UIViewController, WKNavigationDelegate, WKUID
             case .success(let snapshot):
                 guard DispatchTime.now()<snapshot.expires else{self.cancelPairingIdentity();return}
                 self.applyPairingStatusBadge(snapshot)
-                if snapshot.records.isEmpty && snapshot.pendingClientTicket==nil{self.cancelPairingIdentity();self.pairingNotice("Thiết bị này chưa có danh tính hoặc cặp Remote Play.");return}
+                if snapshot.records.isEmpty && snapshot.pendingClientTicket==nil && snapshot.pendingHostTicket==nil{self.cancelPairingIdentity();self.pairingNotice("Thiết bị này chưa có danh tính hoặc cặp Remote Play.");return}
                 let sheet=UIAlertController(title:"Trạng thái Remote Play",message:"Chọn bản ghi để xem chi tiết. Đọc trạng thái không làm thay đổi khóa hoặc kết nối.",preferredStyle:.actionSheet)
                 self.pairingAlert=sheet
+                if let ticket=snapshot.pendingHostTicket{
+                    sheet.addAction(UIAlertAction(title:"Đóng lời mời host trên thiết bị này",style:.destructive){[weak self,weak sheet]_ in
+                        sheet?.dismiss(animated:false){[weak self] in self?.closeHostInvitation(ticket:ticket,owner:owner)}
+                    })
+                }
                 if let ticket=snapshot.pendingClientTicket{
                     sheet.addAction(UIAlertAction(title:"Duyệt host của phiên đang chờ",style:.default){[weak self,weak sheet]_ in
                         sheet?.dismiss(animated:false){[weak self] in self?.showPeerApproval(ticket:ticket,owner:owner)}
@@ -235,6 +240,21 @@ final class GameHubViewController: UIViewController, WKNavigationDelegate, WKUID
                 self.pairingExpiry=expiry;DispatchQueue.main.asyncAfter(deadline:snapshot.expires,execute:expiry);self.present(sheet,animated:true)
             }
         }
+    }
+    private func closeHostInvitation(ticket:String,owner:NativeDocumentLifetime){
+        guard peerReviewAvailable(owner) else{cancelPairingIdentity();return}
+        let alert=UIAlertController(title:"Đóng lời mời host?",message:"Dừng chia sẻ và duyệt lời mời trên thiết bị, rồi yêu cầu đóng trên dịch vụ nếu đã thử đăng ký. Các cặp đã duyệt không bị thu hồi. Nếu kết quả chưa xác nhận, hãy mở lại trạng thái.",preferredStyle:.alert);pairingAlert=alert
+        alert.addAction(UIAlertAction(title:"Để sau",style:.cancel){[weak self]_ in self?.cancelPairingIdentity()})
+        alert.addAction(UIAlertAction(title:"Đóng lời mời",style:.destructive){[weak self,weak alert]_ in
+            alert?.dismiss(animated:false){[weak self] in
+                guard let self=self,self.peerReviewAvailable(owner) else{self?.cancelPairingIdentity();return}
+                self.core.pairingHostTicket(.close,ticket:ticket,owner:owner){[weak self] result in
+                    guard let self=self,self.pairingFlow === owner,owner.active else{return};self.cancelPairingIdentity()
+                    switch result{case .success:self.pairingNotice("Đã đóng lời mời host. Các cặp hiện có không bị thu hồi.");case .failure:self.pairingNotice("Chưa xác nhận được đóng lời mời. Hãy xem lại trạng thái trước khi tiếp tục.")}
+                }
+            }
+        })
+        present(alert,animated:true)
     }
     private func cancelPendingPeer(ticket:String,owner:NativeDocumentLifetime){
         guard peerReviewAvailable(owner) else{cancelPairingIdentity();return}

@@ -127,6 +127,7 @@ struct NativeRecoverySnapshot {
     let relayRetirementAvailable:Bool
     let namespaceProvenanceMissing:Bool
     let pendingClientTicket:String?
+    let pendingHostTicket:String?
     let pairingOrigins:[String]
     var needsAttention:Bool{namespaceProvenanceMissing || records.contains{$0.sessionRecoveryRequired || ($0.nextStep != nil && $0.nextStep != "revalidate_before_use")}}
 }
@@ -643,7 +644,16 @@ final class NativeCore {
                 for origin in origins{
                     guard let url=URLComponents(string:origin),url.scheme=="https",let host=url.host,!host.isEmpty,url.user==nil,url.password==nil,url.query==nil,url.fragment==nil,url.path.isEmpty else{throw OmniFailure.message("Relay nằm ngoài cấu hình HTTPS hợp lệ.")}
                 }
-                let snapshot=NativeRecoverySnapshot(revision:revision.uint64Value,device:device,records:parsed,expires:expires,relayRetirementAvailable:relayAvailable,namespaceProvenanceMissing:namespaceMissing,pendingClientTicket:pendingTicket,pairingOrigins:origins)
+                var hostTicket:String?
+                if let pending=value["pending_host"] as? [String:Any]{
+                    guard let ticket=pending["ticket"] as? String,let id=UUID(uuidString:ticket),id.uuidString.lowercased()==ticket,
+                          id != UUID(uuid:(0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0)) else{throw OmniFailure.message("Ticket lời mời host không hợp lệ.")}
+                    for field in ["expired","locally_closed","remote_close_required"]{
+                        guard let flag=pending[field] as? NSNumber,CFGetTypeID(flag)==CFBooleanGetTypeID() else{throw OmniFailure.message("Trạng thái lời mời host không hợp lệ.")}
+                    }
+                    hostTicket=ticket
+                }
+                let snapshot=NativeRecoverySnapshot(revision:revision.uint64Value,device:device,records:parsed,expires:expires,relayRetirementAvailable:relayAvailable,namespaceProvenanceMissing:namespaceMissing,pendingClientTicket:pendingTicket,pendingHostTicket:hostTicket,pairingOrigins:origins)
                 DispatchQueue.main.async{completion(.success(snapshot))}
             }catch{DispatchQueue.main.async{completion(.failure(error))}}
         }

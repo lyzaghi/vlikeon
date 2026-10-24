@@ -1840,6 +1840,14 @@ this checkpoint.
 
 ## Remaining implementation and qualification
 
+iOS native status now admits canonical pending-host ticket and actual boolean
+expiry/local-close/remote-cleanup flags. It exposes a separate close invitation
+action even without credential records, explaining local stop, conditional
+service cleanup and nonrevocation of existing pairs. Confirmation invokes the
+typed host close caller with owner/lifecycle/expiry admission. Uncertainty directs
+back to status; expired or stale-revision cleanup still needs unfinished recovery.
+No build/test/UI render/runtime operation ran for this checkpoint.
+
 Android native status now admits canonical pending-host ticket and boolean
 expired/local-close/remote-cleanup flags, offering a separate close invitation
 action even when no credential records exist. Confirmation explains local stop,
