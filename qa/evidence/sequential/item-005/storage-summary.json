@@ -1,0 +1,36 @@
+{
+  "item": 5,
+  "status": "external_storage_ready_full_xcode_pending",
+  "host": {"os": "macOS 15.7", "build": "24G217", "architecture": "arm64", "ram_bytes": 17179869184, "logical_cpus": 8},
+  "storage": {
+    "backing_filesystem": "exfat",
+    "backing_external_usb_confirmed": true,
+    "build_filesystem": "apfs",
+    "build_root": "/Volumes/VlikeonBuild/work",
+    "image_capacity_bytes": 375599882240,
+    "physical_available_bytes_native_diskutil": 3938610839552,
+    "approximate_setup_usage_kib": 65536,
+    "capacity_note": "Python statvfs underreported large ExFAT availability; native df and diskutil agreed. Image capacity is not physical preallocation."
+  },
+  "verification": {
+    "executor": "antigravity-test-only-codex-reviewed",
+    "bash_parser_exit_code": 0,
+    "first_native_check": "failed_TMPDIR_Apple_usr_bin_python3_launcher_replaced_environment",
+    "second_native_check": "passed_true_native_json_real_interpreter_selected_via_xcrun",
+    "configured_cache_and_temp_variables_checked": 17,
+    "image_binding_to_external_disk_verified": true,
+    "home_relocated": false,
+    "limitation": "Storage binding and selected sourced environment only; not every future tool cache or system write. Local Tailscale wrapper exit zero alone was not treated as remote success."
+  },
+  "source_transfer": {
+    "archive_sha256_on_mac": "d9b7dda20d8a0963e2050e50df8ded5b2a3586efe5340c489b8e9bd4a8b3144e",
+    "extracted_preparation_receipt_sha256_on_mac": "dd9776d0bb8300894311d53788d3529b646382408ca75fb6abce5ae2b8f9bbc8",
+    "source_inventory_admission": "pending_frozen_recipe"
+  },
+  "full_xcode": "not_configured",
+  "dependency_bootstrap": "not_started",
+  "compiler": "not_started",
+  "runtime": "not_tested",
+  "release_approval": false,
+  "task_5_complete": false
+}

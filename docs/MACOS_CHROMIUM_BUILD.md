@@ -1,4 +1,4 @@
-# Task 5 — macOS ARM64 host connected, storage provisioning pending
+# Task 5 — external APFS ready, full Xcode pending
 
 On 2026-10-24 the owner requested preparing task 5 while task 4 continues its
 actual Linux build. The owner confirmed an Apple Silicon Mac is available and
@@ -40,18 +40,70 @@ shell profiles, relocate Xcode or move macOS swap/system writes. Both the APFS
 image capacity and physical backing HDD free bytes must be monitored.
 
 Antigravity executed a nonexecuting Bash parser check, exit 0, with no output.
-Codex then invoked the helper on the actual Mac. The native diskutil/plutil
-external-device, mountpoint and free-space admission completed. The helper is
-stopped after waiting in its first mkdir on the external disk; no successful APFS
-creation or cache placement has been established. A read-only macOS TCC log
-attributes removable-volume access checks to tailscaled and records an AllFiles
-policy denial; this does not by itself prove why mkdir is waiting. The owner
-has been asked to inspect a possible removable-volume consent prompt. No
-privacy setting was changed or access restriction bypassed. Codex terminated
-the exact owned setup and diagnostic processes and verified their absence.
-Inspect any partial setup paths after consent before a new run; do not overwrite
-them or assume the native setup completed. Existing setup paths are never
-overwritten. Final native behavior and storage placement still need inspection.
+The first native setup waited in its initial external mkdir. Codex stopped the
+exact owned processes and verified their absence. After the owner confirmed
+allowing removable-volume access, Codex verified both setup destinations were
+absent and ran the helper again. It completed successfully: the APFS image is
+mounted and its generated build directories and environment are present. No
+privacy setting was changed by Codex and no access restriction was bypassed.
+
+Antigravity's first native storage check exposed that Apple's `/usr/bin/python3`
+launcher replaces TMPDIR with an internal system directory. Codex verified that
+executing the real interpreter returned by `xcrun --find python3` preserves the
+external TMPDIR. The second native check used that interpreter, retained all
+storage assertions and emitted `passed: true`. It verified image-to-external-disk
+binding and 17 configured temporary/cache variables beneath the build root.
+This qualifies the current storage/environment, not every future tool's cache.
+Actual supervisors must select the bootstrapped Python interpreter explicitly;
+do not assume the Apple launcher preserves the environment.
+
+The old Python statvfs measurement underreported free bytes on the large ExFAT
+volume. Codex cross-checked `df -kP` against native diskutil: physical free space
+was 3,938,610,839,552 bytes; the new sparse bundle consumed about 64 MiB.
+Use native df/diskutil for backing-disk capacity monitoring. The mounted APFS
+image's capacity is 375,599,882,240 bytes, not preallocated physical usage.
+`qa/evidence/sequential/item-005/storage-summary.json` records the bounded result.
+
+For a fresh Terminal on the Mac:
+
+```bash
+source /Volumes/VlikeonBuild/work/env.sh
+cd "$VLIKE_BUILD_ROOT"
+```
+
+After a restart, mount the existing image first (do not rerun setup):
+
+```bash
+bash "/Volumes/New Volume/VlikeonBuildHost/mount-vlikeon.sh"
+source /Volumes/VlikeonBuild/work/env.sh
+```
+
+Full Xcode is still required. Apple's [compatibility matrix](https://developer.apple.com/xcode/system-requirements)
+lists Xcode 26.3 as compatible with macOS 15.6 and later. Obtain the official
+`Xcode_26.3.xip` through [Apple Developer Downloads](https://developer.apple.com/download/all/?q=Xcode%2026.3)
+using the owner's Apple sign-in, saving it directly to
+`/Volumes/VlikeonBuild/work/tools`. No account access or license acceptance has
+been performed by this task. Extract on that same external APFS volume:
+
+```bash
+source /Volumes/VlikeonBuild/work/env.sh
+cd "$VLIKE_BUILD_ROOT/tools"
+xip --expand Xcode_26.3.xip
+open Xcode.app
+```
+
+The owner reviews the first-launch license and required components. After that,
+select this Xcode only for the build process, without a global xcode-select edit:
+
+```bash
+export DEVELOPER_DIR="$VLIKE_BUILD_ROOT/tools/Xcode.app/Contents/Developer"
+xcodebuild -version
+xcrun --sdk macosx --show-sdk-version
+```
+
+This is a compatible host-side candidate; the actual pinned Chromium GN/build
+must still establish SDK compatibility. macOS swap and system-managed writes
+remain on the system disk; the external workspace does not relocate them.
 
 For this exact Chromium pin, `build/config/mac/mac_sdk_overrides.gni` declares
 `mac_sdk_min = "15"`; `mac_sdk.gni` records SDK `26.5`/build `25F70` for official
@@ -92,6 +144,12 @@ this fresh export. They author/copy source and metadata, not a native build.
 The preparation retains configuration/compiler `not_started`, browser
 `not_started`, verification `not_run`, and distribution approval false. The
 development core catalog is empty and is not a production core package.
+
+The archive was transferred directly into the external
+`/Volumes/VlikeonBuild/work/projects` and its SHA-256 matched on the Mac. It was
+extracted into a previously absent `macos-005a` directory there; the extracted
+preparation receipt also matched the SHA-256 above. Full input admission by the
+frozen recipe, dependency bootstrap, hooks and compilation remain pending.
 
 ## Execution and acceptance after host qualification
 
