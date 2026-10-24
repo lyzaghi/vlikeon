@@ -1,5 +1,15 @@
 # Native H.264 primary-picture header consistency — item 56
 
+The picture parser now integrates `native_h264_auxiliary.rs`: AUD picture-type
+matching, bounded SEI envelope/payload ranges, filler syntax and empty end-marker
+RBSPs. AUD must be first, parameter sets/SEI precede slices, and terminal markers
+close the picture. Parsed SEI payloads remain available to the future native
+adapter; their timing/recovery/colour semantics are not yet implemented. Limits
+are 64 KiB per SEI NAL and 256 messages, within the existing AU byte/NAL budget.
+This supersedes the earlier statement that auxiliary syntax is wholly ignored.
+Decoder/DPB/SEI semantics and runtime qualification remain unfinished. No
+build/test/parser execution accompanied this source change.
+
 Source only; build/test/parser/decoder/media/network execution remain deferred.
 `native_h264_picture.rs` checks one primary picture's ordinary slice headers in
 an already bounded `AccessUnit`. The framing layer exposes immutable borrowed

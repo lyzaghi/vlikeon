@@ -107,7 +107,7 @@ impl<'a> SliceBits<'a>{
         Ok(if code&1==0{-(magnitude as i32)}else{magnitude as i32})
     }
 }
-fn decode_payload(nal:&[u8],limit:usize)->Result<Vec<u8>>{
+pub(crate) fn decode_payload(nal:&[u8],limit:usize)->Result<Vec<u8>>{
     let end=nal.len().min(limit+1);let mut rbsp=Vec::new();
     rbsp.try_reserve_exact(end-1).map_err(|_|PlatformError::new(ErrorCode::ResourceLimit,"The H.264 syntax-reader budget is unavailable"))?;
     let mut zeros=0;let mut index=1;

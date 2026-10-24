@@ -2,6 +2,8 @@
 
 ## Current sequence — 1–109 outstanding tasks
 
+Source checkpoint: primary-picture parsing now consumes actual auxiliary NAL syntax instead of skipping it. AUD type is matched to slices, SEI envelopes retain bounded payloads, filler/end-marker syntax and picture ordering are enforced. SEI semantics, DPB, actual decoder admission and product transport integration remain open. Build/test stay deferred.
+
 Source checkpoint: receive-bridge pending frames now retain original AU metadata plus a native admission proof. A required provider recheck runs before each decoder attempt/retry, followed by original-age and decoder-authority checks. It must not repeat DPB/reference mutations or revive replaced parameter versions. No admission provider, transport enablement or runtime qualification is supplied; build/test remain deferred.
 
 Source checkpoint: native video receiver now forwards caller retirement deadlines into the decoder and allows explicit reaping retries of its same CleanupRequired owner. Buffered data is fenced first and never reopened; only a timely confirmed Stop/process/I/O result publishes Revoked. This integrates the previously authored decoder deadline at the receive-bridge boundary, not aggregate session retirement. Build/test remain deferred.
