@@ -1840,6 +1840,17 @@ this checkpoint.
 
 ## Remaining implementation and qualification
 
+The dedicated om_mobile_pairing_activate_client_v1 entry accepts native-only
+address/expected_revision/reviewed_grant_hash JSON <=1024 and an original bounded
+budget. It derives actual foreground provider epoch/cancellation, validates
+address access before/after and reports uncertain late commit explicitly.
+LocalHost requires enabled installed origins. Under one retained scoped lease,
+the writer checks exact journal revision/address/grant hash, then follows existing
+MaterialReady/client-role/vault/fresh relay confirmation checks before Active.
+Active publication still grants no transport/session authority. No build/test,
+vault/crypto/SQL/HTTP operation ran. JNI/Swift activation callers and UI, native
+host product flow, retirement ownership and end-to-end qualification remain due.
+
 iOS native menu now wires installed-relay selection and invitation/independently
 verified host-key/device-label entry to ClientSetup. UITextField delegate bounds
 UTF-8 input; invitation uses secure text entry with correction/spelling disabled.

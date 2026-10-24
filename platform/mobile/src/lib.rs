@@ -151,6 +151,25 @@ struct PairingClientBegin{identity:omniplay_streaming::native_credentials::Crede
 impl Drop for PairingClientBegin{fn drop(&mut self){self.code.zeroize();}}
 #[derive(Deserialize)]#[serde(deny_unknown_fields)]struct PairingClientTicket{ticket:Uuid}
 #[derive(Deserialize)]#[serde(deny_unknown_fields)]struct PairingClientConsent{ticket:Uuid,reviewed_grant_hash:String}
+#[derive(Deserialize)]#[serde(deny_unknown_fields)]
+struct PairingClientActivation{address:omniplay_streaming::native_credentials::CredentialAddress,expected_revision:u64,reviewed_grant_hash:String}
+/// # Safety
+/// Trusted native UI supplies readable JSON <=1024 bytes after explicit review
+/// of the exact persisted candidate and signed grant. Never renderer dispatch.
+#[no_mangle]
+pub unsafe extern "C" fn om_mobile_pairing_activate_client_v1(handle:u64,data:*const u8,length:usize,budget_ms:u32)->OmniBuffer{result((||{
+    if length>1024||!(1000..=25000).contains(&budget_ms){return Err(error(ErrorCode::InvalidRequest,"Native activation arguments exceed bounds"));}
+    let deadline=std::time::Instant::now()+std::time::Duration::from_millis(u64::from(budget_ms));
+    // SAFETY: caller supplies the synchronous bounded readable borrow above.
+    let request:PairingClientActivation=serde_json::from_slice(unsafe{input(data,length)?}).map_err(|_|error(ErrorCode::InvalidRequest,"Native activation arguments are invalid"))?;
+    if request.reviewed_grant_hash.len()!=64||!request.reviewed_grant_hash.bytes().all(|b|b.is_ascii_digit()||(b'a'..=b'f').contains(&b)){return Err(error(ErrorCode::InvalidRequest,"Native reviewed grant hash is invalid"));}
+    let(host,provider,epoch)=pairing_operation(handle)?;
+    let host=host.lock().map_err(|_|error(ErrorCode::Internal,"Mobile profile is unavailable"))?;
+    provider.confirm_access(&request.address,epoch)?;let cancel=provider.operation_cancellation(epoch)?;
+    let value=host.native_pairing_activate_reviewed_client(provider.as_ref(),request.address,request.expected_revision,&request.reviewed_grant_hash,deadline,&cancel)?;
+    provider.confirm_access(&request.address,epoch)?;
+    if cancel.load(Ordering::Acquire)||std::time::Instant::now()>=deadline{return Err(error(ErrorCode::Cancelled,"Native activation may have committed; reload pairing status"));}Ok(value)
+})())}
 /// # Safety
 /// Trusted native UI supplies bounded readable JSON, not renderer input. Host
 /// key must be independently confirmed/pinned by UI, not trusted from code alone.

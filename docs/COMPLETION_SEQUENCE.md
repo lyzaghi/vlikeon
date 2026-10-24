@@ -2,6 +2,11 @@
 
 ## Current sequence — 1–109 outstanding tasks
 
+Item 58 now authors reviewed client activation from mobile C ABI through LocalHost
+to the leased writer. Exact candidate/revision/grant hash is checked before fresh
+relay confirmation and Active publication; native epoch/deadline checks surround
+the operation. Source-only; JNI/Swift activation callers/UI and build/test due.
+
 Item 58 iOS now authors installed-relay selection, bounded invitation/host/label
 form, explicit host verification, begin, explicit join and manual approval checks.
 Code fields clear on submit/dismiss/lifecycle cleanup; string aliases cannot be

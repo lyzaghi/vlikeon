@@ -81,6 +81,12 @@ OmniBuffer om_mobile_attach_pairing_credentials_v1(uint64_t handle,OmniPairingCr
  */
 OmniBuffer om_mobile_pairing_client_begin_v1(uint64_t handle,const uint8_t* data,size_t length,uint32_t budget_ms);
 OmniBuffer om_mobile_pairing_client_action_v1(uint64_t handle,const uint8_t* data,size_t length,uint32_t action,uint32_t budget_ms);
+/* Native UI only after explicit consent to the exact persisted candidate/grant.
+ * JSON <=1024: {address,expected_revision,reviewed_grant_hash}; budget 1000..25000.
+ * Reloads under the scoped credential lease and requires fresh bound relay
+ * approval before Active publication. No transport/session authority is granted.
+ * Errors may follow commit: inspect native status, never assume rollback. */
+OmniBuffer om_mobile_pairing_activate_client_v1(uint64_t handle,const uint8_t* data,size_t length,uint32_t budget_ms);
 /* Trusted native controller only, never renderer commands. Status returns
  * bounded public lifecycle metadata. Preparation requires foreground, attached
  * scoped provider, current journal revision, budget 1000..25000 ms and enabled
