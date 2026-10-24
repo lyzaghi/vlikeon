@@ -174,12 +174,24 @@ impl LocalHost {
     pub fn native_pairing_activate_client_after_local_consent(&self,store:&dyn omniplay_streaming::native_credentials::PairingSecretStore,
         address:omniplay_streaming::native_credentials::CredentialAddress,expected:u64,deadline:std::time::Instant,
         cancel:&std::sync::atomic::AtomicBool)->Result<Value>{
+        self.native_pairing_activate_consented_pair(store,address,expected,deadline,cancel,false)
+    }
+    /// Actual native host peer/input consent, exact persisted candidate only.
+    pub fn native_pairing_activate_host_after_local_consent(&self,store:&dyn omniplay_streaming::native_credentials::PairingSecretStore,
+        address:omniplay_streaming::native_credentials::CredentialAddress,expected:u64,deadline:std::time::Instant,
+        cancel:&std::sync::atomic::AtomicBool)->Result<Value>{
+        self.native_pairing_activate_consented_pair(store,address,expected,deadline,cancel,true)
+    }
+    fn native_pairing_activate_consented_pair(&self,store:&dyn omniplay_streaming::native_credentials::PairingSecretStore,
+        address:omniplay_streaming::native_credentials::CredentialAddress,expected:u64,deadline:std::time::Instant,
+        cancel:&std::sync::atomic::AtomicBool,host:bool)->Result<Value>{
         self.ensure_open()?;
         if std::time::Instant::now()>=deadline||cancel.load(std::sync::atomic::Ordering::Acquire){return Err(PlatformError::new(ErrorCode::Cancelled,"Native client activation expired or was cancelled"));}
         let origins=omniplay_core::stream_signal_authority::installed_pairing_origins()?;
         let relay=omniplay_streaming::native_relay::NativePairRelay::new(origins)?;
         let mut writer=omniplay_core::stream_credential_writer::NativeCredentialWriter::open(&self.database,self.profile_id,store)?;
-        let revision=writer.activate_client_after_local_consent(address,expected,&relay,omniplay_core::now_ms(),deadline,cancel)?;
+        let revision=if host{writer.activate_host_after_local_consent(address,expected,&relay,omniplay_core::now_ms(),deadline,cancel)?}
+            else{writer.activate_client_after_local_consent(address,expected,&relay,omniplay_core::now_ms(),deadline,cancel)?};
         Ok(json!({"credential_protocol":1,"address":address,"revision":revision,"phase":"active","reload_required":true}))
     }
     /// Trusted native peer-consent controller only. No renderer/native JSON can

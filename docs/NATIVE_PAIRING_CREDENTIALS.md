@@ -1607,6 +1607,34 @@ ECDH/parser/vault/SQL/native operation, compiler, build or test was executed.
 Cross-browser vectors, consent/persistence races, crash recovery and the complete
 original scope remain unqualified and open.
 
+## Persisted host approval and activation dispatch
+
+Native host activation now reloads the exact MaterialReady pair and Active pinned
+host identity/material under the same scoped lease as client activation. It first
+checks whether the configured relay already holds this exact live grant. An exact
+confirmation can reconcile a previously lost approval response without the expired
+invite/join rows. Network/protocol/receipt-conflict errors do not trigger approval.
+
+Only an explicit missing/unauthorized pair observation proceeds to ApprovePair
+using the retained signed grant, original invite ID and client public key. No
+alternative grant, generation or exchange is created. Server source returns a
+bound protocol-1 approval receipt for first and identical approvals. Native checks
+pair/grant/invite/client binding and obtains another fresh ConfirmPair before
+allowing journal Active. A revoked existing pair cannot be resurrected by this
+path: the server's revoked row/hash and existing approval checks still refuse it.
+
+The host/client writer paths share revision/namespace/vault/deadline/cancellation
+admission. Relay effects can survive a later local error, so MaterialReady plus
+retained grant is recovery state, not permission to regenerate or auto-activate.
+LocalHost gates either role on enabled installed origins and actual native consent
+must precede dispatch. Current policy is disabled. No session/input capability is
+created by activation; subsequent transport/authority admission remains required.
+
+No server deployment, HTTP/native/vault/SQL operation, compiler, build or test ran.
+Invite registration/poll/share UI, full native controller/foreground binding and
+recovery/owner qualification remain unfinished. Additive approval protocol source
+still needs deployment and browser/native interoperability verification.
+
 ## Remaining implementation and qualification
 
 - Journal/executor/lease/writer product integration, authority epochs, actual native owner

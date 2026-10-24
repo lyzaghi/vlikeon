@@ -2,6 +2,13 @@
 
 ## Current sequence — 1–109 outstanding tasks
 
+Item 58 now connects persisted host candidate activation through exact relay
+confirmation/reconciliation, retained-grant approval with bound protocol receipt,
+then fresh confirmation before journal Active. Client/host share scoped writer
+admission; native consent and enabled installed origins remain required. No
+deployment/HTTP/native/vault/SQL/compiler/build/test ran. Invite registration/poll,
+actual UI/controller and owner/recovery qualification remain due; scope is open.
+
 Item 58 now authors native host invitation/share proof, signed peer review and
 exact consented grant/exchange preparation, bounded to eight distinct client
 attempts and original invite expiry. Host writer reloads its Active pinned key

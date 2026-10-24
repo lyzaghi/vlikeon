@@ -94,15 +94,50 @@ impl NativePairRelay{
     /// consent or a journal activation. May be used after invite UI has closed.
     pub fn confirm_client_grant(&self,identity:&NativeSigningIdentity,audience:&str,document:&crate::SignedDocument,
         now:u64,deadline:Instant,cancel:&AtomicBool)->Result<()>{
+        let grant=verify_grant(document,audience,now)?;
+        if grant.client_public_key!=identity.public_key(){return Err(denied());}
+        self.confirm_pair_grant(identity,audience,document,now,deadline,cancel)
+    }
+    /// Trusted writer dispatches only after exact grant/material persistence.
+    /// Reconcile the same grant first; never create an alternative on failure.
+    pub fn approve_host_grant(&self,identity:&NativeSigningIdentity,audience:&str,document:&crate::SignedDocument,
+        now:u64,deadline:Instant,cancel:&AtomicBool)->Result<()>{
         let started=Instant::now();check(deadline,cancel)?;
         let grant=verify_grant(document,audience,now)?;
-        if grant.id.is_nil()||grant.invite_id.is_nil()||grant.client_public_key!=identity.public_key(){return Err(denied());}
+        if grant.id.is_nil()||grant.invite_id.is_nil()||grant.host_public_key!=identity.public_key(){return Err(denied());}
+        match self.confirm_pair_grant(identity,audience,document,now,deadline,cancel){
+            Ok(())=>return Ok(()),
+            Err(error)if matches!(error.code,ErrorCode::PermissionDenied|ErrorCode::NotFound)=>{},
+            Err(error)=>return Err(error),
+        }
+        check(deadline,cancel)?;let current=elapsed_now(now,started)?;grant.validate(audience,current)?;
+        let body=RelayRequest{schema_version:1,audience:audience.into(),issued_at_ms:current,nonce:Uuid::new_v4(),operation:RelayOperation::ApprovePair{
+            invite_id:grant.invite_id,client_public_key:grant.client_public_key.clone(),grant:document.clone()}};
+        let signed=identity.sign(SigningDomain::Request,&serde_json::to_vec(&body).map_err(|_|network())?)?;
+        let envelope=RelayEnvelope{public_key:identity.public_key(),document:signed};
+        let _=verify_request(&envelope,audience,elapsed_now(now,started)?)?;
+        let response=self.post(audience,&serde_json::to_vec(&envelope).map_err(|_|network())?,deadline,cancel)?;
+        #[derive(serde::Deserialize)]#[serde(deny_unknown_fields)]
+        struct Receipt{approval_protocol:u32,approved:bool,pair_id:Uuid,grant_hash:String,invite_id:Uuid,client_public_key:String}
+        let receipt:Receipt=serde_json::from_value(response).map_err(|_|network())?;
+        if receipt.approval_protocol!=1||!receipt.approved||receipt.pair_id!=grant.id||receipt.grant_hash!=crate::document_hash(document)?||
+            receipt.invite_id!=grant.invite_id||receipt.client_public_key!=grant.client_public_key{return Err(denied());}
+        self.confirm_pair_grant(identity,audience,document,elapsed_now(now,started)?,deadline,cancel)?;
+        grant.validate(audience,elapsed_now(now,started)?)?;check(deadline,cancel)?;Ok(())
+    }
+    fn confirm_pair_grant(&self,identity:&NativeSigningIdentity,audience:&str,document:&crate::SignedDocument,
+        now:u64,deadline:Instant,cancel:&AtomicBool)->Result<()>{
+        let started=Instant::now();check(deadline,cancel)?;
+        let grant=verify_grant(document,audience,now)?;
+        if grant.id.is_nil()||grant.invite_id.is_nil()||(grant.client_public_key!=identity.public_key()&&grant.host_public_key!=identity.public_key()){return Err(denied());}
         let response=self.request(identity,audience,RelayOperation::ConfirmPair{grant:document.clone()},now,deadline,cancel)?;
         #[derive(serde::Deserialize)]#[serde(deny_unknown_fields)]
         struct Receipt{pair_confirmation_protocol:u32,approved:bool,pair_id:Uuid,grant_hash:String,expires_at_ms:u64}
         let receipt:Receipt=serde_json::from_value(response).map_err(|_|network())?;
         if receipt.pair_confirmation_protocol!=1||!receipt.approved||receipt.pair_id!=grant.id||
-            receipt.grant_hash!=crate::document_hash(document)?||receipt.expires_at_ms!=grant.expires_at_ms{return Err(denied());}
+            receipt.grant_hash!=crate::document_hash(document)?||receipt.expires_at_ms!=grant.expires_at_ms{
+            return Err(PlatformError::new(ErrorCode::Conflict,"Relay confirmation does not match the retained native grant"));
+        }
         grant.validate(audience,elapsed_now(now,started)?)?;check(deadline,cancel)?;Ok(())
     }
     fn signed_pairing_status(&self,identity:&NativeSigningIdentity,audience:&str,invite_id:Uuid,

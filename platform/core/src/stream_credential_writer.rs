@@ -110,6 +110,16 @@ impl<'a> NativeCredentialWriter<'a>{
     /// generation, generic boolean receipt or transport/session grant is created.
     pub fn activate_client_after_local_consent(&mut self,address:CredentialAddress,expected:u64,
         relay:&omniplay_streaming::native_relay::NativePairRelay,now:u64,deadline:Instant,cancel:&std::sync::atomic::AtomicBool)->Result<u64>{
+        self.activate_consented_pair(address,expected,relay,false,now,deadline,cancel)
+    }
+    /// Exact already-persisted host candidate only, after actual native consent.
+    /// Reuses the retained signed grant for approval/reconciliation, not a new key.
+    pub fn activate_host_after_local_consent(&mut self,address:CredentialAddress,expected:u64,
+        relay:&omniplay_streaming::native_relay::NativePairRelay,now:u64,deadline:Instant,cancel:&std::sync::atomic::AtomicBool)->Result<u64>{
+        self.activate_consented_pair(address,expected,relay,true,now,deadline,cancel)
+    }
+    fn activate_consented_pair(&mut self,address:CredentialAddress,expected:u64,
+        relay:&omniplay_streaming::native_relay::NativePairRelay,host:bool,now:u64,deadline:Instant,cancel:&std::sync::atomic::AtomicBool)->Result<u64>{
         let started=begin(deadline)?;
         if cancel.load(std::sync::atomic::Ordering::Acquire){return Err(conflict());}
         let snapshot=journal::load_scoped(self.database,&self.lease,self.profile)?;check(deadline)?;
@@ -118,19 +128,20 @@ impl<'a> NativeCredentialWriter<'a>{
         if address.kind()!=SecretKind::PairEncryption||pair.phase()!=Phase::MaterialReady{return Err(conflict());}
         let metadata=pair.grant().ok_or_else(conflict)?;
         let grant=verify_grant(metadata.document(),metadata.audience(),elapsed_now(now,started)?)?;
-        if grant.client_public_key!=pair.public_key(){return Err(conflict());}
+        if (if host{&grant.host_public_key}else{&grant.client_public_key})!=pair.public_key(){return Err(conflict());}
         let identity=snapshot.records().iter().find(|record|record.address().kind()==SecretKind::DeviceSigning&&
             record.phase()==Phase::Active&&record.public_key()==pair.public_key()).ok_or_else(conflict)?;
         let signer=load_identity(self.store,&identity.address(),identity.public_key())?;
         let material=load_pair(self.store,&address,metadata.document(),metadata.audience(),pair.public_key(),elapsed_now(now,started)?)?;
         check(deadline)?;self.lease.check(self.database,self.profile)?;
-        relay.confirm_client_grant(&signer,metadata.audience(),metadata.document(),elapsed_now(now,started)?,deadline,cancel)?;
+        if host{relay.approve_host_grant(&signer,metadata.audience(),metadata.document(),elapsed_now(now,started)?,deadline,cancel)?;}
+        else{relay.confirm_client_grant(&signer,metadata.audience(),metadata.document(),elapsed_now(now,started)?,deadline,cancel)?;}
         check(deadline)?;self.lease.check(self.database,self.profile)?;
         if cancel.load(std::sync::atomic::Ordering::Acquire){return Err(conflict());}
         let updated=journal::activate(self.database,&self.lease,self.profile,expected,address,elapsed_now(now,started)?)?;
         drop(material);drop(signer);check(deadline)?;
         grant.validate(metadata.audience(),elapsed_now(now,started)?)?;
-        if cancel.load(std::sync::atomic::Ordering::Acquire){return Err(PlatformError::new(ErrorCode::Cancelled,"Client activation may have committed; reload native pairing state"));}
+        if cancel.load(std::sync::atomic::Ordering::Acquire){return Err(PlatformError::new(ErrorCode::Cancelled,"Pair activation may have committed; reload native pairing state"));}
         Ok(updated.revision())
     }
     /// The key must come from the native authenticated exchange. This primitive

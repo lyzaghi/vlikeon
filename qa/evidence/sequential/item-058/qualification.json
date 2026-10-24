@@ -107,7 +107,9 @@
     "LocalHost activation uses enabled installed pairing origins, never disabled-policy retirement origins; mobile foreground/peer-consent UI integration and actual qualification remain unfinished",
     "Native host invitation source owns random bearer proof and signed five-minute invite, explicit zeroizing share code and pinned-client hello/comparison review",
     "Native host approval binds consented input/lifetime to exact hello and fresh exchange, with one attempt per client and at most eight attempts per invite",
-    "Retained-lease host writer reloads Active pinned identity and persists exact grant/material as MaterialReady before any relay approval; host dispatch/UI/activation/runtime remain unfinished"
+    "Retained-lease host writer reloads Active pinned identity and persists exact grant/material as MaterialReady before any relay approval; native host UI/runtime remain unfinished",
+    "Host candidate activation source reconciles exact existing relay grant or approves only the retained persisted grant, requires bound approval receipt and fresh ConfirmPair before journal Active",
+    "Server source binds first/identical host approval receipts to pair/grant/invite/client; LocalHost host/client activation shares enabled-policy, scoped vault/revision/deadline gates with no deployment or runtime qualification"
   ],
   "build_executed": false,
   "tests_executed": false,

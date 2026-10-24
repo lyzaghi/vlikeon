@@ -80,12 +80,13 @@ impl Store {
                 let Some((hello,state))=hello else{return Err(ApiError::not_found());};
                 let signed:SignedDocument=serde_json::from_str(&hello).map_err(sql)?;let client:ClientHello=verify(&client_public_key,HELLO_DOMAIN,&signed,4096).map_err(|_|ApiError::unauthorized())?;
                 if document_hash(&signed).map_err(|_|ApiError::invalid())?!=grant.client_hello_hash.0||client.client_ecdh!=grant.client_ecdh||client.client_nonce!=grant.client_nonce{return Err(ApiError::conflict());}
-                if state=="approved"{let previous:Option<String>=tx.query_row("SELECT grant_hash FROM pairs WHERE id=?1 AND revoked=0",[grant.id.to_string()],|r|r.get(0)).optional().map_err(sql)?;if previous.as_deref()==Some(document_hash(&document).map_err(|_|ApiError::invalid())?.as_str()){return Ok(json!({"approved":true}));}return Err(ApiError::conflict());}
+                let receipt=json!({"approved":true,"approval_protocol":1,"pair_id":grant.id,"grant_hash":document_hash(&document).map_err(|_|ApiError::invalid())?,"invite_id":invite_id,"client_public_key":client_public_key});
+                if state=="approved"{let previous:Option<String>=tx.query_row("SELECT grant_hash FROM pairs WHERE id=?1 AND revoked=0",[grant.id.to_string()],|r|r.get(0)).optional().map_err(sql)?;if previous.as_deref()==Some(document_hash(&document).map_err(|_|ApiError::invalid())?.as_str()){return Ok(receipt);}return Err(ApiError::conflict());}
                 if state!="pending"{return Err(ApiError::conflict());}
                 let total:u64=tx.query_row("SELECT count(*) FROM pairs",[],|r|r.get(0)).map_err(sql)?;let owned:u64=tx.query_row("SELECT count(*) FROM pairs WHERE (host=?1 OR client=?1) AND revoked=0",[sender],|r|r.get(0)).map_err(sql)?;
                 if total>=10000||owned>=32{return Err(ApiError::quota());}
                 tx.execute("INSERT INTO pairs(id,host,client,invite,expires,grant_hash,document) VALUES(?1,?2,?3,?4,?5,?6,?7)",params![grant.id.to_string(),sender,client_public_key,invite_id.to_string(),grant.expires_at_ms,document_hash(&document).map_err(|_|ApiError::invalid())?,text(&document)?]).map_err(|_|ApiError::conflict())?;
-                tx.execute("UPDATE joins SET state='approved' WHERE invite=?1 AND client=?2",params![invite_id.to_string(),client_public_key]).map_err(sql)?;Ok(json!({"approved":true}))
+                tx.execute("UPDATE joins SET state='approved' WHERE invite=?1 AND client=?2",params![invite_id.to_string(),client_public_key]).map_err(sql)?;Ok(receipt)
             }
             RelayOperation::DeclinePair{invite_id,client_public_key}=>{invite_row(tx,&invite_id.to_string(),Some(sender))?;tx.execute("UPDATE joins SET state='declined' WHERE invite=?1 AND client=?2 AND state='pending'",params![invite_id.to_string(),client_public_key]).map_err(sql)?;Ok(json!({"declined":true}))}
             RelayOperation::CloseInvite{invite_id}=>{invite_row(tx,&invite_id.to_string(),Some(sender))?;tx.execute("DELETE FROM invites WHERE id=?1",[invite_id.to_string()]).map_err(sql)?;Ok(json!({"closed":true}))}
