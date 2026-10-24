@@ -2,6 +2,10 @@
 
 ## Current sequence — 1–109 outstanding tasks
 
+Item 58 explicit host sharing now has separate raw-byte mobile ABI, avoiding
+proof-bearing generic JSON results. Failure is empty; owned returned bytes wipe
+on om_mobile_free. Source-only; OS/UI copy lifecycle and build/test remain due.
+
 Item 58 iOS now authors bounded one-use host begin from retained Active identity,
 matching local key/revision and explicit unregistered reply flags. Setup refuses
 pending host/client flows. Source-only; UI/share/durable recovery/build/test due.

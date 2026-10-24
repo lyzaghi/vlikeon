@@ -155,6 +155,27 @@ impl Drop for PairingClientBegin{fn drop(&mut self){self.code.zeroize();}}
 struct PairingClientActivation{address:omniplay_streaming::native_credentials::CredentialAddress,expected_revision:u64,reviewed_grant_hash:String}
 #[derive(Deserialize)]#[serde(deny_unknown_fields)]
 struct PairingHostBegin{identity:omniplay_streaming::native_credentials::CredentialAddress,expected_revision:u64,audience:String,label:String}
+/// # Safety
+/// Explicit trusted native share action only, ticket JSON <=128. Returned raw
+/// OPRP1 bytes contain bearer proof; never JSON/log/renderer. Empty means failure.
+/// Caller clears copies and calls om_mobile_free on every returned buffer.
+#[no_mangle]
+pub unsafe extern "C" fn om_mobile_pairing_host_share_v1(handle:u64,data:*const u8,length:usize,budget_ms:u32)->OmniBuffer{
+    let share=(||->Result<zeroize::Zeroizing<String>>{
+        if length>128||!(1000..=25000).contains(&budget_ms){return Err(error(ErrorCode::InvalidRequest,"Native host share exceeds bounds"));}
+        let deadline=std::time::Instant::now()+std::time::Duration::from_millis(u64::from(budget_ms));
+        // SAFETY: caller supplies the bounded synchronous readable input above.
+        let request:PairingClientTicket=serde_json::from_slice(unsafe{input(data,length)?}).map_err(|_|error(ErrorCode::InvalidRequest,"Native host share ticket is invalid"))?;
+        if request.ticket.is_nil(){return Err(error(ErrorCode::InvalidRequest,"Native host share ticket is invalid"));}
+        let(host,provider,epoch)=pairing_operation(handle)?;
+        let host=host.lock().map_err(|_|error(ErrorCode::Internal,"Mobile profile is unavailable"))?;
+        provider.require_operation_epoch(epoch)?;let cancel=provider.operation_cancellation(epoch)?;
+        let code=host.native_pairing_host_share(provider.as_ref(),request.ticket,epoch,deadline,&cancel)?;
+        provider.require_operation_epoch(epoch)?;
+        if cancel.load(Ordering::Acquire)||std::time::Instant::now()>=deadline||code.len()>8192||!code.starts_with("OPRP1."){return Err(error(ErrorCode::Cancelled,"Native host share became stale"));}Ok(code)
+    })();
+    match share{Ok(code)=>buffer(code.as_bytes().to_vec()),Err(_)=>OmniBuffer{data:std::ptr::null_mut(),length:0}}
+}
 #[derive(Deserialize)]#[serde(deny_unknown_fields)]
 struct PairingHostPeer{ticket:Uuid,client_public_key:String,reviewed_hello_hash:String,input_allowed:Option<bool>,lifetime_ms:Option<u64>}
 /// # Safety

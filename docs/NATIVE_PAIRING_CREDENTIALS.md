@@ -1840,6 +1840,15 @@ this checkpoint.
 
 ## Remaining implementation and qualification
 
+Dedicated host_share ABI now returns raw OPRP1 UTF-8 bytes <=8192 only on explicit
+native share admission, outside generic JSON serialization/status. Ticket request
+is bounded; actual provider epoch/cancel/deadline and registered live invitation
+checks apply. Failure returns NULL/0 with no proof-bearing error payload. Original
+Zeroizing String drops after copying to the owned C buffer, which om_mobile_free
+wipes. Caller must always free it and clear later copies where possible; Swift/
+Java/UI/clipboard/share-service copies are not guaranteed erased. No caller/UI or
+build/test/native operation ran. Product sharing lifecycle remains unfinished.
+
 iOS host begin now consumes the original core/owner/cancel-bound identity setup,
 selects an installed origin and uses shared bounded admission plus the earlier
 setup/operation deadline. Successful replies require exact local identity key/

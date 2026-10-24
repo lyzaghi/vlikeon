@@ -98,6 +98,12 @@ OmniBuffer om_mobile_pairing_review_client_v1(uint64_t handle,const uint8_t* dat
  * approval. Late errors may leave pending/registered/closed state: inspect status.
  * Close currently requires foreground provider; background/crash recovery is due. */
 OmniBuffer om_mobile_pairing_host_begin_v1(uint64_t handle,const uint8_t* data,size_t length,uint32_t budget_ms);
+/* Explicit native share only, ticket JSON <=128, budget 1000..25000.
+ * SUCCESS: raw OPRP1 UTF-8 bytes <=8192 containing bearer proof, NOT JSON.
+ * FAILURE: {NULL,0}; read native status for reconciliation, never auto-retry.
+ * Never log/forward to renderer. Clear UI/OS copies when possible; always call
+ * om_mobile_free (which wipes the owned native buffer). No OS copy wipe guarantee. */
+OmniBuffer om_mobile_pairing_host_share_v1(uint64_t handle,const uint8_t* data,size_t length,uint32_t budget_ms);
 OmniBuffer om_mobile_pairing_host_action_v1(uint64_t handle,const uint8_t* data,size_t length,uint32_t action,uint32_t budget_ms);
 /* Native peer review only, <=1024: {ticket,client_public_key,reviewed_hello_hash}.
  * action 1 adds explicit input_allowed/lifetime_ms and persists after actual
