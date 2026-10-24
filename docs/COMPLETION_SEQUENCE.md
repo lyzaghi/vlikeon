@@ -2,6 +2,10 @@
 
 ## Current sequence — 1–109 outstanding tasks
 
+Item 58 host candidate review/activation now has a dedicated bounded mobile ABI
+with exact native address/revision/hash and actual provider epoch/cancel checks.
+No transport authority. Source-only; host callers/UI, durable recovery/build/test due.
+
 Item 58 host peer mobile ABI now routes exact reviewed-hello persistence/decline,
 requiring explicit input/lifetime choices for persistence and actual provider
 epoch/cancel/deadline. No automatic consent/activation; source-only. Native UI,

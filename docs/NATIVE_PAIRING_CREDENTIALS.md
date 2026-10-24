@@ -1840,6 +1840,16 @@ this checkpoint.
 
 ## Remaining implementation and qualification
 
+Dedicated host_candidate ABI now routes strict <=1024-byte review and reviewed
+activation requests to the corresponding host-role LocalHost methods. Activation
+requires canonical reviewed hash; both derive actual foreground provider epoch,
+validate scoped address access before/after and share original bounded deadline
+and cancellation checks. Review grants no consent; activation still requires
+actual native peer/input approval and grants no transport/session authority.
+Late errors require journal reconciliation rather than rollback assumptions.
+No JNI/Swift caller/UI, compiler/build/test or runtime operation ran. Full host
+integration, durable invitation cleanup and end-to-end qualification remain due.
+
 Dedicated host_peer ABI now accepts bounded native-only ticket/client-key/
 reviewed-hello-hash requests. Persist requires explicit input boolean and lifetime;
 decline refuses supplied permission choices. Exact client key is parsed, hash

@@ -158,6 +158,29 @@ struct PairingHostBegin{identity:omniplay_streaming::native_credentials::Credent
 #[derive(Deserialize)]#[serde(deny_unknown_fields)]
 struct PairingHostPeer{ticket:Uuid,client_public_key:String,reviewed_hello_hash:String,input_allowed:Option<bool>,lifetime_ms:Option<u64>}
 /// # Safety
+/// Trusted native candidate JSON <=1024. action 1 review {address,expected_revision};
+/// action 2 activate adds reviewed_grant_hash after actual native peer/input consent.
+#[no_mangle]
+pub unsafe extern "C" fn om_mobile_pairing_host_candidate_v1(handle:u64,data:*const u8,length:usize,action:u32,budget_ms:u32)->OmniBuffer{result((||{
+    if length>1024||!(1..=2).contains(&action)||!(1000..=25000).contains(&budget_ms){return Err(error(ErrorCode::InvalidRequest,"Native host candidate action exceeds bounds"));}
+    let deadline=std::time::Instant::now()+std::time::Duration::from_millis(u64::from(budget_ms));
+    // SAFETY: caller supplies the bounded synchronous readable input above.
+    let bytes=unsafe{input(data,length)?};
+    let activation:Option<PairingClientActivation>=if action==2{Some(serde_json::from_slice(bytes).map_err(|_|error(ErrorCode::InvalidRequest,"Native reviewed host activation is invalid"))?)}else{None};
+    let request=if let Some(review)=&activation{
+        if review.reviewed_grant_hash.len()!=64||!review.reviewed_grant_hash.bytes().all(|b|b.is_ascii_digit()||(b'a'..=b'f').contains(&b)){return Err(error(ErrorCode::InvalidRequest,"Native reviewed host hash is invalid"));}
+        PairingMetadataRecovery{address:review.address,expected_revision:review.expected_revision}
+    }else{serde_json::from_slice(bytes).map_err(|_|error(ErrorCode::InvalidRequest,"Native host candidate review is invalid"))?};
+    let(host,provider,epoch)=pairing_operation(handle)?;
+    let host=host.lock().map_err(|_|error(ErrorCode::Internal,"Mobile profile is unavailable"))?;
+    provider.confirm_access(&request.address,epoch)?;let cancel=provider.operation_cancellation(epoch)?;
+    let value=if let Some(review)=activation{
+        host.native_pairing_activate_reviewed_host(provider.as_ref(),request.address,request.expected_revision,&review.reviewed_grant_hash,deadline,&cancel)?
+    }else{host.native_pairing_review_host_candidate(provider.as_ref(),request.address,request.expected_revision,deadline,&cancel)?};
+    provider.confirm_access(&request.address,epoch)?;
+    if cancel.load(Ordering::Acquire)||std::time::Instant::now()>=deadline{return Err(error(ErrorCode::Cancelled,"Native host candidate result may be stale or committed; inspect status"));}Ok(value)
+})())}
+/// # Safety
 /// Trusted native peer review JSON <=1024. action 1 persist after actual native
 /// peer/comparison/input consent, 2 decline exact reviewed request. No renderer.
 #[no_mangle]

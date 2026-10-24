@@ -104,6 +104,11 @@ OmniBuffer om_mobile_pairing_host_action_v1(uint64_t handle,const uint8_t* data,
  * peer/comparison/input consent. action 2 declines; no permission fields allowed.
  * Budget 1000..25000. No activation; late errors require status reconciliation. */
 OmniBuffer om_mobile_pairing_host_peer_v1(uint64_t handle,const uint8_t* data,size_t length,uint32_t action,uint32_t budget_ms);
+/* Native candidate action <=1024: 1 review {address,expected_revision}; 2 activate
+ * adds reviewed_grant_hash after actual native peer/input consent. Budget 1000..25000.
+ * Exact host-role grant/vault/policy checks apply. Review grants no consent;
+ * activation grants no transport. Late errors require status reconciliation. */
+OmniBuffer om_mobile_pairing_host_candidate_v1(uint64_t handle,const uint8_t* data,size_t length,uint32_t action,uint32_t budget_ms);
 /* Trusted native controller only, never renderer commands. Status returns
  * bounded public lifecycle metadata. Preparation requires foreground, attached
  * scoped provider, current journal revision, budget 1000..25000 ms and enabled
