@@ -1,5 +1,17 @@
 # Native ordered RTP to decoder bridge — item 56
 
+Native POC derivation now has source implementation in `native_h264_poc.rs` for
+types 0/1/2: reference-LSB/MSB wrap, frame-number offsets, cycle offsets and
+nonreference adjustments, top/bottom field counts and MMCO5 normalization. A
+staged update exposes pre-reset counts for current prediction and normalized
+counts for future reference retention. Commit binds the original POC owner,
+version and still-current parameter pair; retries do not implicitly advance it.
+Arithmetic uses wide intermediates with a finite count bound. Separate planes,
+redundant pictures, gap/non-existing-picture generation, field pairing, output
+buffering and actual decoder completion integration remain unfinished. The
+reference-list component still needs to consume these derived counts through
+its native decode owner. No build/test/parser/device execution ran.
+
 Progressive-frame reference state now builds per-slice P/SP/B prediction lists:
 descending wrapped PicNum for P/SP, POC partitions and identical-list swap for B,
 then ascending long-term references. Short/long-term list edits insert the exact
