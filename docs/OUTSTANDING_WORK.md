@@ -1,7 +1,12 @@
 # Sequential outstanding work — owner-approved numbering
 
 The owner requests completing these items in order, without changing scope.
-Antigravity executes assigned tests only; Codex owns review, fixes and acceptance.
+Historical allocation: Antigravity executed assigned tests only; Codex owned fixes.
+Owner steering on 2026-10-25 requests a full handoff plan for Antigravity App,
+including implementation/fixes. The new handoff allocation replaces test-only
+scope for that handoff, while build/test remain deferred and no App execution is
+claimed. See `ANTIGRAVITY_HANDOFF_2026-10-25.md`; existing other-chat jobs keep
+their own ownership and authorizations until explicitly transferred.
 These are the new 1–109 identifiers, distinct from the historical 17-area roadmap.
 Unchecked items remain open, including items with authored but unqualified source.
 
