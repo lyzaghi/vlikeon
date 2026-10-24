@@ -14,6 +14,12 @@ final class NativeDocumentLifetime {
     func invalidate(){lock.lock();alive=false;lock.unlock()}
 }
 
+/// Public metadata owned by a native dialog, never sent to WebKit.
+struct NativeIdentityReview {
+    let id:String, publicKey:String, device:String, generation:String
+    let expires:DispatchTime
+}
+
 /// Only this native object can call path-bearing authorization APIs. Each profile's
 /// SQLite handle is serialized off the main thread; WebKit never sees its root path.
 final class NativeCore {
@@ -98,6 +104,62 @@ final class NativeCore {
         let result=try unwrap(consume(om_mobile_attach_pairing_credentials_v1(handle,
             PairingCredentials.callbacks(profile:profileID,device:device))))
         return result["attached"] as? Bool == true && (result["credential_abi"] as? NSNumber)?.uint32Value == 1
+    }
+    /// Native UI only. Existing/uncertain identities require explicit recovery;
+    /// opening this flow never silently replaces them or activates a peer.
+    func reviewPairingIdentity(owner:NativeDocumentLifetime,completion:@escaping @MainActor (Result<NativeIdentityReview,Error>)->Void){
+        queue.async {
+            do {
+                guard owner.active,self.handle != 0,self.pairingAttached else{throw OmniFailure.message("Kho khóa Remote Play chưa sẵn sàng.")}
+                let status=try self.unwrap(self.consume(om_mobile_pairing_status(self.handle)))
+                guard status["policy_available"] as? Bool == true else{throw OmniFailure.message("Remote Play chưa được bật trong phiên bản này.")}
+                guard let records=status["records"] as? [[String:Any]],let revision=status["revision"] as? NSNumber,
+                      let device=status["device_id"] as? String,status["profile_id"] as? String == self.profileID.uuidString.lowercased() else{throw OmniFailure.message("Trạng thái danh tính không hợp lệ.")}
+                let identities=records.filter{($0["address"] as? [String:Any])?["kind"] as? String == "device_signing" && $0["phase"] as? String != "retired"}
+                var expected=revision.uint64Value
+                guard owner.active else{throw OmniFailure.message("Phiên xác nhận đã kết thúc.")}
+                if identities.isEmpty {
+                    let prepared=try self.unwrap(self.consume(om_mobile_pairing_prepare_identity_v1(self.handle,expected,25_000)))
+                    guard prepared["phase"] as? String == "material_ready",let next=prepared["revision"] as? NSNumber else{throw OmniFailure.message("Hãy đọc lại trạng thái danh tính trước khi tiếp tục.")}
+                    expected=next.uint64Value
+                } else {
+                    guard identities.count==1,identities[0]["phase"] as? String == "material_ready" else{throw OmniFailure.message("Danh tính đã tồn tại hoặc cần phục hồi. Không tạo khóa thay thế tự động.")}
+                }
+                guard owner.active else{throw OmniFailure.message("Phiên xác nhận đã kết thúc. Hãy đọc lại trạng thái danh tính.")}
+                let value=try self.unwrap(self.consume(om_mobile_pairing_review_identity_v1(self.handle,expected)))
+                guard owner.active,let id=value["review_id"] as? String,UUID(uuidString:id) != nil,
+                      (value["credential_protocol"] as? NSNumber)?.uint32Value==1,(value["revision"] as? NSNumber)?.uint64Value==expected,
+                      value["action"] as? String == "activate_local_identity",value["approves_remote_peer"] as? Bool == false,
+                      let address=value["address"] as? [String:Any],address["profile"] as? String == self.profileID.uuidString.lowercased(),
+                      address["device"] as? String == device,address["id"] as? String == device,address["kind"] as? String == "device_signing",
+                      let generation=address["generation"] as? String,UUID(uuidString:generation) != nil,
+                      let key=value["public_key"] as? String,key.count==43,key.utf8.allSatisfy({(65...90).contains($0)||(97...122).contains($0)||(48...57).contains($0)||$0==45||$0==95}),
+                      let ttl=value["expires_in_ms"] as? NSNumber,ttl.doubleValue.isFinite,ttl.doubleValue>0,ttl.doubleValue<=60_000 else{
+                    let cancelled=om_mobile_pairing_cancel_identity_review(self.handle);om_mobile_free(cancelled)
+                    throw OmniFailure.message("Phiên xác nhận danh tính không hợp lệ hoặc đã kết thúc.")
+                }
+                let review=NativeIdentityReview(id:id,publicKey:key,device:device,generation:generation,
+                    expires:.now()+ttl.doubleValue/1000)
+                DispatchQueue.main.async{completion(.success(review))}
+            }catch{DispatchQueue.main.async{completion(.failure(error))}}
+        }
+    }
+    /// Call only from the native dialog's explicit approval action.
+    func confirmPairingIdentity(_ review:NativeIdentityReview,owner:NativeDocumentLifetime,completion:@escaping @MainActor (Result<Void,Error>)->Void){
+        queue.async {
+            do {
+                guard owner.active,DispatchTime.now()<review.expires,self.handle != 0,self.pairingAttached else{throw OmniFailure.message("Phiên xác nhận đã hết hạn. Hãy mở lại trạng thái danh tính.")}
+                let value=try self.unwrap(self.call(["review_id":review.id]){om_mobile_pairing_confirm_identity_v1(self.handle,$0,$1,25_000)})
+                guard owner.active,value["phase"] as? String == "active",value["approves_remote_peer"] as? Bool == false,
+                      let address=value["address"] as? [String:Any],address["profile"] as? String == self.profileID.uuidString.lowercased(),
+                      address["device"] as? String == review.device,address["id"] as? String == review.device,
+                      address["generation"] as? String == review.generation,address["kind"] as? String == "device_signing" else{throw OmniFailure.message("Hãy đọc lại trạng thái danh tính; không tự động gửi lại xác nhận.")}
+                DispatchQueue.main.async{completion(.success(()))}
+            }catch{DispatchQueue.main.async{completion(.failure(error))}}
+        }
+    }
+    func cancelPairingIdentityReview(){
+        queue.async{if self.handle != 0{let value=om_mobile_pairing_cancel_identity_review(self.handle);om_mobile_free(value)}}
     }
     func open(completion: @escaping (Result<Void, Error>) -> Void) {
         queue.async {

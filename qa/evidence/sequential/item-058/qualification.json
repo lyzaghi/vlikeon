@@ -52,7 +52,9 @@
     "LocalHost native-only public journal status and installed-policy-gated identity preparation connect the retained-lease writer without renderer commands or activation",
     "Mobile C ABI requires attached foreground host/provider, original bounded deadline and transition epoch/access rechecks before publishing MaterialReady public metadata",
     "Native identity review source retains one exact generation/revision/foreground epoch with monotonic expiry, replacement and explicit cancellation",
-    "Bounded native confirmation consumes the pending review before pinned-vault-key activation and does not approve remote peers; actual trusted dialog/callers remain unintegrated"
+    "Bounded native confirmation consumes the pending review before pinned-vault-key activation and does not approve remote peers; actual trusted dialog/callers remain unintegrated",
+    "iOS native GameHub identity button/dialog source calls serialized status/prepare/review/confirm/cancel APIs with public scope/revision/action/expiry checks and explicit approval",
+    "iOS transient flow lifetime suppresses stale UI callbacks across cancel, expiry, resign-active, protected-data loss, suspension, view departure, fullscreen and load failure; no automatic replacement/retry"
   ],
   "build_executed": false,
   "tests_executed": false,
@@ -65,7 +67,7 @@
     "Journal/executor/lease/writer product integration, native consent/session owner, copied-profile coordination, startup dispatch and authenticated relay approval/revocation",
     "Native origin/document/session hook and consent/invitation-secret/approval controller integration, abandoned receiver ownership recovery, ICE/backend refresh/stop and retirement dispatch, upgraded relay deployment and WebCrypto/native interoperability",
     "Native broker authority and document/session capability integration",
-    "Android/iOS attachment/protected-data/ABI/lease filesystem device qualification, native status/preparation app callers and full LocalHost pairing/consent/recovery controller integration",
+    "Android/iOS attachment/protected-data/ABI/lease filesystem and iOS native identity UI qualification; Android status/preparation/consent callers and full LocalHost pairing/recovery controller integration",
     "Lock, restore, rotation, profile/device deletion and explicit browser-to-native re-pairing",
     "All build, test, vault and platform runtime verification"
   ]

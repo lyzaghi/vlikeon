@@ -888,6 +888,36 @@ native caller integration and startup/revocation recovery remain unfinished.
 No dialog, ABI endpoint, native callback, vault, SQL, build or test was executed;
 source review and whitespace checks are the only verification of this change.
 
+## iOS native identity dialog caller
+
+GameHub now authors a native identity entry button above WebKit content, hidden
+while a game uses fullscreen. Its Swift caller reads native status first and
+reports the installed disabled policy without trying to create a key. Once an
+eligible installed policy exists, an explicit button action may prepare a new
+identity only if there is no nonretired identity; an existing MaterialReady
+identity can be reviewed. Active or uncertain states require separate recovery
+and are never silently replaced.
+
+The native alert displays the exact device, generation and public key, explains
+the local-only activation action, and has separate cancel/approve actions. Only
+the approve handler calls confirmation. Swift checks protocol, revision, scope,
+action, key shape and bounded expiry before display, then checks the returned
+activation generation. Calls remain on the serialized native queue; review
+metadata/tokens are never returned through HubBridge or JavaScript.
+
+A separate thread-safe flow lifetime suppresses stale callbacks. Resigning
+active, protected-data loss, suspension, view departure, fullscreen, load failure,
+cancel or monotonic expiry invalidates the flow and schedules native review
+cancellation. UI cancellation does not claim to preempt an already-running vault
+call or roll back committed journal changes. Confirmation errors require a fresh
+status read; there is no automatic retry. Rust revision/epoch/deadline and pinned
+vault admission remain authoritative.
+
+This is authored iOS caller/UI source, not qualified product behavior. No Swift
+compiler, UIKit dialog, Keychain callback, native endpoint, build or test ran.
+Android callers, recovery, peer consent/exchange/approval, transport and all
+platform qualification remain unfinished. Policy remains disabled.
+
 ## Remaining implementation and qualification
 
 - Journal/executor/lease/writer product integration, authority epochs, actual native owner

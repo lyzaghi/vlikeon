@@ -17,6 +17,11 @@ final class GameHubViewController: UIViewController, WKNavigationDelegate, WKUID
     private var suspendWaiters:[()->Void]=[]
     private var fullScreenGame=false
     private var hubVisible=false
+    private let pairingButton=UIButton(type:.system)
+    private var pairingButtonHeight:NSLayoutConstraint?
+    private var pairingFlow:NativeDocumentLifetime?
+    private weak var pairingAlert:UIAlertController?
+    private var pairingExpiry:DispatchWorkItem?
     override var prefersStatusBarHidden:Bool{fullScreenGame}
     override var prefersHomeIndicatorAutoHidden:Bool{fullScreenGame}
     var openWebsite: ((URL)->Void)?
@@ -25,11 +30,17 @@ final class GameHubViewController: UIViewController, WKNavigationDelegate, WKUID
     required init?(coder:NSCoder){fatalError("Use the profile initializer")}
     override func viewDidLoad(){
         super.viewDidLoad();view.backgroundColor=UIColor(red:0.05,green:0.08,blue:0.065,alpha:1)
+        pairingButton.setTitle("Danh tính Remote Play",for:.normal);pairingButton.accessibilityLabel="Thiết lập danh tính Remote Play trên thiết bị này"
+        pairingButton.translatesAutoresizingMaskIntoConstraints=false;view.addSubview(pairingButton)
+        pairingButtonHeight=pairingButton.heightAnchor.constraint(equalToConstant:44)
+        NSLayoutConstraint.activate([pairingButton.leadingAnchor.constraint(equalTo:view.safeAreaLayoutGuide.leadingAnchor,constant:16),pairingButton.trailingAnchor.constraint(equalTo:view.safeAreaLayoutGuide.trailingAnchor,constant:-16),pairingButton.topAnchor.constraint(equalTo:view.safeAreaLayoutGuide.topAnchor),pairingButtonHeight!])
+        pairingButton.addAction(UIAction{[weak self]_ in self?.beginPairingIdentity()},for:.touchUpInside)
         status.text="Đang chuẩn bị thư viện…";status.textColor = .white;status.numberOfLines=0;status.textAlignment = .center;status.translatesAutoresizingMaskIntoConstraints=false;view.addSubview(status)
         NSLayoutConstraint.activate([status.leadingAnchor.constraint(equalTo:view.safeAreaLayoutGuide.leadingAnchor,constant:24),status.trailingAnchor.constraint(equalTo:view.safeAreaLayoutGuide.trailingAnchor,constant:-24),status.centerYAnchor.constraint(equalTo:view.centerYAnchor)])
         NotificationCenter.default.addObserver(self,selector:#selector(willResign),name:UIApplication.willResignActiveNotification,object:nil)
         NotificationCenter.default.addObserver(self,selector:#selector(didBackground),name:UIApplication.didEnterBackgroundNotification,object:nil)
         NotificationCenter.default.addObserver(self,selector:#selector(didActivate),name:UIApplication.didBecomeActiveNotification,object:nil)
+        NotificationCenter.default.addObserver(self,selector:#selector(cancelPairingIdentity),name:UIApplication.protectedDataWillBecomeUnavailableNotification,object:nil)
         core.open{[weak self] result in guard let self=self else{return};switch result{case .success:self.startHub();case .failure(let error):self.showFailure(error)}}
     }
     private func startHub(){
@@ -44,14 +55,14 @@ final class GameHubViewController: UIViewController, WKNavigationDelegate, WKUID
         let configuration=WKWebViewConfiguration();configuration.websiteDataStore = .nonPersistent();configuration.allowsInlineMediaPlayback=true
         configuration.mediaTypesRequiringUserActionForPlayback = .all
         let bridge=HubBridge(core:core,server:server,presenter:self);self.bridge=bridge
-        bridge.setGameFullscreen={ [weak self]enabled in guard let self=self else{return};self.fullScreenGame=enabled;self.tabBarController?.tabBar.isHidden=enabled;self.setNeedsStatusBarAppearanceUpdate();self.setNeedsUpdateOfHomeIndicatorAutoHidden();self.view.setNeedsLayout() }
+        bridge.setGameFullscreen={ [weak self]enabled in guard let self=self else{return};self.fullScreenGame=enabled;self.pairingButton.isHidden=enabled;self.pairingButtonHeight?.constant=enabled ? 0:44;if enabled{self.cancelPairingIdentity()};self.tabBarController?.tabBar.isHidden=enabled;self.setNeedsStatusBarAppearanceUpdate();self.setNeedsUpdateOfHomeIndicatorAutoHidden();self.view.setNeedsLayout() }
         configuration.userContentController.addScriptMessageHandler(bridge,contentWorld:.page,name:"omniplay")
         let webView=WKWebView(frame:.zero,configuration:configuration);webView.isInspectable=false;webView.navigationDelegate=self;webView.uiDelegate=self;webView.scrollView.contentInsetAdjustmentBehavior = .never
         bridge.webView=webView;self.webView=webView;webView.translatesAutoresizingMaskIntoConstraints=false;view.addSubview(webView)
-        NSLayoutConstraint.activate([webView.leadingAnchor.constraint(equalTo:view.leadingAnchor),webView.trailingAnchor.constraint(equalTo:view.trailingAnchor),webView.topAnchor.constraint(equalTo:view.safeAreaLayoutGuide.topAnchor),webView.bottomAnchor.constraint(equalTo:view.safeAreaLayoutGuide.bottomAnchor)])
+        NSLayoutConstraint.activate([webView.leadingAnchor.constraint(equalTo:view.leadingAnchor),webView.trailingAnchor.constraint(equalTo:view.trailingAnchor),webView.topAnchor.constraint(equalTo:pairingButton.bottomAnchor),webView.bottomAnchor.constraint(equalTo:view.safeAreaLayoutGuide.bottomAnchor)])
         webView.load(URLRequest(url:url))
     }
-    private func showFailure(_ error:Error){bridge?.resetDocument();core.setForeground(false);fullScreenGame=false;tabBarController?.tabBar.isHidden=false;setNeedsStatusBarAppearanceUpdate();status.text=error.localizedDescription;status.isHidden=false;webView?.isHidden=true;showRetry()}
+    private func showFailure(_ error:Error){cancelPairingIdentity();bridge?.resetDocument();core.setForeground(false);fullScreenGame=false;pairingButton.isHidden=false;pairingButtonHeight?.constant=44;tabBarController?.tabBar.isHidden=false;setNeedsStatusBarAppearanceUpdate();status.text=error.localizedDescription;status.isHidden=false;webView?.isHidden=true;showRetry()}
     private func showRetry(){
         retryButton?.removeFromSuperview()
         let retry=UIButton(type:.system);retryButton=retry;retry.setTitle("Mở lại Thư viện",for:.normal)
@@ -75,11 +86,51 @@ final class GameHubViewController: UIViewController, WKNavigationDelegate, WKUID
     func webView(_ webView:WKWebView,createWebViewWith configuration:WKWebViewConfiguration,for navigationAction:WKNavigationAction,windowFeatures:WKWindowFeatures)->WKWebView?{if let url=navigationAction.request.url,["https","http"].contains(url.scheme?.lowercased() ?? ""){openWebsite?(url)};return nil}
     func webView(_ webView:WKWebView,runJavaScriptAlertPanelWithMessage message:String,initiatedByFrame frame:WKFrameInfo,completionHandler:@escaping()->Void){let alert=UIAlertController(title:"OmniPlay",message:String(message.prefix(2000)),preferredStyle:.alert);alert.addAction(UIAlertAction(title:"OK",style:.default){_ in completionHandler()});present(alert,animated:true)}
     func webView(_ webView:WKWebView,runJavaScriptConfirmPanelWithMessage message:String,initiatedByFrame frame:WKFrameInfo,completionHandler:@escaping(Bool)->Void){let alert=UIAlertController(title:"OmniPlay",message:String(message.prefix(2000)),preferredStyle:.alert);alert.addAction(UIAlertAction(title:"Hủy",style:.cancel){_ in completionHandler(false)});alert.addAction(UIAlertAction(title:"Tiếp tục",style:.default){_ in completionHandler(true)});present(alert,animated:true)}
+    private func beginPairingIdentity(){
+        guard pairingFlow==nil,presentedViewController==nil,hubVisible,!fullScreenGame,!pendingSuspend,
+              UIApplication.shared.applicationState == .active,UIApplication.shared.isProtectedDataAvailable else{return}
+        let owner=NativeDocumentLifetime();pairingFlow=owner;pairingButton.isEnabled=false
+        core.reviewPairingIdentity(owner:owner){[weak self] result in
+            guard let self=self,self.pairingFlow === owner,owner.active else{return}
+            guard self.hubVisible,UIApplication.shared.applicationState == .active,UIApplication.shared.isProtectedDataAvailable,self.presentedViewController==nil else{self.cancelPairingIdentity();return}
+            switch result {
+            case .failure(let error):self.cancelPairingIdentity();self.pairingNotice(error.localizedDescription)
+            case .success(let review):
+                guard DispatchTime.now()<review.expires else{self.cancelPairingIdentity();return}
+                let message="Kích hoạt danh tính cục bộ trên thiết bị này?\n\nThiết bị: \(review.device)\nThế hệ: \(review.generation)\nKhóa công khai:\n\(review.publicKey)\n\nBước này chưa cho phép thiết bị khác kết nối hoặc điều khiển."
+                let alert=UIAlertController(title:"Xác nhận danh tính Remote Play",message:message,preferredStyle:.alert);self.pairingAlert=alert
+                alert.addAction(UIAlertAction(title:"Hủy",style:.cancel){[weak self]_ in self?.cancelPairingIdentity()})
+                alert.addAction(UIAlertAction(title:"Kích hoạt danh tính",style:.default){[weak self]_ in
+                    guard let self=self,self.pairingFlow === owner,owner.active,DispatchTime.now()<review.expires,
+                          self.hubVisible,UIApplication.shared.applicationState == .active,UIApplication.shared.isProtectedDataAvailable else{self?.cancelPairingIdentity();return}
+                    self.core.confirmPairingIdentity(review,owner:owner){[weak self] result in
+                        guard let self=self,self.pairingFlow === owner,owner.active else{return}
+                        self.cancelPairingIdentity()
+                        switch result{case .success:self.pairingNotice("Đã kích hoạt danh tính cục bộ. Chưa có thiết bị từ xa nào được chấp thuận.");case .failure(let error):self.pairingNotice(error.localizedDescription+"\nHãy mở lại trạng thái trước khi tiếp tục; không tự động thử lại.")}
+                    }
+                })
+                let expiry=DispatchWorkItem{[weak self] in guard let self=self,self.pairingFlow === owner else{return};self.cancelPairingIdentity()}
+                self.pairingExpiry=expiry;DispatchQueue.main.asyncAfter(deadline:review.expires,execute:expiry)
+                self.present(alert,animated:true)
+            }
+        }
+    }
+    @objc private func cancelPairingIdentity(){
+        guard let owner=pairingFlow else{return};owner.invalidate();pairingFlow=nil
+        pairingExpiry?.cancel();pairingExpiry=nil;pairingButton.isEnabled=true
+        pairingAlert?.dismiss(animated:false);pairingAlert=nil;core.cancelPairingIdentityReview()
+    }
+    private func pairingNotice(_ message:String){
+        guard hubVisible,presentedViewController==nil,UIApplication.shared.applicationState == .active else{return}
+        let alert=UIAlertController(title:"Remote Play",message:message,preferredStyle:.alert)
+        alert.addAction(UIAlertAction(title:"Đóng",style:.cancel));present(alert,animated:true)
+    }
     @objc private func willResign(){suspend()}
     @objc private func didBackground(){suspend()}
     @objc private func didActivate(){if !pendingSuspend&&hubVisible&&UIApplication.shared.applicationState == .active&&webView?.isHidden != true{core.setForeground(true)}}
     override func viewDidAppear(_ animated:Bool){super.viewDidAppear(animated);hubVisible=true;didActivate()}
     func suspend(completion:@escaping()->Void = {}){
+        cancelPairingIdentity()
         core.setForeground(false)
         if pendingSuspend{suspendWaiters.append(completion);return}
         guard let webView=webView else{core.suspend(completion:completion);return}

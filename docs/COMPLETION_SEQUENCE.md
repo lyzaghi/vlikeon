@@ -2,6 +2,13 @@
 
 ## Current sequence — 1–109 outstanding tasks
 
+Item 58 now authors an iOS native identity button/dialog and serialized status,
+prepare, review, confirm and cancel callers. Public scope/revision/action/expiry
+checks and a separate flow lifetime suppress stale callbacks; existing uncertain
+identities are not replaced. Disabled policy is shown without key creation.
+No UIKit/vault/native endpoint, compiler, build or test was executed. Android UI,
+recovery, peer pairing/transport and qualification remain due; full scope is open.
+
 Item 58 now authors a native one-use identity review/confirmation binding with
 exact candidate/revision/foreground epoch and monotonic expiry. Confirmation
 consumes the review before vault work and uses pinned-key activation; cancellation
