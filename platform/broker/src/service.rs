@@ -24,6 +24,8 @@ pub struct Broker {
     import_jobs:crate::import_jobs::ImportJobs,
     preparations:crate::preparation_jobs::Preparations,
     stream_inputs:crate::stream_input::StreamInputs,
+    #[cfg(windows)]
+    receive_video:crate::stream_video_registry::ReceiveRegistry,
     gamepad_recovery:crate::stream_gamepad_recovery::RecoveryLane,
     device_probe:omniplay_device_info::DeviceProbe,
     native_work_jobs:crate::native_work_jobs::NativeWorkJobs,
@@ -47,6 +49,8 @@ impl Broker {
             import_jobs:crate::import_jobs::ImportJobs::default(),
             preparations:crate::preparation_jobs::Preparations::default(),
             stream_inputs:crate::stream_input::StreamInputs::default(),
+            #[cfg(windows)]
+            receive_video:crate::stream_video_registry::ReceiveRegistry::default(),
             gamepad_recovery:crate::stream_gamepad_recovery::RecoveryLane::default(),
             device_probe:omniplay_device_info::DeviceProbe::default(),
             native_work_jobs:crate::native_work_jobs::NativeWorkJobs::default(),
@@ -437,7 +441,10 @@ impl Broker {
         Ok(preview)
     }
 
-    pub fn close(&mut self) { self.gamepad_recovery.cancel();self.native_work_jobs.cancel_all();self.asset_ranges.close_owner(self.client_id);self.stream_inputs.close();self.jobs.cancel_all();self.update_jobs.cancel_all();self.import_jobs.cancel_all();self.preparations.cancel_all();let ids=self.sessions.list().into_iter().filter(|s|!s.state.is_terminal()).map(|s|s.id).collect::<Vec<_>>();for id in ids{let _=self.detach_session(id);}self.sessions.stop_all(&self.database);self.web_sessions.close(&self.database);self.transfers.clear();self.permissions.revoke_owner(self.client_id);self.directory_grants.revoke_owner(self.client_id); }
+    pub fn close(&mut self) {
+        #[cfg(windows)]{let _=self.receive_video.close_until(std::time::Instant::now()+std::time::Duration::from_millis(1000));}
+        self.gamepad_recovery.cancel();self.native_work_jobs.cancel_all();self.asset_ranges.close_owner(self.client_id);self.stream_inputs.close();self.jobs.cancel_all();self.update_jobs.cancel_all();self.import_jobs.cancel_all();self.preparations.cancel_all();let ids=self.sessions.list().into_iter().filter(|s|!s.state.is_terminal()).map(|s|s.id).collect::<Vec<_>>();for id in ids{let _=self.detach_session(id);}self.sessions.stop_all(&self.database);self.web_sessions.close(&self.database);self.transfers.clear();self.permissions.revoke_owner(self.client_id);self.directory_grants.revoke_owner(self.client_id);
+    }
 }
 
 fn encode(value: impl serde::Serialize) -> Result<Value> { serde_json::to_value(value).map_err(|_|PlatformError::new(ErrorCode::Internal,"Response could not be encoded")) }

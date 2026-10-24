@@ -1,5 +1,14 @@
 # Native ordered RTP to decoder bridge — item 56
 
+Broker now owns a Windows ReceiveRegistry and invokes its deadline-bearing close
+from broker shutdown. One exact document/media owner can open/push/tick/take or
+retire a native receive session. Replacement is refused while any old entry is
+retained; failed cleanup keeps the same owner retryable. Registry close seals
+new admission permanently without silently removing uncertain retirement. No
+renderer command, document capability issuer or authenticated transport caller
+is added; those still need actual native scope/ICE/SRTP integration. This source
+has not been built/tested or executed against helpers/devices.
+
 `WindowsReceiveSession<S>` now orchestrates installed worker admission, guarded
 decoder launch, independent native authority maintenance, codec/reorder receiver
 construction and push/tick/unpresented/close lifecycle under one original session
