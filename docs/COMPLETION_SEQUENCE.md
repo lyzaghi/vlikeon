@@ -2,6 +2,10 @@
 
 ## Current sequence — 1–109 outstanding tasks
 
+Item 58 host controller now declines exact reviewed peer requests by ticket/
+epoch/hello hash and reports transient pending-host cleanup metadata in native
+status. No proof is exposed; durable crash recovery/ABI/UI/build/test remain due.
+
 Item 58 host controller now connects explicit peer consent to exact-ticket/
 epoch/hello-hash candidate persistence. Revision advances only on confirmed
 writer success; no relay approval/activation is implied. Source-only;

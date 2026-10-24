@@ -1840,6 +1840,15 @@ this checkpoint.
 
 ## Remaining implementation and qualification
 
+Host decline controller now validates exact ticket/epoch/live invitation and
+reviewed retained hello hash before calling the leased decline path. Bound success
+returns peer/hash and pairs_revoked:false. Native status exposes pending-host
+ticket/revision, monotonic expired flag and local-close state, without invitation
+proof or signed request contents. remote_close_required is conservative even for
+never-registered invitations; it does not prove relay state. This metadata is
+transient and does not implement crash recovery. No build/test/runtime operation
+ran. Mobile status UI does not yet consume pending_host; ABI/UI integration due.
+
 LocalHost host_prepare_peer now admits exact ticket/epoch/original invitation
 lifetime and forwards the retained peer hello hash plus explicit input/lifetime
 choice to the leased writer. Confirmed success updates the invitation's expected

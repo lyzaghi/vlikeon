@@ -72,7 +72,10 @@ impl LocalHost {
             "namespace_provenance_missing":snapshot.namespace_provenance_missing(),
             "pending_client":self.pairing_client.as_ref().map(|pending|json!({"ticket":pending.id,
                 "revision":pending.revision,"expires_at_ms":pending.pairing.expires_at_ms(),
-                "expired":std::time::Instant::now()>=pending.pairing.native_deadline()}))}))
+                "expired":std::time::Instant::now()>=pending.pairing.native_deadline()})),
+            "pending_host":self.pairing_host.as_ref().map(|pending|json!({"ticket":pending.id,"revision":pending.revision,
+                "expired":std::time::Instant::now()>=pending.invitation.native_deadline(),"locally_closed":pending.invitation.locally_closed(),
+                "remote_close_required":true}))}))
     }
     /// Explicit native recovery dispatch, not automatic startup cleanup. May
     /// permanently fence a candidate; caller must not use this as a status read.
@@ -242,6 +245,19 @@ impl LocalHost {
         Ok(json!({"credential_protocol":1,"pairing_ticket":ticket,"address":candidate.address(),"public_key":candidate.public_key(),
             "revision":candidate.revision(),"phase":"material_ready","reviewed_hello_hash":reviewed_hello_hash,
             "client_public_key":client,"relay_approved":false,"reload_required":true}))
+    }
+    pub fn native_pairing_host_decline_peer(&mut self,store:&dyn omniplay_streaming::native_credentials::PairingSecretStore,
+        ticket:Uuid,epoch:u64,client:&str,reviewed_hello_hash:&str,deadline:std::time::Instant,
+        cancel:&std::sync::atomic::AtomicBool)->Result<Value>{
+        self.ensure_open()?;
+        let pending=self.pairing_host.as_mut().ok_or_else(||PlatformError::new(ErrorCode::NotFound,"Native host invitation is absent"))?;
+        if pending.id!=ticket||epoch==0||pending.epoch!=epoch||std::time::Instant::now()>=deadline.min(pending.invitation.native_deadline())||cancel.load(std::sync::atomic::Ordering::Acquire){return Err(PlatformError::new(ErrorCode::Cancelled,"Native host decline expired or changed lifecycle"));}
+        let hello=pending.invitation.signed_request(client).ok_or_else(||PlatformError::new(ErrorCode::NotFound,"Native peer request is absent"))?;
+        if omniplay_streaming::document_hash(hello)?!=reviewed_hello_hash{return Err(PlatformError::new(ErrorCode::Conflict,"Native peer request changed; review it again"));}
+        let relay=omniplay_streaming::native_relay::NativePairRelay::new(omniplay_core::stream_signal_authority::installed_pairing_origins()?)?;
+        let writer=omniplay_core::stream_credential_writer::NativeCredentialWriter::open(&self.database,self.profile_id,store)?;
+        writer.decline_host_peer(pending.revision,pending.identity,&mut pending.invitation,client,&relay,omniplay_core::now_ms(),deadline,cancel)?;
+        Ok(json!({"pairing_protocol":1,"ticket":ticket,"client_public_key":client,"hello_hash":reviewed_hello_hash,"declined":true,"pairs_revoked":false}))
     }
     /// Native local close plus exact remote cleanup. Failed cleanup retains owner.
     pub fn native_pairing_host_close(&mut self,store:&dyn omniplay_streaming::native_credentials::PairingSecretStore,

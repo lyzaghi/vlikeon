@@ -32,6 +32,7 @@ impl NativeHostInvitation{
     }
     pub fn signed_invite(&self)->&SignedDocument{&self.document}
     pub fn native_deadline(&self)->Instant{self.deadline}
+    pub fn locally_closed(&self)->bool{self.closed}
     pub fn share_code(&self,now:u64)->Result<Zeroizing<String>>{
         self.live(now)?;if !self.registered{return Err(unauthorized());}
         #[derive(Serialize)]struct Share<'a>{invite:&'a SignedDocument,secret:&'a str}
