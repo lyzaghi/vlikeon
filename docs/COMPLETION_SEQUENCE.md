@@ -2,6 +2,12 @@
 
 ## Current sequence — 1–109 outstanding tasks
 
+Item 58 now authors a leased writer primitive to re-review an interrupted saved
+client candidate: exact revision/address, live signed grant, Active local identity
+and vault material are reloaded before returning public review metadata. It
+explicitly reports comparison unavailable; no activation/consent is inferred.
+Source-only; controller/ABI/UI resume wiring and build/test remain due.
+
 Item 58 client persistence replies now return the exact reviewed grant hash.
 Both mobile lanes and activation snapshot factories require it to match the
 retained consent hash before accepting the saved candidate. Source-only;

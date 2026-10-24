@@ -1840,6 +1840,17 @@ this checkpoint.
 
 ## Remaining implementation and qualification
 
+The writer now authors review_client_candidate for interrupted MaterialReady
+client records. Under the scoped lease it checks exact revision/address, absence
+of durable session ownership, signed live grant/client role, retained grant hash,
+Active local identity and both vault records. Public result includes original
+host/fingerprint/pair/input/expiry/audience/hash; no secrets or authority escape.
+Original invite/hello comparison text is not durably retained, so this explicitly
+returns comparison_available:false. A future resume UI must independently verify
+the host and obtain fresh consent; it cannot claim the original comparison was
+reconstructed. Controller/ABI/UI wiring is still absent. No build/test or vault,
+crypto, SQL or network operation ran for this source checkpoint.
+
 Consented client persistence now returns grant_hash alongside pairing_ticket.
 LocalHost sources it from the reviewed hash already checked against the retained
 signed grant before exchange consumption. Both mobile lanes require exact request

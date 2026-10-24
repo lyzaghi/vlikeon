@@ -132,6 +132,30 @@ impl<'a> NativeCredentialWriter<'a>{
         check(deadline)?;drop(signer);
         self.prepare_pair(expected,identity_address,&document,&grant.audience,&material,elapsed_now(now,started)?,deadline)
     }
+    /// Re-review after interruption: public signed metadata only, no activation.
+    /// Reload vault material under the scoped lease before presenting a candidate.
+    pub fn review_client_candidate(&self,address:CredentialAddress,expected:u64,now:u64,deadline:Instant)->Result<serde_json::Value>{
+        let started=begin(deadline)?;
+        let snapshot=journal::load_scoped(self.database,&self.lease,self.profile)?;
+        if snapshot.revision()!=expected{return Err(conflict());}
+        let pair=snapshot.records().iter().find(|record|record.address()==address).ok_or_else(conflict)?;
+        if address.kind()!=SecretKind::PairEncryption||pair.phase()!=Phase::MaterialReady||pair.signal_session().is_some(){return Err(conflict());}
+        let metadata=pair.grant().ok_or_else(conflict)?;
+        let grant=verify_grant(metadata.document(),metadata.audience(),elapsed_now(now,started)?)?;
+        if grant.id!=address.id()||grant.client_public_key!=pair.public_key(){return Err(conflict());}
+        let identity=snapshot.records().iter().find(|record|record.phase()==Phase::Active&&record.address().kind()==SecretKind::DeviceSigning&&record.public_key()==pair.public_key()).ok_or_else(conflict)?;
+        let signer=load_identity(self.store,&identity.address(),identity.public_key())?;
+        let material=load_pair(self.store,&address,metadata.document(),metadata.audience(),pair.public_key(),elapsed_now(now,started)?)?;
+        let hash=omniplay_streaming::document_hash(metadata.document())?;
+        if pair.grant_hash()!=Some(hash.as_str()){return Err(conflict());}
+        drop(material);drop(signer);check(deadline)?;self.lease.check(self.database,self.profile)?;
+        grant.validate(metadata.audience(),elapsed_now(now,started)?)?;
+        let fingerprint=omniplay_streaming::key_id(&grant.host_public_key)?;
+        Ok(serde_json::json!({"credential_protocol":1,"address":address,"revision":expected,"phase":"material_ready",
+            "grant_hash":hash,"host_public_key":grant.host_public_key,"host_fingerprint":fingerprint,
+            "pair_id":grant.id,"input_allowed":grant.input_allowed,"expires_at_ms":grant.expires_at_ms,
+            "audience":metadata.audience(),"local_consent_required":true,"comparison_available":false}))
+    }
     /// Explicit native client consent only. Reload exact stored material and
     /// obtain fresh bound relay approval before publishing Active. No replacement
     /// generation, generic boolean receipt or transport/session grant is created.
