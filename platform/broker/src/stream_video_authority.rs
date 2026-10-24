@@ -15,7 +15,7 @@ static RUNNING:AtomicBool=AtomicBool::new(false);
 struct Permit;
 impl Drop for Permit{fn drop(&mut self){RUNNING.store(false,Ordering::Release);}}
 pub struct VideoAuthorityLane{
-    thread:Option<JoinHandle<()>>,cancel:Arc<AtomicBool>,
+    thread:Option<JoinHandle<()>>,cancel:Arc<AtomicBool>,join_failed:bool,
 }
 // Field drop order retains the permit through actual observer destruction.
 // Source Drop may itself stall; that must not admit a replacement lane.
@@ -45,7 +45,7 @@ impl VideoAuthorityLane{
             // independent native lease expires without this thread's cooperation.
             observer.lease.close();
         }).map_err(|_|PlatformError::new(ErrorCode::ResourceLimit,"The native video authority observer could not start"))?;
-        Ok(Self{thread:Some(thread),cancel})
+        Ok(Self{thread:Some(thread),cancel,join_failed:false})
     }
     /// Cooperative cancellation only; never claim source/OS-call preemption.
     /// To earn graceful Stop receipts, stop the video worker before canceling
@@ -53,9 +53,10 @@ impl VideoAuthorityLane{
     pub fn close(&mut self){
         self.cancel.store(true,Ordering::Release);
         if self.thread.as_ref().is_some_and(|thread|thread.is_finished()){
-            if let Some(thread)=self.thread.take(){let _=thread.join();}
+            if let Some(thread)=self.thread.take(){self.join_failed|=thread.join().is_err();}
         }
     }
     pub fn finished(&self)->bool{self.thread.as_ref().is_none_or(|thread|thread.is_finished())}
+    pub fn retirement_confirmed(&self)->bool{self.thread.is_none()&&!self.join_failed}
 }
 impl Drop for VideoAuthorityLane{fn drop(&mut self){self.close();}}

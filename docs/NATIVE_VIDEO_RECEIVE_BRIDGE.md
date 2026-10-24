@@ -1,5 +1,18 @@
 # Native ordered RTP to decoder bridge — item 56
 
+`WindowsReceiveSession<S>` now orchestrates installed worker admission, guarded
+decoder launch, independent native authority maintenance, codec/reorder receiver
+construction and push/tick/unpresented/close lifecycle under one original session
+deadline. The codec backend and authority lane share the actual native observer;
+its original observation time is preserved. Decoder Stop precedes authority-lane
+cancellation. Retirement requires a joined observer without panic as well as the
+decoder receipt; partial cleanup remains CleanupRequired and retryable. Failed
+setup uses existing worker/guard retention rather than admitting a replacement.
+No renderer route, policy enablement, raw UDP/SRTP endpoint or registered service
+session is installed by this source change. Actual authenticated ICE/SRTP caller,
+native scope registry, display/audio and device qualification remain open. No
+build/test/helper/network execution ran.
+
 `WindowsH264Backend<S>` now supplies concrete codec admission for the existing
 progressive SDR FIFO lane. Its native-only constructor pins negotiated profile
 66/77/100, exact constraints/level 3.1–4.2 and the configured 720/1080 30/60 profile.

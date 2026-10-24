@@ -2,6 +2,8 @@
 
 ## Current sequence — 1–109 outstanding tasks
 
+Source checkpoint: Windows receive-session owner now connects installed decoder launch, native authority lane, concrete codec/POC/DPB receiver and deadline-aware lifecycle. Joined observer retirement is distinguished from an ended thread. Actual authenticated transport caller, broker session registry and presentation/audio integration remain unfinished. Build/test stay deferred.
+
 Source checkpoint: a concrete Windows progressive SDR H.264 backend now joins native authority observation, negotiated/configured format checks and the parameter/POC/DPB receiver pipeline through an explicit constructor. Actual transport/service ownership and extended-format/general reorder/coverage completion remain unfinished. No build/test executed.
 
 Source checkpoint: matched decoder output now commits the concrete POC/DPB plan owned by ParameterAdmission. Progressive FIFO scheduling defers plan preparation until queue head, preserves plans on S_FALSE and waits for prior completion before planning dependencies. General reorder/fields/gaps, complete codec/owner backend and product transport wiring remain unfinished; build/test stay deferred.
