@@ -2,6 +2,12 @@
 
 ## Current sequence — 1–109 outstanding tasks
 
+Item 58 mobile callers now admit only known join/poll/cancel response states.
+Approved poll metadata requires a canonical pair UUID, actual boolean input
+permission and unexpired integral safe-range expiry; local consent remains
+mandatory. Cancel explicitly remains local, not remote revocation. No build/test
+ran; native consent UI and complete transcript binding remain unfinished.
+
 Item 58 mobile candidate admission now validates canonical nonzero device/pair/
 generation UUIDs, bounded integral journal revision and canonical 32-byte public
 key text. iOS explicitly refuses JSON booleans as revisions. Source review and

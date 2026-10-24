@@ -1840,6 +1840,14 @@ this checkpoint.
 
 ## Remaining implementation and qualification
 
+Join response admission requires pending state and `approves_peer:false`.
+Poll admission requires `local_consent_required:true` and a known pending,
+declined or approved state. Approved metadata requires canonical nonzero pair
+UUID, actual boolean input permission and integral future expiry within JSON's
+safe integer range. Cancel admission requires `cancelled:true` and
+`remote_revoked:false`. These are source-only metadata checks, not native user
+consent or relay/transport activation. Build/test remain deferred.
+
 Mobile candidate reply admission additionally checks canonical nonzero address
 UUIDs, integral revision 1..10,000,000 and unpadded canonical base64url text for
 the 32-byte public key (including final-character pad-bit constraints). These

@@ -246,6 +246,27 @@ final class NativeCore {
                           id != UUID(uuid:(0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0)),expectedTicket==nil || expectedTicket==ticket else{throw OmniFailure.message("Kết quả không khớp ticket ghép đôi.")}
                 }
                 guard DispatchTime.now()<deadline,(action == .cancel || owner.active) else{throw OmniFailure.message("Kết quả ghép đôi đã cũ. Hãy mở lại trạng thái trước khi tiếp tục.")}
+                func exactBool(_ object:Any?,_ expected:Bool)->Bool{
+                    guard let number=object as? NSNumber,CFGetTypeID(number)==CFBooleanGetTypeID() else{return false}
+                    return number.boolValue==expected
+                }
+                if action == .join{
+                    guard value["state"] as? String == "pending",exactBool(value["approves_peer"],false) else{throw OmniFailure.message("Kết quả gửi yêu cầu không hợp lệ.")}
+                }
+                if action == .poll{
+                    guard exactBool(value["local_consent_required"],true),let status=value["status"] as? [String:Any],let state=status["state"] as? String else{throw OmniFailure.message("Trạng thái ghép đôi không hợp lệ.")}
+                    if state == "approved"{
+                        guard let text=status["pair_id"] as? String,let id=UUID(uuidString:text),id.uuidString.lowercased()==text,
+                              id != UUID(uuid:(0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0)),
+                              exactBool(status["input_allowed"],true)||exactBool(status["input_allowed"],false),
+                              let expiry=status["expires_at_ms"] as? NSNumber,CFGetTypeID(expiry) != CFBooleanGetTypeID(),
+                              expiry.doubleValue>Date().timeIntervalSince1970*1000,expiry.doubleValue<=9_007_199_254_740_991,
+                              expiry.doubleValue==Double(expiry.uint64Value) else{throw OmniFailure.message("Thông tin host duyệt không hợp lệ hoặc đã hết hạn.")}
+                    }else if state != "pending" && state != "declined"{throw OmniFailure.message("Trạng thái ghép đôi không được hỗ trợ.")}
+                }
+                if action == .cancel{
+                    guard exactBool(value["cancelled"],true),exactBool(value["remote_revoked"],false) else{throw OmniFailure.message("Kết quả hủy local không hợp lệ.")}
+                }
                 DispatchQueue.main.async{
                     guard DispatchTime.now()<deadline,(action == .cancel || owner.active) else{completion(.failure(OmniFailure.message("Kết quả ghép đôi đã cũ. Hãy mở lại trạng thái.")));return}
                     completion(.success(value))

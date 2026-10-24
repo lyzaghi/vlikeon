@@ -148,6 +148,18 @@ public final class NativeCore {
                                 ||!canonicalPairingId(address.getString("device"))||!canonicalPairingId(address.getString("id"))
                                 ||!canonicalPairingId(address.getString("generation"))||!value.getString("public_key").matches("[A-Za-z0-9_-]{42}[AEIMQUYcgkosw048]"))throw new IllegalStateException();
                     }else if(value.getInt("pairing_protocol")!=1||!canonicalPairingId(value.getString("ticket"))||(expectedTicket!=null&&!expectedTicket.equals(value.getString("ticket"))))throw new IllegalStateException();
+                    if(action==1&&(!"pending".equals(value.getString("state"))||!Boolean.FALSE.equals(value.get("approves_peer"))))throw new IllegalStateException();
+                    if(action==2){
+                        if(!Boolean.TRUE.equals(value.get("local_consent_required")))throw new IllegalStateException();
+                        JSONObject status=value.getJSONObject("status");String state=status.getString("state");
+                        if("approved".equals(state)){
+                            Object expiry=status.get("expires_at_ms");
+                            if(!canonicalPairingId(status.getString("pair_id"))||!(status.get("input_allowed") instanceof Boolean)
+                                    ||!(expiry instanceof Number)||((Number)expiry).doubleValue()!=((Number)expiry).longValue()
+                                    ||((Number)expiry).longValue()<=System.currentTimeMillis()||((Number)expiry).longValue()>9_007_199_254_740_991L)throw new IllegalStateException();
+                        }else if(!"pending".equals(state)&&!"declined".equals(state))throw new IllegalStateException();
+                    }
+                    if(action==4&&(!Boolean.TRUE.equals(value.get("cancelled"))||!Boolean.FALSE.equals(value.get("remote_revoked"))))throw new IllegalStateException();
                 }
                 if(action!=4&&!alive.getAsBoolean())response=failure("","cancelled","Pairing response became stale. Inspect native status before continuing.");
             }catch(Exception|LinkageError error){response=failure("","runtime_unavailable","Pairing result is uncertain. Inspect native status before continuing.");}
