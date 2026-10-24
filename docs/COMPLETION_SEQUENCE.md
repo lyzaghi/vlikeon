@@ -2,6 +2,10 @@
 
 ## Current sequence — 1–109 outstanding tasks
 
+Item 58 Android now has separate raw share JNI with ticket/budget/output bounds,
+OPRP1/base64url byte admission and RAII native buffer wiping. No String/clipboard
+or renderer route. Source-only; lifecycle-owned caller/UI and build/test due.
+
 Item 58 explicit host sharing now has separate raw-byte mobile ABI, avoiding
 proof-bearing generic JSON results. Failure is empty; owned returned bytes wipe
 on om_mobile_free. Source-only; OS/UI copy lifecycle and build/test remain due.

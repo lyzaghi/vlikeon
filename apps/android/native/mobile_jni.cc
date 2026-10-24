@@ -218,6 +218,28 @@ Java_org_chromium_chrome_browser_omniplay_NativeCore_nativePairingClientV1(JNIEn
 
 // Dedicated native host dispatch; no renderer/nativeCall route or proof sharing.
 extern "C" JNIEXPORT jbyteArray JNICALL
+Java_org_chromium_chrome_browser_omniplay_NativeCore_nativePairingHostShareV1(JNIEnv* env,jclass,jlong handle,jbyteArray input,jint budget){
+  if(handle<=0||!input||budget<1000||budget>25000)return nullptr;
+  const auto length=env->GetArrayLength(input);
+  if(exception(env)||length<=0||length>128)return nullptr;
+  std::vector<uint8_t> bytes(static_cast<size_t>(length));WipeBytes wipe{bytes};
+  env->GetByteArrayRegion(input,0,length,reinterpret_cast<jbyte*>(bytes.data()));if(exception(env))return nullptr;
+  auto response=om_mobile_pairing_host_share_v1(static_cast<uint64_t>(handle),bytes.data(),bytes.size(),static_cast<uint32_t>(budget));
+  ReleaseBuffer release{response};
+  if(!response.data||response.length<=6||response.length>8192)return nullptr;
+  constexpr uint8_t prefix[]={'O','P','R','P','1','.'};
+  for(size_t i=0;i<sizeof(prefix);++i)if(response.data[i]!=prefix[i])return nullptr;
+  for(size_t i=sizeof(prefix);i<response.length;++i){const auto b=response.data[i];if(!((b>='A'&&b<='Z')||(b>='a'&&b<='z')||(b>='0'&&b<='9')||b=='-'||b=='_'))return nullptr;}
+  auto output=env->NewByteArray(static_cast<jsize>(response.length));if(exception(env)||!output)return nullptr;
+  env->SetByteArrayRegion(output,0,static_cast<jsize>(response.length),reinterpret_cast<const jbyte*>(response.data));
+  if(exception(env)){
+    std::array<jbyte,8192> zero{};env->SetByteArrayRegion(output,0,static_cast<jsize>(response.length),zero.data());exception(env);return nullptr;
+  }
+  return output;
+}
+
+// Dedicated native host dispatch; no renderer/nativeCall route or proof sharing.
+extern "C" JNIEXPORT jbyteArray JNICALL
 Java_org_chromium_chrome_browser_omniplay_NativeCore_nativePairingHostV1(JNIEnv* env,jclass,jlong handle,jbyteArray input,jint action,jint budget){
   if(handle<=0||!input||budget<1000||budget>25000||action<0||action>7)return nullptr;
   const auto length=env->GetArrayLength(input);

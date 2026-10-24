@@ -1840,6 +1840,14 @@ this checkpoint.
 
 ## Remaining implementation and qualification
 
+Android dedicated host-share JNI now calls the raw share ABI, validates <=8192
+OPRP1/base64url bytes before copying and frees/wipes the Rust buffer on every
+path. Request vector also wipes; a failed JNI output copy attempts to clear the
+Java array before returning null. Exact private declaration/shrinker signature
+are retained. No jstring, generic JSON, clipboard or renderer route is introduced.
+Java returned bytes still require a future lifecycle-owned caller to clear them;
+OS/UI copies are outside these guarantees. No build/test/native operation ran.
+
 Dedicated host_share ABI now returns raw OPRP1 UTF-8 bytes <=8192 only on explicit
 native share admission, outside generic JSON serialization/status. Ticket request
 is bounded; actual provider epoch/cancel/deadline and registered live invitation

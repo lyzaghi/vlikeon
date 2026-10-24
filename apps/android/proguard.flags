@@ -4,6 +4,7 @@
     private static native byte[] nativePairingScope(long);
     private static native byte[] nativePairingClientV1(long, byte[], int, int);
     private static native byte[] nativePairingHostV1(long, byte[], int, int);
+    private static native byte[] nativePairingHostShareV1(long, byte[], int);
     private static native boolean nativePairingInvalidateEpoch(long);
     private static native byte[] nativePairingIdentity(int, long, long, byte[]);
     private static native byte[] nativePairingRecoveryV2(long, byte[], int, int);

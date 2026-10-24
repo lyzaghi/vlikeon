@@ -104,6 +104,8 @@ public final class NativeCore {
     // Host: 0 begin, 1 register, 2 poll, 3 close, 4 persist peer, 5 decline,
     // 6 review saved host candidate, 7 activate reviewed host candidate.
     private static native byte[] nativePairingHostV1(long handle,byte[] input,int action,int budget);
+    // Raw bearer-proof bytes; never pass to pairingResponse/log/renderer.
+    private static native byte[] nativePairingHostShareV1(long handle,byte[] input,int budget);
     private final java.util.concurrent.atomic.AtomicBoolean mPairingClientBusy=new java.util.concurrent.atomic.AtomicBoolean();
     private final java.util.concurrent.atomic.AtomicReference<Object> mPairingClientDeliveryFence=new java.util.concurrent.atomic.AtomicReference<>(new Object());
     /** Dedicated trusted UI lane; consumes and clears the supplied byte array
