@@ -2,6 +2,11 @@
 
 ## Current sequence — 1–109 outstanding tasks
 
+Item 58 interrupted-candidate review now connects LocalHost and a dedicated
+mobile C ABI with foreground epoch/cancel/deadline and installed-origin checks.
+No activation or consent is inferred. Source-only; mobile caller/UI resume wiring
+and build/test remain due.
+
 Item 58 now authors a leased writer primitive to re-review an interrupted saved
 client candidate: exact revision/address, live signed grant, Active local identity
 and vault material are reloaded before returning public review metadata. It

@@ -255,6 +255,20 @@ impl LocalHost {
         cancel:&std::sync::atomic::AtomicBool)->Result<Value>{
         self.native_pairing_activate_consented_pair(store,address,expected,deadline,cancel,false)
     }
+    /// Native interrupted-candidate inspection, never consent or activation.
+    pub fn native_pairing_review_client_candidate(&self,store:&dyn omniplay_streaming::native_credentials::PairingSecretStore,
+        address:omniplay_streaming::native_credentials::CredentialAddress,expected:u64,deadline:std::time::Instant,
+        cancel:&std::sync::atomic::AtomicBool)->Result<Value>{
+        self.ensure_open()?;
+        let origins=omniplay_core::stream_signal_authority::installed_pairing_origins()?;
+        if std::time::Instant::now()>=deadline||cancel.load(std::sync::atomic::Ordering::Acquire){return Err(PlatformError::new(ErrorCode::Cancelled,"Native candidate review expired or was cancelled"));}
+        let writer=omniplay_core::stream_credential_writer::NativeCredentialWriter::open(&self.database,self.profile_id,store)?;
+        let value=writer.review_client_candidate(address,expected,omniplay_core::now_ms(),deadline)?;
+        if !value.get("audience").and_then(Value::as_str).is_some_and(|audience|origins.iter().any(|origin|origin==audience)){
+            return Err(PlatformError::new(ErrorCode::PermissionDenied,"Saved candidate relay is not currently installed"));
+        }
+        if std::time::Instant::now()>=deadline||cancel.load(std::sync::atomic::Ordering::Acquire){return Err(PlatformError::new(ErrorCode::Cancelled,"Native candidate review became stale"));}Ok(value)
+    }
     /// Actual native client consent to exact persisted candidate and grant hash.
     pub fn native_pairing_activate_reviewed_client(&self,store:&dyn omniplay_streaming::native_credentials::PairingSecretStore,
         address:omniplay_streaming::native_credentials::CredentialAddress,expected:u64,reviewed_hash:&str,deadline:std::time::Instant,

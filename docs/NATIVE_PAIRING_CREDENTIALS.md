@@ -1840,6 +1840,15 @@ this checkpoint.
 
 ## Remaining implementation and qualification
 
+Dedicated om_mobile_pairing_review_client_v1 now accepts exact native-status
+address/revision with a bounded original budget. Actual foreground provider epoch
+and cancellation are derived natively; address access is checked before/after.
+LocalHost requires enabled installed policy and rejects saved grant audiences no
+longer configured. The leased writer reloads the candidate and returns only
+review metadata; no relay HTTP, activation, consent or session authority results.
+Missing old comparison remains explicit. No compiler/build/test or runtime
+operation ran. JNI/Swift callers and resume consent UI remain unfinished.
+
 The writer now authors review_client_candidate for interrupted MaterialReady
 client records. Under the scoped lease it checks exact revision/address, absence
 of durable session ownership, signed live grant/client role, retained grant hash,

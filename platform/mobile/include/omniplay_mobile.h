@@ -87,6 +87,11 @@ OmniBuffer om_mobile_pairing_client_action_v1(uint64_t handle,const uint8_t* dat
  * approval before Active publication. No transport/session authority is granted.
  * Errors may follow commit: inspect native status, never assume rollback. */
 OmniBuffer om_mobile_pairing_activate_client_v1(uint64_t handle,const uint8_t* data,size_t length,uint32_t budget_ms);
+/* Native-only interrupted-candidate review. JSON <=1024: {address,expected_revision}.
+ * Budget 1000..25000 ms includes waiting. Reloads vault/journal/signed live grant;
+ * no relay call, activation or consent. comparison_available is false: UI must
+ * independently verify host and obtain fresh consent, not invent old code. */
+OmniBuffer om_mobile_pairing_review_client_v1(uint64_t handle,const uint8_t* data,size_t length,uint32_t budget_ms);
 /* Trusted native controller only, never renderer commands. Status returns
  * bounded public lifecycle metadata. Preparation requires foreground, attached
  * scoped provider, current journal revision, budget 1000..25000 ms and enabled
