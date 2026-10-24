@@ -353,7 +353,9 @@ no redirect, ambient proxy, cookies or caller headers. Connect timeout is five
 seconds, total request timeout is the lesser of original remaining time and
 15 seconds, and idle connections per host are bounded to two.
 
-The supplied native signing identity must participate in the verified live grant.
+The supplied native signing identity must participate in the verified grant;
+normal send/receive/ICE additionally require it to be live. Retirement-only
+historical validation below cannot authorize normal operations.
 The existing RelayRequest body is signed in its original domain, then re-admitted
 through `verify_request` before HTTP. Each attempt has a fresh request nonce;
 there is no hidden transport retry. Request envelopes are bounded to 192 KiB,
@@ -366,7 +368,7 @@ Cancellation/deadline checks occur before/after HTTP, between bounded response
 reads and before success. A blocking DNS/connect/read/backend operation cannot
 be synchronously interrupted merely by the AtomicBool; request timeout and the
 future native supervisor must cover that interval. A cancelled, late, failed or
-expired-grant result is never positive approval/revocation acknowledgment, even
+expired ordinary grant result is never positive operation acknowledgment, even
 if the remote side effect happened. Original state must be reconciled explicitly.
 This code must run on its native blocking-I/O lane, not inside an async/UI thread.
 
@@ -416,6 +418,47 @@ Unknown/closed-session recovery and deliberate discard policy remain unfinished;
 there is no automatic cursor jump to hide them. ICE/revocation, native authority,
 approval/product/startup/mobile integration and all actual HTTP/crypto/replay/
 cancel/platform verification are still required. No poll or acceptance was run.
+
+## Bound relay retirement source
+
+The shared `verify_grant_for_retirement` now verifies canonical audience,
+signature, grant shape/IDs and nonfuture creation while retaining expired
+metadata. It is used only for cleanup. Live grant verification remains required
+for send, receive, ICE, approval and activation. The native paired client permits
+historical validation only for RevokePair; it cannot use an old grant for other
+operations and does not report ordinary grant-expiry failures as success.
+
+The signaling store's RevokePair transaction verifies that the signed request
+sender is one of the exact grant's participants. A matching stored grant is
+marked revoked and its messages deleted. Repeating that same revocation can
+return the same bound result. If the row is absent, only an expired exact grant
+can receive an `expired` retirement result: expired rows were collected inside
+the same transaction, and normal approval refuses that expired grant. An absent
+live grant returns NotFound. An existing pair UUID bound to a different grant
+hash returns Conflict and is not modified.
+
+The response now contains `retirement_protocol:1`, `revoked:true`, exact pair
+UUID/grant hash and reason `revoked` or `expired`. It remains an authenticated
+HTTPS response from the configured relay, not a cryptographically signed
+server receipt. Existing browser code that only checks request success can
+ignore the added fields; native cleanup requires the exact bound response.
+
+`stream_credential_recovery::retire_pair_remote` connects that response to the
+durable relay-retired observation. It requires the current journal revision,
+pair Revoking state and previously confirmed writer/local retirement under the
+same retained lease. The matching identity must be Active or Revoking, with its
+writer retired and vault material still retained. It reloads the pinned identity
+only for the exact revoke request, checks the response pair/hash/protocol/reason,
+then records cleanup with the original revision after cancellation/deadline
+checks. A revoking identity is not reopened for media or normal signaling.
+
+An unbound legacy response, 404, unknown network/SQL result or local elapsed
+time does not acknowledge relay retirement. Lost/late responses retain debt and
+can retry the same grant. Old relay deployments need this response protocol
+before native cleanup can confirm it; no automatic fallback is supplied. The
+actual native startup/controller still needs to dispatch this concrete branch
+alongside writer/local retirement and vault removal. No relay was deployed,
+request made, transaction executed, key loaded, build or test run.
 
 ## Required durable ordering and integration
 

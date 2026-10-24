@@ -103,9 +103,23 @@ impl Store {
             }
             RelayOperation::IceCredentials{grant:document}=>{let grant=pair(tx,sender,&document,audience,now)?;Ok(json!({"pair_id":grant.id,"expires_at_ms":grant.expires_at_ms.min(now+600000)}))}
             RelayOperation::RevokePair{grant:document}=>{
-                let grant=verify_grant(&document,audience,now).map_err(|_|ApiError::unauthorized())?;if sender!=grant.host_public_key&&sender!=grant.client_public_key{return Err(ApiError::unauthorized());}
-                let changed=tx.execute("UPDATE pairs SET revoked=1 WHERE id=?1 AND grant_hash=?2",params![grant.id.to_string(),document_hash(&document).map_err(|_|ApiError::invalid())?]).map_err(sql)?;if changed==0{return Err(ApiError::not_found());}
-                tx.execute("DELETE FROM messages WHERE pair=?1",[grant.id.to_string()]).map_err(sql)?;Ok(json!({"revoked":true}))
+                let grant=verify_grant_for_retirement(&document,audience,now).map_err(|_|ApiError::unauthorized())?;
+                if sender!=grant.host_public_key&&sender!=grant.client_public_key{return Err(ApiError::unauthorized());}
+                let hash=document_hash(&document).map_err(|_|ApiError::invalid())?;
+                let known:Option<String>=tx.query_row("SELECT grant_hash FROM pairs WHERE id=?1",[grant.id.to_string()],|row|row.get(0)).optional().map_err(sql)?;
+                let reason=match known{
+                    Some(known)=>{
+                        if known!=hash{return Err(ApiError::conflict());}
+                        if tx.execute("UPDATE pairs SET revoked=1 WHERE id=?1 AND grant_hash=?2",params![grant.id.to_string(),hash]).map_err(sql)?!=1{return Err(ApiError::conflict());}
+                        tx.execute("DELETE FROM messages WHERE pair=?1",[grant.id.to_string()]).map_err(sql)?;"revoked"
+                    },
+                    // execute() already removed expired rows in this same
+                    // transaction. Approval still requires a LIVE grant, so
+                    // this exact expired grant cannot be activated afterward.
+                    None if grant.expires_at_ms<=now=>"expired",
+                    None=>return Err(ApiError::not_found()),
+                };
+                Ok(json!({"revoked":true,"retirement_protocol":1,"pair_id":grant.id,"grant_hash":hash,"reason":reason}))
             }
         }
     }

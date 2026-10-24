@@ -1,7 +1,7 @@
 //! Bounded native HTTP transport for already paired operations only. Product
 //! generation/session authority must be checked by its native caller. Creating
 //! this client or authoring this source does not deploy or contact a relay.
-use crate::{validate_audience,verify_grant,verify_request,RelayEnvelope,RelayOperation,RelayRequest,
+use crate::{validate_audience,verify_grant,verify_grant_for_retirement,verify_request,RelayEnvelope,RelayOperation,RelayRequest,
     native_credentials::{NativeSigningIdentity,SigningDomain}};
 use omniplay_contracts::{ErrorCode,PlatformError,Result};
 use reqwest::{blocking::Client,redirect::Policy,header};
@@ -37,7 +37,8 @@ impl NativePairRelay{
             RelayOperation::Send{grant,..}|RelayOperation::Receive{grant,..}|RelayOperation::IceCredentials{grant}|RelayOperation::RevokePair{grant}=>grant,
             _=>return Err(PlatformError::new(ErrorCode::UnsupportedCapability,"The native paired transport does not implement invitation or approval requests")),
         };
-        let public=identity.public_key();let grant=verify_grant(document,audience,now)?;
+        let retiring=matches!(&operation,RelayOperation::RevokePair{..});
+        let public=identity.public_key();let grant=if retiring{verify_grant_for_retirement(document,audience,now)?}else{verify_grant(document,audience,now)?};
         if grant.id.is_nil()||(grant.host_public_key!=public&&grant.client_public_key!=public){return Err(denied());}
         let body=RelayRequest{schema_version:1,audience:audience.into(),issued_at_ms:now,nonce:Uuid::new_v4(),operation};
         let bytes=Zeroizing::new(serde_json::to_vec(&body).map_err(|_|network())?);
@@ -45,7 +46,7 @@ impl NativePairRelay{
         let envelope=RelayEnvelope{public_key:public,document};
         let current=elapsed_now(now,started)?;
         let _=verify_request(&envelope,audience,current)?;
-        grant.validate(audience,current)?;
+        if !retiring{grant.validate(audience,current)?;}
         let bytes=Zeroizing::new(serde_json::to_vec(&envelope).map_err(|_|network())?);
         if bytes.len()>192*1024{return Err(PlatformError::new(ErrorCode::ResourceLimit,"Native relay request exceeds its fixed bound"));}
         check(deadline,cancel)?;
@@ -75,9 +76,9 @@ impl NativePairRelay{
                 404=>ErrorCode::NotFound,409=>ErrorCode::Conflict,413|429=>ErrorCode::ResourceLimit,_=>ErrorCode::RuntimeUnavailable};
             return Err(PlatformError::new(code,"The configured native relay rejected the operation"));
         }
-        // No positive result after cancellation/deadline or grant expiry. A
+        // No positive result after cancellation/deadline or ordinary grant expiry. A
         // remote side effect may already exist and needs explicit reconciliation.
-        grant.validate(audience,elapsed_now(now,started)?)?;check(deadline,cancel)?;Ok(value)
+        if !retiring{grant.validate(audience,elapsed_now(now,started)?)?;}check(deadline,cancel)?;Ok(value)
     }
 }
 fn check(deadline:Instant,cancel:&AtomicBool)->Result<()>{

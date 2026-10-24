@@ -2,6 +2,13 @@
 
 ## Current sequence — 1–109 outstanding tasks
 
+Item 58 now authors retirement-only historical grant admission, a relay
+transaction response bound to exact pair/grant hash, and concrete native remote
+retirement-to-journal orchestration after prior writer/local retirement. Absent
+live and mismatched grants are refused; expired retirement does not authorize
+normal signaling. No service was deployed or HTTP/SQL/vault/build/test executed.
+Actual native owner/controller/mobile integration and original scope remain open.
+
 Item 58 now connects bounded native HTTPS receive polling to a non-skippable
 encrypted batch and sequential authenticated/journal-committed acceptance. Poll
 does not advance the cursor; original epoch/revision/deadline and native session

@@ -57,6 +57,17 @@ impl PairGrant {pub fn validate(&self,audience:&str,now:u64)->Result<()>{
 }}
 pub fn verify_grant(document:&SignedDocument,audience:&str,now:u64)->Result<PairGrant>{let untrusted:PairGrant=inspect(document,8192)?;let grant:PairGrant=verify(&untrusted.host_public_key,GRANT_DOMAIN,document,8192)?;grant.validate(audience,now)?;Ok(grant)}
 
+/// Retirement metadata only. Never use to authorize media, ICE, signal send,
+/// receive, approval or activation. Expiry does not invalidate the signature's
+/// binding needed to retire an old grant, but future-created grants are refused.
+pub fn verify_grant_for_retirement(document:&SignedDocument,audience:&str,now:u64)->Result<PairGrant>{
+    validate_audience(audience)?;
+    let untrusted:PairGrant=inspect(document,8192)?;
+    let grant:PairGrant=verify(&untrusted.host_public_key,GRANT_DOMAIN,document,8192)?;
+    grant.validate(audience,grant.created_at_ms)?;
+    if grant.id.is_nil()||grant.invite_id.is_nil()||grant.created_at_ms>now.saturating_add(30_000){return Err(unauthorized());}Ok(grant)
+}
+
 #[derive(Clone,Serialize,Deserialize)]#[serde(deny_unknown_fields)]
 pub struct RelayEnvelope {pub public_key:String,pub document:SignedDocument}
 #[derive(Clone,Serialize,Deserialize)]#[serde(deny_unknown_fields)]
