@@ -215,6 +215,11 @@ final class GameHubViewController: UIViewController, WKNavigationDelegate, WKUID
                 if snapshot.records.isEmpty && snapshot.pendingClientTicket==nil && snapshot.pendingHostTicket==nil{self.cancelPairingIdentity();self.pairingNotice("Thiết bị này chưa có danh tính hoặc cặp Remote Play.");return}
                 let sheet=UIAlertController(title:"Trạng thái Remote Play",message:"Chọn bản ghi để xem chi tiết. Đọc trạng thái không làm thay đổi khóa hoặc kết nối.",preferredStyle:.actionSheet)
                 self.pairingAlert=sheet
+                for invitation in snapshot.hostInvitationCleanup{
+                    sheet.addAction(UIAlertAction(title:"Cleanup lời mời · \(invitation.inviteID)",style:.default){[weak self,weak sheet]_ in
+                        sheet?.dismiss(animated:false){[weak self] in self?.showDurableInvitationCleanup(invitation,snapshot:snapshot,owner:owner)}
+                    })
+                }
                 if let ticket=snapshot.pendingHostTicket{
                     sheet.addAction(UIAlertAction(title:"Đóng lời mời host trên thiết bị này",style:.destructive){[weak self,weak sheet]_ in
                         sheet?.dismiss(animated:false){[weak self] in self?.closeHostInvitation(ticket:ticket,owner:owner)}
@@ -240,6 +245,26 @@ final class GameHubViewController: UIViewController, WKNavigationDelegate, WKUID
                 self.pairingExpiry=expiry;DispatchQueue.main.asyncAfter(deadline:snapshot.expires,execute:expiry);self.present(sheet,animated:true)
             }
         }
+    }
+    private func showDurableInvitationCleanup(_ invitation:NativeHostInvitationCleanup,snapshot:NativeRecoverySnapshot,owner:NativeDocumentLifetime){
+        guard peerReviewAvailable(owner),DispatchTime.now()<snapshot.expires else{cancelPairingIdentity();return}
+        let expired=invitation.expired || invitation.expiresAt<=Date()
+        let expiry=DateFormatter.localizedString(from:invitation.expiresAt,dateStyle:.medium,timeStyle:.short)
+        let message="Lời mời: \(invitation.inviteID)\nThế hệ danh tính ký: \(invitation.identityGeneration)\nDịch vụ: \(invitation.audience)\nHết hạn: \(expiry)\n\nĐóng đúng lời mời trên dịch vụ rồi hoàn tất record cleanup đã giữ. Các cặp hiện có không bị thu hồi."
+        let alert=UIAlertController(title:"Phục hồi cleanup lời mời host",message:message+(expired ? "\n\nLời mời đã hết hạn. Phiên bản này chưa hỗ trợ đối soát hết hạn; record vẫn được giữ.":""),preferredStyle:.alert);pairingAlert=alert
+        alert.addAction(UIAlertAction(title:"Để sau",style:.cancel){[weak self]_ in self?.cancelPairingIdentity()})
+        if !expired && !snapshot.namespaceProvenanceMissing && snapshot.relayRetirementAvailable{
+            alert.addAction(UIAlertAction(title:"Đóng và hoàn tất cleanup",style:.destructive){[weak self,weak alert]_ in
+                alert?.dismiss(animated:false){[weak self] in
+                    guard let self=self,self.peerReviewAvailable(owner),DispatchTime.now()<snapshot.expires else{self?.cancelPairingIdentity();return}
+                    self.core.recoverHostInvitation(invitation,snapshot:snapshot,owner:owner){[weak self] result in
+                        guard let self=self,self.pairingFlow === owner,owner.active else{return};self.cancelPairingIdentity()
+                        switch result{case .success:self.pairingNotice("Đã hoàn tất cleanup lời mời. Hãy đọc lại trạng thái để xem việc còn lại.");case .failure:self.pairingNotice("Chưa xác nhận được cleanup. Hãy đọc lại trạng thái trước khi thử lại.")}
+                    }
+                }
+            })
+        }
+        present(alert,animated:true)
     }
     private func closeHostInvitation(ticket:String,owner:NativeDocumentLifetime){
         guard peerReviewAvailable(owner) else{cancelPairingIdentity();return}

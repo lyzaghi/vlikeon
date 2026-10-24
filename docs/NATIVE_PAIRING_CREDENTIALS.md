@@ -1840,6 +1840,17 @@ this checkpoint.
 
 ## Remaining implementation and qualification
 
+iOS status now lists durable invitation cleanup entries and displays invite ID,
+signer generation, service and expiry in a separate confirmation. Unexpired
+entries with provenance and retirement configuration can invoke the dedicated
+restart-close ABI. Caller matches complete metadata against its snapshot,
+invalidates the native epoch, reserves bounded cleanup admission and uses the
+earlier status/operation deadline. Exact invite receipt and actual closed/
+nonrevocation/reload flags are required; main delivery rechecks owner/fence/time.
+Expired entries remain displayed without pretending cleanup is complete. No
+compiler/build/test/UI render/network operation ran. Expiry reconciliation,
+full host integration and end-to-end qualification remain unfinished.
+
 Android native status now lists each durable invitation cleanup record and shows
 invite ID, signer generation, service and expiry in a separate confirmation.
 Unexpired records with valid provenance/configured retirement service can invoke

@@ -347,6 +347,38 @@ final class NativeCore {
             }catch{DispatchQueue.main.async{completion(nil,"Chưa lấy được mã chia sẻ. Hãy kiểm tra trạng thái trước khi thử lại.")}}
         }
     }
+    @MainActor func recoverHostInvitation(_ invitation:NativeHostInvitationCleanup,snapshot:NativeRecoverySnapshot,owner:NativeDocumentLifetime,
+        completion:@escaping @MainActor (Result<[String:Any],Error>)->Void){
+        let deadline=min(snapshot.expires,DispatchTime.now()+25)
+        guard owner.active,DispatchTime.now()<deadline,!snapshot.namespaceProvenanceMissing,snapshot.relayRetirementAvailable,
+              !invitation.expired,invitation.expiresAt>Date(),snapshot.hostInvitationCleanup.contains(where:{
+                  $0.inviteID==invitation.inviteID && $0.inviteHash==invitation.inviteHash && $0.audience==invitation.audience &&
+                  $0.expiresAt==invitation.expiresAt && $0.expired==invitation.expired && NSDictionary(dictionary:$0.identity).isEqual(to:invitation.identity)
+              }) else{completion(.failure(OmniFailure.message("Hãy đọc lại trạng thái cleanup. Lời mời hết hạn cần xử lý riêng.")));return}
+        let token=pairingClientDeliveryFence.capture(cancel:true)
+        guard handle != 0,om_mobile_pairing_invalidate_epoch(handle)==1 else{completion(.failure(OmniFailure.message("Chưa xác nhận được vô hiệu hóa phiên. Hãy xem trạng thái.")));return}
+        guard pairingClientQueuePermit.wait(timeout:.now()) == .success else{completion(.failure(OmniFailure.message("Hàng đợi cleanup đang bận.")));return}
+        queue.async{
+            defer{self.pairingClientQueuePermit.signal()}
+            do{
+                let now=DispatchTime.now()
+                guard now<deadline,self.handle != 0,self.pairingAttached,owner.active,self.pairingClientDeliveryFence.admits(token) else{throw OmniFailure.message("Phiên cleanup đã kết thúc.")}
+                let remaining=(deadline.uptimeNanoseconds-now.uptimeNanoseconds)/1_000_000
+                guard remaining>=1000 else{throw OmniFailure.message("Cleanup hết hạn trong hàng đợi.")}
+                var input=try JSONSerialization.data(withJSONObject:["invite_id":invitation.inviteID,"expected_revision":snapshot.revision]);defer{input.resetBytes(in:0..<input.count)}
+                guard input.count<=256 else{throw OmniFailure.message("Yêu cầu cleanup vượt giới hạn.")}
+                let value=try self.unwrap(input.withUnsafeBytes{raw in try self.consume(om_mobile_pairing_recover_host_close_v1(self.handle,raw.bindMemory(to:UInt8.self).baseAddress,raw.count,UInt32(min(25_000,remaining))))})
+                guard (value["recovery_protocol"] as? NSNumber)?.uint32Value==1,value["invite_id"] as? String==invitation.inviteID else{throw OmniFailure.message("Kết quả cleanup không khớp lời mời.")}
+                for (field,expected) in [("closed",true),("pairs_revoked",false),("reload_required",true)]{
+                    guard let flag=value[field] as? NSNumber,CFGetTypeID(flag)==CFBooleanGetTypeID(),flag.boolValue==expected else{throw OmniFailure.message("Chưa xác nhận đúng kết quả cleanup.")}
+                }
+                DispatchQueue.main.async{
+                    guard owner.active,DispatchTime.now()<deadline,self.pairingClientDeliveryFence.admits(token) else{completion(.failure(OmniFailure.message("Kết quả cleanup đã cũ. Hãy đọc lại trạng thái.")));return}
+                    completion(.success(value))
+                }
+            }catch{DispatchQueue.main.async{completion(.failure(error))}}
+        }
+    }
     @MainActor func pairingHostTicket(_ action:NativeHostTicketAction,ticket:String,owner:NativeDocumentLifetime,
         completion:@escaping @MainActor (Result<[String:Any],Error>)->Void){
         guard let id=UUID(uuidString:ticket),id.uuidString.lowercased()==ticket,id != UUID(uuid:(0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0)) else{completion(.failure(OmniFailure.message("Ticket host không hợp lệ.")));return}

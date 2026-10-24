@@ -2,6 +2,11 @@
 
 ## Current sequence — 1–109 outstanding tasks
 
+Item 58 iOS now connects durable invitation records to explicit restart-cleanup
+confirmation and bounded recovery ABI, with exact snapshot/receipt admission and
+immediate delivery fencing. Expired records remain visible without a completion
+action. Source-only; no build/test/UI/network operation ran.
+
 Item 58 Android now connects durable invitation cleanup entries to explicit
 native confirmation and bounded JNI restart-close calls. Exact snapshot entry/
 revision/receipt admission and immediate delivery invalidation apply. Expired
