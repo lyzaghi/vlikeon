@@ -1840,6 +1840,13 @@ this checkpoint.
 
 ## Remaining implementation and qualification
 
+Both mobile peer-permission dialogs now display the exact retained grant's
+wall-clock expiry using local date/time formatting, separate from the existing
+monotonic review deadline capped at 60 seconds. iOS retains this Date in the
+immutable snapshot; Android uses its retained expires_at_ms. Save/result labels
+use pairing language while still explaining activation is separate. The journal
+phase remains MaterialReady. No build/test or UI render was performed.
+
 Android/iOS native status menus now offer explicit local cancellation of the
 pending ticket, with a separate confirmation that remote-approved pairs and
 saved candidates are not revoked/deleted. Confirming invokes the existing

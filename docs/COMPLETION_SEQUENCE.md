@@ -2,6 +2,11 @@
 
 ## Current sequence — 1–109 outstanding tasks
 
+Item 58 mobile peer-permission dialogs now display retained grant expiry in the
+device locale and explain the separate one-minute review cap. User-facing save
+labels say pairing rather than candidate; persistence remains MaterialReady only.
+Source-only; no build/test or UI rendering qualification ran.
+
 Item 58 both native status views now offer explicit pending-client local cancel
 with a confirmation explaining remote approvals/candidates are unaffected.
 They use immediate epoch invalidation then exact-ticket cleanup via action 4.

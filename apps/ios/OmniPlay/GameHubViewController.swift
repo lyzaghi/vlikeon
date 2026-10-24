@@ -155,7 +155,7 @@ final class GameHubViewController: UIViewController, WKNavigationDelegate, WKUID
     }
     private func cancelPendingPeer(ticket:String,owner:NativeDocumentLifetime){
         guard peerReviewAvailable(owner) else{cancelPairingIdentity();return}
-        let alert=UIAlertController(title:"Hủy phiên ghép đôi tại thiết bị?",message:"Bỏ phiên trao đổi đang chờ trên thiết bị này. Thao tác không thu hồi cặp đã được dịch vụ duyệt và không xóa candidate đã lưu.",preferredStyle:.alert)
+        let alert=UIAlertController(title:"Hủy phiên ghép đôi tại thiết bị?",message:"Bỏ phiên trao đổi đang chờ trên thiết bị này. Thao tác không thu hồi cặp đã được dịch vụ duyệt và không xóa ghép đôi đã lưu.",preferredStyle:.alert)
         pairingAlert=alert
         alert.addAction(UIAlertAction(title:"Đóng",style:.cancel){[weak self]_ in self?.cancelPairingIdentity()})
         alert.addAction(UIAlertAction(title:"Hủy cục bộ",style:.destructive){[weak self]_ in
@@ -197,15 +197,16 @@ final class GameHubViewController: UIViewController, WKNavigationDelegate, WKUID
     private func showPeerPermission(_ review:NativePeerApproval,owner:NativeDocumentLifetime){
         guard peerReviewAvailable(owner),DispatchTime.now()<review.expires else{cancelPairingIdentity();return}
         let permission=review.inputAllowed ? "Cho phép điều khiển đầu vào":"Không cho phép điều khiển đầu vào"
-        let alert=UIAlertController(title:"Xác nhận quyền của cặp thiết bị",message:"Host: \(review.hostFingerprint)\nCặp: \(review.pairID)\nQuyền: \(permission)\n\nChỉ lưu candidate đã xác minh; kết nối chưa được kích hoạt.",preferredStyle:.alert)
+        let expiry=DateFormatter.localizedString(from:review.grantExpiresAt,dateStyle:.medium,timeStyle:.short)
+        let alert=UIAlertController(title:"Xác nhận quyền của cặp thiết bị",message:"Host: \(review.hostFingerprint)\nCặp: \(review.pairID)\nQuyền: \(permission)\nHạn dùng quyền: \(expiry)\n\nLưu ghép đôi đã xác minh; kết nối chưa được kích hoạt. Phiên xác nhận đóng trong tối đa một phút.",preferredStyle:.alert)
         pairingAlert=alert
         alert.addAction(UIAlertAction(title:"Hủy",style:.cancel){[weak self]_ in self?.cancelPairingIdentity()})
-        alert.addAction(UIAlertAction(title:"Đồng ý quyền và lưu candidate",style:.default){[weak self]_ in
+        alert.addAction(UIAlertAction(title:"Đồng ý quyền và lưu ghép đôi",style:.default){[weak self]_ in
             guard let self=self,self.pairingFlow === owner,owner.active,DispatchTime.now()<review.expires,
                   self.hubVisible,!self.pendingSuspend,UIApplication.shared.applicationState == .active,UIApplication.shared.isProtectedDataAvailable else{self?.cancelPairingIdentity();return}
             self.core.confirmPairingPeer(review,owner:owner){[weak self] result in
                 guard let self=self,self.pairingFlow === owner,owner.active else{return};self.cancelPairingIdentity()
-                switch result{case .success:self.pairingNotice("Đã lưu candidate. Mở lại trạng thái để kiểm tra; chưa khởi động kết nối.");case .failure:self.pairingNotice("Chưa xác nhận được kết quả. Mở lại trạng thái trước khi tiếp tục.")}
+                switch result{case .success:self.pairingNotice("Đã lưu ghép đôi. Mở lại trạng thái để kiểm tra; chưa khởi động kết nối.");case .failure:self.pairingNotice("Chưa xác nhận được kết quả. Mở lại trạng thái trước khi tiếp tục.")}
             }
         })
         present(alert,animated:true)

@@ -221,7 +221,7 @@ public final class GameHubController implements AutoCloseable {
     private void cancelPendingPeer(String ticket,java.util.concurrent.atomic.AtomicBoolean owner){
         if(mIdentityFlow!=owner||!owner.get()||!identityUiAvailable()){cancelIdentityReview();return;}
         AlertDialog alert=new AlertDialog.Builder(mActivity).setTitle("Cancel pending pairing?")
-                .setMessage("Discard this device's pending exchange. This does not revoke a pair already approved on the connection service or delete a saved candidate.")
+                .setMessage("Discard this device's pending exchange. This does not revoke a pair already approved on the connection service or delete a saved pairing.")
                 .setNegativeButton("Close",(dialog,which)->cancelIdentityReview())
                 .setPositiveButton("Cancel locally",(dialog,which)->{
                     mIdentityDialog=null;
@@ -250,9 +250,9 @@ public final class GameHubController implements AutoCloseable {
             permission.setText(review.inputAllowed?"I approve the input-control permission shown for this pair.":"I approve this pair without input-control permission.");
             checks.addView(peer);checks.addView(permission);
             AlertDialog alert=new AlertDialog.Builder(mActivity).setTitle("Confirm Remote Play peer")
-                    .setMessage("Host key:\n"+review.hostPublicKey+"\nFingerprint:\n"+review.hostFingerprint+"\nComparison code: "+review.comparisonCode+"\nPair: "+review.pairId+"\nInput control: "+(review.inputAllowed?"Allowed":"Not allowed")+"\n\nSave this pairing candidate after verification. Activation is a separate step.")
+                    .setMessage("Host key:\n"+review.hostPublicKey+"\nFingerprint:\n"+review.hostFingerprint+"\nComparison code: "+review.comparisonCode+"\nPair: "+review.pairId+"\nInput control: "+(review.inputAllowed?"Allowed":"Not allowed")+"\nPermission expires: "+java.text.DateFormat.getDateTimeInstance().format(new java.util.Date(review.grantExpiresAt))+"\n\nSave this verified pairing. Activation is a separate step. This review closes within one minute.")
                     .setView(checks).setNegativeButton(android.R.string.cancel,(dialog,which)->cancelIdentityReview())
-                    .setPositiveButton("Save verified candidate",null).create();
+                    .setPositiveButton("Save verified pairing",null).create();
             mIdentityDialog=alert;alert.setOnCancelListener(dialog->cancelIdentityReview());alert.show();
             android.widget.Button confirm=alert.getButton(AlertDialog.BUTTON_POSITIVE);confirm.setEnabled(false);
             android.widget.CompoundButton.OnCheckedChangeListener changed=(button,checked)->confirm.setEnabled(peer.isChecked()&&permission.isChecked());
@@ -262,7 +262,7 @@ public final class GameHubController implements AutoCloseable {
                 confirm.setEnabled(false);alert.dismiss();mIdentityDialog=null;
                 mCore.confirmPairingPeer(review,owner::get,response->{
                     if(mIdentityFlow!=owner||!owner.get())return;cancelIdentityReview();
-                    if(identityUiAvailable())identityNotice("ok".equals(response.optString("status"))?"Verified candidate saved. Open status to inspect it; no connection was started.":"Candidate result is uncertain. Open status before continuing.");
+                    if(identityUiAvailable())identityNotice("ok".equals(response.optString("status"))?"Verified pairing saved. Open status to inspect it; no connection was started.":"Pairing result is uncertain. Open status before continuing.");
                 });
             });
             mIdentityExpiry=()->{if(mIdentityFlow==owner)cancelIdentityReview();};mMain.postDelayed(mIdentityExpiry,remaining);

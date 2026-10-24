@@ -24,14 +24,16 @@ enum NativeClientPairingAction:UInt32 { case begin=0,join=1,poll=2,persistAfterP
 /// Immutable approved-poll metadata for a trusted native confirmation view.
 final class NativePeerApproval {
     let pairID:String,inputAllowed:Bool,expires:DispatchTime
+    let grantExpiresAt:Date
     let hostPublicKey:String,hostFingerprint:String,comparisonCode:String
     fileprivate let ticket:String,grantHash:String
     fileprivate let origin:ObjectIdentifier
     private let lock=NSLock()
     private var consumed=false
     private let current:()->Bool
-    fileprivate init(origin:NativeCore,ticket:String,hash:String,pair:String,host:String,fingerprint:String,comparison:String,input:Bool,expires:DispatchTime,current:@escaping ()->Bool){
+    fileprivate init(origin:NativeCore,ticket:String,hash:String,pair:String,host:String,fingerprint:String,comparison:String,input:Bool,grantExpiresAt:Date,expires:DispatchTime,current:@escaping ()->Bool){
         self.origin=ObjectIdentifier(origin)
+        self.grantExpiresAt=grantExpiresAt
         hostPublicKey=host;hostFingerprint=fingerprint;comparisonCode=comparison
         self.ticket=ticket;grantHash=hash;pairID=pair;inputAllowed=input;self.expires=expires;self.current=current
     }
@@ -361,6 +363,7 @@ final class NativeCore {
                     let remaining=expiry.doubleValue-Date().timeIntervalSince1970*1000
                     guard remaining>0 else{throw OmniFailure.message("Grant đã hết hạn. Hãy đọc lại trạng thái.")}
                     let review=NativePeerApproval(origin:self,ticket:ticket,hash:hash,pair:pair,host:host,fingerprint:fingerprint,comparison:comparison,input:allowed,
+                        grantExpiresAt:Date(timeIntervalSince1970:expiry.doubleValue/1000),
                         expires:DispatchTime.now() + .milliseconds(Int(min(60_000,remaining))),current:{[weak self] in
                             owner.active && self?.pairingClientDeliveryFence.admits(token)==true
                         })
