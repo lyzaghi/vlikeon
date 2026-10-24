@@ -121,13 +121,31 @@ public final class NativeCore {
         try{mIo.execute(()->{
             JSONObject response;
             try{
+                String expectedTicket=null;
+                if(action!=0){
+                    JSONObject request=new JSONObject(new String(ownedInput,StandardCharsets.UTF_8));
+                    expectedTicket=request.getString("ticket");
+                    if(request.length()!=1||!canonicalPairingId(expectedTicket))throw new IllegalStateException();
+                }
                 long remaining=expires-android.os.SystemClock.elapsedRealtime();
                 if(mHandle==0||mFailed||remaining<1000||(action!=4&&(!alive.getAsBoolean()||!mPairingAttached)))throw new IllegalStateException();
                 response=pairingResponse(nativePairingClientV1(mHandle,ownedInput,action,(int)Math.min(25_000,remaining)));
+                if("ok".equals(response.optString("status"))){
+                    JSONObject value=response.getJSONObject("result");
+                    if(action==3){
+                        JSONObject address=value.getJSONObject("address");
+                        if(value.getInt("credential_protocol")!=1||!"material_ready".equals(value.getString("phase"))||!mProfile.equals(address.getString("profile"))||!"pair_encryption".equals(address.getString("kind")))throw new IllegalStateException();
+                    }else if(value.getInt("pairing_protocol")!=1||!canonicalPairingId(value.getString("ticket"))||(expectedTicket!=null&&!expectedTicket.equals(value.getString("ticket"))))throw new IllegalStateException();
+                }
                 if(action!=4&&!alive.getAsBoolean())response=failure("","cancelled","Pairing response became stale. Inspect native status before continuing.");
             }catch(Exception|LinkageError error){response=failure("","runtime_unavailable","Pairing result is uncertain. Inspect native status before continuing.");}
             finally{java.util.Arrays.fill(ownedInput,(byte)0);mWorkPending.decrementAndGet();if(reserved)mPairingClientBusy.set(false);}
-            final JSONObject completed=response;mMain.post(()->reply.accept(completed));
+            final JSONObject completed=response;mMain.post(()->{
+                // Queue-to-main delay is part of the original operation. Never
+                // deliver an old success into a replaced native dialog.
+                if(android.os.SystemClock.elapsedRealtime()>=expires||(action!=4&&!alive.getAsBoolean()))reply.accept(failure("","cancelled","Pairing result became stale. Inspect native status before continuing."));
+                else reply.accept(completed);
+            });
         });}catch(java.util.concurrent.RejectedExecutionException rejected){java.util.Arrays.fill(ownedInput,(byte)0);mWorkPending.decrementAndGet();if(reserved)mPairingClientBusy.set(false);reply.accept(failure("","busy","Native pairing lane is unavailable."));}
     }
     private static native boolean nativePairingInvalidateEpoch(long handle);

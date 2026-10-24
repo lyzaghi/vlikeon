@@ -209,6 +209,13 @@ final class NativeCore {
         queue.async{
             defer{owned.clear();self.pairingClientQueuePermit.signal();if reservesOperation{self.pairingClientPermit.signal()}}
             do{
+                var expectedTicket:String?
+                if action != .begin{
+                    guard let request=try JSONSerialization.jsonObject(with:owned.bytes) as? [String:Any],request.count==1,
+                          let ticket=request["ticket"] as? String,let id=UUID(uuidString:ticket),id.uuidString.lowercased()==ticket,
+                          id != UUID(uuid:(0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0)) else{throw OmniFailure.message("Ticket ghép đôi không hợp lệ.")}
+                    expectedTicket=ticket
+                }
                 let now=DispatchTime.now()
                 guard self.handle != 0,now<deadline,(action == .cancel || (owner.active&&self.pairingAttached)) else{throw OmniFailure.message("Phiên ghép đôi đã kết thúc. Hãy mở lại trạng thái.")}
                 let remaining=(deadline.uptimeNanoseconds-now.uptimeNanoseconds)/1_000_000
@@ -220,8 +227,20 @@ final class NativeCore {
                         ? om_mobile_pairing_client_begin_v1(self.handle,pointer,raw.count,budget)
                         : om_mobile_pairing_client_action_v1(self.handle,pointer,raw.count,action.rawValue,budget))
                 })
+                if action == .persistAfterPeerConsent{
+                    guard (value["credential_protocol"] as? NSNumber)?.uint32Value==1,value["phase"] as? String=="material_ready",
+                          let address=value["address"] as? [String:Any],address["profile"] as? String==self.profileID.uuidString.lowercased(),
+                          address["kind"] as? String=="pair_encryption" else{throw OmniFailure.message("Kết quả candidate không hợp lệ. Hãy đọc lại trạng thái.")}
+                }else{
+                    guard (value["pairing_protocol"] as? NSNumber)?.uint32Value==1,let ticket=value["ticket"] as? String,
+                          let id=UUID(uuidString:ticket),id.uuidString.lowercased()==ticket,
+                          id != UUID(uuid:(0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0)),expectedTicket==nil || expectedTicket==ticket else{throw OmniFailure.message("Kết quả không khớp ticket ghép đôi.")}
+                }
                 guard DispatchTime.now()<deadline,(action == .cancel || owner.active) else{throw OmniFailure.message("Kết quả ghép đôi đã cũ. Hãy mở lại trạng thái trước khi tiếp tục.")}
-                DispatchQueue.main.async{completion(.success(value))}
+                DispatchQueue.main.async{
+                    guard DispatchTime.now()<deadline,(action == .cancel || owner.active) else{completion(.failure(OmniFailure.message("Kết quả ghép đôi đã cũ. Hãy mở lại trạng thái.")));return}
+                    completion(.success(value))
+                }
             }catch{DispatchQueue.main.async{completion(.failure(error))}}
         }
     }

@@ -1821,6 +1821,23 @@ No SQL/server/network operation, deployment, compiler, build or test ran. Source
 review and whitespace inspection only. Race/retry/quota/expiry/schema qualification
 and native durable post-crash reconciliation remain open with the original scope.
 
+## Mobile client reply admission (source only)
+
+Android and iOS callers now parse non-begin requests as a single canonical,
+nonzero UUID ticket and require matching ticket/protocol metadata in normal
+successful replies. Persisted candidate replies receive basic profile, kind and
+MaterialReady phase checks. This is not exhaustive typed validation or a new
+consent/activation authority; the native controller remains responsible for
+the transaction and credential scope.
+
+Successful callbacks recheck the original queue-inclusive deadline and dialog
+lifetime on the main thread. Late results require native status reconciliation:
+rejecting delivery does not undo a committed operation. Cancel may outlive the
+dialog but still respects its original operation deadline. Actual consent UI,
+complete typed candidate admission and runtime qualification remain open.
+No compiler, build, test, vault, crypto, SQL or network operation was run for
+this checkpoint.
+
 ## Remaining implementation and qualification
 
 - Journal/executor/lease/writer product integration, authority epochs, actual native owner

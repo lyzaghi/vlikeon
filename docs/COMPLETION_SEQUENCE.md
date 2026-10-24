@@ -2,6 +2,12 @@
 
 ## Current sequence — 1–109 outstanding tasks
 
+Item 58 mobile callers now check canonical request/reply tickets, protocol
+metadata and candidate profile/kind/phase before accepting successful replies.
+Both callers recheck the original deadline and dialog lifetime on main-thread
+delivery. These are source changes only: no compiler/build/test ran. Full typed
+reply validation, actual consent UI and end-to-end qualification remain due.
+
 Item 58 relay review now authors transactionally retained closed-invite fences
 so old registration retries cannot resurrect a still-valid closed invite. Same-
 host close retry receives the bound stored receipt; quota never evicts live
