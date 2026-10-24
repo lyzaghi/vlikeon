@@ -2,6 +2,11 @@
 
 ## Current sequence — 1–109 outstanding tasks
 
+Item 58 Android host persistence now leads to a separate one-use activation
+snapshot/dialog, exact candidate/revision/grant checks and host JNI activation.
+Only explicit confirmation publishes relay approval; no connection starts.
+Source-only; interrupted host rereview, iOS flow and build/test remain due.
+
 Item 58 Android host peer review now leads to explicit comparison consent,
 default-off input choice and selected permission lifetime before one-use candidate
 persistence. Native replies bind reviewed hello/client and retained grant hash.

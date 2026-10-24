@@ -280,6 +280,7 @@ public final class NativeCore {
         private final String ticket,helloHash;private final Object fence;
         private final java.util.function.BooleanSupplier owner;
         private final java.util.concurrent.atomic.AtomicBoolean decided=new java.util.concurrent.atomic.AtomicBoolean();
+        private final java.util.concurrent.atomic.AtomicBoolean activationIssued=new java.util.concurrent.atomic.AtomicBoolean();
         private HostPeerReview(String ticket,JSONObject peer,Object fence,java.util.function.BooleanSupplier owner,long expires) throws Exception{
             this.ticket=ticket;clientPublicKey=peer.getString("client_public_key");label=peer.getString("label");comparisonCode=peer.getString("comparison_code");
             helloHash=peer.getString("hello_hash");this.fence=fence;this.owner=owner;this.expires=expires;
@@ -287,6 +288,56 @@ public final class NativeCore {
         boolean current(){return owner.getAsBoolean()&&android.os.SystemClock.elapsedRealtime()<expires;}
     }
     interface HostPeersReply {void accept(java.util.List<HostPeerReview> peers,String error);}
+    static final class HostActivation {
+        final HostPeerReview peer;final String pairId,generation;final boolean inputAllowed;final long grantExpiresAt;
+        private final String address,hash;private final long revision;
+        private final java.util.concurrent.atomic.AtomicBoolean consumed=new java.util.concurrent.atomic.AtomicBoolean();
+        private HostActivation(HostPeerReview peer,JSONObject value) throws Exception{
+            this.peer=peer;JSONObject scope=value.getJSONObject("address");address=scope.toString();pairId=scope.getString("id");generation=scope.getString("generation");
+            hash=value.getString("grant_hash");revision=value.getLong("revision");inputAllowed=value.getBoolean("input_allowed");grantExpiresAt=value.getLong("expires_at_ms");
+        }
+    }
+    HostActivation activationForHostPeer(HostPeerReview peer,JSONObject response) throws Exception{
+        if(peer==null||!peer.current()||!peer.decided.get()||mPairingClientDeliveryFence.get()!=peer.fence)throw new IllegalStateException();
+        JSONObject value=pairingResult(response),address=value.getJSONObject("address");Object revision=value.get("revision"),expiry=value.get("expires_at_ms");
+        if(value.getInt("credential_protocol")!=1||!"material_ready".equals(value.getString("phase"))||!peer.ticket.equals(value.getString("pairing_ticket"))||!peer.clientPublicKey.equals(value.getString("client_public_key"))
+                ||!peer.helloHash.equals(value.getString("reviewed_hello_hash"))||!Boolean.FALSE.equals(value.get("relay_approved"))||!Boolean.TRUE.equals(value.get("reload_required"))
+                ||address.length()!=5||!mProfile.equals(address.getString("profile"))||!"pair_encryption".equals(address.getString("kind"))
+                ||!canonicalPairingId(address.getString("device"))||!canonicalPairingId(address.getString("id"))||!canonicalPairingId(address.getString("generation"))
+                ||!value.getString("grant_hash").matches("[0-9a-f]{64}")||!(value.get("input_allowed") instanceof Boolean)
+                ||!(revision instanceof Number)||((Number)revision).doubleValue()!=((Number)revision).longValue()||((Number)revision).longValue()<1||((Number)revision).longValue()>=10_000_000
+                ||!(expiry instanceof Number)||((Number)expiry).doubleValue()!=((Number)expiry).longValue()||((Number)expiry).longValue()<=System.currentTimeMillis()||((Number)expiry).longValue()>9_007_199_254_740_991L)throw new IllegalStateException();
+        if(!peer.activationIssued.compareAndSet(false,true))throw new IllegalStateException();return new HostActivation(peer,value);
+    }
+    void activateHostPeer(HostActivation activation,java.util.function.BooleanSupplier alive,Reply reply){
+        if(activation==null||!alive.getAsBoolean()||!activation.peer.current()||mPairingClientDeliveryFence.get()!=activation.peer.fence||!activation.consumed.compareAndSet(false,true)){
+            reply.accept(failure("","cancelled","Host activation review ended. Inspect status."));return;
+        }
+        if(!mPairingClientBusy.compareAndSet(false,true)){reply.accept(failure("","busy","Pairing work is still finishing. Inspect status."));return;}
+        if(mWorkPending.incrementAndGet()>32){mWorkPending.decrementAndGet();mPairingClientBusy.set(false);reply.accept(failure("","busy","Native activation queue is full."));return;}
+        final long deadline=Math.min(activation.peer.expires,android.os.SystemClock.elapsedRealtime()+25_000);
+        try{mIo.execute(()->{
+            JSONObject response;byte[] input=null;
+            try{
+                long remaining=deadline-android.os.SystemClock.elapsedRealtime();
+                if(mHandle==0||mFailed||!mPairingAttached||remaining<1000||!alive.getAsBoolean()||!activation.peer.current()||mPairingClientDeliveryFence.get()!=activation.peer.fence)throw new IllegalStateException();
+                JSONObject expected=new JSONObject(activation.address);
+                input=new JSONObject().put("address",expected).put("expected_revision",activation.revision).put("reviewed_grant_hash",activation.hash).toString().getBytes(StandardCharsets.UTF_8);
+                if(input.length>1024)throw new IllegalStateException();
+                response=pairingResponse(nativePairingHostV1(mHandle,input,7,(int)Math.min(25_000,remaining)));
+                if("ok".equals(response.optString("status"))){
+                    JSONObject value=pairingResult(response),address=value.getJSONObject("address");Object revision=value.get("revision");
+                    if(value.getInt("credential_protocol")!=1||!"active".equals(value.getString("phase"))||!activation.hash.equals(value.getString("grant_hash"))||!Boolean.TRUE.equals(value.get("reload_required"))||address.length()!=5
+                            ||!(revision instanceof Number)||((Number)revision).doubleValue()!=((Number)revision).longValue()||((Number)revision).longValue()<=activation.revision||((Number)revision).longValue()>10_000_000)throw new IllegalStateException();
+                    for(String field:new String[]{"profile","device","kind","id","generation"})if(!expected.getString(field).equals(address.getString(field)))throw new IllegalStateException();
+                }
+            }catch(Exception|LinkageError error){response=failure("","runtime_unavailable","Host activation may have committed. Reload status before retrying.");}
+            finally{if(input!=null)java.util.Arrays.fill(input,(byte)0);mWorkPending.decrementAndGet();mPairingClientBusy.set(false);}
+            final JSONObject completed=response;mMain.post(()->{
+                if(android.os.SystemClock.elapsedRealtime()>=deadline||!alive.getAsBoolean()||!activation.peer.current()||mPairingClientDeliveryFence.get()!=activation.peer.fence)reply.accept(failure("","cancelled","Host activation result became stale. Reload status."));else reply.accept(completed);
+            });
+        });}catch(java.util.concurrent.RejectedExecutionException error){mWorkPending.decrementAndGet();mPairingClientBusy.set(false);reply.accept(failure("","busy","Native activation queue is unavailable."));}
+    }
     void declineHostPeer(HostPeerReview peer,java.util.function.BooleanSupplier alive,Reply reply){
         decideHostPeer(peer,false,false,0,alive,reply);
     }

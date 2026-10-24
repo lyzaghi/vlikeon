@@ -1840,6 +1840,18 @@ this checkpoint.
 
 ## Remaining implementation and qualification
 
+Android host save success can now issue one immutable activation snapshot from
+the consumed peer review. Exact original ticket/client/hello context and returned
+MaterialReady address/revision/hash/permission/expiry are admitted before issue.
+Separate confirmation displays peer, pair/generation, input permission and expiry,
+then consumes activation once and calls host candidate action 7. Successful reply
+must bind full address/hash and advancing bounded revision/Active phase. Shared
+queue, original review deadline, owner/cancel fences and byte clearing apply.
+Relay approval occurs only after that explicit action; transport is not started.
+Expired/uncertain results require native status reconciliation, not another grant.
+No build/test/UI render/native operation ran. Saved-host rereview/resume UI, iOS
+host product flow and end-to-end qualification remain unfinished.
+
 Android host peer permissions now require an unchecked independent-peer/code
 verification box, default-off input choice and explicit displayed lifetime (one
 hour, one day or seven days). Save consumes the same one-use decision snapshot

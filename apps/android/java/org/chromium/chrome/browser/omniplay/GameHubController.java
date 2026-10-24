@@ -290,10 +290,28 @@ public final class GameHubController implements AutoCloseable {
             long[] durations={3_600_000L,86_400_000L,604_800_000L};long duration=durations[lifetime.getSelectedItemPosition()];boolean allowed=input.isChecked();
             confirm.setEnabled(false);alert.dismiss();mIdentityDialog=null;
             mCore.persistHostPeer(peer,allowed,duration,owner::get,response->{
-                if(mIdentityFlow!=owner||!owner.get())return;cancelIdentityReview();
-                if(identityUiAvailable())identityNotice("ok".equals(response.optString("status"))?"Host pairing saved pending activation. No relay approval or connection was started. Open status to inspect it.":"Pairing result could not be confirmed. Inspect status before creating another grant.");
+                if(mIdentityFlow!=owner||!owner.get())return;
+                if(!identityUiAvailable()){cancelIdentityReview();return;}
+                try{showHostActivation(mCore.activationForHostPeer(peer,response),owner);}
+                catch(Exception error){cancelIdentityReview();identityNotice("Pairing result is uncertain or the review expired. Inspect status before creating another grant.");}
             });
         });
+    }
+    private void showHostActivation(NativeCore.HostActivation activation,java.util.concurrent.atomic.AtomicBoolean owner){
+        if(mIdentityFlow!=owner||!owner.get()||!identityUiAvailable()||!activation.peer.current()){cancelIdentityReview();return;}
+        AlertDialog alert=new AlertDialog.Builder(mActivity).setTitle("Approve and activate host pairing?")
+                .setMessage("Client key:\n"+activation.peer.clientPublicKey+"\nPair: "+activation.pairId+"\nGeneration: "+activation.generation+"\nInput control: "+(activation.inputAllowed?"Allowed":"Not allowed")+"\nPermission expires: "+java.text.DateFormat.getDateTimeInstance().format(new java.util.Date(activation.grantExpiresAt))+"\n\nPublish approval of this exact saved grant on the configured service and activate the pairing. No connection is started by this step.")
+                .setNegativeButton("Later",(dialog,which)->cancelIdentityReview())
+                .setPositiveButton("Approve and activate",(dialog,which)->{
+                    mIdentityDialog=null;
+                    if(mIdentityFlow!=owner||!owner.get()||!identityUiAvailable()||!activation.peer.current()){cancelIdentityReview();return;}
+                    mCore.activateHostPeer(activation,owner::get,response->{
+                        if(mIdentityFlow!=owner||!owner.get())return;cancelIdentityReview();
+                        if(identityUiAvailable())identityNotice("ok".equals(response.optString("status"))?"Host pairing approved and activated. No connection was started. Open status to inspect it.":"Host approval or activation could not be confirmed. Reload status before retrying.");
+                    });
+                }).create();
+        mIdentityDialog=alert;alert.setOnCancelListener(dialog->cancelIdentityReview());alert.show();
+        mMain.postDelayed(()->{if(mIdentityDialog==alert&&!activation.peer.current()){cancelIdentityReview();}},Math.max(0,activation.peer.expires-android.os.SystemClock.elapsedRealtime()));
     }
     private void confirmHostPeerDecline(String ticket,NativeCore.HostPeerReview peer,java.util.concurrent.atomic.AtomicBoolean owner){
         if(mIdentityFlow!=owner||!owner.get()||!identityUiAvailable()||!peer.current()){cancelIdentityReview();return;}
