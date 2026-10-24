@@ -1306,6 +1306,33 @@ ordering, lock/unlock and desktop containment remain unfinished.
 No Android file/Keystore call, native callback, compilation, build or test was
 executed. Only source review and whitespace inspection were performed.
 
+## Desktop provider retirement marker
+
+The generic desktop keyring provider now retains a public marker in the separate
+`org.vlikeon.remote-play.retirement.v1` service at the exact credential account.
+Its fixed 73-byte record binds tag/kind/profile/device/item/generation and holds
+no secret. Cleanup admits any existing marker, creates only when explicitly
+missing, reads it back before secret deletion and retains it after deletion.
+Corrupt, mismatched, locked or failed marker reads never authorize replacement.
+
+Candidate writes validate the full secret envelope, refuse an existing secret
+or retirement marker, and check the marker again around set_secret. This is
+check/write under the caller's retained native credential lease, not backend
+compare-and-swap or atomic create-only semantics. Reads refuse a marked generation
+with remaining secret material; cleanup returns success only after explicit secret
+absence and exact marker read-back. Public marker absence is distinct from a vault
+error. Temporary secret results remain zeroizing on rejected paths.
+
+This prevents normal cooperating provider use of marked generations. It does
+not prevent a generic OS vault from physically completing a previously submitted
+write after process death. Such late material remains quarantined by the separate
+marker and requires reconciliation; this change supplies no WriterRetired receipt,
+forensic erasure guarantee or complete cross-process/backend ownership proof.
+Desktop-specific late-operation containment and marker retention/repair remain due.
+
+No vault/OS operation, compiler, build or test was executed. Only source review
+and whitespace checks were performed; item 58 and all original scope remain open.
+
 ## Remaining implementation and qualification
 
 - Journal/executor/lease/writer product integration, authority epochs, actual native owner

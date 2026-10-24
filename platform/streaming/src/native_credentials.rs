@@ -198,25 +198,64 @@ fn vault_error()->PlatformError{PlatformError::new(ErrorCode::PermissionDenied,"
 #[derive(Default)]pub struct OsPairingSecretStore;
 #[cfg(any(target_os="windows",target_os="macos",target_os="linux"))]
 fn entry(address:&CredentialAddress)->Result<keyring::Entry>{keyring::Entry::new(SECRET_SERVICE,&address.account()?).map_err(|_|vault_error())}
+#[cfg(any(target_os="windows",target_os="macos",target_os="linux"))]
+fn retirement_entry(address:&CredentialAddress)->Result<keyring::Entry>{keyring::Entry::new("org.vlikeon.remote-play.retirement.v1",&address.account()?).map_err(|_|vault_error())}
+#[cfg(any(target_os="windows",target_os="macos",target_os="linux"))]
+fn retirement_marker(address:&CredentialAddress)->[u8;73]{
+    let mut marker=[0u8;73];marker[..8].copy_from_slice(b"VLKRF001");marker[8]=address.tag();
+    for(index,id)in [address.profile(),address.device(),address.id(),address.generation()].iter().enumerate(){marker[9+index*16..25+index*16].copy_from_slice(id.as_bytes());}marker
+}
+#[cfg(any(target_os="windows",target_os="macos",target_os="linux"))]
+fn retirement_present(address:&CredentialAddress)->Result<bool>{
+    match retirement_entry(address)?.get_secret(){
+        Ok(bytes)=>{let bytes=Zeroizing::new(bytes);if bytes.as_slice()!=retirement_marker(address).as_slice(){return Err(corrupt());}Ok(true)},
+        Err(keyring::Error::NoEntry)=>Ok(false),Err(_)=>Err(vault_error()),
+    }
+}
+#[cfg(any(target_os="windows",target_os="macos",target_os="linux"))]
+fn seal_retirement(address:&CredentialAddress)->Result<()>{
+    // Serialized by the caller's retained credential lease, not backend CAS.
+    if !retirement_present(address)?{retirement_entry(address)?.set_secret(&retirement_marker(address)).map_err(|_|vault_error())?;}
+    if !retirement_present(address)?{return Err(vault_error());}Ok(())
+}
+#[cfg(any(target_os="windows",target_os="macos",target_os="linux"))]
+fn retired()->PlatformError{PlatformError::new(ErrorCode::PermissionDenied,"The native credential generation is retired or has unfinished cleanup")}
 impl PairingSecretStore for OsPairingSecretStore{
     fn read(&self,address:&CredentialAddress)->Result<Option<Zeroizing<Vec<u8>>>>{
         address.validate()?;
         #[cfg(any(target_os="windows",target_os="macos",target_os="linux"))]{
+            let retiring=retirement_present(address)?;
             match entry(address)?.get_secret(){
-                Ok(bytes)=>{let bytes=Zeroizing::new(bytes);if bytes.len()!=SECRET_RECORD_BYTES{return Err(corrupt());}Ok(Some(bytes))},
-                Err(keyring::Error::NoEntry)=>Ok(None),Err(_)=>Err(vault_error()),
+                Ok(bytes)=>{let bytes=Zeroizing::new(bytes);validate_secret_envelope(address,&bytes)?;
+                    if retiring||retirement_present(address)?{return Err(retired());}Ok(Some(bytes))},
+                Err(keyring::Error::NoEntry)=>{let _=retirement_present(address)?;Ok(None)},Err(_)=>Err(vault_error()),
             }
         }
         #[cfg(not(any(target_os="windows",target_os="macos",target_os="linux")))]{Err(native_required())}
     }
     fn write(&self,address:&CredentialAddress,record:&[u8])->Result<()>{
-        address.validate()?;if record.len()!=SECRET_RECORD_BYTES{return Err(corrupt());}
-        #[cfg(any(target_os="windows",target_os="macos",target_os="linux"))]{entry(address)?.set_secret(record).map_err(|_|vault_error())}
+        address.validate()?;validate_secret_envelope(address,record)?;
+        #[cfg(any(target_os="windows",target_os="macos",target_os="linux"))]{
+            if retirement_present(address)?{return Err(retired());}
+            let secret=entry(address)?;
+            match secret.get_secret(){Ok(bytes)=>{let _bytes=Zeroizing::new(bytes);return Err(retired());},Err(keyring::Error::NoEntry)=>{},Err(_)=>return Err(vault_error())}
+            // Native lease serializes check/write; generic keyring set_secret
+            // is not an atomic create-only API or a late OS-write barrier.
+            if retirement_present(address)?{return Err(retired());}
+            secret.set_secret(record).map_err(|_|vault_error())?;
+            if retirement_present(address)?{return Err(retired());}Ok(())
+        }
         #[cfg(not(any(target_os="windows",target_os="macos",target_os="linux")))]{Err(native_required())}
     }
     fn remove(&self,address:&CredentialAddress)->Result<()>{
         address.validate()?;
-        #[cfg(any(target_os="windows",target_os="macos",target_os="linux"))]{match entry(address)?.delete_credential(){Ok(())|Err(keyring::Error::NoEntry)=>Ok(()),Err(_)=>Err(vault_error())}}
+        #[cfg(any(target_os="windows",target_os="macos",target_os="linux"))]{
+            seal_retirement(address)?;
+            let secret=entry(address)?;
+            match secret.delete_credential(){Ok(())|Err(keyring::Error::NoEntry)=>{},Err(_)=>return Err(vault_error())}
+            match secret.get_secret(){Err(keyring::Error::NoEntry)=>{},Ok(bytes)=>{let _bytes=Zeroizing::new(bytes);return Err(vault_error());},Err(_)=>return Err(vault_error())}
+            if !retirement_present(address)?{return Err(vault_error());}Ok(())
+        }
         #[cfg(not(any(target_os="windows",target_os="macos",target_os="linux")))]{Err(native_required())}
     }
 }

@@ -2,6 +2,13 @@
 
 ## Current sequence — 1–109 outstanding tasks
 
+Item 58 now authors separate desktop vault retirement markers, exact marker
+admission/read-back around cleanup and candidate-write refusal around generic
+keyring set operations. Marked generations with remaining material stay errors.
+This quarantines cooperating provider use, not late OS writes themselves, and
+does not provide WriterRetired evidence. No OS/vault/compiler/build/test was
+executed. Backend retirement/repair and qualification remain due; scope stays open.
+
 Item 58 now authors an Android exact-generation public retirement barrier,
 durably created/read back before wrapped-material deletion and retained after
 cleanup. Candidate writes refuse the marker and reads do not classify partial
