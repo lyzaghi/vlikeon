@@ -1840,6 +1840,15 @@ this checkpoint.
 
 ## Remaining implementation and qualification
 
+iOS saved-peer review helper now requires a matching MaterialReady record from
+native status, verified provenance, no session debt and a live snapshot. Validated
+reviewSaved output becomes immutable metadata with private address/revision/hash,
+original core/owner/cancel binding and monotonic lifetime capped at 60 seconds.
+Separate activation consumes it once and uses existing reviewed activation ABI
+and admission predicates. Fresh independent host/permission consent is still
+required; no old comparison is invented. Resume view remains unwired. No build,
+test or native runtime operation ran for this source checkpoint.
+
 Android MaterialReady pair details now expose a separate saved-pair review action
 when storage provenance is present and no durable session debt exists. Fresh
 leased review opens a native dialog showing host key/fingerprint, service, pair,

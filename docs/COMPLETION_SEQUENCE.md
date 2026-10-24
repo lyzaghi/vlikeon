@@ -2,6 +2,10 @@
 
 ## Current sequence — 1–109 outstanding tasks
 
+Item 58 iOS now authors immutable saved-peer review and one-use activation
+helpers bound to native status record, core/owner/cancel and capped expiry.
+No old comparison is reconstructed. Source-only; resume view/build/test due.
+
 Item 58 Android MaterialReady pair details now offer saved-peer rereview and
 explicit one-use activation with fresh host/permission checks and original
 review expiry. Missing old comparison is explicit. Source-only; no build/test;

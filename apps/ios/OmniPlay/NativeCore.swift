@@ -49,6 +49,26 @@ final class NativePeerApproval {
         guard consumed,!activationIssued,admitted else{return false};activationIssued=true;return true
     }
 }
+final class NativeSavedPeerReview {
+    let hostPublicKey:String,hostFingerprint:String,pairID:String,generation:String,audience:String
+    let inputAllowed:Bool,grantExpiresAt:Date,expires:DispatchTime
+    fileprivate let core:ObjectIdentifier,address:[String:Any],revision:UInt64,hash:String
+    private let current:()->Bool
+    private let lock=NSLock();private var consumed=false
+    fileprivate init(core:NativeCore,value:[String:Any],expires:DispatchTime,current:@escaping ()->Bool) throws{
+        guard let address=value["address"] as? [String:Any],let generation=address["generation"] as? String,
+              let host=value["host_public_key"] as? String,let fingerprint=value["host_fingerprint"] as? String,
+              let pair=value["pair_id"] as? String,let audience=value["audience"] as? String,let allowed=value["input_allowed"] as? Bool,
+              let expiry=value["expires_at_ms"] as? NSNumber,let revision=value["revision"] as? NSNumber,let hash=value["grant_hash"] as? String else{throw OmniFailure.message("Thiếu dữ liệu ghép đôi đã lưu.")}
+        self.core=ObjectIdentifier(core);self.address=address;self.revision=revision.uint64Value;self.hash=hash
+        hostPublicKey=host;hostFingerprint=fingerprint;pairID=pair;self.generation=generation;self.audience=audience;inputAllowed=allowed
+        grantExpiresAt=Date(timeIntervalSince1970:expiry.doubleValue/1000);self.expires=expires;self.current=current
+    }
+    fileprivate var admitted:Bool{DispatchTime.now()<expires&&current()}
+    fileprivate func consume()->Bool{
+        lock.lock();defer{lock.unlock()};guard !consumed,admitted else{return false};consumed=true;return true
+    }
+}
 final class NativePeerActivation {
     let peer:NativePeerApproval,generation:String
     fileprivate let address:[String:Any],revision:UInt64
@@ -478,6 +498,35 @@ final class NativeCore {
                 guard review.admitted else{completion(.failure(OmniFailure.message("Kết quả xác nhận đã cũ. Hãy kiểm tra trạng thái native.")));return}
                 completion(result)
             }
+        }catch{completion(.failure(error))}
+    }
+    @MainActor func reviewSavedPeer(_ record:NativeRecoveryRecord,snapshot:NativeRecoverySnapshot,owner:NativeDocumentLifetime,
+        completion:@escaping @MainActor (Result<NativeSavedPeerReview,Error>)->Void){
+        let token=pairingClientDeliveryFence.capture(cancel:false)
+        guard owner.active,DispatchTime.now()<snapshot.expires,!snapshot.namespaceProvenanceMissing,!record.isIdentity,record.phase=="material_ready",!record.sessionRecoveryRequired,
+              snapshot.records.contains(where:{NSDictionary(dictionary:$0.address).isEqual(to:record.address)&&$0.phase==record.phase&&$0.publicKey==record.publicKey}) else{completion(.failure(OmniFailure.message("Hãy đọc lại trạng thái trước khi duyệt ghép đôi đã lưu.")));return}
+        do{
+            var input=try JSONSerialization.data(withJSONObject:["address":record.address,"expected_revision":snapshot.revision])
+            pairingClient(.reviewSaved,input:&input,owner:owner,admission:{DispatchTime.now()<snapshot.expires}){result in
+                do{
+                    let value=try result.get()
+                    guard owner.active,self.pairingClientDeliveryFence.admits(token),DispatchTime.now()<snapshot.expires,
+                          let expiry=value["expires_at_ms"] as? NSNumber else{throw OmniFailure.message("Phiên duyệt đã kết thúc.")}
+                    let remaining=min(60_000,expiry.doubleValue-Date().timeIntervalSince1970*1000)
+                    guard remaining>0 else{throw OmniFailure.message("Quyền ghép đôi đã hết hạn.")}
+                    let review=try NativeSavedPeerReview(core:self,value:value,expires:.now() + .milliseconds(Int(remaining)),current:{[weak self] in owner.active&&self?.pairingClientDeliveryFence.admits(token)==true})
+                    completion(.success(review))
+                }catch{completion(.failure(error))}
+            }
+        }catch{completion(.failure(error))}
+    }
+    /// Fresh independent host/permission consent required; no old code exists.
+    @MainActor func activateSavedPeer(_ review:NativeSavedPeerReview,owner:NativeDocumentLifetime,
+        completion:@escaping @MainActor (Result<[String:Any],Error>)->Void){
+        guard owner.active,review.core==ObjectIdentifier(self),review.consume() else{completion(.failure(OmniFailure.message("Phiên duyệt đã kết thúc. Hãy duyệt lại ghép đôi.")));return}
+        do{
+            var input=try JSONSerialization.data(withJSONObject:["address":review.address,"expected_revision":review.revision,"reviewed_grant_hash":review.hash])
+            pairingClient(.activate,input:&input,owner:owner,admission:{review.admitted},completion:completion)
         }catch{completion(.failure(error))}
     }
     @MainActor func activationForPeer(_ review:NativePeerApproval,value:[String:Any]) throws->NativePeerActivation{
