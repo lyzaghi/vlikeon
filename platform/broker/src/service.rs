@@ -463,7 +463,7 @@ impl Broker {
         }
     }
     #[cfg(windows)]
-    pub(crate) fn attach_native_video_transport<T:crate::stream_video_ingress::NativeSrtpReceiver+'static,C:crate::stream_video_ingress::NativeDatagramReceipt+'static>(&mut self,transport:crate::stream_video_ingress::UdpVideoIngress<T,C>)->Result<()>{
+    pub(crate) fn attach_native_video_transport<T:crate::stream_video_ingress::NativeSrtpReceiver+'static,C:crate::stream_video_ingress::NativeDatagramReceipt+'static>(&mut self,transport:&mut Option<crate::stream_video_ingress::UdpVideoIngress<T,C>>)->Result<()>{
         self.receive_transport.attach(transport,&self.receive_video,&self.receive_document)
     }
     pub fn close(&mut self) {

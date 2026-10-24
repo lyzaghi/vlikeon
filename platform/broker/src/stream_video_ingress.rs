@@ -66,6 +66,24 @@ pub trait NativeDatagramReceipt{
 /// Owns an already connected ICE-selected socket, never binds/connects to a
 /// renderer-provided address. Fixed peer checks are not SRTP authentication.
 pub struct UdpVideoIngress<T:NativeSrtpReceiver,C:NativeDatagramReceipt>{socket:Option<UdpSocket>,peer:SocketAddr,ingress:VideoIngress<T>,clock:C,closed:bool}
+impl<T:NativeSrtpReceiver> UdpVideoIngress<T,crate::stream_video_winsock::SelectedWinsockDatagrams>{
+    /// Native ICE caller supplies its selected, already connected socket. Keep
+    /// the engine in the caller's slot on any setup error so keys/workers can
+    /// still be explicitly retired; never consume it before socket admission.
+    pub fn from_windows_selected_socket(socket:UdpSocket,expected_peer:SocketAddr,index:u32,owner:VideoOwner,transport:&mut Option<T>)->Result<Self>{
+        if socket.peer_addr().map_err(|_|denied())?!=expected_peer||expected_peer.port()==0
+            ||expected_peer.ip().is_unspecified()||expected_peer.ip().is_multicast()
+            ||[owner.capture,owner.game,owner.pair,owner.session].iter().any(|id|id.is_nil())
+            ||!(1..=1_000_000).contains(&owner.generation){return Err(denied());}
+        if transport.as_ref().ok_or_else(denied)?.owner()!=owner{return Err(denied());}
+        let clock=crate::stream_video_winsock::SelectedWinsockDatagrams::from_selected_socket(&socket,index)?;
+        if transport.as_ref().ok_or_else(denied)?.owner()!=owner{return Err(denied());}
+        // No fallible operation remains after taking engine ownership.
+        let transport=transport.take().ok_or_else(denied)?;
+        let ingress=VideoIngress{owner,transport,closed:false,retired:false,video_retired:false};
+        Ok(Self{socket:Some(socket),peer:expected_peer,ingress,clock,closed:false})
+    }
+}
 impl<T:NativeSrtpReceiver,C:NativeDatagramReceipt> UdpVideoIngress<T,C>{
     pub fn owner(&self)->VideoOwner{self.ingress.owner}
     pub fn from_selected_socket(socket:UdpSocket,expected_peer:SocketAddr,owner:VideoOwner,transport:T,clock:C)->Result<Self>{
@@ -113,10 +131,13 @@ impl<T:NativeSrtpReceiver,C:NativeDatagramReceipt> PollingTransport for UdpVideo
 pub struct TransportSlot{entry:Option<Box<dyn PollingTransport>>,sealed:bool,closed:bool}
 impl TransportSlot{
     pub fn occupied(&self)->bool{self.entry.is_some()}
-    pub fn attach<T:NativeSrtpReceiver+'static,C:NativeDatagramReceipt+'static>(&mut self,transport:UdpVideoIngress<T,C>,registry:&ReceiveRegistry,document:&ReceiveDocument)->Result<()>{
+    pub fn attach<T:NativeSrtpReceiver+'static,C:NativeDatagramReceipt+'static>(&mut self,transport:&mut Option<UdpVideoIngress<T,C>>,registry:&ReceiveRegistry,document:&ReceiveDocument)->Result<()>{
         if self.closed||self.entry.is_some(){return Err(PlatformError::new(ErrorCode::Busy,"The native transport slot still requires retirement"));}
-        if registry.state(document.id(),transport.owner())?!=crate::stream_video_receive::ReceiveState::Active{return Err(denied());}
-        self.entry=Some(Box::new(transport));self.sealed=false;Ok(())
+        let pending=transport.as_ref().ok_or_else(denied)?;
+        if registry.state(document.id(),pending.owner())?!=crate::stream_video_receive::ReceiveState::Active{return Err(denied());}
+        // Rejected attachment leaves socket/crypto/decoder cleanup ownership in
+        // the caller's slot. Successful admission transfers it exactly once.
+        self.entry=Some(Box::new(transport.take().ok_or_else(denied)?));self.sealed=false;Ok(())
     }
     pub fn maintain(&mut self,registry:&mut ReceiveRegistry,document:&ReceiveDocument,deadline:Instant)->Result<()>{
         let Some(entry)=self.entry.as_mut()else{return Ok(())};

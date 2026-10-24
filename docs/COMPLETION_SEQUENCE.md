@@ -2,6 +2,8 @@
 
 ## Current sequence — 1–109 outstanding tasks
 
+Source checkpoint: native UDP ingress now has a concrete Windows constructor assembling selected-socket binding, active software timestamp validation and atomic datagram receipt. Setup errors retain the crypto engine in the caller's Option; broker attachment now consumes a caller slot only after registry admission, preserving rejected transports for explicit retirement. No actual ICE/DTLS/SRTP backend or product negotiation caller is supplied by this checkpoint. Build/test remain deferred.
+
 Source checkpoint: concrete Windows receive binding now validates the ICE-selected socket's local unicast address and interface index with GetUnicastIpAddressEntry, retains local/peer/socket/LUID identity and fences ownership changes. SelectedWinsockDatagrams assembles binding, active software timestamp source and atomic recvmsg adapter. Actual native ICE candidate issuer, DTLS/SRTP engine and product negotiation wiring remain unfinished. Build/test stay deferred.
 
 Source checkpoint: Winsock now requires packet-info ancillary interface identity alongside each original ingress timestamp, converts the received interface index to LUID and matches the native binding. IPv4/IPv6 packet-info options are configured, with IPv4 additionally enabled for dual-stack sockets. Missing/duplicate/mismatched interface metadata fences ingress. Native binding issuer and crypto/product wiring remain open; build/test are deferred.
