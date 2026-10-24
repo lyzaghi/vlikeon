@@ -4,7 +4,7 @@ use crate::stream_video::{WindowsVideoDecoder,UnpresentedVideoFrame};
 use omniplay_contracts::{ErrorCode,PlatformError,Result};
 use omniplay_stream_input::video_client::{DecoderReceipt,VideoOwner};
 use omniplay_streaming::{native_h264_receive::ReceivedAccessUnit,native_rtp_reorder::OrderedReceiver};
-use std::collections::VecDeque;
+use std::{collections::VecDeque,time::{Duration,Instant}};
 
 /// Mandatory installed native receiver check of the ACTUAL parameter sets,
 /// profile/level/resolution/VUI/dependencies and negotiated owner/codec. Existing
@@ -77,17 +77,23 @@ impl<A:NativeH264Admission> NativeVideoReceiver<A>{
         if result.is_err(){self.retire();}result
     }
     fn retire(&mut self){
+        let _=self.revoke_until(Instant::now()+Duration::from_millis(1000));
+    }
+    /// Fence delivery before cleanup; the decoder retains its original worker.
+    /// Retrying CleanupRequired may reap that same worker, never reopens receive
+    /// admission and never replaces missing native Stop acknowledgement.
+    pub fn revoke_until(&mut self,deadline:Instant)->Result<()>{
+        if self.state==ReceiveState::Revoked{return Ok(());}
         // Fence first. EOF/timeout/forced process retirement may close delivery
         // without a native Stop receipt; retain that uncertainty for the caller.
         self.state=ReceiveState::CleanupRequired;self.ordered.close();self.pending.clear();
-        if self.decoder.revoke().is_ok(){self.state=ReceiveState::Revoked;}
+        self.decoder.revoke_until(deadline)?;
+        // A backend must not turn a late completion into a timely receipt.
+        if Instant::now()>=deadline{return Err(unavailable());}
+        self.state=ReceiveState::Revoked;Ok(())
     }
     pub fn revoke(&mut self)->Result<()>{
-        match self.state{
-            ReceiveState::Revoked=>Ok(()),
-            ReceiveState::CleanupRequired=>Err(unavailable()),
-            ReceiveState::Active=>{self.retire();if self.state==ReceiveState::Revoked{Ok(())}else{Err(unavailable())}},
-        }
+        self.revoke_until(Instant::now()+Duration::from_millis(1000))
     }
 }
 impl<A:NativeH264Admission> Drop for NativeVideoReceiver<A>{fn drop(&mut self){if self.state==ReceiveState::Active{self.retire();}}}

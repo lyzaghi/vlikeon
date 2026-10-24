@@ -1,5 +1,16 @@
 # Native ordered RTP to decoder bridge — item 56
 
+Receiver retirement now accepts an original caller deadline through
+`revoke_until`, fences ordered/pending data before decoder cleanup, and passes
+that deadline into the existing decoder/worker retirement path. A positive,
+timely Stop/process/I/O result is required to publish Revoked. CleanupRequired
+can explicitly retry reaping the same retained decoder owner; receive admission
+stays closed and no Stop receipt is invented. This supersedes the earlier
+always-error CleanupRequired revoke behavior. Confirmed Revoked remains an
+idempotent historical result rather than new backend work. Default/error/Drop
+cleanup uses a separate best-effort budget. No build/test or timing/device
+qualification ran, and full session retirement/transport integration stays open.
+
 Primary-picture header consistency now has the source primitive described in
 `NATIVE_H264_PICTURE_HEADERS.md`. Complete AU/DPB/negotiation validation and the
 actual admission implementation remain unfinished; this bridge does not invoke
