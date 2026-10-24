@@ -1840,6 +1840,17 @@ this checkpoint.
 
 ## Remaining implementation and qualification
 
+Android native-only host ticket caller now uses shared ordinary pairing admission,
+bounded queue and original 25-second deadline. Close rotates delivery fence and
+requires immediate native epoch acknowledgment before queueing. Reply admission
+checks exact protocol/ticket, register flags, bounded unique peer snapshots with
+canonical keys/hashes/comparison and bounded labels, or explicit close semantics.
+Never-registered close is distinguished from actual relay acknowledgment. Main
+delivery rechecks owner/fence/deadline; buffers clear on worker completion.
+No automatic polling or renderer route. Close still requires foreground provider
+and a live owner; this is not background cleanup. No build/test/runtime operation
+ran. Other host callers/UI and durable recovery remain unfinished.
+
 Android private nativePairingHostV1 now dispatches begin/register/poll/close,
 peer persist/decline and saved host candidate review/activation to separate Rust
 ABI entries. Action/budget/input bounds precede array copy; native vector is

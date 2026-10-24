@@ -223,6 +223,56 @@ public final class NativeCore {
     }
     private static native boolean nativePairingInvalidateEpoch(long handle);
     private static native byte[] nativePairingIdentity(int operation,long handle,long revision,byte[] input);
+    /** Native host ticket operations only. Never renderer dispatch/raw forwarding. */
+    void pairingHostTicket(String ticket,int action,java.util.function.BooleanSupplier alive,Reply reply){
+        if(!canonicalPairingId(ticket)||action<1||action>3){reply.accept(failure("","invalid_request","Invalid native host ticket action."));return;}
+        final boolean closing=action==3;
+        final Object fence=closing?new Object():mPairingClientDeliveryFence.get();
+        if(closing){
+            mPairingClientDeliveryFence.set(fence);
+            try{if(mHandle==0||!nativePairingInvalidateEpoch(mHandle)){reply.accept(failure("","runtime_unavailable","Host close invalidation was not acknowledged. Inspect status."));return;}}
+            catch(LinkageError error){reply.accept(failure("","unsupported_capability","Native host control is unavailable."));return;}
+        }
+        final boolean reserved=!closing&&mPairingClientBusy.compareAndSet(false,true);
+        if(!closing&&!reserved){reply.accept(failure("","busy","Native pairing work is still finishing."));return;}
+        if(mWorkPending.incrementAndGet()>32){mWorkPending.decrementAndGet();if(reserved)mPairingClientBusy.set(false);reply.accept(failure("","busy","Native queue is full."));return;}
+        final long deadline=android.os.SystemClock.elapsedRealtime()+25_000;
+        try{mIo.execute(()->{
+            JSONObject response;byte[] input=null;
+            try{
+                long remaining=deadline-android.os.SystemClock.elapsedRealtime();
+                if(mHandle==0||mFailed||!mPairingAttached||remaining<1000||!alive.getAsBoolean()||mPairingClientDeliveryFence.get()!=fence)throw new IllegalStateException();
+                input=new JSONObject().put("ticket",ticket).toString().getBytes(StandardCharsets.UTF_8);
+                response=pairingResponse(nativePairingHostV1(mHandle,input,action,(int)Math.min(25_000,remaining)));
+                if("ok".equals(response.optString("status"))){
+                    JSONObject value=pairingResult(response);
+                    if(value.getInt("pairing_protocol")!=1||!ticket.equals(value.getString("ticket")))throw new IllegalStateException();
+                    if(action==1&&(!Boolean.TRUE.equals(value.get("registered"))||!Boolean.TRUE.equals(value.get("share_available"))||!Boolean.FALSE.equals(value.get("approves_peer"))))throw new IllegalStateException();
+                    if(action==2){
+                        Object revision=value.get("revision");org.json.JSONArray peers=value.getJSONArray("peers");
+                        if(!Boolean.TRUE.equals(value.get("local_consent_required"))||peers.length()>8||!(revision instanceof Number)
+                                ||((Number)revision).doubleValue()!=((Number)revision).longValue()||((Number)revision).longValue()<1||((Number)revision).longValue()>10_000_000)throw new IllegalStateException();
+                        java.util.HashSet<String> keys=new java.util.HashSet<>();
+                        for(int i=0;i<peers.length();i++){
+                            JSONObject peer=peers.getJSONObject(i);String key=peer.getString("client_public_key"),label=peer.getString("label");
+                            if(!key.matches("[A-Za-z0-9_-]{42}[AEIMQUYcgkosw048]")||!keys.add(key)||!peer.getString("hello_hash").matches("[0-9a-f]{64}")
+                                    ||!peer.getString("comparison_code").matches("[0-9]{6}")||label.isEmpty()||label.getBytes(StandardCharsets.UTF_8).length>120)throw new IllegalStateException();
+                            for(int j=0;j<label.length();j++)if(Character.isISOControl(label.charAt(j)))throw new IllegalStateException();
+                        }
+                    }
+                    if(action==3){
+                        if(!Boolean.TRUE.equals(value.get("closed"))||!Boolean.FALSE.equals(value.get("pairs_revoked")))throw new IllegalStateException();
+                        if(!Boolean.TRUE.equals(value.get("relay_close_confirmed"))&&(!Boolean.FALSE.equals(value.get("remote_close_required"))||!"never_registered".equals(value.getString("reason"))))throw new IllegalStateException();
+                    }
+                }
+            }catch(Exception|LinkageError error){response=failure("","runtime_unavailable","Host result is uncertain. Inspect native status before retrying.");}
+            finally{if(input!=null)java.util.Arrays.fill(input,(byte)0);mWorkPending.decrementAndGet();if(reserved)mPairingClientBusy.set(false);}
+            final JSONObject completed=response;mMain.post(()->{
+                if(android.os.SystemClock.elapsedRealtime()>=deadline||!alive.getAsBoolean()||mPairingClientDeliveryFence.get()!=fence)reply.accept(failure("","cancelled","Host result became stale. Inspect status."));
+                else reply.accept(completed);
+            });
+        });}catch(java.util.concurrent.RejectedExecutionException error){mWorkPending.decrementAndGet();if(reserved)mPairingClientBusy.set(false);reply.accept(failure("","busy","Native host queue is unavailable."));}
+    }
     interface IdentityReply { void accept(IdentityReview review,String error); }
     interface PeerApprovalReply { void accept(PeerApproval review,String error); }
     interface ClientSetupReply { void accept(ClientSetup setup,String error); }

@@ -2,6 +2,10 @@
 
 ## Current sequence — 1–109 outstanding tasks
 
+Item 58 Android now authors bounded serialized host ticket register/poll/close
+calls, exact reply admission and immediate close invalidation/delivery fencing.
+Source-only; no build/test. Begin/share/peer/candidate callers and host UI due.
+
 Item 58 Android now has private versioned JNI host dispatch for bounded begin,
 ticket, peer and candidate ABI actions with retained byte wipe and exact keep
 signature. No Java caller/UI/proof sharing yet; source-only, no build/test ran.
