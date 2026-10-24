@@ -2,6 +2,13 @@
 
 ## Current sequence — 1–109 outstanding tasks
 
+Item 58 now authors exact host invite registration receipts and idempotent same-
+invite server registration, with sharing gated on acknowledgment. Bounded host
+polling verifies all signed hellos before replacing a snapshot; approval requires
+its exact stored request. No HTTP/native/crypto/SQL/deployment/compiler/build/test
+ran. Host close/decline, real native identity/foreground/UI controller and crash
+qualification remain due; full original scope is still open.
+
 Item 58 now connects persisted host candidate activation through exact relay
 confirmation/reconciliation, retained-grant approval with bound protocol receipt,
 then fresh confirmation before journal Active. Client/host share scoped writer

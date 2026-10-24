@@ -154,6 +154,34 @@ impl NativePairRelay{
             (receipt.state=="approved")!=receipt.grant.is_some(){return Err(denied());}
         check(deadline,cancel)?;Ok(receipt)
     }
+    fn signed_control(&self,identity:&NativeSigningIdentity,audience:&str,operation:RelayOperation,now:u64,deadline:Instant,cancel:&AtomicBool)->Result<Value>{
+        let started=Instant::now();check(deadline,cancel)?;
+        let body=RelayRequest{schema_version:1,audience:audience.into(),issued_at_ms:now,nonce:Uuid::new_v4(),operation};
+        let document=identity.sign(SigningDomain::Request,&serde_json::to_vec(&body).map_err(|_|network())?)?;
+        let envelope=RelayEnvelope{public_key:identity.public_key(),document};let _=verify_request(&envelope,audience,elapsed_now(now,started)?)?;
+        self.post(audience,&serde_json::to_vec(&envelope).map_err(|_|network())?,deadline,cancel)
+    }
+    pub(crate) fn register_invitation(&self,identity:&NativeSigningIdentity,pending:&crate::native_pair_exchange::NativeHostInvitation,
+        now:u64,deadline:Instant,cancel:&AtomicBool)->Result<()>{
+        let started=Instant::now();let(audience,document,invite)=pending.relay_material(identity,now)?;
+        let response=self.signed_control(identity,audience,RelayOperation::CreateInvite{invite:document.clone()},now,deadline,cancel)?;
+        #[derive(serde::Deserialize)]#[serde(deny_unknown_fields)]
+        struct Receipt{invite_protocol:u32,created:bool,invite_id:Uuid,host_public_key:String,invite_hash:String,expires_at_ms:u64}
+        let receipt:Receipt=serde_json::from_value(response).map_err(|_|network())?;
+        if receipt.invite_protocol!=1||!receipt.created||receipt.invite_id!=invite.id||receipt.host_public_key!=identity.public_key()||
+            receipt.invite_hash!=crate::document_hash(document)?||receipt.expires_at_ms!=invite.expires_at_ms{return Err(denied());}
+        let _=pending.relay_material(identity,elapsed_now(now,started)?)?;check(deadline,cancel)?;Ok(())
+    }
+    pub(crate) fn poll_invitation(&self,identity:&NativeSigningIdentity,pending:&crate::native_pair_exchange::NativeHostInvitation,
+        now:u64,deadline:Instant,cancel:&AtomicBool)->Result<Vec<crate::SignedDocument>>{
+        let started=Instant::now();let(audience,document,invite)=pending.relay_material(identity,now)?;
+        let response=self.signed_control(identity,audience,RelayOperation::PollInvite{invite_id:invite.id},now,deadline,cancel)?;
+        #[derive(serde::Deserialize)]#[serde(deny_unknown_fields)]
+        struct Receipt{poll_protocol:u32,invite_id:Uuid,host_public_key:String,invite_hash:String,requests:Vec<crate::SignedDocument>}
+        let receipt:Receipt=serde_json::from_value(response).map_err(|_|network())?;
+        if receipt.poll_protocol!=1||receipt.invite_id!=invite.id||receipt.host_public_key!=identity.public_key()||receipt.invite_hash!=crate::document_hash(document)?||receipt.requests.len()>8{return Err(denied());}
+        let _=pending.relay_material(identity,elapsed_now(now,started)?)?;check(deadline,cancel)?;Ok(receipt.requests)
+    }
     fn post(&self,audience:&str,bytes:&[u8],deadline:Instant,cancel:&AtomicBool)->Result<Value>{
         let started=Instant::now();check(deadline,cancel)?;validate_audience(audience)?;
         if deadline.saturating_duration_since(started)>Duration::from_secs(30)||!self.allowed.iter().any(|origin|origin==audience){return Err(denied());}

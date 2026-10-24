@@ -43,9 +43,12 @@ impl Store {
         match operation {
             RelayOperation::CreateInvite{invite:document}=>{
                 let invite:Invite=verify(sender,INVITE_DOMAIN,&document,4096).map_err(|_|ApiError::unauthorized())?;invite.validate(audience,now).map_err(|_|ApiError::invalid())?;if invite.host_public_key!=sender{return Err(ApiError::unauthorized());}
+                let receipt=json!({"created":true,"invite_protocol":1,"invite_id":invite.id,"host_public_key":sender,"invite_hash":document_hash(&document).map_err(|_|ApiError::invalid())?,"expires_at_ms":invite.expires_at_ms});
+                let existing:Option<String>=tx.query_row("SELECT document FROM invites WHERE id=?1",[invite.id.to_string()],|row|row.get(0)).optional().map_err(sql)?;
+                if let Some(existing)=existing{if existing!=text(&document)?{return Err(ApiError::conflict());}return Ok(receipt);}
                 let count:u64=tx.query_row("SELECT count(*) FROM invites",[],|r|r.get(0)).map_err(sql)?;
                 let owned:u64=tx.query_row("SELECT count(*) FROM invites WHERE host=?1",[sender],|r|r.get(0)).map_err(sql)?;if count>=512||owned>=2{return Err(ApiError::quota());}
-                tx.execute("INSERT INTO invites(id,host,expires,document,secret_hash) VALUES(?1,?2,?3,?4,?5)",params![invite.id.to_string(),sender,invite.expires_at_ms,text(&document)?,invite.secret_hash.0]).map_err(|_|ApiError::conflict())?;Ok(json!({"created":true}))
+                tx.execute("INSERT INTO invites(id,host,expires,document,secret_hash) VALUES(?1,?2,?3,?4,?5)",params![invite.id.to_string(),sender,invite.expires_at_ms,text(&document)?,invite.secret_hash.0]).map_err(|_|ApiError::conflict())?;Ok(receipt)
             }
             RelayOperation::JoinInvite{invite_id,secret,hello}=>{
                 let(_,hash)=invite_row(tx,&invite_id.to_string(),None)?;
@@ -60,8 +63,10 @@ impl Store {
             }
             RelayOperation::PollInvite{invite_id}=>{
                 invite_row(tx,&invite_id.to_string(),Some(sender))?;
+                let document:String=tx.query_row("SELECT document FROM invites WHERE id=?1",[invite_id.to_string()],|row|row.get(0)).map_err(sql)?;
+                let document:SignedDocument=serde_json::from_str(&document).map_err(sql)?;
                 let mut statement=tx.prepare("SELECT hello FROM joins WHERE invite=?1 AND state='pending' ORDER BY client LIMIT 8").map_err(sql)?;
-                let rows=statement.query_map([invite_id.to_string()],|r|r.get::<_,String>(0)).map_err(sql)?;let mut hellos=Vec::<SignedDocument>::new();for row in rows{hellos.push(serde_json::from_str(&row.map_err(sql)?).map_err(sql)?);}Ok(json!({"requests":hellos}))
+                let rows=statement.query_map([invite_id.to_string()],|r|r.get::<_,String>(0)).map_err(sql)?;let mut hellos=Vec::<SignedDocument>::new();for row in rows{hellos.push(serde_json::from_str(&row.map_err(sql)?).map_err(sql)?);}Ok(json!({"requests":hellos,"poll_protocol":1,"invite_id":invite_id,"host_public_key":sender,"invite_hash":document_hash(&document).map_err(|_|ApiError::invalid())?}))
             }
             RelayOperation::PairingStatus{invite_id}=>{
                 let joined:Option<(String,String)>=tx.query_row("SELECT state,hello FROM joins WHERE invite=?1 AND client=?2",params![invite_id.to_string(),sender],|r|Ok((r.get(0)?,r.get(1)?))).optional().map_err(sql)?;

@@ -12,7 +12,7 @@ use serde::{Deserialize,Serialize};
 
 /// Native host invitation. Share code deliberately contains bearer proof:
 /// present only through an explicit native share action, never diagnostics.
-pub struct NativeHostInvitation{document:SignedDocument,secret:Zeroizing<String>,host:String,audience:String,deadline:Instant,attempted:std::collections::BTreeSet<String>}
+pub struct NativeHostInvitation{document:SignedDocument,secret:Zeroizing<String>,host:String,audience:String,deadline:Instant,attempted:std::collections::BTreeSet<String>,registered:bool,requests:std::collections::BTreeMap<String,SignedDocument>}
 pub struct NativeHostPeerReview{pub client_public_key:String,pub label:String,pub comparison_code:String}
 /// Locally consented host transcript, NOT relay approval. Persist material
 /// before dispatching its public signed grant to ApprovePair.
@@ -28,11 +28,11 @@ impl NativeHostInvitation{
         let document=identity.sign(crate::native_credentials::SigningDomain::Invite,&serde_json::to_vec(&invite).map_err(|_|invalid())?)?;
         let deadline=started.checked_add(MAX_EXCHANGE_AGE).ok_or_else(invalid)?;
         if Instant::now()>=deadline{return Err(unauthorized());}
-        Ok(Self{document,secret:Zeroizing::new(URL_SAFE_NO_PAD.encode(&raw[..])),host:identity.public_key(),audience:audience.into(),deadline,attempted:std::collections::BTreeSet::new()})
+        Ok(Self{document,secret:Zeroizing::new(URL_SAFE_NO_PAD.encode(&raw[..])),host:identity.public_key(),audience:audience.into(),deadline,attempted:std::collections::BTreeSet::new(),registered:false,requests:std::collections::BTreeMap::new()})
     }
     pub fn signed_invite(&self)->&SignedDocument{&self.document}
     pub fn share_code(&self,now:u64)->Result<Zeroizing<String>>{
-        self.live(now)?;
+        self.live(now)?;if !self.registered{return Err(unauthorized());}
         #[derive(Serialize)]struct Share<'a>{invite:&'a SignedDocument,secret:&'a str}
         let bytes=Zeroizing::new(serde_json::to_vec(&Share{invite:&self.document,secret:self.secret.as_str()}).map_err(|_|invalid())?);
         let mut code=Zeroizing::new(String::from("OPRP1."));URL_SAFE_NO_PAD.encode_string(&bytes[..],&mut code);
@@ -42,6 +42,33 @@ impl NativeHostInvitation{
         if Instant::now()>=self.deadline{return Err(unauthorized());}
         let invite:Invite=verify(&self.host,INVITE_DOMAIN,&self.document,4096)?;invite.validate(&self.audience,now)?;Ok(invite)
     }
+    pub(crate) fn relay_material<'a>(&'a self,identity:&crate::native_credentials::NativeSigningIdentity,now:u64)->Result<(&'a str,&'a SignedDocument,Invite)>{
+        let invite=self.live(now)?;if identity.public_key()!=self.host{return Err(unauthorized());}Ok((&self.audience,&self.document,invite))
+    }
+    pub fn register(&mut self,relay:&crate::native_relay::NativePairRelay,identity:&crate::native_credentials::NativeSigningIdentity,
+        now:u64,deadline:Instant,cancel:&std::sync::atomic::AtomicBool)->Result<()>{
+        let started=Instant::now();if deadline<=started||deadline.saturating_duration_since(started)>Duration::from_secs(30){return Err(unauthorized());}
+        relay.register_invitation(identity,self,now,deadline.min(self.deadline),cancel)?;
+        self.registered=true;Ok(())
+    }
+    /// One complete bounded snapshot, never automatic peer approval. Labels
+    /// and keys remain untrusted UI input until the native user compares them.
+    pub fn poll_requests(&mut self,relay:&crate::native_relay::NativePairRelay,identity:&crate::native_credentials::NativeSigningIdentity,
+        now:u64,deadline:Instant,cancel:&std::sync::atomic::AtomicBool)->Result<Vec<NativeHostPeerReview>>{
+        let started=Instant::now();if !self.registered||deadline<=started||deadline.saturating_duration_since(started)>Duration::from_secs(30){return Err(unauthorized());}
+        let documents=relay.poll_invitation(identity,self,now,deadline.min(self.deadline),cancel)?;
+        let mut requests=std::collections::BTreeMap::new();let mut reviews=Vec::new();
+        for document in documents{
+            let untrusted:ClientHello=crate::inspect(&document,4096)?;
+            let review=self.review_client(&document,&untrusted.client_public_key,elapsed_now(now,started)?)?;
+            if requests.insert(review.client_public_key.clone(),document).is_some(){return Err(unauthorized());}reviews.push(review);
+        }
+        let _=self.live(elapsed_now(now,started)?)?;
+        if Instant::now()>=deadline||cancel.load(std::sync::atomic::Ordering::Acquire){return Err(unauthorized());}
+        self.requests=requests;Ok(reviews)
+    }
+    /// Public signed request for a native UI-selected peer, not bearer proof.
+    pub fn signed_request(&self,client:&str)->Option<&SignedDocument>{self.requests.get(client)}
     pub fn review_client(&self,hello:&SignedDocument,expected_client:&str,now:u64)->Result<NativeHostPeerReview>{
         let started=Instant::now();let invite=self.live(now)?;key(expected_client)?;
         if expected_client==self.host{return Err(unauthorized());}
@@ -56,6 +83,8 @@ impl NativeHostInvitation{
     pub fn prepare_approval_after_local_consent(&mut self,identity:&crate::native_credentials::NativeSigningIdentity,
         hello:&SignedDocument,expected_client:&str,input_allowed:bool,lifetime_ms:u64,now:u64)->Result<NativeHostApproval>{
         let started=Instant::now();let invite=self.live(now)?;let _=self.review_client(hello,expected_client,now)?;
+        let request=self.requests.get(expected_client).ok_or_else(unauthorized)?;
+        if !self.registered||document_hash(request)?!=document_hash(hello)?{return Err(unauthorized());}
         if identity.public_key()!=self.host||lifetime_ms==0||lifetime_ms>crate::MAX_PAIR_LIFETIME||now.checked_add(lifetime_ms).is_none_or(|expiry|expiry>9_007_199_254_740_991)||self.attempted.len()>=8||self.attempted.contains(expected_client){return Err(unauthorized());}
         self.attempted.insert(expected_client.into());
         let peer:ClientHello=verify(expected_client,HELLO_DOMAIN,hello,4096)?;

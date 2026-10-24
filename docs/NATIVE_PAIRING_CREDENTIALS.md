@@ -1635,6 +1635,34 @@ Invite registration/poll/share UI, full native controller/foreground binding and
 recovery/owner qualification remain unfinished. Additive approval protocol source
 still needs deployment and browser/native interoperability verification.
 
+## Native host registration and bounded hello polling
+
+The host invitation now explicitly registers through the configured native HTTPS
+client. Only a protocol-1 receipt binding invite ID, host key, exact signed-invite
+hash and expiry marks it registered. share_code refuses an unregistered invite.
+Signaling source makes identical signed-invite registration idempotent before
+quota admission; a conflicting document for that ID is still refused. An uncertain
+response keeps the original invite/proof for an explicit retry, without creating
+a competing invite or extending its five-minute deadline.
+
+Host polling requires registration and a bound protocol-1 invite/host/hash response,
+with at most eight signed hellos. The native object verifies every hello's client
+signature, invite/time/key constraints and comparison code before publishing a
+complete snapshot. Duplicate clients or any invalid entry reject the entire new
+batch. The previous snapshot is not partially replaced. Labels/keys remain peer
+claims for actual native user verification, not automatic trust or permission.
+
+Approval preparation now requires the exact signed hello from that polled
+snapshot, alongside native comparison/input consent and the existing one-attempt
+per-client rule. A caller cannot substitute another hello for the same UI-selected
+client. Only public signed requests/review metadata are available outside the
+pending object; bearer proof is sent only by the explicit share operation.
+
+No HTTP/crypto/parser/native/SQL operation, deployment, compiler, build or test ran.
+Host decline/close handling, Active-identity/foreground controller ownership,
+native sharing/peer UI and durable crash reconciliation remain unfinished. Server
+receipt changes need deployment and browser/native interoperability qualification.
+
 ## Remaining implementation and qualification
 
 - Journal/executor/lease/writer product integration, authority epochs, actual native owner
