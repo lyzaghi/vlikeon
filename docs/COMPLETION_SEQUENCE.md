@@ -2,6 +2,8 @@
 
 ## Current sequence — 1–109 outstanding tasks
 
+Source checkpoint: progressive H.264 DPB metadata now builds P/SP/B reference lists and applies short/long-term list edits, with exact retained-serial lookup, active-count enforcement and DPB/parameter-version recheck. B slices require actual derived POC supplied by the native owner. POC derivation, fields/gaps and backend commit integration remain unfinished; build/test stay deferred.
+
 Source checkpoint: progressive H.264 reference marking now implements short/long-term entries, sliding eviction, IDR and MMCO 1–6 with staged, version/parameter-bound one-use commit. It is a frame-reference component, not full DPB/output/decode admission; field/MBAFF, reference lists/POC/gap handling and backend wiring remain open. No build/test executed.
 
 Source checkpoint: receiver admission now has a concrete parameter/syntax pipeline joining Annex B, wire-order SPS/PPS installation, versioned dependency resolution, picture/slice/auxiliary parsing and exact queued-AU proof binding. The native backend's negotiated codec/DPB/owner implementation remains mandatory and unfinished; there is no default-success route. Build/test remain deferred.

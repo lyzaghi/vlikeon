@@ -1,5 +1,15 @@
 # Native ordered RTP to decoder bridge — item 56
 
+Progressive-frame reference state now builds per-slice P/SP/B prediction lists:
+descending wrapped PicNum for P/SP, POC partitions and identical-list swap for B,
+then ascending long-term references. Short/long-term list edits insert the exact
+retained serial, remove later duplicates and require enough active references.
+Results retain DPB-table identity/version and SPS/PPS binding for stale recheck.
+B-list construction requires a complete serial-to-POC mapping from the future
+native POC owner; RTP time never substitutes for that mapping. Actual POC
+derivation, fields/MBAFF, frame-gap/non-existing reference handling and decoder
+completion/backend integration remain open. No build/test ran.
+
 Frame reference marking now has source implementation in
 `native_h264_frame_references.rs`: bounded short/long-term entries, frame-number
 wrap, IDR reset, sliding-window eviction and ordered MMCO 1–6 effects. Updates

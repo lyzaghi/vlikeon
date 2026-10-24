@@ -3,7 +3,7 @@ use crate::{invalid,native_h264_bits::SliceBits,native_h264_parameters::Paramete
     native_h264_slice::{SlicePrefix,SliceKind},native_h264_pps::SliceGroups};
 use omniplay_contracts::Result;
 
-#[derive(Clone,Debug,PartialEq,Eq)]
+#[derive(Clone,Copy,Debug,PartialEq,Eq)]
 pub enum ListEdit{SubtractShort(u32),AddShort(u32),LongTerm(u32)}
 #[derive(Clone,Debug,PartialEq,Eq)]
 pub struct WeightedReference{pub luma:Option<(i16,i16)>,pub chroma:Option<[(i16,i16);2]>}

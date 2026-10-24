@@ -1,7 +1,7 @@
-//! Frame-picture reference marking metadata. Field/MBAFF, reference-list/POC,
+//! Frame-picture reference marking metadata. Field/MBAFF, POC derivation,
 //! output buffering and actual decode completion remain separate integrations.
 use crate::{invalid,native_h264_parameters::{ParameterSets,ParameterBinding},native_h264_picture::PrimaryPictureHeaders,
-    native_h264_slice::PictureIdentity,native_h264_slice_header::{ReferenceMarking,MemoryEdit}};
+    native_h264_slice::{PictureIdentity,SliceKind},native_h264_slice_header::{ReferenceMarking,MemoryEdit,SliceHeader,ListEdit}};
 use omniplay_contracts::Result;
 use std::sync::Arc;
 
@@ -23,11 +23,65 @@ pub struct FrameReferences{identity:Arc<()>,version:u64,state:State,closed:bool}
 /// A staged, table-local transition. Dropping it leaves retained references
 /// unchanged. It cannot be replayed after another successful commit.
 pub struct FrameReferenceUpdate{identity:Arc<()>,expected:u64,binding:ParameterBinding,next:State}
+/// Actual derived picture orders from the native POC owner, keyed by retained
+/// serials, not remote timestamps. This type does not calculate or verify POC.
+pub struct FramePictureOrders{pub current:i64,pub references:Vec<(u64,i64)>}
+pub struct FramePredictionLists{identity:Arc<()>,version:u64,binding:ParameterBinding,list0:Vec<u64>,list1:Vec<u64>}
+impl FramePredictionLists{
+    pub fn list0(&self)->&[u64]{&self.list0}
+    pub fn list1(&self)->&[u64]{&self.list1}
+}
 impl Default for FrameReferences{fn default()->Self{Self::new()}}
 impl FrameReferences{
     pub fn new()->Self{Self{identity:Arc::new(()),version:0,state:State::default(),closed:false}}
     pub fn close(&mut self){self.closed=true;self.state=State::default();}
     pub fn entries(&self)->&[FrameReference]{&self.state.entries}
+    /// Build lists from PRE-marking reference state. B pictures require actual
+    /// picture orders; arrival/RTP timestamps must never stand in for POC.
+    pub fn prediction_lists(&self,header:&SliceHeader,parameters:&ParameterSets,orders:Option<&FramePictureOrders>)->Result<FramePredictionLists>{
+        if self.closed{return Err(invalid());}
+        let picture=header.prefix.picture();let resolved=parameters.check(picture.parameters())?;let sps=resolved.sps();
+        if !sps.frame_only||picture.field().is_some()||picture.colour_plane().is_some()||picture.redundant()!=0{return Err(invalid());}
+        let kind=header.prefix.kind();let mut list0=Vec::new();let mut list1=Vec::new();
+        if !matches!(kind,SliceKind::I|SliceKind::Si){
+            let config=Configuration{frame_num_bits:sps.frame_num_bits,references:sps.reference_frames,width:sps.coded_width,height:sps.coded_height};
+            if !self.state.started||self.state.configuration!=Some(config)||self.state.entries.is_empty(){return Err(invalid());}
+            let current=picture.frame_num();let maximum=1u32<<sps.frame_num_bits;
+            let mut short:Vec<_>=self.state.entries.iter().filter(|entry|entry.long_term.is_none()).collect();
+            let mut long:Vec<_>=self.state.entries.iter().filter(|entry|entry.long_term.is_some()).collect();
+            long.sort_by_key(|entry|entry.long_term);
+            if kind==SliceKind::B{
+                let orders=orders.ok_or_else(invalid)?;
+                if orders.references.len()!=self.state.entries.len(){return Err(invalid());}
+                let mut seen=std::collections::BTreeSet::new();
+                for (serial,_) in &orders.references{
+                    if !seen.insert(*serial)||!self.state.entries.iter().any(|entry|entry.serial==*serial){return Err(invalid());}
+                }
+                let by_serial:std::collections::BTreeMap<_,_>=orders.references.iter().copied().collect();
+                // Exact membership was checked above for every retained serial.
+                let order=|entry:&FrameReference|by_serial[&entry.serial];
+                short.sort_by_key(|entry|order(entry));
+                let before:Vec<_>=short.iter().filter(|entry|order(entry)<orders.current).rev().map(|entry|entry.serial).collect();
+                let after:Vec<_>=short.iter().filter(|entry|order(entry)>=orders.current).map(|entry|entry.serial).collect();
+                list0.extend_from_slice(&before);list0.extend_from_slice(&after);
+                list1.extend(short.iter().filter(|entry|order(entry)>orders.current).map(|entry|entry.serial));
+                list1.extend(short.iter().filter(|entry|order(entry)<=orders.current).rev().map(|entry|entry.serial));
+                list0.extend(long.iter().map(|entry|entry.serial));list1.extend(long.iter().map(|entry|entry.serial));
+                if list0==list1&&list1.len()>1{list1.swap(0,1);}
+            }else{
+                short.sort_by_key(|entry|std::cmp::Reverse(entry.picture_number(current,maximum)));
+                list0.extend(short.iter().map(|entry|entry.serial));list0.extend(long.iter().map(|entry|entry.serial));
+            }
+            edit_list(&mut list0,&header.list0_edits,header.active_references[0],&self.state,current,maximum)?;
+            if kind==SliceKind::B{edit_list(&mut list1,&header.list1_edits,header.active_references[1],&self.state,current,maximum)?;}
+            else if header.active_references[1]!=0||!header.list1_edits.is_empty(){return Err(invalid());}
+        }else if header.active_references!=[0,0]||!header.list0_edits.is_empty()||!header.list1_edits.is_empty(){return Err(invalid());}
+        Ok(FramePredictionLists{identity:self.identity.clone(),version:self.version,binding:picture.parameters().clone(),list0,list1})
+    }
+    pub fn recheck_lists(&self,lists:&FramePredictionLists,parameters:&ParameterSets)->Result<()>{
+        if self.closed||!Arc::ptr_eq(&self.identity,&lists.identity)||self.version!=lists.version{return Err(invalid());}
+        parameters.check(&lists.binding)?;Ok(())
+    }
     /// Stage marking AFTER the caller has established actual picture/reference
     /// decode validity. Header parsing alone does not establish that prerequisite.
     /// This component handles complete progressive frame pictures only; field
@@ -119,4 +173,28 @@ fn short_index(state:&State,current:u32,maximum:u32,difference:u32)->Result<usiz
     if difference==0||difference>maximum{return Err(invalid());}
     let target=i64::from(current)-i64::from(difference);
     state.entries.iter().position(|entry|entry.long_term.is_none()&&entry.picture_number(current,maximum)==target).ok_or_else(invalid)
+}
+fn edit_list(list:&mut Vec<u64>,edits:&[ListEdit],active:u8,state:&State,current:u32,maximum:u32)->Result<()>{
+    if active==0||active>16||edits.len()>usize::from(active){return Err(invalid());}
+    let mut predicted=current;
+    for (index,edit) in edits.iter().enumerate(){
+        let serial=match *edit{
+            ListEdit::SubtractShort(difference)|ListEdit::AddShort(difference)=>{
+                if difference==0||difference>maximum{return Err(invalid());}
+                predicted=if matches!(edit,ListEdit::SubtractShort(_)){(predicted+maximum-difference)%maximum}else{(predicted+difference)%maximum};
+                let target=if predicted>current{i64::from(predicted)-i64::from(maximum)}else{i64::from(predicted)};
+                state.entries.iter().find(|entry|entry.long_term.is_none()&&entry.picture_number(current,maximum)==target).ok_or_else(invalid)?.serial
+            },
+            ListEdit::LongTerm(number)=>{
+                if number>15{return Err(invalid());}
+                state.entries.iter().find(|entry|entry.long_term==Some(number as u8)).ok_or_else(invalid)?.serial
+            },
+        };
+        if index>list.len(){return Err(invalid());}
+        list.insert(index,serial);
+        let mut next=index+1;
+        while next<list.len(){if list[next]==serial{list.remove(next);}else{next+=1;}}
+    }
+    if list.len()<usize::from(active){return Err(invalid());}
+    list.truncate(usize::from(active));Ok(())
 }
