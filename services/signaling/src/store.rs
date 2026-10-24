@@ -53,9 +53,10 @@ impl Store {
                 let request:ClientHello=verify(sender,HELLO_DOMAIN,&hello,4096).map_err(|_|ApiError::unauthorized())?;request.validate(invite_id,now).map_err(|_|ApiError::invalid())?;
                 if request.client_public_key!=sender{return Err(ApiError::unauthorized());}
                 let existing:Option<String>=tx.query_row("SELECT hello FROM joins WHERE invite=?1 AND client=?2",params![invite_id.to_string(),sender],|r|r.get(0)).optional().map_err(sql)?;
-                if let Some(existing)=existing{if existing!=text(&hello)?{return Err(ApiError::conflict());}return Ok(json!({"pending":true}));}
+                let receipt=json!({"pending":true,"join_protocol":1,"invite_id":invite_id,"client_public_key":sender,"hello_hash":document_hash(&hello).map_err(|_|ApiError::invalid())?});
+                if let Some(existing)=existing{if existing!=text(&hello)?{return Err(ApiError::conflict());}return Ok(receipt);}
                 let count:u64=tx.query_row("SELECT count(*) FROM joins WHERE invite=?1",[invite_id.to_string()],|r|r.get(0)).map_err(sql)?;if count>=8{return Err(ApiError::quota());}
-                tx.execute("INSERT INTO joins(invite,client,hello,state) VALUES(?1,?2,?3,'pending')",params![invite_id.to_string(),sender,text(&hello)?]).map_err(sql)?;Ok(json!({"pending":true}))
+                tx.execute("INSERT INTO joins(invite,client,hello,state) VALUES(?1,?2,?3,'pending')",params![invite_id.to_string(),sender,text(&hello)?]).map_err(sql)?;Ok(receipt)
             }
             RelayOperation::PollInvite{invite_id}=>{
                 invite_row(tx,&invite_id.to_string(),Some(sender))?;

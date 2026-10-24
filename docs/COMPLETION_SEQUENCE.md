@@ -2,6 +2,14 @@
 
 ## Current sequence — 1–109 outstanding tasks
 
+Item 58 now authors explicit pending-transcript JoinInvite transport and bound
+protocol-1 invite/client/hello-hash receipt admission. Signaling source returns
+the same binding for first/identical joins; legacy unbound replies cannot mark
+native joined. Borrowed proof serialization shares bounded allowlisted HTTPS
+handling; finish requires the joined receipt. No HTTP/native/vault/SQL/deployment/
+compiler/build/test ran. Product admission/consent/poll/activation and host flow
+remain due; full original scope stays incomplete.
+
 Item 58 now authors NativeClientPairing preparation from a bounded OPRP1 code,
 separately pinned signed invite/secret admission, native exchange-bound signed
 hello and browser-layout comparison code. Exact transcript and original invite

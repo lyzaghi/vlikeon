@@ -95,7 +95,9 @@
     "Broker input retains uncertain worker/artifact/process witnesses in CleanupRequired instead of discarding them on terminal observations or close while alive",
     "Video adapters allow explicit revoke to recheck retained closed workers; dropped/crashed owners still require durable recovery and no actual backend owner aggregation is provided",
     "NativeClientPairing source admits bounded OPRP1 invite/secret against pinned host/audience and prepares its own exchange-bound signed hello plus browser-layout comparison code",
-    "Pending native client transcript owns exact invite/hello/ephemeral exchange and opaque zeroizing proof through original monotonic expiry; relay join/consent/product activation and interoperability remain unimplemented or unverified"
+    "Pending native client transcript owns exact invite/hello/ephemeral exchange and opaque zeroizing proof through original monotonic expiry; consent/product activation and interoperability remain unimplemented or unverified",
+    "Native pending-client join source borrows retained proof into signed requests via the shared bounded allowlisted HTTPS path and requires exact invite/client/hello-hash protocol receipt before joined state",
+    "Signaling join source returns additive bound receipts for first and identical joins; no server deployment/network/SQL operation or native runtime has executed"
   ],
   "build_executed": false,
   "tests_executed": false,

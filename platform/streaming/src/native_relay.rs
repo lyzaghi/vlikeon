@@ -1,4 +1,4 @@
-//! Bounded native HTTP transport for already paired operations only. Product
+//! Bounded native HTTP transport for paired operations and admitted client join. Product
 //! generation/session authority must be checked by its native caller. Creating
 //! this client or authoring this source does not deploy or contact a relay.
 use crate::{validate_audience,verify_grant,verify_grant_for_retirement,verify_request,RelayEnvelope,RelayOperation,RelayRequest,
@@ -9,6 +9,15 @@ use serde_json::Value;
 use std::{io::Read,sync::atomic::{AtomicBool,Ordering},time::{Duration,Instant}};
 use uuid::Uuid;
 use zeroize::Zeroizing;
+use zeroize::Zeroize;
+use serde::Serialize;
+
+struct SensitiveEnvelope(RelayEnvelope);
+impl Drop for SensitiveEnvelope{fn drop(&mut self){self.0.document.payload.zeroize();}}
+#[derive(Serialize)]
+struct JoinProof<'a>{#[serde(rename="type")]kind:&'static str,invite_id:Uuid,secret:&'a str,hello:&'a crate::SignedDocument}
+#[derive(Serialize)]
+struct JoinRequest<'a>{schema_version:u32,audience:&'a str,issued_at_ms:u64,nonce:Uuid,operation:JoinProof<'a>}
 
 const MAX_RESPONSE:usize=1024*1024;
 pub struct NativePairRelay{client:Client,allowed:Vec<String>}
@@ -48,6 +57,30 @@ impl NativePairRelay{
         let _=verify_request(&envelope,audience,current)?;
         if !retiring{grant.validate(audience,current)?;}
         let bytes=Zeroizing::new(serde_json::to_vec(&envelope).map_err(|_|network())?);
+        let value=self.post(audience,&bytes,deadline,cancel)?;
+        if !retiring{grant.validate(audience,elapsed_now(now,started)?)?;}check(deadline,cancel)?;Ok(value)
+    }
+    /// Only the admitted pending transcript supplies its proof. No generic
+    /// caller-selected JoinInvite/signing endpoint or secret result exists.
+    pub(crate) fn join_invitation(&self,identity:&NativeSigningIdentity,pending:&crate::native_pair_exchange::NativeClientPairing,
+        now:u64,deadline:Instant,cancel:&AtomicBool)->Result<()>{
+        let started=Instant::now();check(deadline,cancel)?;
+        let(audience,invite_id,secret,hello)=pending.join_material(identity,now)?;
+        let body=JoinRequest{schema_version:1,audience,issued_at_ms:now,nonce:Uuid::new_v4(),operation:JoinProof{kind:"join_invite",invite_id,secret,hello}};
+        let bytes=Zeroizing::new(serde_json::to_vec(&body).map_err(|_|network())?);
+        let document=identity.sign(SigningDomain::Request,&bytes)?;
+        let envelope=SensitiveEnvelope(RelayEnvelope{public_key:identity.public_key(),document});
+        let bytes=Zeroizing::new(serde_json::to_vec(&envelope.0).map_err(|_|network())?);
+        let response=self.post(audience,&bytes,deadline,cancel)?;
+        #[derive(serde::Deserialize)]#[serde(deny_unknown_fields)]
+        struct Receipt{join_protocol:u32,pending:bool,invite_id:Uuid,client_public_key:String,hello_hash:String}
+        let receipt:Receipt=serde_json::from_value(response).map_err(|_|network())?;
+        if receipt.join_protocol!=1||!receipt.pending||receipt.invite_id!=invite_id||receipt.client_public_key!=identity.public_key()||receipt.hello_hash!=crate::document_hash(hello)?{return Err(denied());}
+        let _=pending.join_material(identity,elapsed_now(now,started)?)?;check(deadline,cancel)?;Ok(())
+    }
+    fn post(&self,audience:&str,bytes:&[u8],deadline:Instant,cancel:&AtomicBool)->Result<Value>{
+        let started=Instant::now();check(deadline,cancel)?;validate_audience(audience)?;
+        if deadline.saturating_duration_since(started)>Duration::from_secs(30)||!self.allowed.iter().any(|origin|origin==audience){return Err(denied());}
         if bytes.len()>192*1024{return Err(PlatformError::new(ErrorCode::ResourceLimit,"Native relay request exceeds its fixed bound"));}
         check(deadline,cancel)?;
         let remaining=deadline.saturating_duration_since(Instant::now()).min(Duration::from_secs(15));
@@ -76,9 +109,9 @@ impl NativePairRelay{
                 404=>ErrorCode::NotFound,409=>ErrorCode::Conflict,413|429=>ErrorCode::ResourceLimit,_=>ErrorCode::RuntimeUnavailable};
             return Err(PlatformError::new(code,"The configured native relay rejected the operation"));
         }
-        // No positive result after cancellation/deadline or ordinary grant expiry. A
-        // remote side effect may already exist and needs explicit reconciliation.
-        if !retiring{grant.validate(audience,elapsed_now(now,started)?)?;}check(deadline,cancel)?;Ok(value)
+        // No positive HTTP result after cancellation/deadline. Callers also
+        // recheck their own grant/invitation lifetime before publishing it.
+        check(deadline,cancel)?;Ok(value)
     }
 }
 fn check(deadline:Instant,cancel:&AtomicBool)->Result<()>{

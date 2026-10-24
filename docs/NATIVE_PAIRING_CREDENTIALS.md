@@ -1461,6 +1461,36 @@ invitation controller remain unfinished. No parse/crypto/native/vault/network
 operation, compiler, build or test ran. Source review compared the format with
 the checked-in browser pairing.js; runtime interoperability is not proven.
 
+## Native client join transport and bound receipt
+
+The pending native client transcript now dispatches an explicit JoinInvite through
+the existing allowlisted HTTPS transport. A crate-private operation borrows the
+retained invitation proof and signed hello, checks the supplied identity against
+that hello and the pinned signed invite, and signs a fresh request nonce. Request
+serialization uses borrowed proof fields and zeroizing buffers; the signed
+envelope's proof-bearing base64 payload is cleared on Drop. HTTP/library internal
+copies are outside this guarantee. No renderer signing/proof-export API is added.
+
+Paired requests and join share one bounded POST/response path: installed/native
+origin allowlist, no redirect/ambient proxy, fixed response bounds and original
+deadline/cancellation rules remain. Join additionally caps the request by the
+pending invite's monotonic expiry. Only an exact protocol-1 pending receipt for
+invite ID, client public key and signed-hello hash marks the object joined. Finish
+now requires that acknowledgment in addition to local consent and valid signed
+grant/transcript. Pending is not host approval or activation.
+
+Signaling source returns this bound receipt for both first insertion and identical
+hello resubmission. Conflicting hellos still refuse; existing browser callers can
+ignore the additive receipt fields. Legacy unbound pending responses are refused
+by native. The server must be deployed before native join can succeed. Ambiguous
+failure keeps the same transcript for an explicit retry, never a new exchange or
+automatically published pair.
+
+No HTTP/crypto/parser/native/vault/SQL operation, server deployment, compiler,
+build or test was executed. Product Active identity/lease/foreground admission,
+native peer-consent UI, grant polling, pair activation and host invitation flow
+remain unfinished; protocol and interoperability qualification remain due.
+
 ## Remaining implementation and qualification
 
 - Journal/executor/lease/writer product integration, authority epochs, actual native owner
