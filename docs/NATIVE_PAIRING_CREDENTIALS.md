@@ -1840,6 +1840,16 @@ this checkpoint.
 
 ## Remaining implementation and qualification
 
+iOS typed host ticket caller now shares bounded pairing admission and original
+queue-inclusive deadline. Close rotates cancellation delivery token and requires
+immediate native epoch acknowledgment before queueing. Reply checks bind ticket,
+registration/close booleans, or bounded unique peer snapshots with exact key/hash/
+comparison text and bounded control-free labels. Main delivery rechecks owner,
+deadline and token. Owned request Data clears on worker return; no automatic poll,
+renderer route or sharing is introduced. Close still needs foreground provider.
+No build/test/native operation ran; other host callers/views and durable recovery
+remain unfinished.
+
 Android native-only host ticket caller now uses shared ordinary pairing admission,
 bounded queue and original 25-second deadline. Close rotates delivery fence and
 requires immediate native epoch acknowledgment before queueing. Reply admission

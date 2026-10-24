@@ -2,6 +2,10 @@
 
 ## Current sequence — 1–109 outstanding tasks
 
+Item 58 iOS now authors typed host register/poll/close calls with bounded shared
+admission, original deadline, close invalidation/fence and exact reply checks.
+Source-only; no build/test. Remaining host callers/views and durable recovery due.
+
 Item 58 Android now authors bounded serialized host ticket register/poll/close
 calls, exact reply admission and immediate close invalidation/delivery fencing.
 Source-only; no build/test. Begin/share/peer/candidate callers and host UI due.

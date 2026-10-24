@@ -21,6 +21,7 @@ struct NativeIdentityReview {
     let expires:DispatchTime
 }
 enum NativeClientPairingAction:UInt32 { case begin=0,join=1,poll=2,persistAfterPeerConsent=3,cancel=4,activate=5,reviewSaved=6 }
+enum NativeHostTicketAction:UInt32 {case register=1,poll=2,close=3}
 /// Immutable approved-poll metadata for a trusted native confirmation view.
 final class NativePeerApproval {
     let pairID:String,inputAllowed:Bool,expires:DispatchTime
@@ -294,6 +295,49 @@ final class NativeCore {
     /// Trusted native UI only. The UI independently confirms host key and
     /// comparison/input consent before persistAfterPeerConsent. No renderer
     /// request may call this or receive its raw replies/tickets.
+    @MainActor func pairingHostTicket(_ action:NativeHostTicketAction,ticket:String,owner:NativeDocumentLifetime,
+        completion:@escaping @MainActor (Result<[String:Any],Error>)->Void){
+        guard let id=UUID(uuidString:ticket),id.uuidString.lowercased()==ticket,id != UUID(uuid:(0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0)) else{completion(.failure(OmniFailure.message("Ticket host không hợp lệ.")));return}
+        let closing=action == .close,token=pairingClientDeliveryFence.capture(cancel:action == .close)
+        if closing{
+            guard handle != 0,om_mobile_pairing_invalidate_epoch(handle)==1 else{completion(.failure(OmniFailure.message("Chưa xác nhận được vô hiệu hóa lời mời. Hãy xem trạng thái.")));return}
+        }
+        let reserved = !closing
+        if reserved && pairingClientPermit.wait(timeout:.now()) != .success{completion(.failure(OmniFailure.message("Thao tác ghép đôi trước đang kết thúc.")));return}
+        guard pairingClientQueuePermit.wait(timeout:.now()) == .success else{if reserved{pairingClientPermit.signal()};completion(.failure(OmniFailure.message("Hàng đợi host đang bận.")));return}
+        let deadline=DispatchTime.now()+25
+        queue.async{
+            defer{self.pairingClientQueuePermit.signal();if reserved{self.pairingClientPermit.signal()}}
+            do{
+                let now=DispatchTime.now()
+                guard now<deadline,self.handle != 0,self.pairingAttached,owner.active,self.pairingClientDeliveryFence.admits(token) else{throw OmniFailure.message("Phiên host đã kết thúc.")}
+                let remaining=(deadline.uptimeNanoseconds-now.uptimeNanoseconds)/1_000_000
+                guard remaining>=1000 else{throw OmniFailure.message("Yêu cầu host hết hạn trong hàng đợi.")}
+                var input=try JSONSerialization.data(withJSONObject:["ticket":ticket]);defer{input.resetBytes(in:0..<input.count)}
+                let value=try self.unwrap(input.withUnsafeBytes{raw in try self.consume(om_mobile_pairing_host_action_v1(self.handle,raw.bindMemory(to:UInt8.self).baseAddress,raw.count,action.rawValue,UInt32(min(25_000,remaining))))})
+                func flag(_ value:Any?,_ expected:Bool)->Bool{guard let n=value as? NSNumber,CFGetTypeID(n)==CFBooleanGetTypeID() else{return false};return n.boolValue==expected}
+                guard (value["pairing_protocol"] as? NSNumber)?.uint32Value==1,value["ticket"] as? String==ticket else{throw OmniFailure.message("Phản hồi host không khớp ticket.")}
+                if action == .register{
+                    guard flag(value["registered"],true),flag(value["share_available"],true),flag(value["approves_peer"],false) else{throw OmniFailure.message("Phản hồi đăng ký không hợp lệ.")}
+                }else if action == .poll{
+                    guard flag(value["local_consent_required"],true),let peers=value["peers"] as? [[String:Any]],peers.count<=8,
+                          let revision=value["revision"] as? NSNumber,CFGetTypeID(revision) != CFBooleanGetTypeID(),revision.doubleValue>=1,revision.doubleValue<=10_000_000,revision.doubleValue==Double(revision.uint64Value) else{throw OmniFailure.message("Danh sách peer không hợp lệ.")}
+                    var seen=Set<String>()
+                    for peer in peers{
+                        guard let key=peer["client_public_key"] as? String,NativePairingText.publicKey(key),seen.insert(key).inserted,
+                              let hash=peer["hello_hash"] as? String,NativePairingText.fingerprint(hash),let code=peer["comparison_code"] as? String,NativePairingText.comparison(code),
+                              let label=peer["label"] as? String,!label.isEmpty,label.utf8.count<=120,!label.unicodeScalars.contains(where:{CharacterSet.controlCharacters.contains($0)}) else{throw OmniFailure.message("Metadata peer không hợp lệ.")}
+                    }
+                }else{
+                    guard flag(value["closed"],true),flag(value["pairs_revoked"],false),flag(value["relay_close_confirmed"],true)||(flag(value["relay_close_confirmed"],false)&&flag(value["remote_close_required"],false)&&value["reason"] as? String=="never_registered") else{throw OmniFailure.message("Chưa xác nhận đúng kết quả đóng lời mời.")}
+                }
+                DispatchQueue.main.async{
+                    guard owner.active,DispatchTime.now()<deadline,self.pairingClientDeliveryFence.admits(token) else{completion(.failure(OmniFailure.message("Kết quả host đã cũ. Hãy đọc lại trạng thái.")));return}
+                    completion(.success(value))
+                }
+            }catch{DispatchQueue.main.async{completion(.failure(error))}}
+        }
+    }
     func pairingClient(_ action:NativeClientPairingAction,input:inout Data,owner:NativeDocumentLifetime,admission:@escaping ()->Bool={true},
         completion:@escaping @MainActor (Result<[String:Any],Error>)->Void){
         let owned=NativePairingInput(taking:&input)
