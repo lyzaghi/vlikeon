@@ -275,6 +275,36 @@ public final class NativeCore {
             });
         });}catch(java.util.concurrent.RejectedExecutionException error){mWorkPending.decrementAndGet();if(reserved)mPairingClientBusy.set(false);reply.accept(failure("","busy","Native host queue is unavailable."));}
     }
+    /** bytes are borrowed only during callback; never retain/log/forward them. */
+    interface HostShareReply {void accept(byte[] bytes,String error);}
+    void sharePairingHost(String ticket,java.util.function.BooleanSupplier alive,HostShareReply reply){
+        if(!canonicalPairingId(ticket)||!alive.getAsBoolean()){reply.accept(null,"Host share ticket is unavailable.");return;}
+        if(!mPairingClientBusy.compareAndSet(false,true)){reply.accept(null,"Native pairing work is still finishing.");return;}
+        if(mWorkPending.incrementAndGet()>32){mWorkPending.decrementAndGet();mPairingClientBusy.set(false);reply.accept(null,"Native queue is full.");return;}
+        final Object fence=mPairingClientDeliveryFence.get();final long deadline=android.os.SystemClock.elapsedRealtime()+25_000;
+        try{mIo.execute(()->{
+            byte[] input=null,proof=null;
+            try{
+                long remaining=deadline-android.os.SystemClock.elapsedRealtime();
+                if(mHandle==0||mFailed||!mPairingAttached||remaining<1000||!alive.getAsBoolean()||mPairingClientDeliveryFence.get()!=fence)throw new IllegalStateException();
+                input=new JSONObject().put("ticket",ticket).toString().getBytes(StandardCharsets.UTF_8);
+                proof=nativePairingHostShareV1(mHandle,input,(int)Math.min(25_000,remaining));
+                if(proof==null||proof.length<=6||proof.length>8192)throw new IllegalStateException();
+                byte[] prefix={'O','P','R','P','1','.'};for(int i=0;i<prefix.length;i++)if(proof[i]!=prefix[i])throw new IllegalStateException();
+                for(int i=6;i<proof.length;i++){int b=proof[i]&255;if(!((b>=65&&b<=90)||(b>=97&&b<=122)||(b>=48&&b<=57)||b==45||b==95))throw new IllegalStateException();}
+                if(android.os.SystemClock.elapsedRealtime()>=deadline||!alive.getAsBoolean()||mPairingClientDeliveryFence.get()!=fence)throw new IllegalStateException();
+                final byte[] borrowed=proof;
+                if(!mMain.post(()->{
+                    try{
+                        if(android.os.SystemClock.elapsedRealtime()>=deadline||!alive.getAsBoolean()||mPairingClientDeliveryFence.get()!=fence)reply.accept(null,"Host share became stale. Inspect status.");
+                        else reply.accept(borrowed,null);
+                    }finally{java.util.Arrays.fill(borrowed,(byte)0);}
+                }))throw new IllegalStateException();
+                proof=null; // main callback now owns clearing, including callback errors.
+            }catch(Exception|LinkageError error){mMain.post(()->reply.accept(null,"Host share is unavailable. Inspect status before retrying."));}
+            finally{if(input!=null)java.util.Arrays.fill(input,(byte)0);if(proof!=null)java.util.Arrays.fill(proof,(byte)0);mWorkPending.decrementAndGet();mPairingClientBusy.set(false);}
+        });}catch(java.util.concurrent.RejectedExecutionException error){mWorkPending.decrementAndGet();mPairingClientBusy.set(false);reply.accept(null,"Native share queue is unavailable.");}
+    }
     interface IdentityReply { void accept(IdentityReview review,String error); }
     interface PeerApprovalReply { void accept(PeerApproval review,String error); }
     interface ClientSetupReply { void accept(ClientSetup setup,String error); }

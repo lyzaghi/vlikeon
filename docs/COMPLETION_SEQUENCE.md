@@ -2,6 +2,10 @@
 
 ## Current sequence — 1–109 outstanding tasks
 
+Item 58 Android now authors explicit raw-share caller with bounded queue/deadline,
+owner/cancel admission and callback-borrowed proof wiped after UI callback.
+Source-only; actual share UI/OS copy lifecycle and build/test remain due.
+
 Item 58 Android now has separate raw share JNI with ticket/budget/output bounds,
 OPRP1/base64url byte admission and RAII native buffer wiping. No String/clipboard
 or renderer route. Source-only; lifecycle-owned caller/UI and build/test due.

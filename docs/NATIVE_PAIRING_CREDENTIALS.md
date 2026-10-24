@@ -1840,6 +1840,16 @@ this checkpoint.
 
 ## Remaining implementation and qualification
 
+Android explicit host-share caller now keeps proof as byte[] through its bounded
+serialized lane, validates OPRP1/base64url form and checks owner/fence/deadline
+before queue and main delivery. Native reply bytes are borrowed only during the
+main callback and wiped in finally, including callback errors; rejected posting
+and worker failures clear owned bytes. No string/JSON/clipboard conversion occurs.
+While awaiting main delivery the array remains retained; close prevents delivery
+but cannot synchronously erase queued data. Future UI must not retain the borrow
+and must manage any unavoidable OS copies separately. No build/test/runtime
+operation ran; product sharing UI and iOS equivalent remain unfinished.
+
 Android dedicated host-share JNI now calls the raw share ABI, validates <=8192
 OPRP1/base64url bytes before copying and frees/wipes the Rust buffer on every
 path. Request vector also wipes; a failed JNI output copy attempts to clear the
