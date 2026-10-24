@@ -40,6 +40,28 @@ impl LocalHost {
     pub fn sync_lifecycle(&self)->Arc<crate::SyncLifecycle>{self.lifecycle.clone()}
     /// Trusted native scope, never a renderer-selected credential identity.
     pub fn native_device_id(&self)->Uuid{self.database.device_id}
+    /// Native controller only, absent from Command/renderer dispatch. Metadata
+    /// remains readable with streaming disabled for reviewed cleanup/recovery.
+    pub fn native_pairing_status(&self)->Result<Value>{
+        self.ensure_open()?;
+        let snapshot=omniplay_core::stream_credentials::load(&self.database,self.profile_id)?;
+        let records:Vec<_>=snapshot.records().iter().map(|record|json!({
+            "address":record.address(),"phase":record.phase(),"public_key":record.public_key(),
+            "writer_retired":record.writer_retired(),"material_absent":record.material_absent(),
+            "local_retired":record.local_retired(),"relay_retired":record.relay_retired()
+        })).collect();
+        Ok(json!({"credential_protocol":1,"profile_id":self.profile_id,"device_id":self.database.device_id,
+            "revision":snapshot.revision(),"policy_available":omniplay_core::stream_signal_authority::require_installed_pairing_policy().is_ok(),"records":records}))
+    }
+    /// Trusted native foreground/consent controller supplies the scoped store.
+    /// Prepares MaterialReady only; no identity activation or pairing approval.
+    pub fn native_pairing_prepare_identity(&self,store:&dyn omniplay_streaming::native_credentials::PairingSecretStore,
+        expected:u64,deadline:std::time::Instant)->Result<omniplay_core::stream_credential_writer::Candidate>{
+        self.ensure_open()?;
+        omniplay_core::stream_signal_authority::require_installed_pairing_policy()?;
+        let mut writer=omniplay_core::stream_credential_writer::NativeCredentialWriter::open(&self.database,self.profile_id,store)?;
+        writer.prepare_identity(expected,deadline)
+    }
     pub fn background_sync_policy(&self)->Result<Value>{
         self.ensure_open()?;
         let opted_in=self.database.mobile_background_sync()?;

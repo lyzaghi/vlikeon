@@ -48,7 +48,9 @@
     "iOS host-open source consumes dedicated scoped Keychain attachment table; source added to Xcode target with deterministic identifiers",
     "iOS protected-data events update separate nonwrapping provider epoch; a lock/unlock cycle cannot publish an earlier in-flight Keychain result",
     "Unix/mobile cooperative credential lease source uses canonical private profile root, no-follow create-new/existing-only file opens and nonblocking exclusive lock",
-    "Unix lease checks held/named inode/device/owner/link count and private mode; trusted Android/iOS host-open source normalizes native storage aliases"
+    "Unix lease checks held/named inode/device/owner/link count and private mode; trusted Android/iOS host-open source normalizes native storage aliases",
+    "LocalHost native-only public journal status and installed-policy-gated identity preparation connect the retained-lease writer without renderer commands or activation",
+    "Mobile C ABI requires attached foreground host/provider, original bounded deadline and transition epoch/access rechecks before publishing MaterialReady public metadata"
   ],
   "build_executed": false,
   "tests_executed": false,
@@ -61,7 +63,7 @@
     "Journal/executor/lease/writer product integration, native consent/session owner, copied-profile coordination, startup dispatch and authenticated relay approval/revocation",
     "Native origin/document/session hook and consent/invitation-secret/approval controller integration, abandoned receiver ownership recovery, ICE/backend refresh/stop and retirement dispatch, upgraded relay deployment and WebCrypto/native interoperability",
     "Native broker authority and document/session capability integration",
-    "Android/iOS attachment/protected-data/ABI/lease filesystem device qualification, LocalHost pairing-controller consumption and app integration",
+    "Android/iOS attachment/protected-data/ABI/lease filesystem device qualification, native status/preparation app callers and full LocalHost pairing/consent/recovery controller integration",
     "Lock, restore, rotation, profile/device deletion and explicit browser-to-native re-pairing",
     "All build, test, vault and platform runtime verification"
   ]

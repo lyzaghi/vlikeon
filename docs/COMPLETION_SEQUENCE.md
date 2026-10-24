@@ -2,6 +2,13 @@
 
 ## Current sequence — 1–109 outstanding tasks
 
+Item 58 now connects LocalHost source to native public-status and MaterialReady
+identity-preparation entry points. Mobile operations require the actual foreground
+host/provider, original bounded deadline and lifecycle epoch checks; preparation
+also requires the installed policy, which remains disabled. No renderer command,
+activation, app UI caller or recovery dispatcher was added. No native/vault/SQL,
+build or test was executed. Item 58 and the full original scope stay incomplete.
+
 Item 58 now authors a Unix/mobile credential lease using a canonical private
 profile root, bounded no-follow lock-file admission and nonblocking exclusion,
 with held/named inode/device/owner checks. Trusted Android/iOS open paths resolve

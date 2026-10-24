@@ -44,6 +44,18 @@ impl NativePairingCredentialStore{
         self.available.store(value&&!self.closed.load(Ordering::Acquire),Ordering::Release);
     }
     pub(crate) fn close(&self){self.closed.store(true,Ordering::Release);self.available.store(false,Ordering::Release);}
+    pub(crate) fn operation_epoch(&self)->Result<u64>{
+        let epoch=self.epoch.load(Ordering::Acquire);
+        if self.closed.load(Ordering::Acquire)||!self.available.load(Ordering::Acquire){return Err(denied());}Ok(epoch)
+    }
+    pub(crate) fn require_operation_epoch(&self,expected:u64)->Result<()>{
+        if self.operation_epoch()?!=expected{return Err(denied());}Ok(())
+    }
+    pub(crate) fn confirm_access(&self,address:&CredentialAddress,expected:u64)->Result<()>{
+        self.require_operation_epoch(expected)?;
+        let native=self.scoped(address)?;
+        if self.access(&native)?!=expected{return Err(denied());}Ok(())
+    }
     fn scoped(&self,address:&CredentialAddress)->Result<OmniPairingAddress>{
         address.validate()?;
         if address.profile()!=self.profile||address.device()!=self.device{return Err(denied());}

@@ -57,6 +57,15 @@ typedef struct {
  */
 OmniBuffer om_mobile_pairing_scope(uint64_t handle);
 OmniBuffer om_mobile_attach_pairing_credentials_v1(uint64_t handle,OmniPairingCredentialCallbacks callbacks);
+/* Trusted native controller only, never renderer commands. Status returns
+ * bounded public lifecycle metadata. Preparation requires foreground, attached
+ * scoped provider, current journal revision, budget 1000..25000 ms and enabled
+ * installed policy; current policy refuses it. Result is MaterialReady public
+ * metadata only, not an activated identity/pair. Errors may follow durable
+ * side effects: reload status before retry. No keys/seeds leave native memory.
+ */
+OmniBuffer om_mobile_pairing_status(uint64_t handle);
+OmniBuffer om_mobile_pairing_prepare_identity_v1(uint64_t handle,uint64_t expected_revision,uint32_t budget_ms);
 /* Trusted native document-tree reader ABI 1. open receives 16 bound profile
  * bytes and a borrowed normalized relative UTF-8 path (<=2048 bytes, <=8 parts).
  * It must authorize each part within the user-selected tree and return a unique

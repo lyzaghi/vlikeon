@@ -99,6 +99,34 @@ pub unsafe extern "C" fn om_mobile_attach_pairing_credentials_v1(handle:u64,call
     })())
 }
 
+fn pairing_operation(handle:u64)->Result<(Arc<Mutex<LocalHost>>,Arc<pairing_credentials::NativePairingCredentialStore>,u64)>{
+    let registry=hosts().lock().map_err(|_|error(ErrorCode::Internal,"Mobile registry is unavailable"))?;
+    let entry=registry.get(&handle).filter(|entry|!entry.closing&&entry.foreground).ok_or_else(||error(ErrorCode::PermissionDenied,"Native pairing requires a live foreground host"))?;
+    let provider=entry.pairing.clone().ok_or_else(||error(ErrorCode::UnsupportedCapability,"Native pairing provider is not attached"))?;
+    let epoch=provider.operation_epoch()?;Ok((entry.host.clone(),provider,epoch))
+}
+/// Native metadata only; intentionally absent from the renderer Command enum.
+#[no_mangle]
+pub extern "C" fn om_mobile_pairing_status(handle:u64)->OmniBuffer{result((||{
+    let(host,provider,epoch)=pairing_operation(handle)?;
+    let value=host.lock().map_err(|_|error(ErrorCode::Internal,"Mobile profile is unavailable"))?.native_pairing_status()?;
+    provider.require_operation_epoch(epoch)?;Ok(value)
+})())}
+/// Explicit native preparation only. No secret/signing result or activation is
+/// returned; installed disabled policy refuses before RNG/vault side effects.
+#[no_mangle]
+pub extern "C" fn om_mobile_pairing_prepare_identity_v1(handle:u64,expected_revision:u64,budget_ms:u32)->OmniBuffer{result((||{
+    if !(1000..=25000).contains(&budget_ms){return Err(error(ErrorCode::InvalidRequest,"Native pairing operation budget is invalid"));}
+    let deadline=std::time::Instant::now()+std::time::Duration::from_millis(u64::from(budget_ms));
+    let(host,provider,epoch)=pairing_operation(handle)?;
+    let host=host.lock().map_err(|_|error(ErrorCode::Internal,"Mobile profile is unavailable"))?;
+    provider.require_operation_epoch(epoch)?;
+    let candidate=host.native_pairing_prepare_identity(provider.as_ref(),expected_revision,deadline)?;
+    provider.confirm_access(&candidate.address(),epoch)?;
+    if std::time::Instant::now()>=deadline{return Err(error(ErrorCode::DeadlineExceeded,"Native identity preparation completed after its deadline; reload journal state"));}
+    Ok(json!({"credential_protocol":1,"address":candidate.address(),"public_key":candidate.public_key(),"revision":candidate.revision(),"phase":"material_ready"}))
+})())}
+
 /// # Safety
 /// The input follows `om_mobile_open`'s borrowed byte contract.
 #[no_mangle]

@@ -827,6 +827,35 @@ host, vault, SQL, build or test was executed. Actual Android/iOS filesystem,
 contender/crash/replacement/permissions tests, LocalHost pairing-controller
 consumption and native runtime qualification remain unfinished.
 
+## Native LocalHost preparation entry points
+
+LocalHost now provides native-only status and identity-preparation methods. They
+are absent from the renderer Command enum. Status returns bounded journal
+metadata, revision and installed-policy availability; it does not return private
+key material, signed grants or a signing capability.
+
+The mobile C ABI snapshots the actual open foreground host and its attached,
+profile/device-scoped provider, then releases the global registry lock before
+waiting for the host mutex or doing journal/vault work. Identity preparation
+requires an expected journal revision and an original 1–25 second budget,
+including time waiting for the host mutex. It uses the existing retained-lease
+writer and returns only public MaterialReady candidate metadata. There is no
+activation, pairing approval, implicit retry or replacement of an existing key.
+
+Provider transition epochs are checked before work and again before publication,
+including a native access observation for the prepared address. A background,
+close or observed protected-data failure rejects the result. These observations
+are not an atomic guarantee against a subsequent OS state change. A synchronous
+vault call is not forcibly interrupted at the deadline. An error may follow
+durable journal/vault effects, so the native controller must reload status and
+perform reviewed recovery instead of assuming that nothing happened.
+
+The installed streaming policy still refuses preparation before RNG/vault
+side effects. No Swift/JNI UI caller, consent flow, activation action, recovery
+dispatcher or transport controller is connected to these new entry points yet.
+No endpoint, native callback, vault, SQL, build or test was executed. Only source
+review and whitespace inspection were performed; item 58 remains incomplete.
+
 ## Remaining implementation and qualification
 
 - Journal/executor/lease/writer product integration, authority epochs, actual native owner

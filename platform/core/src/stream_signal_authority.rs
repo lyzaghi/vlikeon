@@ -44,6 +44,9 @@ fn installed_policy()->Result<InstalledPolicy>{
     // Signaling authorization does not grant capture, host or remote input.
     let _=(policy.allow_browser_host,policy.allow_remote_input);Ok(policy)
 }
+/// Native product entry gate only; this does not supply local consent or a
+/// session grant. Current installed policy is disabled and therefore refuses.
+pub fn require_installed_pairing_policy()->Result<()>{installed_policy().map(|_|())}
 pub struct NativeSignalRegistry<'a>{database:&'a Database,profile:Uuid,entries:BTreeMap<Uuid,Entry>}
 impl<'a> NativeSignalRegistry<'a>{
     pub fn new(database:&'a Database,profile:Uuid)->Result<Self>{

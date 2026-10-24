@@ -1451,6 +1451,7 @@ dependencies = [
  "omniplay-contracts",
  "omniplay-core",
  "omniplay-device-info",
+ "omniplay-streaming",
  "omniplay-sync-client",
  "serde",
  "serde_json",
