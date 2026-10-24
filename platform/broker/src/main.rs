@@ -63,13 +63,19 @@ fn native_registry(profile_root:&std::path::Path,profile_id:uuid::Uuid)->omnipla
 fn run() -> omniplay_contracts::Result<()> {
     let origin = std::env::args().nth(1).unwrap_or_default();
     if origin != ALLOWED_ORIGIN.trim() { return Err(PlatformError::new(ErrorCode::PermissionDenied,"Native host caller is not authorized")); }
-    let mut input = io::stdin().lock();
+    let input=control_input_lane()?;
     let output:Output=Arc::new(Mutex::new(io::stdout()));
     let mut media_lane=None;
     let mut broker: Option<service::Broker> = None;
     let mut profile_id = None;
-    while let Some(bytes) = framing::read_message(&mut input)? {
-        let bytes=Zeroizing::new(bytes);
+    loop {
+        let bytes=match input.recv_timeout(std::time::Duration::from_millis(25)){
+            Ok(Ok(Some(bytes)))=>bytes,
+            Ok(Ok(None))=>break,
+            Ok(Err(error))=>{if let Some(broker)=broker.as_mut(){broker.close();}return Err(error);},
+            Err(mpsc::RecvTimeoutError::Timeout)=>{if let Some(broker)=broker.as_mut(){broker.maintain_native_receive();}continue;},
+            Err(mpsc::RecvTimeoutError::Disconnected)=>{if let Some(broker)=broker.as_mut(){broker.close();}return Err(PlatformError::new(ErrorCode::RuntimeUnavailable,"Native input reader stopped without a terminal result"));},
+        };
         let mut request = match serde_json::from_slice::<Request>(&bytes) {
             Ok(request) => request,
             Err(_) => {
@@ -126,6 +132,23 @@ fn run() -> omniplay_contracts::Result<()> {
     }
     if let Some(broker) = broker.as_mut() { broker.close(); }
     Ok(())
+}
+/// One bounded framing reader per broker process. No database or native session
+/// ownership crosses threads. A partial/idle stdin read cannot stall receive
+/// maintenance; queue backpressure preserves request order without accumulation.
+fn control_input_lane()->omniplay_contracts::Result<mpsc::Receiver<omniplay_contracts::Result<Option<Zeroizing<Vec<u8>>>>>>{
+    let(sender,receiver)=mpsc::sync_channel(1);
+    std::thread::Builder::new().name("vlikeon-control-input".into()).spawn(move||{
+        let mut input=io::stdin().lock();
+        loop{
+            let message=framing::read_message(&mut input).map(|value|value.map(Zeroizing::new));
+            let terminal=!matches!(&message,Ok(Some(_)));
+            if sender.send(message).is_err()||terminal{break;}
+        }
+    }).map_err(|_|PlatformError::new(ErrorCode::ResourceLimit,"Native input reader could not start"))?;
+    // The OS stdin read is not claimed interruptible. On broker shutdown this
+    // process exits; do not block joining a thread waiting on external input.
+    Ok(receiver)
 }
 fn clear_strings_if_sensitive(response:&mut Response,sensitive:bool){if sensitive{if let omniplay_contracts::ResponseOutcome::Ok{result}=&mut response.outcome{clear_strings(result);}}}
 

@@ -1,5 +1,16 @@
 # Native ordered RTP to decoder bridge — item 56
 
+The broker control loop now receives framed input from one bounded reader lane
+and runs receive maintenance on 25-ms idle timeouts. Partial stdin headers/bodies
+and packet silence no longer block the main loop's maintenance opportunity.
+Database/session owners remain on the broker thread; framed request order and
+backpressure are retained. Queued complete messages use zeroizing storage.
+EOF/error terminates through broker cleanup. The reader's blocking OS read is
+not falsely joined or claimed cancellable at shutdown; process exit ends it.
+This is cooperative idle maintenance, not preemption of file dialogs, slow
+broker work, output writes or native calls. Transport caller and actual device
+qualification remain open. Build/test remain deferred.
+
 Broker now creates a native receive-document lifetime for its channel and closes
 it before shutdown cleanup. A private native open method binds sessions to that
 owner. The message loop invokes registry maintenance at each admitted request
