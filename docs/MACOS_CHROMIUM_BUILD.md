@@ -198,8 +198,11 @@ this fresh export. They author/copy source and metadata, not a native build.
 - Intended clean depot_tools revision:
   `4be4e4628e093c4ad50210db5dcfa05a88280bda`.
 
-The preparation retains configuration/compiler `not_started`, browser
-`not_started`, verification `not_run`, and distribution approval false. The
+The preparation retains configuration/compiler 
+ot_started`, browser
+
+ot_started`, verification 
+ot_run`, and distribution approval false. The
 development core catalog is empty and is not a production core package.
 
 The archive was transferred directly into the external
@@ -291,3 +294,9 @@ it a host-compatible candidate for the current macOS 15.7, not proof that GN
 or the full Chromium build passes. The pinned official SDK is 26.5; that
 official combination needs a newer host OS. A compatible SDK must be installed
 and checked for the required modulemaps before another build is started.
+
+Before retrying with a replacement SDK, run the read-only
+`qa/macos/sdk-modulemap-preflight.sh` against its absolute SDK path. The
+script checks the four pinned Apple modulemap inputs only; a pass is not
+GN, compiler or runtime acceptance. The new script still requires native
+execution verification and is not recorded as a passed test.
