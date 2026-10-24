@@ -1840,6 +1840,15 @@ this checkpoint.
 
 ## Remaining implementation and qualification
 
+Dedicated host_peer ABI now accepts bounded native-only ticket/client-key/
+reviewed-hello-hash requests. Persist requires explicit input boolean and lifetime;
+decline refuses supplied permission choices. Exact client key is parsed, hash
+shape checked, actual provider epoch/cancellation derived and original deadline
+rechecked after controller work. Late errors explicitly require reconciliation;
+success does not activate or remotely approve the candidate. Native UI must still
+perform real peer/comparison/input consent. No JNI/Swift UI caller or build/test/
+runtime operation ran; full host integration and durable recovery remain due.
+
 Dedicated mobile host_begin/host_action ABI entries now accept strict bounded
 native-only JSON: begin exact identity/revision/audience/label <=1024, ticket
 actions <=128 for register/poll/close. Actual foreground attached provider supplies

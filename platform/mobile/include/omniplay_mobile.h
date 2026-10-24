@@ -99,6 +99,11 @@ OmniBuffer om_mobile_pairing_review_client_v1(uint64_t handle,const uint8_t* dat
  * Close currently requires foreground provider; background/crash recovery is due. */
 OmniBuffer om_mobile_pairing_host_begin_v1(uint64_t handle,const uint8_t* data,size_t length,uint32_t budget_ms);
 OmniBuffer om_mobile_pairing_host_action_v1(uint64_t handle,const uint8_t* data,size_t length,uint32_t action,uint32_t budget_ms);
+/* Native peer review only, <=1024: {ticket,client_public_key,reviewed_hello_hash}.
+ * action 1 adds explicit input_allowed/lifetime_ms and persists after actual
+ * peer/comparison/input consent. action 2 declines; no permission fields allowed.
+ * Budget 1000..25000. No activation; late errors require status reconciliation. */
+OmniBuffer om_mobile_pairing_host_peer_v1(uint64_t handle,const uint8_t* data,size_t length,uint32_t action,uint32_t budget_ms);
 /* Trusted native controller only, never renderer commands. Status returns
  * bounded public lifecycle metadata. Preparation requires foreground, attached
  * scoped provider, current journal revision, budget 1000..25000 ms and enabled

@@ -155,6 +155,34 @@ impl Drop for PairingClientBegin{fn drop(&mut self){self.code.zeroize();}}
 struct PairingClientActivation{address:omniplay_streaming::native_credentials::CredentialAddress,expected_revision:u64,reviewed_grant_hash:String}
 #[derive(Deserialize)]#[serde(deny_unknown_fields)]
 struct PairingHostBegin{identity:omniplay_streaming::native_credentials::CredentialAddress,expected_revision:u64,audience:String,label:String}
+#[derive(Deserialize)]#[serde(deny_unknown_fields)]
+struct PairingHostPeer{ticket:Uuid,client_public_key:String,reviewed_hello_hash:String,input_allowed:Option<bool>,lifetime_ms:Option<u64>}
+/// # Safety
+/// Trusted native peer review JSON <=1024. action 1 persist after actual native
+/// peer/comparison/input consent, 2 decline exact reviewed request. No renderer.
+#[no_mangle]
+pub unsafe extern "C" fn om_mobile_pairing_host_peer_v1(handle:u64,data:*const u8,length:usize,action:u32,budget_ms:u32)->OmniBuffer{result((||{
+    if length>1024||!(1..=2).contains(&action)||!(1000..=25000).contains(&budget_ms){return Err(error(ErrorCode::InvalidRequest,"Native host peer action exceeds bounds"));}
+    let deadline=std::time::Instant::now()+std::time::Duration::from_millis(u64::from(budget_ms));
+    // SAFETY: caller supplies the bounded synchronous readable input above.
+    let request:PairingHostPeer=serde_json::from_slice(unsafe{input(data,length)?}).map_err(|_|error(ErrorCode::InvalidRequest,"Native host peer arguments are invalid"))?;
+    if request.ticket.is_nil()||request.reviewed_hello_hash.len()!=64||!request.reviewed_hello_hash.bytes().all(|b|b.is_ascii_digit()||(b'a'..=b'f').contains(&b)){
+        return Err(error(ErrorCode::InvalidRequest,"Native host reviewed request is invalid"));
+    }
+    omniplay_streaming::key(&request.client_public_key)?;
+    if (action==1&&(request.input_allowed.is_none()||request.lifetime_ms.is_none()))||
+        (action==2&&(request.input_allowed.is_some()||request.lifetime_ms.is_some())){return Err(error(ErrorCode::InvalidRequest,"Native host consent choices do not match action"));}
+    let(host,provider,epoch)=pairing_operation(handle)?;
+    let mut host=host.lock().map_err(|_|error(ErrorCode::Internal,"Mobile profile is unavailable"))?;
+    provider.require_operation_epoch(epoch)?;let cancel=provider.operation_cancellation(epoch)?;
+    let value=if action==1{
+        let allowed=request.input_allowed.ok_or_else(||error(ErrorCode::InvalidRequest,"Explicit input choice is required"))?;
+        let lifetime=request.lifetime_ms.ok_or_else(||error(ErrorCode::InvalidRequest,"Explicit grant lifetime is required"))?;
+        host.native_pairing_host_prepare_peer(provider.as_ref(),request.ticket,epoch,&request.client_public_key,&request.reviewed_hello_hash,allowed,lifetime,deadline,&cancel)?
+    }else{host.native_pairing_host_decline_peer(provider.as_ref(),request.ticket,epoch,&request.client_public_key,&request.reviewed_hello_hash,deadline,&cancel)?};
+    provider.require_operation_epoch(epoch)?;
+    if cancel.load(Ordering::Acquire)||std::time::Instant::now()>=deadline{return Err(error(ErrorCode::Cancelled,"Host peer result may have committed; inspect native status"));}Ok(value)
+})())}
 /// # Safety
 /// Native-only readable JSON <=1024; no renderer dispatch or automatic sharing.
 #[no_mangle]

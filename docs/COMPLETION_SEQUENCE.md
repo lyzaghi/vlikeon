@@ -2,6 +2,11 @@
 
 ## Current sequence — 1–109 outstanding tasks
 
+Item 58 host peer mobile ABI now routes exact reviewed-hello persistence/decline,
+requiring explicit input/lifetime choices for persistence and actual provider
+epoch/cancel/deadline. No automatic consent/activation; source-only. Native UI,
+durable uncertainty recovery and build/test remain due.
+
 Item 58 mobile ABI now authors native host begin/register/poll/close with strict
 bounded requests and actual foreground provider epoch/cancel/deadline admission.
 No proof sharing/peer approval; source-only, no build/test. JNI/Swift/UI and
