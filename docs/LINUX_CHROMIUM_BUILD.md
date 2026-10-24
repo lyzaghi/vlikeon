@@ -1,17 +1,18 @@
-# Task 4 — Linux x64 Chromium build, awaiting build host
+# Task 4 — Linux x64 Chromium build, provisioning in progress
 
 Task 4 requires the full Vlikeon `chrome` target on Linux x64. It remains open.
 The Windows executable, a source archive, a Windows-hosted fixture and source
-preparation cannot satisfy this requirement. No Linux dependency hook, compiler
-or test has run for this task.
+preparation cannot satisfy this requirement. A remote Linux build host is now
+available and dependency provisioning has started. No Linux full-target success
+or acceptance test is recorded yet.
 
 ## Observed host constraint
 
 On 2026-10-23, the current Windows host's `wsl.exe --list --verbose` reported
 that Windows Subsystem for Linux is not installed. No Docker executable was
 found on PATH. Filesystem inspection reported approximately 63 GB free on C
-and 35 GB free on E; these fluctuate during other authorized work. No Linux
-host or SSH destination has been supplied for this assignment.
+and 35 GB free on E; these fluctuate during other authorized work. This was the
+initial constraint before the owner supplied a remote host on 2026-10-24.
 
 The [Linux build instructions at the exact Chromium revision](https://chromium.googlesource.com/chromium/src/+/0e66b94549a8bd85f03fbdf189b752d6e7b63c32/docs/linux/build_instructions.md)
 were read from the hydrated pinned checkout. They require an x86-64 host,
@@ -21,11 +22,31 @@ Ubuntu 22.04. The selected recipe uses Chromium's supported Clang/libc++ tools.
 The current disks cannot provide the stated minimum free space for another
 independent build. Existing accepted Windows outputs remain preserved.
 
-The owner has been asked for an existing Linux host and SSH username/address,
-or additional local storage for a separately authorized WSL setup. No password,
-new paid runner, VM installation, OS-feature change or restart is assumed.
-Parallel source work's item-53/54/55 deferrals are preserved and not counted as
-completion of task 4.
+The supplied Ubuntu 22.04.5 x86-64 host initially had about 1 GB RAM and a
+10 GB disk. After the owner requested a recheck, read-only SSH diagnostics
+confirmed its configuration changed to 4,101,849,088 bytes physical RAM,
+30,064,766,976 bytes swap and 175,720,919,040 bytes available disk on a 200 GiB
+volume, with two logical CPUs. Storage now exceeds the pinned minimum; physical
+RAM still falls below upstream's stated 8 GB minimum. Codex is attempting one
+compiler job using the existing swap, recording this resource deviation rather
+than claiming the host meets that minimum. Compiler/linker success remains
+unproven. No swap, VM, OS-feature or restart change was made by this task.
+
+The frozen archive transferred to a new task-owned remote workspace and passed
+its SHA-256 check. Batch `004-build-a` bootstrapped the clean pinned depot but
+failed its vpython invocation because the process PATH did not include the
+depot wrapper directory; its result/logs are retained. Codex authored a fresh
+supervisor for `004-build-b`, which admits the unchanged prepared inputs and
+clean depot revision before resuming with the corrected process-local PATH.
+Official vpython bootstrap passed and the exact pinned
+`build/install-build-deps.py` is provisioning Ubuntu packages. The script's
+SHA-256 is `a71e5ed8e3cbcaf87b255ff124c424cda73b48bcb3fd6a4d44bed2de42c68f19`.
+
+The supervisor persists each stage's stdout/stderr, process-group identity and
+terminal result independently of SSH, with a bounded 48-hour full-target stage
+and one job. Bootstrap/provisioning is not Chromium compilation or acceptance.
+The supplied host address and access credentials are not part of public evidence.
+Parallel source work's item-53/54/55 deferrals remain separate assignments.
 
 ## Frozen transferable preparation
 

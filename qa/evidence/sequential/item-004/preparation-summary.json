@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "item": 4,
-  "status": "source_prepared_awaiting_linux_host",
+  "status": "remote_host_dependency_provisioning_in_progress",
   "target": "linux-x86_64",
   "development_only": true,
   "source_commit": "e527bf2a01df2a42d5cbd6bca91072719420329a",
@@ -18,5 +18,12 @@
   "browser": "not_started",
   "verification": "not_run",
   "distribution_approved": false,
-  "host_requirement": "Linux x86-64 with at least 100 GB free storage; host not yet supplied"
+  "host_requirement": "Linux x86-64 host supplied; storage exceeds 100 GB, physical RAM is below upstream 8 GB minimum",
+  "host_physical_memory_bytes": 4101849088,
+  "host_swap_bytes": 30064766976,
+  "host_initial_available_disk_bytes": 175720919040,
+  "jobs": 1,
+  "low_memory_attempt": true,
+  "current_batch": "004-build-b",
+  "prior_batch": "004-build-a failed at vpython bootstrap due to process PATH"
 }
