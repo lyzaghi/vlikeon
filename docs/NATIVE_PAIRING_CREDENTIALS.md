@@ -1840,6 +1840,19 @@ this checkpoint.
 
 ## Remaining implementation and qualification
 
+Credential journal now authors up to eight host invitation cleanup intents,
+containing original identity generation, signed invitation and audience only.
+Validation binds exact retained Active/Revoking identity, signature/audience and
+unique invite ID; no proof/private exchange or resume consent is persisted.
+The transactional retain API uses existing namespace-bound FULL/EXTRA WAL update
+and expected revision, rejecting conflicting same-ID documents and capacity
+overflow. Identity recovery waits for retained invitation cleanup before material
+removal. Existing journals default to empty new metadata; that does not establish
+absence of preexisting unrecorded remote invites. Writer registration does not yet
+call this primitive, so durable integration is incomplete. No build/test/SQL or
+native operation ran. Actual pre-HTTP wiring, close receipt completion, restart
+inspection and migration/qualification remain required.
+
 LocalHost transient cleanup on detach now fences host invitations and clears
 proof/request snapshots, while retaining possibly registered public cleanup
 ownership in the same object. A new document cannot resume share/approval, but

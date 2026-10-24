@@ -2,6 +2,11 @@
 
 ## Current sequence — 1–109 outstanding tasks
 
+Item 58 credential journal now authors bounded signed host invitation cleanup
+metadata and transactional retain intent, with exact identity/signature/hash and
+namespace validation. Identity recovery waits for retained invitation cleanup.
+Not yet wired before HTTP; source-only, no build/test. Migration/recovery due.
+
 Item 58 detach now fences host proof/reviews but retains possibly registered
 cleanup ownership inside the same LocalHost, preserving signer-removal guard.
 Never-attempted invitations drop. Process/terminal-host loss still needs durable

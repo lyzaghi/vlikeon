@@ -65,13 +65,23 @@ impl Record{
     pub fn relay_retired(&self)->bool{self.relay_retired}
 }
 #[derive(Clone,Serialize,Deserialize)]#[serde(deny_unknown_fields)]
-pub struct Journal{schema_version:u32,profile:Uuid,device:Uuid,revision:u64,records:Vec<Record>,lease_namespace:Option<String>}
+pub struct Journal{schema_version:u32,profile:Uuid,device:Uuid,revision:u64,records:Vec<Record>,lease_namespace:Option<String>,
+    #[serde(default)]host_invitations:Vec<HostInvitationCleanup>}
+/// Public cleanup intent only. No bearer proof, exchange key or resume consent.
+#[derive(Clone,Serialize,Deserialize)]#[serde(deny_unknown_fields)]
+pub struct HostInvitationCleanup{identity:CredentialAddress,document:SignedDocument,audience:String}
+impl HostInvitationCleanup{
+    pub fn identity(&self)->CredentialAddress{self.identity}
+    pub fn document(&self)->&SignedDocument{&self.document}
+    pub fn audience(&self)->&str{&self.audience}
+}
 impl Journal{
     pub fn revision(&self)->u64{self.revision}
     pub fn records(&self)->&[Record]{&self.records}
+    pub fn host_invitations(&self)->&[HostInvitationCleanup]{&self.host_invitations}
     /// Legacy journal inspection only; absence is never silently trusted for
     /// an existing history. An explicit provenance/migration path is required.
-    pub fn namespace_provenance_missing(&self)->bool{self.lease_namespace.is_none()&&(self.revision!=0||!self.records.is_empty())}
+    pub fn namespace_provenance_missing(&self)->bool{self.lease_namespace.is_none()&&(self.revision!=0||!self.records.is_empty()||!self.host_invitations.is_empty())}
     fn admit_namespace(&self,binding:&str)->Result<()>{
         match self.lease_namespace.as_deref(){Some(recorded)if recorded==binding=>Ok(()),None if !self.namespace_provenance_missing()=>Ok(()),_=>Err(namespace_error())}
     }
@@ -87,7 +97,7 @@ impl Journal{
                 Phase::Revoking=>{
                     if !record.writer_retired{RecoveryStep::RetireWriter}
                     else if !record.local_retired{RecoveryStep::RetireLocalSessions}
-                    else if record.address.kind()==SecretKind::DeviceSigning&&self.records.iter().any(|pair|pair.address.kind()==SecretKind::PairEncryption&&pair.phase!=Phase::Retired){RecoveryStep::WaitForPairCleanup}
+                    else if record.address.kind()==SecretKind::DeviceSigning&&(self.records.iter().any(|pair|pair.address.kind()==SecretKind::PairEncryption&&pair.phase!=Phase::Retired)||self.host_invitations.iter().any(|invite|invite.identity==record.address)){RecoveryStep::WaitForPairCleanup}
                     else if !record.relay_retired{RecoveryStep::RevokeRelay}
                     else if !record.material_absent{RecoveryStep::RemoveMaterial}
                     else{RecoveryStep::FinalizeRetirement}
@@ -100,6 +110,15 @@ impl Journal{
         if self.lease_namespace.as_ref().is_some_and(|binding|binding.len()!=64||!binding.bytes().all(|byte|byte.is_ascii_digit()||(b'a'..=b'f').contains(&byte))){return Err(invalid());}
         if self.schema_version!=1||self.profile.is_nil()||self.device.is_nil()||self.revision>MAX_REVISION||self.records.len()>MAX_RECORDS||self.revision==0&&!self.records.is_empty(){return Err(invalid());}
         let mut generations=BTreeSet::new();let mut live=BTreeSet::new();
+        if self.host_invitations.len()>8||(!self.host_invitations.is_empty()&&self.revision==0){return Err(invalid());}
+        let mut invite_ids=BTreeSet::new();
+        for cleanup in &self.host_invitations{
+            let identity=self.records.iter().find(|record|record.address==cleanup.identity).ok_or_else(invalid)?;
+            if cleanup.identity.kind()!=SecretKind::DeviceSigning||identity.material_absent||!matches!(identity.phase,Phase::Active|Phase::Revoking){return Err(invalid());}
+            let invite:omniplay_streaming::Invite=verify(&identity.public_key,omniplay_streaming::INVITE_DOMAIN,&cleanup.document,4096)?;
+            invite.validate(&cleanup.audience,invite.created_at_ms)?;
+            if invite.id.is_nil()||invite.host_public_key!=identity.public_key||!invite_ids.insert(invite.id){return Err(invalid());}
+        }
         for record in &self.records{
             let address=record.address;address.validate()?;key(&record.public_key)?;
             if record.signal_epoch>self.revision||record.signal_epoch>MAX_REVISION||
@@ -156,7 +175,7 @@ fn read(connection:&rusqlite::Connection,profile:Uuid,device:Uuid)->Result<Journ
     if profile.is_nil()||device.is_nil(){return Err(invalid());}
     // Bound the SQL value before fetching the full JSON string.
     let length:Option<i64>=connection.query_row("SELECT length(CAST(value AS BLOB)) FROM preferences WHERE key=?1",[KEY],|row|row.get(0)).optional().map_err(storage_error)?;
-    let Some(length)=length else{return Ok(Journal{schema_version:1,profile,device,revision:0,records:Vec::new(),lease_namespace:None});};
+    let Some(length)=length else{return Ok(Journal{schema_version:1,profile,device,revision:0,records:Vec::new(),lease_namespace:None,host_invitations:Vec::new()});};
     if length<=0||length>MAX_BYTES as i64{return Err(invalid());}
     let json:String=connection.query_row("SELECT value FROM preferences WHERE key=?1",[KEY],|row|row.get(0)).map_err(storage_error)?;
     if json.len()>MAX_BYTES{return Err(invalid());}
@@ -194,6 +213,26 @@ fn update(database:&Database,lease:&CredentialLease,profile:Uuid,expected:u64,ch
 }
 fn selected(journal:&mut Journal,address:CredentialAddress)->Result<&mut Record>{
     journal.records.iter_mut().find(|record|record.address==address).ok_or_else(conflict)
+}
+/// Commit before any registration HTTP. Same signed document retry is idempotent;
+/// a conflicting invite ID never replaces cleanup ownership.
+pub(crate) fn retain_host_invitation(database:&Database,lease:&CredentialLease,profile:Uuid,expected:u64,
+    identity:CredentialAddress,document:&SignedDocument,audience:&str)->Result<Journal>{
+    update(database,lease,profile,expected,|journal|{
+        let signer=journal.records.iter().find(|record|record.address==identity&&record.phase==Phase::Active&&identity.kind()==SecretKind::DeviceSigning).ok_or_else(conflict)?;
+        let invite:omniplay_streaming::Invite=verify(&signer.public_key,omniplay_streaming::INVITE_DOMAIN,document,4096)?;
+        invite.validate(audience,invite.created_at_ms)?;
+        if invite.host_public_key!=signer.public_key||invite.id.is_nil(){return Err(conflict());}
+        for existing in &journal.host_invitations{
+            let old:omniplay_streaming::Invite=inspect(&existing.document,4096)?;
+            if old.id==invite.id{
+                if existing.identity==identity&&existing.audience==audience&&document_hash(&existing.document)?==document_hash(document)?{return Ok(());}
+                return Err(conflict());
+            }
+        }
+        if journal.host_invitations.len()>=8{return Err(PlatformError::new(ErrorCode::ResourceLimit,"Host invitation cleanup limit reached"));}
+        journal.host_invitations.push(HostInvitationCleanup{identity,document:document.clone(),audience:audience.into()});Ok(())
+    })
 }
 fn add(journal:&mut Journal,address:CredentialAddress,public_key:String,grant_hash:Option<String>,expires_at_ms:Option<u64>,grant:Option<GrantMetadata>)->Result<()>{
     address.validate()?;key(&public_key)?;

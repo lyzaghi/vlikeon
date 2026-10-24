@@ -391,7 +391,7 @@ public final class GameHubController implements AutoCloseable {
             case "revalidate_before_use":return "Live authorization must be checked before use.";
             case "retire_writer":return "Waiting for confirmation that the key writer has stopped.";
             case "retire_local_sessions":return "Waiting for confirmation that local sessions have stopped.";
-            case "wait_for_pair_cleanup":return "Waiting for device pair cleanup.";
+            case "wait_for_pair_cleanup":return "Waiting for device pair or host invitation cleanup.";
             case "revoke_relay":return "Waiting for relay revocation confirmation.";
             case "remove_material":return "Waiting for key removal and vault verification.";
             case "finalize_retirement":return "Finish cleanup.";
