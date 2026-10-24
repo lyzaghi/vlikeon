@@ -1,4 +1,34 @@
-# Task 5 — external APFS ready, full Xcode pending
+# Task 5 — full Mac build running on external APFS
+
+## Current execution
+
+The owner installed full Xcode **16.4 (16F6)** at `/Volumes/Xcode/Xcode.app`,
+with SDK **15.5 (24F74)**. This differs from the earlier proposed 26.3 download.
+Codex inspected the mounted image binding to the external HDD, and Antigravity
+independently verified Xcode/SDK paths and first-launch status, remote exit 0.
+No replacement Xcode download is currently required by the available evidence;
+the actual GN/compiler must determine compatibility with the pinned Chromium.
+Historical preparation notes below describe earlier states.
+
+On 2026-10-24 the owner explicitly requested starting task 5 in the background
+and moving to task 6. Batch `005-build-a` was launched under a detached Python
+supervisor with caffeinate, two build jobs, a 72-hour full-recipe timeout and
+process-group timeout cleanup. Its actual PID is recorded in its progress file;
+it was independently observed alive after SSH disconnected, with the frozen
+recipe in `dependency_sync`, journal `failed: null`.
+
+- Project: `/Volumes/VlikeonBuild/work/projects/macos-005a`.
+- Durable logs/result: `/Volumes/VlikeonBuild/work/logs/005-build-a`.
+- Supervisor source: `/Volumes/VlikeonBuild/work/tools/run-macos-005a.py`.
+- Developer directory: `/Volumes/Xcode/Xcode.app/Contents/Developer`.
+- Recipe host interpreter: Xcode's actual Python 3.9 interpreter.
+- Dependency interpreter: pinned depot `.cipd_bin/vpython3`.
+
+The first-launch stage passed; hooks, GN, full target and artifact acceptance
+have not completed. This is an active build attempt, not task-5 completion.
+Never rerun while its supervisor/children are alive or remove live locks.
+SSH/poll timeouts do not stop the detached build. Preserve any terminal failure
+logs and inspect children before Codex decides repairs. Antigravity tests only.
 
 On 2026-10-24 the owner requested preparing task 5 while task 4 continues its
 actual Linux build. The owner confirmed an Apple Silicon Mac is available and
