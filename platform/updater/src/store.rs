@@ -211,4 +211,5 @@ impl Store {
 
     pub fn version_directory(&self,id:Uuid)->PathBuf {self.root.join("versions").join(id.to_string())}
     pub fn envelope_from_file(path:&Path)->Result<SignedEnvelope> {let raw=bounded_read(&mut File::open(path).map_err(storage_error)?,1024*1024)?;serde_json::from_slice(&raw).map_err(|_|rejected("Release envelope is invalid"))}
+    pub fn delete_release_record(&mut self,id:Uuid)->Result<()>{self.connection.execute("DELETE FROM releases WHERE id=?1",[id.to_string()]).map_err(storage_error)?;Ok(())}
 }

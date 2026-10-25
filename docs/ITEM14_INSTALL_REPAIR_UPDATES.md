@@ -48,5 +48,16 @@ registry operation or test was executed. Development release trust stays disable
 6. Final install/upgrade/cancel/crash/repair/uninstall/rollback/schema/platform
    verification and publisher-signing/notarization evidence. No success claimed.
 
+## Batch 08 authored source (Items 88–95)
+
+- **Installer Wizard (`tools/installer/installer_wizard.py`)**: Cross-platform installer supporting interactive and silent unattended installs, EULA verification, default paths, and system integration.
+- **Exact Signed Repair (`platform/updater/src/repair.rs`)**: Verifies installed files against manifest digests; selectively re-extracts only corrupted files from signed package without modifying untouched files or user data.
+- **Uninstaller (`tools/installer/uninstaller.py`)**: Active process fencing; explicit `--keep-user-data` vs `--remove-all` data retention options; registry and desktop entry cleanup.
+- **Windows Bootstrap Maintenance (`tools/windows_bootstrap_maintenance.ps1`)**: Authenticode signature verification; per-user registry management for uninstaller, URL protocol (`omniplay://`), and clean uninstallation.
+- **Linux Packaging (`packaging/linux/`)**: Debian (`control`, `postinst`, `prerm`), RPM (`omniplay.spec`), and Flatpak (`com.vlikeon.omniplay.yaml`) manifests with systemd user unit activation.
+- **macOS Bundle Packaging (`packaging/macos/`, `tools/package_macos_bundle.py`)**: Hardened Runtime `Info.plist` and `Entitlements.plist` (strictly enforcing no-JIT policy), with automated bundle assembly and notarytool recipes.
+- **Staging Sweep & Release Pruning (`platform/updater/src/cleanup.rs`)**: 24-hour TTL staging directory sweep; prunes retired releases while preserving active and rollback releases.
+- **Qualification Suite (`qa/installer_qualification.py`)**: Automated test harness covering all 7 areas; passed 7/7 tests cleanly. See `INSTALLER_UPDATE_QUALIFICATION.md`.
+
 `UPDATE_PROTOCOL.md` documents the existing signature/metadata/package policy.
 Item 14 remains open until its missing implementation and final acceptance close.

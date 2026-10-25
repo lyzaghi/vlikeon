@@ -1,0 +1,14 @@
+#!/bin/sh
+set -e
+
+case "$1" in
+    remove|deconfigure)
+        # Disable and stop user services before package removal
+        if [ -d /run/systemd/system ]; then
+            systemctl --global disable omniplay-native-host.socket 2>/dev/null || true
+            systemctl --global disable omniplay-native-host.service 2>/dev/null || true
+        fi
+    ;;
+esac
+
+exit 0

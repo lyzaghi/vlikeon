@@ -1,0 +1,31 @@
+app-id: com.vlikeon.omniplay
+runtime: org.freedesktop.Platform
+runtime-version: '23.08'
+sdk: org.freedesktop.Sdk
+command: omniplay
+finish-args:
+  # Display and windowing
+  - --socket=wayland
+  - --socket=fallback-x11
+  - --share=ipc
+  # Audio
+  - --socket=pulseaudio
+  # Gamepad and USB input
+  - --device=all
+  # Storage access
+  - --filesystem=xdg-documents
+  - --filesystem=xdg-download
+  # Network for Remote Play streaming and sync
+  - --share=network
+
+modules:
+  - name: omniplay
+    buildsystem: simple
+    build-commands:
+      - install -D -m755 bin/omniplay-launcher /app/bin/omniplay
+      - install -D -m755 bin/omniplay-update /app/libexec/omniplay/omniplay-update
+      - install -D -m644 share/applications/omniplay.desktop /app/share/applications/com.vlikeon.omniplay.desktop
+      - install -D -m644 share/icons/hicolor/256x256/apps/omniplay.png /app/share/icons/hicolor/256x256/apps/com.vlikeon.omniplay.png
+    sources:
+      - type: archive
+        path: omniplay-source.tar.gz

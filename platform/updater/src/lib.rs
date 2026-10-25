@@ -4,6 +4,8 @@ pub mod channel;
 pub mod package;
 pub mod store;
 pub mod transport;
+pub mod repair;
+pub mod cleanup;
 
 use omniplay_contracts::{ErrorCode,PlatformError,Result};
 use std::path::PathBuf;
