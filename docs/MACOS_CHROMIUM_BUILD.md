@@ -298,5 +298,26 @@ and checked for the required modulemaps before another build is started.
 Before retrying with a replacement SDK, run the read-only
 `qa/macos/sdk-modulemap-preflight.sh` against its absolute SDK path. The
 script checks the four pinned Apple modulemap inputs only; a pass is not
-GN, compiler or runtime acceptance. The new script still requires native
-execution verification and is not recorded as a passed test.
+GN, compiler or runtime acceptance. Native execution results for the replacement SDK are recorded below.
+
+## Xcode 26.3 installation and SDK-change resume
+
+Xcode 26.3 (17C529) was expanded successfully into the external-volume path
+`/Volumes/Xcode/Xcode-26.3/Xcode.app`. The archive copy SHA-256 is
+`f3a3a6394f03dd2b562bd0d78fbfedf31bed23c48ff5a881cadeb72b5552a1e9`.
+Apple archive signature inspection succeeded, and the extracted app passed
+`codesign --verify --deep --strict` with exit 0. After the owner accepted the
+new license, `xcodebuild -checkFirstLaunchStatus` returned 0.
+
+The read-only SDK module-map preflight was executed natively against SDK 26.2:
+all four required files were present, exit 0. This resolves the observed
+missing-map prerequisite; GN and full compilation still require actual results.
+
+A separate `macos-005d` project preserves the same frozen source and preparation
+SHA-256 as batch c. Explicit provenance records the replacement Git tool hash,
+Xcode/SDK paths, and the failed batch c result/journal hashes. Its workspace was
+renamed on the same external volume after old processes and locks were checked.
+The resume phase is synced so hooks run again with the replacement SDK. Prior
+failed logs remain preserved. Xcode selection is process-local; the original
+Xcode application remains available. Batch `005-build-d` uses two jobs and
+durable logs under the external build root. No full build success is claimed.
