@@ -67,3 +67,15 @@ pub fn grant_public_runtime_read(directory:&Path)->Result<()> {
     #[cfg(windows)]{windows::grant_public_runtime_read(directory)}
     #[cfg(not(windows))]{let _=directory;Err(unavailable())}
 }
+
+pub fn enforce_windows_session_write_quotas(profile_root:&Path,work_dir:&Path,allow_legacy_os_writes:bool)->Result<()>{
+    #[cfg(windows)]{
+        windows::write_quota::enforce_work_write_quotas(work_dir,allow_legacy_os_writes)?;
+        windows::write_quota::enforce_profile_write_quota(profile_root)?;
+        Ok(())
+    }
+    #[cfg(not(windows))]{
+        let _=(profile_root,work_dir,allow_legacy_os_writes);
+        Ok(())
+    }
+}
