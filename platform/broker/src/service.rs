@@ -348,8 +348,10 @@ impl Broker {
                 let paired_host_available = omniplay_core::stream_credentials::load(&self.database, self.profile_id)
                     .map(|j| j.records().iter().any(|r| r.phase() == omniplay_core::stream_credentials::Phase::Active && r.expires_at_ms().map_or(true, |exp| exp > now)))
                     .unwrap_or(false);
-                let native_allowed = !cfg!(target_arch = "wasm32");
-                let remote_allowed = true;
+                let is_pc_registered = omniplay_core::installed::InstalledGames::is_registered(&self.database, game_id).unwrap_or(false);
+                let has_native_emulator = installed_manifests.iter().any(|m| m.systems.contains(&game.system));
+                let native_allowed = is_pc_registered || has_native_emulator;
+                let remote_allowed = paired_host_available;
                 let device_class = if device.memory_mb.is_some_and(|m| m >= 8192) && device.webgpu {
                     "desktop-x86_64-dedicated-gpu".to_string()
                 } else if device.touch {
@@ -358,7 +360,10 @@ impl Broker {
                     format!("{}-{}", std::env::consts::OS, std::env::consts::ARCH)
                 };
 
+                self.benchmark_registry.load_from_database(&self.database, game_id, &device_class);
+
                 for candidate in &mut candidates {
+                    candidate.benchmark = None;
                     match candidate.kind {
                         RuntimeKind::WebWasm => {
                             if !device.wasm {
@@ -386,8 +391,10 @@ impl Broker {
                             }
                         }
                         RuntimeKind::InstalledGame => {
-                            let installed_list = self.installed.list(&self.database).unwrap_or_default();
-                            candidate.available = installed_list.iter().any(|entry| entry.game_id == game_id);
+                            candidate.available = is_pc_registered && game.system == GameSystem::Pc;
+                            if candidate.available {
+                                candidate.distribution_approved = true;
+                            }
                         }
                     }
                     if candidate.available {

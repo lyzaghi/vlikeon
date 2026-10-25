@@ -46,11 +46,13 @@ public final class OmniPlayFileProvider: NSObject {
             return false
         }
 
-        // Must be in Saves or NativeExports subdirectory
-        let savesPath = base.appendingPathComponent("Saves").standardized.path
-        let exportsPath = base.appendingPathComponent("NativeExports").standardized.path
+        // Must be strictly inside Saves/ or NativeExports/ subdirectory
+        let savesPath = base.appendingPathComponent("Saves", isDirectory: true).standardized.resolvingSymlinksInPath().path
+        let exportsPath = base.appendingPathComponent("NativeExports", isDirectory: true).standardized.resolvingSymlinksInPath().path
+        let savesPrefix = savesPath.hasSuffix("/") ? savesPath : savesPath + "/"
+        let exportsPrefix = exportsPath.hasSuffix("/") ? exportsPath : exportsPath + "/"
 
-        return canonicalTarget.hasPrefix(savesPath) || canonicalTarget.hasPrefix(exportsPath)
+        return canonicalTarget.hasPrefix(savesPrefix) || canonicalTarget.hasPrefix(exportsPrefix)
     }
 
     /// Performs an atomic, coordinated file read using NSFileCoordinator.
@@ -62,7 +64,9 @@ public final class OmniPlayFileProvider: NSObject {
 
         let coordinator = NSFileCoordinator()
         var coordinatorError: NSError?
+        var completed = false
         coordinator.coordinate(readingItemAt: url, options: .withoutChanges, error: &coordinatorError) { readUrl in
+            completed = true
             do {
                 let data = try Data(contentsOf: readUrl)
                 completion(.success(data))
@@ -71,7 +75,7 @@ public final class OmniPlayFileProvider: NSObject {
             }
         }
 
-        if let error = coordinatorError {
+        if !completed && coordinatorError != nil {
             completion(.failure(.coordinatedReadFailed))
         }
     }
@@ -85,7 +89,9 @@ public final class OmniPlayFileProvider: NSObject {
 
         let coordinator = NSFileCoordinator()
         var coordinatorError: NSError?
+        var completed = false
         coordinator.coordinate(writingItemAt: url, options: .forReplacing, error: &coordinatorError) { writeUrl in
+            completed = true
             do {
                 try data.write(to: writeUrl, options: .atomic)
                 completion(.success(()))
@@ -94,7 +100,7 @@ public final class OmniPlayFileProvider: NSObject {
             }
         }
 
-        if let error = coordinatorError {
+        if !completed && coordinatorError != nil {
             completion(.failure(.coordinatedWriteFailed))
         }
     }

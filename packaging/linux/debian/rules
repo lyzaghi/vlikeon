@@ -1,0 +1,18 @@
+#!/usr/bin/make -f
+export DH_VERBOSE = 1
+export DEB_BUILD_MAINT_OPTIONS = hardening=+all
+
+%:
+	dh $@
+
+override_dh_auto_build:
+	cargo build --frozen --release -p omniplay-broker -p omniplay-local-service -p omniplay-updater
+
+override_dh_auto_install:
+	install -Dm755 target/release/omniplay-broker debian/omniplay/usr/bin/omniplay-broker
+	install -Dm755 target/release/omniplay-local-service debian/omniplay/usr/bin/omniplay-local-service
+	install -Dm755 target/release/omniplay-updater debian/omniplay/usr/bin/omniplay-updater
+	install -Dm644 packaging/linux/omniplay.desktop debian/omniplay/usr/share/applications/omniplay.desktop
+	install -Dm644 packaging/linux/omniplay.mime.xml debian/omniplay/usr/share/mime/packages/omniplay.xml
+	install -Dm644 packaging/linux/systemd/omniplay-native-host.service debian/omniplay/usr/lib/systemd/user/omniplay-native-host.service
+	install -Dm644 packaging/linux/systemd/omniplay-native-host.socket debian/omniplay/usr/lib/systemd/user/omniplay-native-host.socket

@@ -192,9 +192,6 @@ impl NativeSrtpSession {
         // Compute 64-bit sequence number with rollover
         let full_seq = self.extend_sequence(seq16);
 
-        // Verify replay window
-        self.replay.check_and_update(full_seq)?;
-
         let keys = self.keys.as_ref().ok_or_else(unavailable)?;
 
         // SRTP authentication tag is trailing 10 bytes (or 16 for GCM)
@@ -205,10 +202,28 @@ impl NativeSrtpSession {
         let payload_and_header_len = datagram.len() - tag_len;
         let auth_tag = &datagram[payload_and_header_len..];
 
-        // Authenticate using HMAC-SHA1-80 over authenticated portion
+        // Derive distinct session encryption key and session authentication key
+        // from (master_key, master_salt) per RFC 3711 key derivation separation.
         use ring::hmac;
-        let s_key = hmac::Key::new(hmac::HMAC_SHA1_FOR_LEGACY_USE_ONLY, &keys.master_key);
-        let tag_full = hmac::sign(&s_key, &datagram[..payload_and_header_len]);
+        let master_prf = hmac::Key::new(hmac::HMAC_SHA256, &keys.master_key);
+
+        let mut auth_kdf_input = Vec::with_capacity(keys.master_salt.len() + 7);
+        auth_kdf_input.extend_from_slice(&keys.master_salt);
+        auth_kdf_input.extend_from_slice(&[0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]);
+        let session_auth_key = hmac::sign(&master_prf, &auth_kdf_input);
+
+        let mut enc_kdf_input = Vec::with_capacity(keys.master_salt.len() + 7);
+        enc_kdf_input.extend_from_slice(&keys.master_salt);
+        enc_kdf_input.extend_from_slice(&[0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]);
+        let session_enc_key = hmac::sign(&master_prf, &enc_kdf_input);
+
+        // Authenticate using HMAC-SHA1-80 over (authenticated portion || ROC) per RFC 3711
+        let roc = (full_seq >> 16) as u32;
+        let s_key = hmac::Key::new(hmac::HMAC_SHA1_FOR_LEGACY_USE_ONLY, session_auth_key.as_ref());
+        let mut auth_ctx = hmac::Context::with_key(&s_key);
+        auth_ctx.update(&datagram[..payload_and_header_len]);
+        auth_ctx.update(&roc.to_be_bytes());
+        let tag_full = auth_ctx.sign();
         let expected_tag = &tag_full.as_ref()[..tag_len];
 
         // Constant-time tag verification
@@ -217,21 +232,42 @@ impl NativeSrtpSession {
             return Err(denied());
         }
 
+        // Update replay window only AFTER cryptographic authentication succeeds!
+        self.replay.check_and_update(full_seq)?;
+
         // Decrypt payload: header (12 bytes) remains in cleartext, payload is decrypted
         let header = &datagram[..12];
         let mut decrypted_packet = Vec::with_capacity(payload_and_header_len);
         decrypted_packet.extend_from_slice(header);
 
-        // Keystream decryption (AES-CTR)
+        // Cryptographic counter-mode keystream generation (32-byte PRF blocks over IV || counter)
         let ciphertext = &datagram[12..payload_and_header_len];
         let mut plaintext = ciphertext.to_vec();
+        let stream_prf = hmac::Key::new(hmac::HMAC_SHA256, session_enc_key.as_ref());
 
-        // Keystream mask derived from master_salt and IV (ssrc, full_seq)
-        for (i, byte) in plaintext.iter_mut().enumerate() {
-            let mask = keys.master_salt[i % keys.master_salt.len()]
-                ^ (keys.master_key[i % keys.master_key.len()])
-                ^ ((full_seq >> ((i % 8) * 8)) as u8);
-            *byte ^= mask;
+        // Construct 14-byte SRTP IV: salt XOR (SSRC at bytes 4..8, packet index at bytes 8..14)
+        let mut iv = [0u8; 14];
+        iv.copy_from_slice(&keys.master_salt[..14]);
+        let ssrc_bytes = ssrc.to_be_bytes();
+        for i in 0..4 {
+            iv[4 + i] ^= ssrc_bytes[i];
+        }
+        let seq_bytes = full_seq.to_be_bytes();
+        for i in 0..6 {
+            iv[8 + i] ^= seq_bytes[2 + i];
+        }
+
+        for (block_idx, chunk) in plaintext.chunks_mut(32).enumerate() {
+            let mut counter_in = [0u8; 16];
+            counter_in[..14].copy_from_slice(&iv);
+            let ctr = (block_idx as u16).to_be_bytes();
+            counter_in[14] = ctr[0];
+            counter_in[15] = ctr[1];
+            let keystream_block = hmac::sign(&stream_prf, &counter_in);
+            let ks = keystream_block.as_ref();
+            for (b, k) in chunk.iter_mut().zip(ks.iter()) {
+                *b ^= *k;
+            }
         }
 
         decrypted_packet.extend_from_slice(&plaintext);
@@ -241,11 +277,18 @@ impl NativeSrtpSession {
     }
 
     fn extend_sequence(&self, seq16: u16) -> u64 {
+        if !self.replay.initialized {
+            return seq16 as u64;
+        }
         let max_low = (self.replay.max_seq & 0xFFFF) as u16;
         let high = self.replay.max_seq & !0xFFFF;
         if seq16 >= max_low {
-            high | (seq16 as u64)
-        } else if max_low.wrapping_sub(seq16) > 32768 {
+            if seq16 - max_low > 32768 && high >= 0x10000 {
+                (high - 0x10000) | (seq16 as u64)
+            } else {
+                high | (seq16 as u64)
+            }
+        } else if max_low - seq16 > 32768 {
             (high + 0x10000) | (seq16 as u64)
         } else {
             high | (seq16 as u64)

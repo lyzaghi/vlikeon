@@ -4,20 +4,20 @@
 //! and durable reconciliation without silent device leakage.
 
 use crate::{
-    gamepad::{Gamepads, HostObservation, Owner, Report, State, TargetBinding},
-    gamepad_protocol::{Action, Binding, Identity, Pad, Reply},
+    gamepad::{Gamepads, HostObservation, Owner, State},
+    gamepad_protocol::{self as wire, Action, Identity, Reply},
     gamepad_uinput::UinputProvider,
 };
 use omniplay_contracts::{ContentHash, ErrorCode, PlatformError, RemotePad, Result};
 use std::{
-    collections::BTreeSet,
+    fs::File,
+    io::Read,
     sync::{
         atomic::{AtomicBool, Ordering},
         Arc, Mutex,
     },
     time::{Duration, Instant},
 };
-use uuid::Uuid;
 
 fn denied() -> PlatformError {
     PlatformError::new(
@@ -31,6 +31,19 @@ fn unavailable() -> PlatformError {
         ErrorCode::RuntimeUnavailable,
         "The Linux uinput gamepad provider is unavailable or requires cleanup",
     )
+}
+
+fn read_starttime(pid: u32) -> Option<u64> {
+    let path = format!("/proc/{}/stat", pid);
+    let mut file = File::open(&path).ok()?;
+    let mut contents = String::new();
+    file.read_to_string(&mut contents).ok()?;
+    let rparen = contents.rfind(')')?;
+    let fields: Vec<&str> = contents[rparen + 1..].split_whitespace().collect();
+    if fields.len() < 20 {
+        return None;
+    }
+    fields[19].parse::<u64>().ok()
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -63,12 +76,15 @@ impl LinuxProcessWitness {
         }
         #[cfg(target_os = "linux")]
         {
-            let path = format!("/proc/{}/stat", self.identity.process_id);
-            if !std::path::Path::new(&path).exists() {
-                return Ok(true);
+            match read_starttime(self.identity.process_id) {
+                Some(actual_start) => Ok(actual_start != self.identity.creation_time),
+                None => Ok(true),
             }
         }
-        Ok(false)
+        #[cfg(not(target_os = "linux"))]
+        {
+            Ok(false)
+        }
     }
 }
 
@@ -116,111 +132,183 @@ impl LinuxGamepadHostClient {
         &self.sha256
     }
 
+    fn current_identities(pads: &Gamepads<UinputProvider>) -> Result<Vec<Identity>> {
+        let pairs = pads.cleanup_identities()?;
+        Ok(pairs
+            .into_iter()
+            .map(|(slot, container)| Identity { slot, container })
+            .collect())
+    }
+
+    fn current_host_observation(&self, document_alive: bool, capture_alive: bool, pair_authorized: bool) -> HostObservation {
+        let alive = !self.witness.exited(self.witness.identity).unwrap_or(true);
+        HostObservation {
+            target: if alive { Some(self.owner.target) } else { None },
+            foreground: alive,
+            local_override: false,
+            document_alive,
+            capture_alive,
+            pair_authorized,
+        }
+    }
+
     pub fn exchange(&mut self, action: Action, timeout: Duration) -> Result<(u64, Reply)> {
-        if self.stopped.load(Ordering::Acquire) {
+        if self.stopped.load(Ordering::Acquire) || timeout.is_zero() {
             return Err(unavailable());
         }
+        if self.request_id >= wire::MAX_ID {
+            return Err(denied());
+        }
         let req_id = self.request_id;
-        self.request_id = self.request_id.wrapping_add(1);
+        self.request_id += 1;
 
         let mut pads = self.gamepads.lock().map_err(|_| unavailable())?;
         match action {
-            Action::Prepare { slots, expires_at_ms, remaining_ms, generation } => {
-                let host = HostObservation {
-                    target: Some(self.owner.target),
-                    foreground: true,
-                    local_override: false,
-                    document_alive: true,
-                    capture_alive: true,
-                    pair_authorized: true,
-                };
-                let remaining = Duration::from_millis(remaining_ms as u64);
-                pads.prepare(self.owner, &slots, remaining, &host, true)?;
-
+            Action::Prepare {
+                slots,
+                remaining_ms,
+                expires_at_ms: _,
+                system_visible_consent,
+                vendor: _,
+                product: _,
+            } => {
+                let host = self.current_host_observation(true, true, true);
+                let remaining = Duration::from_millis(u64::from(remaining_ms));
+                pads.prepare(self.owner, &slots, remaining, &host, system_visible_consent)?;
+                let identities = Self::current_identities(&pads)?;
                 let reply = Reply {
-                    request_id: req_id,
-                    success: true,
+                    protocol: wire::VERSION,
+                    id: req_id,
+                    binding: self.owner.into(),
+                    status: "ok".to_string(),
+                    complete: true,
                     phase: "prepared".to_string(),
-                    sequence: 0,
-                    devices: vec![],
+                    reason: None,
+                    identities: Some(identities),
                 };
                 Ok((req_id, reply))
             }
-            Action::Activate => {
-                let host = HostObservation {
-                    target: Some(self.owner.target),
-                    foreground: true,
-                    local_override: false,
-                    document_alive: true,
-                    capture_alive: true,
-                    pair_authorized: true,
+            Action::Heartbeat {
+                document_alive,
+                capture_alive,
+                pair_authorized,
+            } => {
+                let host = self.current_host_observation(document_alive, capture_alive, pair_authorized);
+                pads.tick(&host)?;
+                let identities = Self::current_identities(&pads).ok();
+                let phase = match pads.state() {
+                    State::Preparing => "prepared",
+                    State::Active => "active",
+                    State::CleanupRequired => "cleanup_required",
+                    State::Idle => "revoked",
                 };
+                let reply = Reply {
+                    protocol: wire::VERSION,
+                    id: req_id,
+                    binding: self.owner.into(),
+                    status: "ok".to_string(),
+                    complete: true,
+                    phase: phase.to_string(),
+                    reason: None,
+                    identities,
+                };
+                Ok((req_id, reply))
+            }
+            Action::Activate { identities: expected } => {
+                let host = self.current_host_observation(true, true, true);
+                let current = Self::current_identities(&pads)?;
+                if current != expected {
+                    let _ = pads.revoke(&self.owner);
+                    return Err(denied());
+                }
                 pads.activate(&self.owner, &host)?;
                 let reply = Reply {
-                    request_id: req_id,
-                    success: true,
+                    protocol: wire::VERSION,
+                    id: req_id,
+                    binding: self.owner.into(),
+                    status: "ok".to_string(),
+                    complete: true,
                     phase: "active".to_string(),
-                    sequence: 0,
-                    devices: vec![],
+                    reason: None,
+                    identities: Some(current),
                 };
                 Ok((req_id, reply))
             }
-            Action::Frame { sequence, pads: remote_pads } => {
-                let host = HostObservation {
-                    target: Some(self.owner.target),
-                    foreground: true,
-                    local_override: false,
-                    document_alive: true,
-                    capture_alive: true,
-                    pair_authorized: true,
-                };
-                let mut reports = Vec::new();
-                for (slot, pad) in &remote_pads {
-                    reports.push((*slot, Report::from_remote(pad)?));
-                }
-                pads.frame(&self.owner, sequence, &reports, &host)?;
+            Action::Input { sequence, pads: remote_pads } => {
+                let host = self.current_host_observation(true, true, true);
+                let frames: Vec<(u8, RemotePad)> = remote_pads
+                    .into_iter()
+                    .map(|p| (p.slot, p.state))
+                    .collect();
+                pads.apply(&self.owner, sequence, &frames, &host)?;
+                let identities = Self::current_identities(&pads)?;
                 let reply = Reply {
-                    request_id: req_id,
-                    success: true,
+                    protocol: wire::VERSION,
+                    id: req_id,
+                    binding: self.owner.into(),
+                    status: "ok".to_string(),
+                    complete: true,
                     phase: "active".to_string(),
-                    sequence,
-                    devices: vec![],
+                    reason: None,
+                    identities: Some(identities),
                 };
                 Ok((req_id, reply))
             }
-            Action::ReleaseFence { sequence } => {
-                let host = HostObservation {
-                    target: Some(self.owner.target),
-                    foreground: true,
-                    local_override: false,
-                    document_alive: true,
-                    capture_alive: true,
-                    pair_authorized: true,
-                };
-                pads.release_fence(&self.owner, sequence, &host)?;
+            Action::Release { sequence } => {
+                let host = self.current_host_observation(true, true, true);
+                pads.release(&self.owner, sequence, &host)?;
+                let identities = Self::current_identities(&pads)?;
                 let reply = Reply {
-                    request_id: req_id,
-                    success: true,
+                    protocol: wire::VERSION,
+                    id: req_id,
+                    binding: self.owner.into(),
+                    status: "ok".to_string(),
+                    complete: true,
                     phase: "active".to_string(),
-                    sequence,
-                    devices: vec![],
+                    reason: None,
+                    identities: Some(identities),
+                };
+                Ok((req_id, reply))
+            }
+            Action::Status => {
+                let host = self.current_host_observation(true, true, true);
+                let _ = pads.tick(&host);
+                let identities = Self::current_identities(&pads).ok();
+                let phase = match pads.state() {
+                    State::Preparing => "prepared",
+                    State::Active => "active",
+                    State::CleanupRequired => "cleanup_required",
+                    State::Idle => "revoked",
+                };
+                let reply = Reply {
+                    protocol: wire::VERSION,
+                    id: req_id,
+                    binding: self.owner.into(),
+                    status: "ok".to_string(),
+                    complete: true,
+                    phase: phase.to_string(),
+                    reason: None,
+                    identities,
                 };
                 Ok((req_id, reply))
             }
             Action::Stop => {
-                let _ = pads.retire();
+                let _ = pads.revoke(&self.owner);
                 self.stopped.store(true, Ordering::Release);
-                let phase = if pads.state() == State::CleanupRequired {
-                    "cleanup_required"
+                let (phase, identities) = if pads.state() == State::CleanupRequired {
+                    ("cleanup_required", Self::current_identities(&pads).ok())
                 } else {
-                    "revoked"
+                    ("revoked", Some(Vec::new()))
                 };
                 let reply = Reply {
-                    request_id: req_id,
-                    success: true,
+                    protocol: wire::VERSION,
+                    id: req_id,
+                    binding: self.owner.into(),
+                    status: "ok".to_string(),
+                    complete: true,
                     phase: phase.to_string(),
-                    sequence: 0,
-                    devices: vec![],
+                    reason: None,
+                    identities,
                 };
                 Ok((req_id, reply))
             }
@@ -231,16 +319,12 @@ impl LinuxGamepadHostClient {
         if self.stopped.load(Ordering::Acquire) {
             return Err(unavailable());
         }
+        if self.request_id >= wire::MAX_ID {
+            return Err(denied());
+        }
         let req_id = self.request_id;
-        self.request_id = self.request_id.wrapping_add(1);
-        let host = HostObservation {
-            target: Some(self.owner.target),
-            foreground: true,
-            local_override: false,
-            document_alive: true,
-            capture_alive: true,
-            pair_authorized: true,
-        };
+        self.request_id += 1;
+        let host = self.current_host_observation(true, true, true);
         let mut pads = self.gamepads.lock().map_err(|_| unavailable())?;
         pads.tick(&host)?;
         Ok(req_id)
@@ -249,7 +333,7 @@ impl LinuxGamepadHostClient {
     pub fn stop(&mut self) -> Result<()> {
         self.stopped.store(true, Ordering::Release);
         if let Ok(mut pads) = self.gamepads.lock() {
-            let _ = pads.retire();
+            pads.revoke(&self.owner)?;
         }
         Ok(())
     }

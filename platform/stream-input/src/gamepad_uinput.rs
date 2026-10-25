@@ -7,6 +7,7 @@ use omniplay_contracts::{ErrorCode,PlatformError,Result};
 use std::{fs::{File,OpenOptions},io::Write,mem::size_of,
     os::{fd::AsRawFd,unix::fs::{FileTypeExt,MetadataExt,OpenOptionsExt}},
     sync::Mutex};
+use uuid::Uuid;
 
 const EV_KEY:u16=1;
 const EV_ABS:u16=3;
@@ -34,7 +35,7 @@ impl UinputProvider{
     pub fn new()->Self{Self{_private:()}}
 }
 impl Default for UinputProvider{fn default()->Self{Self::new()}}
-pub struct UinputDevice{file:Option<File>,created:bool,lease:Option<SlotLease>}
+pub struct UinputDevice{file:Option<File>,created:bool,lease:Option<SlotLease>,container:Uuid}
 impl UinputDevice{
     fn file(&self)->Result<&File>{self.file.as_ref().filter(|_|self.created).ok_or_else(failure)}
     fn destroy(&mut self)->Result<()>{
@@ -89,7 +90,7 @@ impl Provider for UinputProvider{
         let mut version:libc::c_uint=0;
         // SAFETY: live exact device fd and initialized writable integer.
         if unsafe{libc::ioctl(file.as_raw_fd(),libc::_IOR::<libc::c_uint>(b'U'.into(),45),&mut version)}<0||version<5{return Err(failure());}
-        let mut device=UinputDevice{file:Some(file),created:false,lease:Some(lease)};
+        let mut device=UinputDevice{file:Some(file),created:false,lease:Some(lease),container:Uuid::new_v4()};
         let file=device.file.as_ref().ok_or_else(failure)?;
         bit(file,100,EV_KEY)?;bit(file,100,EV_ABS)?;
         for button in BUTTONS{bit(file,101,button)?;}
@@ -125,4 +126,5 @@ impl Provider for UinputProvider{
         if file.write(&bytes).map_err(|_|failure())?!=bytes.len(){return Err(failure());}Ok(())
     }
     fn detach(&mut self,device:&mut UinputDevice)->Result<()>{device.destroy()}
+    fn cleanup_identity(&self,device:&UinputDevice)->Option<Uuid>{Some(device.container)}
 }

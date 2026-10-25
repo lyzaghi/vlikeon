@@ -1,0 +1,6 @@
+omniplay (1.0.0-1) stable; urgency=medium
+
+  * Initial Debian release package for OmniPlay runtime, broker, updater,
+    XDG desktop/MIME integration, and systemd user socket units.
+
+ -- Vlikeon Engineering <packaging@vlikeon.vn>  Sun, 25 Oct 2026 10:00:00 +0700

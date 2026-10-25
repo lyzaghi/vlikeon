@@ -106,14 +106,22 @@ public final class RemotePlayBridge: NSObject {
         self.watchdogTimer = timer
     }
 
+    private static func clampAxis(_ value: Int16) -> Int16 {
+        return value < -32767 ? -32767 : value
+    }
+
     private func dispatchCurrentReport() {
         guard isSessionActive, let handler = reportHandler else { return }
 
-        var seq = sequenceNumber
-        sequenceNumber &+= 1
         if sequenceNumber > 10_000_000 {
-            sequenceNumber = 1
+            isSessionActive = false
+            watchdogTimer?.cancel()
+            watchdogTimer = nil
+            sendNeutralReport()
+            return
         }
+        let seq = sequenceNumber
+        sequenceNumber &+= 1
 
         var report = Data(count: Self.kReportSize)
         report.withUnsafeMutableBytes { ptr in
@@ -123,10 +131,10 @@ public final class RemotePlayBridge: NSObject {
             base.storeBytes(of: UInt16(0), toByteOffset: 2, as: UInt16.self) // padding
             base.storeBytes(of: seq.littleEndian, toByteOffset: 4, as: UInt32.self)
             base.storeBytes(of: currentButtons.littleEndian, toByteOffset: 8, as: UInt32.self)
-            base.storeBytes(of: leftStickX.littleEndian, toByteOffset: 12, as: Int16.self)
-            base.storeBytes(of: leftStickY.littleEndian, toByteOffset: 14, as: Int16.self)
-            base.storeBytes(of: rightStickX.littleEndian, toByteOffset: 16, as: Int16.self)
-            base.storeBytes(of: rightStickY.littleEndian, toByteOffset: 18, as: Int16.self)
+            base.storeBytes(of: Self.clampAxis(leftStickX).littleEndian, toByteOffset: 12, as: Int16.self)
+            base.storeBytes(of: Self.clampAxis(leftStickY).littleEndian, toByteOffset: 14, as: Int16.self)
+            base.storeBytes(of: Self.clampAxis(rightStickX).littleEndian, toByteOffset: 16, as: Int16.self)
+            base.storeBytes(of: Self.clampAxis(rightStickY).littleEndian, toByteOffset: 18, as: Int16.self)
             base.storeBytes(of: leftTrigger, toByteOffset: 20, as: UInt8.self)
             base.storeBytes(of: rightTrigger, toByteOffset: 21, as: UInt8.self)
             base.storeBytes(of: UInt16(0), toByteOffset: 22, as: UInt16.self) // padding
@@ -170,10 +178,10 @@ public final class RemotePlayBridge: NSObject {
 
     public func updateSticks(lx: Int16, ly: Int16, rx: Int16, ry: Int16) {
         reportQueue.async {
-            self.leftStickX = lx
-            self.leftStickY = ly
-            self.rightStickX = rx
-            self.rightStickY = ry
+            self.leftStickX = Self.clampAxis(lx)
+            self.leftStickY = Self.clampAxis(ly)
+            self.rightStickX = Self.clampAxis(rx)
+            self.rightStickY = Self.clampAxis(ry)
             self.dispatchCurrentReport()
         }
     }
@@ -237,8 +245,8 @@ public final class RemotePlayBridge: NSObject {
         extended.dpad.right.valueChangedHandler = { [weak self] _, _, pressed in self?.updateButton(mask: Self.btnDpadRight, isPressed: pressed) }
 
         extended.leftThumbstick.valueChangedHandler = { [weak self] _, x, y in
-            let lx = Int16(max(-32768, min(32767, round(x * 32767))))
-            let ly = Int16(max(-32768, min(32767, round(y * 32767))))
+            let lx = Int16(max(-32767, min(32767, round(x * 32767))))
+            let ly = Int16(max(-32767, min(32767, round(y * 32767))))
             self?.reportQueue.async {
                 self?.leftStickX = lx
                 self?.leftStickY = ly
@@ -246,8 +254,8 @@ public final class RemotePlayBridge: NSObject {
             }
         }
         extended.rightThumbstick.valueChangedHandler = { [weak self] _, x, y in
-            let rx = Int16(max(-32768, min(32767, round(x * 32767))))
-            let ry = Int16(max(-32768, min(32767, round(y * 32767))))
+            let rx = Int16(max(-32767, min(32767, round(x * 32767))))
+            let ry = Int16(max(-32767, min(32767, round(y * 32767))))
             self?.reportQueue.async {
                 self?.rightStickX = rx
                 self?.rightStickY = ry

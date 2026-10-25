@@ -107,10 +107,10 @@ export class WebGamepadManager {
     if (pad.buttons[10]?.pressed) buttons |= (1 << 12); // L3
     if (pad.buttons[11]?.pressed) buttons |= (1 << 13); // R3
 
-    const lx = Math.max(-32768, Math.min(32767, Math.round((pad.axes[0] || 0) * 32767)));
-    const ly = Math.max(-32768, Math.min(32767, Math.round((pad.axes[1] || 0) * 32767)));
-    const rx = Math.max(-32768, Math.min(32767, Math.round((pad.axes[2] || 0) * 32767)));
-    const ry = Math.max(-32768, Math.min(32767, Math.round((pad.axes[3] || 0) * 32767)));
+    const lx = Math.max(-32767, Math.min(32767, Math.round((pad.axes[0] || 0) * 32767)));
+    const ly = Math.max(-32767, Math.min(32767, Math.round((pad.axes[1] || 0) * 32767)));
+    const rx = Math.max(-32767, Math.min(32767, Math.round((pad.axes[2] || 0) * 32767)));
+    const ry = Math.max(-32767, Math.min(32767, Math.round((pad.axes[3] || 0) * 32767)));
 
     const ltVal = pad.buttons[6]?.value !== undefined ? pad.buttons[6].value : (pad.buttons[6]?.pressed ? 1.0 : 0.0);
     const rtVal = pad.buttons[7]?.value !== undefined ? pad.buttons[7].value : (pad.buttons[7]?.pressed ? 1.0 : 0.0);
@@ -121,13 +121,32 @@ export class WebGamepadManager {
     this.lastReportTime = now;
   }
 
+  static formatRemotePadJson(seq, buttons, lx, ly, rx, ry, lt, rt) {
+    return {
+      sequence: seq,
+      buttons: buttons >>> 0,
+      left_x: Math.max(-32767, Math.min(32767, lx | 0)),
+      left_y: Math.max(-32767, Math.min(32767, ly | 0)),
+      right_x: Math.max(-32767, Math.min(32767, rx | 0)),
+      right_y: Math.max(-32767, Math.min(32767, ry | 0)),
+      left_trigger: Math.max(0, Math.min(255, lt | 0)),
+      right_trigger: Math.max(0, Math.min(255, rt | 0))
+    };
+  }
+
   sendReport(buttons, lx, ly, rx, ry, lt, rt) {
     if (!this.reportSink) return;
-
-    let seq = this.sequence++;
     if (this.sequence > 10000000) {
-      this.sequence = 1;
+      // Sequence exhausted; fence session instead of wrapping sequence numbers
+      this.stop();
+      return;
     }
+
+    const seq = this.sequence++;
+    const clampedLx = Math.max(-32767, Math.min(32767, lx | 0));
+    const clampedLy = Math.max(-32767, Math.min(32767, ly | 0));
+    const clampedRx = Math.max(-32767, Math.min(32767, rx | 0));
+    const clampedRy = Math.max(-32767, Math.min(32767, ry | 0));
 
     const buffer = new ArrayBuffer(64);
     const view = new DataView(buffer);
@@ -137,10 +156,10 @@ export class WebGamepadManager {
     view.setUint16(2, 0, true);
     view.setUint32(4, seq, true);
     view.setUint32(8, buttons, true);
-    view.setInt16(12, lx, true);
-    view.setInt16(14, ly, true);
-    view.setInt16(16, rx, true);
-    view.setInt16(18, ry, true);
+    view.setInt16(12, clampedLx, true);
+    view.setInt16(14, clampedLy, true);
+    view.setInt16(16, clampedRx, true);
+    view.setInt16(18, clampedRy, true);
     view.setUint8(20, lt);
     view.setUint8(21, rt);
     view.setUint16(22, 0, true);

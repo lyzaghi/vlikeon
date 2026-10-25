@@ -78,6 +78,26 @@ fn check_cancel(cancel:&std::sync::atomic::AtomicBool)->Result<()>{if cancel.loa
 pub fn unpack_cancellable(source:&mut File,directory:&Path,release:&ReleaseManifest,cancel:&std::sync::atomic::AtomicBool)->Result<PackageManifest> {
     check_cancel(cancel)?;
     let manifest=read_manifest(source)?;manifest.validate(release)?;
+    unpack_payload_cancellable(source,directory,&manifest,cancel)?;
+    Ok(manifest)
+}
+
+pub fn unpack_matching_manifest(source:&mut File,directory:&Path,expected:&PackageManifest,cancel:&std::sync::atomic::AtomicBool)->Result<PackageManifest> {
+    check_cancel(cancel)?;
+    let manifest=read_manifest(source)?;
+    if manifest.schema_version!=expected.schema_version||manifest.channel!=expected.channel||manifest.platform!=expected.platform||manifest.version!=expected.version||manifest.chromium_revision!=expected.chromium_revision||manifest.files.len()!=expected.files.len() {
+        return Err(rejected("Repair package manifest does not match the installed release"));
+    }
+    for (lhs,rhs) in manifest.files.iter().zip(expected.files.iter()) {
+        if lhs.path!=rhs.path||lhs.bytes!=rhs.bytes||lhs.sha256!=rhs.sha256||lhs.executable!=rhs.executable {
+            return Err(rejected("Repair package file inventory does not match the installed release"));
+        }
+    }
+    unpack_payload_cancellable(source,directory,&manifest,cancel)?;
+    Ok(manifest)
+}
+
+fn unpack_payload_cancellable(source:&mut File,directory:&Path,manifest:&PackageManifest,cancel:&std::sync::atomic::AtomicBool)->Result<()> {
     // Caller creates a fresh UUID directory under its private install root. Never merge
     // package files into an existing tree; no links or archive-supplied permissions exist.
     if std::fs::read_dir(directory).map_err(storage_error)?.next().is_some(){return Err(rejected("Update staging directory is not empty"));}
@@ -97,7 +117,7 @@ pub fn unpack_cancellable(source:&mut File,directory:&Path,release:&ReleaseManif
     let mut tail=[0u8;1];if source.read(&mut tail).map_err(storage_error)?!=0{return Err(rejected("Package has unlisted trailing data"));}
     if manifest.platform=="linux-x86_64"{validate_linux_registration(directory)?;}
     for parent in created.into_iter().rev(){check_cancel(cancel)?;sync_directory(&parent)?;}sync_directory(directory)?;check_cancel(cancel)?;
-    Ok(manifest)
+    Ok(())
 }
 
 fn validate_linux_registration(directory:&Path)->Result<()> {

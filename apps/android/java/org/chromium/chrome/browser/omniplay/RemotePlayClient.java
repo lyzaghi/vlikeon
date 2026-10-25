@@ -125,8 +125,8 @@ public final class RemotePlayClient {
 
         long seq = mSequence.getAndIncrement();
         if (seq > 10_000_000) {
-            mSequence.set(1);
-            seq = 1;
+            stop();
+            return;
         }
 
         byte[] buffer = new byte[REPORT_SIZE];
@@ -137,10 +137,10 @@ public final class RemotePlayClient {
         bb.putShort((short) 0); // padding
         bb.putInt((int) seq);
         bb.putInt(mButtons);
-        bb.putShort(mLeftStickX);
-        bb.putShort(mLeftStickY);
-        bb.putShort(mRightStickX);
-        bb.putShort(mRightStickY);
+        bb.putShort(clampAxis(mLeftStickX));
+        bb.putShort(clampAxis(mLeftStickY));
+        bb.putShort(clampAxis(mRightStickX));
+        bb.putShort(clampAxis(mRightStickY));
         bb.put(mLeftTrigger);
         bb.put(mRightTrigger);
         bb.putShort((short) 0); // padding
@@ -148,6 +148,10 @@ public final class RemotePlayClient {
 
         mLastReportTimeMs = SystemClock.elapsedRealtime();
         mSink.sendReport(buffer);
+    }
+
+    private static short clampAxis(short val) {
+        return val < -32767 ? (short) -32767 : val;
     }
 
     private void sendNeutralReport() {
@@ -180,10 +184,10 @@ public final class RemotePlayClient {
     }
 
     public synchronized void updateSticks(short lx, short ly, short rx, short ry) {
-        mLeftStickX = lx;
-        mLeftStickY = ly;
-        mRightStickX = rx;
-        mRightStickY = ry;
+        mLeftStickX = clampAxis(lx);
+        mLeftStickY = clampAxis(ly);
+        mRightStickX = clampAxis(rx);
+        mRightStickY = clampAxis(ry);
         dispatchCurrentReport();
     }
 
@@ -237,10 +241,10 @@ public final class RemotePlayClient {
             float lt = event.getAxisValue(MotionEvent.AXIS_BRAKE);
             float rt = event.getAxisValue(MotionEvent.AXIS_GAS);
 
-            short lx = (short) Math.max(-32768, Math.min(32767, Math.round(x * 32767)));
-            short ly = (short) Math.max(-32768, Math.min(32767, Math.round(y * 32767)));
-            short rx = (short) Math.max(-32768, Math.min(32767, Math.round(z * 32767)));
-            short ry = (short) Math.max(-32768, Math.min(32767, Math.round(rz * 32767)));
+            short lx = (short) Math.max(-32767, Math.min(32767, Math.round(x * 32767)));
+            short ly = (short) Math.max(-32767, Math.min(32767, Math.round(y * 32767)));
+            short rx = (short) Math.max(-32767, Math.min(32767, Math.round(z * 32767)));
+            short ry = (short) Math.max(-32767, Math.min(32767, Math.round(rz * 32767)));
             byte leftTrig = (byte) Math.max(0, Math.min(255, Math.round(lt * 255)));
             byte rightTrig = (byte) Math.max(0, Math.min(255, Math.round(rt * 255)));
 

@@ -76,6 +76,14 @@ impl InstalledGames {
 
     pub fn is_running(&self,game_id:Uuid)->bool {self.running.values().any(|value|value.info.game_id==game_id)}
 
+    pub fn is_registered(database:&Database,game_id:Uuid)->Result<bool> {
+        database.connection.query_row(
+            "SELECT EXISTS(SELECT 1 FROM installed_games WHERE game_id=?1)",
+            [game_id.to_string()],
+            |row| row.get(0),
+        ).map_err(storage_error)
+    }
+
     #[cfg(windows)]
     pub fn stream_process(&mut self,database:&Database,game_id:Uuid)->Result<std::os::windows::io::OwnedHandle>{
         self.poll(database)?;

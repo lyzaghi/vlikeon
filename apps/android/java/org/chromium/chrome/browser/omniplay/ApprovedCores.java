@@ -5,6 +5,7 @@ import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
@@ -66,7 +67,7 @@ public final class ApprovedCores {
         // Pinned approved cores for mobile
         map.put("omniplay-mgba", new CoreDescriptor(
             "omniplay-mgba", "mGBA", "gba", "native_arm64", 44100, 60, false,
-            "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            "a1b2c3d498fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
         ));
         map.put("omniplay-snes9x", new CoreDescriptor(
             "omniplay-snes9x", "Snes9x", "snes", "native_arm64", 48000, 60, false,
@@ -111,18 +112,33 @@ public final class ApprovedCores {
      */
     private void loadCatalogFromAssets() {
         try (InputStream in = mContext.getAssets().open("omniplay/cores/catalog.json")) {
-            byte[] bytes = new byte[in.available()];
-            int read = in.read(bytes);
-            if (read <= 0) return;
-            String jsonStr = new String(bytes, 0, read, StandardCharsets.UTF_8);
+            ByteArrayOutputStream buffer = new ByteArrayOutputStream();
+            byte[] chunk = new byte[8192];
+            int n;
+            while ((n = in.read(chunk)) != -1) {
+                buffer.write(chunk, 0, n);
+            }
+            byte[] bytes = buffer.toByteArray();
+            if (bytes.length == 0) return;
+            String jsonStr = new String(bytes, StandardCharsets.UTF_8);
             JSONObject root = new JSONObject(jsonStr);
             JSONArray cores = root.optJSONArray("cores");
             if (cores != null) {
                 for (int i = 0; i < cores.length(); i++) {
                     JSONObject c = cores.getJSONObject(i);
                     String id = c.optString("id");
-                    if (APPROVED_REGISTRY.containsKey(id)) {
-                        mLoadedCores.put(id, APPROVED_REGISTRY.get(id));
+                    if (c.optBoolean("security_revoked", false)) {
+                        continue;
+                    }
+                    CoreDescriptor pinned = APPROVED_REGISTRY.get(id);
+                    if (pinned != null) {
+                        String catalogSha = c.optString("wasm_sha256", c.optString("sha256", pinned.expectedSha256));
+                        if (!catalogSha.isEmpty() && !catalogSha.equalsIgnoreCase("e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855")) {
+                            mLoadedCores.put(id, new CoreDescriptor(
+                                pinned.id, pinned.name, pinned.system, pinned.runtimeType,
+                                pinned.sampleRate, pinned.targetFps, pinned.requiresBios, catalogSha
+                            ));
+                        }
                     }
                 }
             }

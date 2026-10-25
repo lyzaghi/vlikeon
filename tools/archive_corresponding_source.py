@@ -14,7 +14,17 @@ import hashlib
 import json
 from pathlib import Path
 
+ROOT = Path(__file__).resolve().parents[1]
+
 COMPONENTS = [
+    {
+        "name": "omniplay-native-engines",
+        "version": "1.0.0-omniplay",
+        "license": "GPL-2.0-or-later AND MPL-2.0",
+        "source_dir": "engines/native",
+        "patches": ["browser/patches/0001-omniplay-browser.patch", "browser/patches/0002-omniplay-android.patch"],
+        "build_script": "tools/build_desktop_core.py",
+    },
     {
         "name": "bsnes",
         "version": "115-omniplay",
@@ -76,14 +86,61 @@ To compile, follow the instructions in BUILD.md.
         tar.addfile(readme_info, io_bytes(readme_content))
 
         for comp in COMPONENTS:
+            src_root = ROOT / comp["source_dir"]
+            archived_files = []
+            missing_paths = []
+
+            if src_root.exists() and src_root.is_dir():
+                for item in sorted(src_root.rglob("*")):
+                    if item.is_file() and not item.is_symlink():
+                        rel = item.relative_to(ROOT).as_posix()
+                        tar.add(item, arcname=rel, recursive=False)
+                        archived_files.append({
+                            "path": rel,
+                            "bytes": item.stat().st_size,
+                            "sha256": file_sha256(item),
+                        })
+            else:
+                missing_paths.append(comp["source_dir"])
+
+            for patch_rel in comp.get("patches", []):
+                patch_path = ROOT / patch_rel
+                if patch_path.is_file() and not patch_path.is_symlink():
+                    tar.add(patch_path, arcname=patch_rel, recursive=False)
+                    archived_files.append({
+                        "path": patch_rel,
+                        "bytes": patch_path.stat().st_size,
+                        "sha256": file_sha256(patch_path),
+                    })
+                else:
+                    missing_paths.append(patch_rel)
+
+            build_rel = comp.get("build_script")
+            if build_rel:
+                build_path = ROOT / build_rel
+                if build_path.is_file() and not build_path.is_symlink():
+                    tar.add(build_path, arcname=build_rel, recursive=False)
+                    archived_files.append({
+                        "path": build_rel,
+                        "bytes": build_path.stat().st_size,
+                        "sha256": file_sha256(build_path),
+                    })
+                else:
+                    missing_paths.append(build_rel)
+
+            source_included = len(archived_files) > 0 and len(missing_paths) == 0
             comp_record = {
                 "name": comp["name"],
                 "version": comp["version"],
                 "license": comp["license"],
-                "source_included": True,
+                "source_included": source_included,
+                "status": "archived" if source_included else "missing_upstream_checkout",
+                "archived_file_count": len(archived_files),
+                "files": archived_files,
+                "missing_paths": missing_paths,
             }
             manifest["components"].append(comp_record)
-            print(f"    Archiving component: {comp['name']} ({comp['version']})")
+            print(f"    Component: {comp['name']} ({comp['version']}) -> source_included={source_included} ({len(archived_files)} files)")
 
     archive_digest = file_sha256(archive_path)
     manifest["archive_sha256"] = archive_digest

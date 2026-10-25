@@ -339,7 +339,13 @@ impl RecoveryObserver for LinuxRecoveryObserver {
         })
     }
     fn presence(&mut self, _container: Uuid) -> journal::Presence {
-        journal::Presence::Absent
+        // Linux uinput virtual gamepads are owned by the open /dev/uinput descriptor
+        // and destroyed by the kernel only once the owning process has exited.
+        match self.process.exited(self.process.identity()) {
+            Ok(true) => journal::Presence::Absent,
+            Ok(false) => journal::Presence::Present,
+            Err(_) => journal::Presence::Unknown,
+        }
     }
 }
 

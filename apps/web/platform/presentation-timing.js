@@ -66,7 +66,7 @@ export class PresentationTimingCollector {
       render_timestamp_ns: renderNs,
       enqueue_timestamp_ns: renderNs,
       present_timestamp_ns: presentNs,
-      flip_timestamp_ns: flipTimestampNs || (presentNs + 1_000_000), // ~1ms compositor estimate
+      flip_timestamp_ns: flipTimestampNs !== undefined ? flipTimestampNs : null,
       dropped: false,
       drop_reason: null,
     };
@@ -127,6 +127,13 @@ export class PresentationTimingCollector {
     }
     jitters.sort((a, b) => a - b);
 
+    const flipRecords = validRecords.filter(
+      (r) => typeof r.flip_timestamp_ns === 'number' && r.flip_timestamp_ns >= r.present_timestamp_ns
+    );
+    const presentToFlipLatencies = flipRecords
+      .map((r) => (r.flip_timestamp_ns - r.present_timestamp_ns) / 1_000_000)
+      .sort((a, b) => a - b);
+
     return {
       session_id: sessionId,
       sample_at_ms: Date.now(),
@@ -139,8 +146,8 @@ export class PresentationTimingCollector {
       render_to_present_p50_ms: quantile(renderToPresentLatencies, 0.5),
       render_to_present_p95_ms: quantile(renderToPresentLatencies, 0.95),
       render_to_present_p99_ms: quantile(renderToPresentLatencies, 0.99),
-      present_to_flip_p50_ms: 1.0,
-      present_to_flip_p95_ms: 2.0,
+      present_to_flip_p50_ms: presentToFlipLatencies.length > 0 ? quantile(presentToFlipLatencies, 0.5) : null,
+      present_to_flip_p95_ms: presentToFlipLatencies.length > 0 ? quantile(presentToFlipLatencies, 0.95) : null,
       jitter_p95_ms: quantile(jitters, 0.95),
       audio_dac_starvations: this.#dacStarvations,
     };

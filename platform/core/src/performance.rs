@@ -5,8 +5,17 @@ use std::io::Write;
 use uuid::Uuid;
 
 pub struct PerformanceRuns<'a>{database:&'a mut Database}
+pub struct ReadonlyPerformanceRuns<'a>{database:&'a Database}
+impl<'a> ReadonlyPerformanceRuns<'a> {
+    pub fn list(&self,game_id:Uuid)->Result<Vec<PerformanceRunSummary>> {
+        let mut query=self.database.connection.prepare("SELECT summary_json FROM performance_runs WHERE game_id=?1 ORDER BY created_at_ms DESC LIMIT 20").map_err(storage_error)?;
+        let rows=query.query_map([game_id.to_string()],|r|r.get::<_,String>(0)).map_err(storage_error)?;
+        rows.map(|r|serde_json::from_str(&r.map_err(storage_error)?).map_err(|_|PlatformError::new(ErrorCode::CorruptData,"Performance summary is invalid"))).collect()
+    }
+}
 impl<'a> PerformanceRuns<'a> {
     pub fn new(database:&'a mut Database)->Self{Self{database}}
+    pub fn new_readonly(database:&'a Database)->ReadonlyPerformanceRuns<'a>{ReadonlyPerformanceRuns{database}}
     pub fn commit(&mut self,input:PerformanceRunInput)->Result<PerformanceRunSummary> {
         self.commit_from(input,"web_worker_performance_clock")
     }

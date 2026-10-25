@@ -23,35 +23,38 @@ FIXTURES = {
         "source": "qa/windows/storage-probe.cpp",
         "output": "out/qualification/windows-storage/storage-probe.exe",
         "flags": ["/nologo", "/std:c++20", "/EHsc", "/W4", "/WX", "/MT", "/O2", "/guard:cf", "/DUNICODE", "/D_UNICODE"],
-        "libs": ["advapi32.lib", "userenv.lib", "windowsapp.lib"],
+        "libs": ["advapi32.lib", "userenv.lib", "ole32.lib"],
     },
     "storage_readonly": {
         "env_var": "OMNIPLAY_WINDOWS_READONLY_STORAGE_PROBE",
         "source": "qa/windows/storage-probe.cpp",
         "output": "out/qualification/windows-storage/storage-probe-readonly.exe",
         "flags": ["/nologo", "/std:c++20", "/EHsc", "/W4", "/WX", "/MT", "/O2", "/guard:cf", "/DUNICODE", "/D_UNICODE", "/DOMNIPLAY_EXPECT_SCRATCH_DENIED"],
-        "libs": ["advapi32.lib", "userenv.lib", "windowsapp.lib"],
+        "libs": ["advapi32.lib", "userenv.lib", "ole32.lib"],
     },
     "loader_diagnostic": {
-        "env_var": "OMNIPLAY_WINDOWS_LOADER_DIAGNOSTIC_PROBE",
-        "source": "qa/windows/loader-diagnostic-probe.cpp",
+        "env_var": "OMNIPLAY_WINDOWS_LOADER_PROBE",
+        "source": "qa/windows/loader-probe.cpp",
         "output": "out/qualification/windows-storage/loader-probe.exe",
         "flags": ["/nologo", "/std:c++20", "/EHsc", "/W4", "/WX", "/MT", "/O2", "/guard:cf", "/DUNICODE", "/D_UNICODE"],
-        "libs": ["advapi32.lib", "userenv.lib"],
+        "libs": ["kernel32.lib"],
     },
     "presentation_fixture": {
         "env_var": "OMNIPLAY_WINDOWS_PRESENTATION_FIXTURE",
         "source": "qa/windows/presentation-fixture.cpp",
         "output": "out/qualification/windows-presentation/omniplay-presentation-fixture.exe",
-        "flags": ["/nologo", "/std:c++20", "/EHsc", "/W4", "/WX", "/MT", "/O2", "/guard:cf", "/DUNICODE", "/D_UNICODE"],
-        "libs": ["user32.lib", "d3d11.lib", "dxgi.lib"],
+        "flags": ["/nologo", "/std:c++20", "/EHsc", "/W4", "/WX", "/MT", "/O2", "/guard:cf", "/DUNICODE", "/D_UNICODE", "/Iengines/native/presentation/src"],
+        "libs": ["kernel32.lib"],
     },
 }
 
 def compile_fixtures(msvc_available: bool = False):
     print("[+] Preparing Windows Sandbox Fixtures...")
-    out_dir = Path("out/qualification/windows-storage")
-    out_dir.mkdir(parents=True, exist_ok=True)
+    for spec in FIXTURES.values():
+        Path(spec["output"]).parent.mkdir(parents=True, exist_ok=True)
+        src_path = Path(spec["source"])
+        if not src_path.is_file():
+            raise FileNotFoundError(f"Missing fixture source file: {src_path}")
 
     if not msvc_available:
         print("    [Deferred] MSVC compiler 'cl.exe' deferred; printing build commands:")
@@ -62,8 +65,26 @@ def compile_fixtures(msvc_available: bool = False):
             cmd = f"cl {flags_str} {spec['source']} /Fe:{spec['output']} /link /DYNAMICBASE /HIGHENTROPYVA /NXCOMPAT /GUARD:CF {libs_str}"
             print(f"  {cmd}")
             print(f"  $env:{spec['env_var']} = (Resolve-Path '{spec['output']}').Path")
+        print("\n# Device-free worker & core environment variables:")
+        print("  $env:OMNIPLAY_WINDOWS_DEVICE_FREE_WORKER = (Resolve-Path 'out/qualification/windows-presentation/omniplay-native-worker.exe').Path")
+        print("  $env:OMNIPLAY_WINDOWS_DEVICE_FREE_CORE = (Resolve-Path 'out/qualification/windows-presentation/omniplay-lifecycle-fixture.dll').Path")
     else:
         print("[+] MSVC cl.exe detected; compiling fixtures...")
+        for name, spec in FIXTURES.items():
+            cmd = [
+                "cl",
+                *spec["flags"],
+                spec["source"],
+                f"/Fe:{spec['output']}",
+                "/link",
+                "/DYNAMICBASE",
+                "/HIGHENTROPYVA",
+                "/NXCOMPAT",
+                "/GUARD:CF",
+                *spec["libs"],
+            ]
+            subprocess.run(cmd, check=True)
+            os.environ[spec["env_var"]] = str(Path(spec["output"]).resolve())
 
 def test_execution_commands():
     print("\n=== Windows Fixture Execution Commands ===")

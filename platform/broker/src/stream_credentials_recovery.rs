@@ -1,159 +1,152 @@
 //! Broker pairing credentials crash reconciliation and revocation orchestrator.
 //! Reconciles SQLite credential journal with native PairingSecretStore after crash or restart.
-//! Enforces immediate producer fencing upon revocation and ensures no cleanup debt is dropped.
+//! Delegates step-by-step transitions through `omniplay_core::stream_credential_recovery::advance`
+//! with a concrete `NativeRecoveryOwner`, ensuring no cleanup debt is dropped.
 
-use omniplay_contracts::{ErrorCode, PlatformError, Result};
+use omniplay_contracts::Result;
 use omniplay_core::{
     now_ms, Database,
+    stream_credential_lease::CredentialLease,
+    stream_credential_recovery::{
+        self, NativeRecoveryOwner, Retirement, StepOutcome,
+    },
     stream_credentials::{
-        self, CleanupObservation, CredentialLease, Journal, RecoveryAction, RecoveryStep,
+        self, Journal, Record, RecoveryStep,
     },
 };
 use omniplay_streaming::native_credentials::{CredentialAddress, PairingSecretStore};
-use std::time::Instant;
+use std::time::{Duration, Instant};
 use uuid::Uuid;
 
-fn unavailable() -> PlatformError {
-    PlatformError::new(
-        ErrorCode::RuntimeUnavailable,
-        "Credential recovery is unavailable or vault locked",
-    )
+/// Broker-owned recovery witness that confirms local writer/session containment.
+pub struct BrokerCredentialRecoveryOwner {
+    profile: Uuid,
+    device: Uuid,
+    writer_contained: bool,
+    local_sessions_contained: bool,
+    relay_confirmed: bool,
 }
 
-/// Orchestrates post-crash and startup reconciliation for pairing credentials.
+impl BrokerCredentialRecoveryOwner {
+    pub fn new(
+        profile: Uuid,
+        device: Uuid,
+        writer_contained: bool,
+        local_sessions_contained: bool,
+        relay_confirmed: bool,
+    ) -> Self {
+        Self {
+            profile,
+            device,
+            writer_contained,
+            local_sessions_contained,
+            relay_confirmed,
+        }
+    }
+}
+
+impl NativeRecoveryOwner for BrokerCredentialRecoveryOwner {
+    fn check_exclusive(&mut self, profile: Uuid, device: Uuid) -> Result<()> {
+        if self.profile != profile || self.device != device {
+            return Err(omniplay_contracts::PlatformError::new(
+                omniplay_contracts::ErrorCode::PermissionDenied,
+                "Credential recovery owner does not match the active profile/device",
+            ));
+        }
+        Ok(())
+    }
+
+    fn retire_writer(&mut self, _record: &Record, _deadline: Instant) -> Result<Retirement> {
+        Ok(if self.writer_contained {
+            Retirement::Confirmed
+        } else {
+            Retirement::Pending
+        })
+    }
+
+    fn retire_local(&mut self, _record: &Record, _deadline: Instant) -> Result<Retirement> {
+        Ok(if self.local_sessions_contained {
+            Retirement::Confirmed
+        } else {
+            Retirement::Pending
+        })
+    }
+
+    fn revoke_relay(&mut self, _record: &Record, _deadline: Instant) -> Result<Retirement> {
+        Ok(if self.relay_confirmed {
+            Retirement::Confirmed
+        } else {
+            Retirement::Pending
+        })
+    }
+}
+
+/// Orchestrates post-crash and startup reconciliation for pairing credentials
+/// by executing bounded recovery steps via `stream_credential_recovery::advance`.
 pub fn reconcile_credentials_after_crash(
     database: &Database,
     profile: Uuid,
     store: &dyn PairingSecretStore,
     lease: &CredentialLease,
+    owner: &mut dyn NativeRecoveryOwner,
+    deadline: Instant,
 ) -> Result<Journal> {
-    let mut journal = stream_credentials::load_scoped(database, lease, profile)?;
-    let now = now_ms();
-    let plan = journal.recovery_plan(now)?;
+    // At most 32 bounded state transitions per reconciliation pass
+    for _ in 0..32 {
+        let journal = stream_credentials::load_scoped(database, lease, profile)?;
+        let now = now_ms();
+        let plan = journal.recovery_plan(now)?;
+        let Some(action) = plan.into_iter().find(|a| {
+            !matches!(
+                a.step(),
+                RecoveryStep::RevalidateBeforeUse | RecoveryStep::WaitForPairCleanup
+            )
+        }) else {
+            return Ok(journal);
+        };
 
-    for action in plan {
-        let address = action.address();
-        match action.step() {
-            RecoveryStep::RetireWriter => {
-                // Writer has halted due to crash/restart
-                journal = stream_credentials::observe_cleanup(
-                    database,
-                    lease,
-                    profile,
-                    journal.revision(),
-                    address,
-                    CleanupObservation::WriterRetired,
-                )?;
-            }
-            RecoveryStep::RemoveMaterial => {
-                // Remove secret from native vault and verify absence
-                let _ = store.remove(&address);
-                if store.read(&address)?.is_none() {
-                    journal = stream_credentials::observe_cleanup(
-                        database,
-                        lease,
-                        profile,
-                        journal.revision(),
-                        address,
-                        CleanupObservation::MaterialAbsent,
-                    )?;
-                }
-            }
-            RecoveryStep::RevokeRelay => {
-                // For pairs with relay reservations, note relay retirement
-                journal = stream_credentials::observe_cleanup(
-                    database,
-                    lease,
-                    profile,
-                    journal.revision(),
-                    address,
-                    CleanupObservation::RelayRetired,
-                )?;
-            }
-            RecoveryStep::RetireLocalSession => {
-                // Local active streaming sessions are torn down on crash
-                journal = stream_credentials::observe_cleanup(
-                    database,
-                    lease,
-                    profile,
-                    journal.revision(),
-                    address,
-                    CleanupObservation::LocalRetired,
-                )?;
-            }
-            RecoveryStep::FinalizeRetirement => {
-                journal = stream_credentials::finalize_retirement(
-                    database,
-                    lease,
-                    profile,
-                    journal.revision(),
-                    address,
-                )?;
+        let outcome = stream_credential_recovery::advance(
+            database,
+            lease,
+            profile,
+            action.address(),
+            journal.revision(),
+            store,
+            owner,
+            now,
+            deadline,
+        )?;
+        match outcome {
+            StepOutcome::Committed { .. } => continue,
+            StepOutcome::Pending
+            | StepOutcome::RevalidationRequired
+            | StepOutcome::AlreadyRetired => {
+                return stream_credentials::load_scoped(database, lease, profile);
             }
         }
     }
 
-    Ok(journal)
+    stream_credentials::load_scoped(database, lease, profile)
 }
 
-/// Atomically revokes an active credential generation, fencing producers/consumers.
+/// Atomically fences an active credential generation and advances local cleanup steps.
 pub fn revoke_credential(
     database: &Database,
     profile: Uuid,
     store: &dyn PairingSecretStore,
     lease: &CredentialLease,
     address: CredentialAddress,
+    owner: &mut dyn NativeRecoveryOwner,
 ) -> Result<Journal> {
-    let mut journal = stream_credentials::load_scoped(database, lease, profile)?;
-    
-    // Step 1: Transition to Revoking state in SQLite journal
-    journal = stream_credentials::revoke(database, lease, profile, journal.revision(), address)?;
-
-    // Step 2: Remove secret material from native vault
-    let _ = store.remove(&address);
-    if store.read(&address)?.is_none() {
-        journal = stream_credentials::observe_cleanup(
-            database,
-            lease,
-            profile,
-            journal.revision(),
-            address,
-            CleanupObservation::MaterialAbsent,
-        )?;
-    }
-
-    // Step 3: Observe writer and local session retirement
-    journal = stream_credentials::observe_cleanup(
+    let deadline = Instant::now() + Duration::from_secs(10);
+    let journal = stream_credentials::load_scoped(database, lease, profile)?;
+    let _ = stream_credential_recovery::revoke_active(
         database,
         lease,
         profile,
-        journal.revision(),
         address,
-        CleanupObservation::WriterRetired,
-    )?;
-    journal = stream_credentials::observe_cleanup(
-        database,
-        lease,
-        profile,
         journal.revision(),
-        address,
-        CleanupObservation::LocalRetired,
+        deadline,
     )?;
-
-    // Step 4: Finalize retirement if all conditions are satisfied
-    let plan = journal.recovery_plan(now_ms())?;
-    for action in plan {
-        if action.address() == address && matches!(action.step(), RecoveryStep::FinalizeRetirement) {
-            journal = stream_credentials::finalize_retirement(
-                database,
-                lease,
-                profile,
-                journal.revision(),
-                address,
-            )?;
-            break;
-        }
-    }
-
-    Ok(journal)
+    reconcile_credentials_after_crash(database, profile, store, lease, owner, deadline)
 }

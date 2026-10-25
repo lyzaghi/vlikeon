@@ -241,6 +241,7 @@ fn thread_handle(thread:&JoinHandle<()>)->Result<OwnedHandle>{
     if unsafe{DuplicateHandle(current,thread.as_raw_handle(),current,&mut handle,THREAD_TERMINATE|THREAD_SYNCHRONIZE,0,0)}==0||handle.is_null()||handle==INVALID_HANDLE_VALUE{return Err(failure());}
     Ok(unsafe{OwnedHandle::from_raw_handle(handle)})
 }
+#[cfg(windows)]
 impl VideoWorker{
     pub fn spawn(executable:&Path,artifact:File,sha256:ContentHash,owner:VideoOwner,target:ProcessWitness,remaining:Duration)->Result<(Self,VideoAuthorityLease)>{
         Self::spawn_mode(executable,artifact,sha256,owner,Some(target),remaining,None,Vec::new(),false)
@@ -407,8 +408,10 @@ impl VideoWorker{
         if !self.threads.is_empty()||self.join_failed||Instant::now()>=deadline{return Err(failure());}result
     }
 }
+#[cfg(windows)]
 impl Drop for VideoWorker{fn drop(&mut self){let _=self.close();}}
 
+#[cfg(windows)]
 fn exchange(input:&mut File,output:&mut File,shared:&Shared,id:&mut u64,kind:u16,payload:&[u8],timeout:Duration)->Result<(u16,Vec<u8>)>{
     if !shared.transport_live()||*id>=10_000_000||payload.len()>3_110_409{return Err(failure());}
     *id+=1;*shared.pending.lock().map_err(|_|failure())?=Some(Instant::now()+timeout);
@@ -431,6 +434,7 @@ fn exchange(input:&mut File,output:&mut File,shared:&Shared,id:&mut u64,kind:u16
     if reply_kind==0x8000&&(bytes.len()<4||bytes[3]&0x80!=0){return Err(failure());}
     Ok((reply_kind,bytes))
 }
+#[cfg(windows)]
 fn io_loop(mut input:File,mut output:File,shared:Arc<Shared>,receiver:mpsc::Receiver<Call>){
     let run=(||->Result<()>{
         let mut id=0;let mut configured=false;let mut last_poll=Instant::now();let mut first_input=true;

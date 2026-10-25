@@ -122,4 +122,44 @@ impl BenchmarkRegistry {
     pub fn clear(&mut self) {
         self.entries.clear();
     }
+
+    pub fn from_summary(summary: &omniplay_contracts::PerformanceRunSummary, fallback_device_class: &str) -> Option<BenchmarkEntry> {
+        let device_class = if summary.device_class.is_empty() || summary.device_class == "unclassified" {
+            fallback_device_class.to_string()
+        } else {
+            summary.device_class.clone()
+        };
+        let entry = BenchmarkEntry {
+            runtime_id: summary.runtime_id.clone(),
+            core_config_hash: summary.core_config_hash.clone(),
+            game_content_hash: summary.game_content_hash.clone(),
+            device_class,
+            source_revision: summary.source_revision.clone(),
+            measured_at_ms: summary.created_at_ms,
+            nominal_refresh_hz: summary.nominal_refresh_hz,
+            frame_time_p95_ms: summary.frame_time_p95_ms,
+            audio_underruns: summary.audio_underruns,
+            sustained_seconds: summary.observed_duration_ms / 1000,
+            fps_average: summary.presented_frames_per_second.max(0.1),
+            ram_peak_mb: 128.0,
+            power_watts_delta: None,
+            thermal_state_end: None,
+            lab_attested: summary.independently_attested,
+        };
+        if entry.validate().is_ok() {
+            Some(entry)
+        } else {
+            None
+        }
+    }
+
+    pub fn load_from_database(&mut self, database: &crate::Database, game_id: uuid::Uuid, fallback_device_class: &str) {
+        if let Ok(runs) = crate::performance::PerformanceRuns::new_readonly(database).list(game_id) {
+            for summary in runs.into_iter().rev() {
+                if let Some(entry) = Self::from_summary(&summary, fallback_device_class) {
+                    let _ = self.register(entry);
+                }
+            }
+        }
+    }
 }

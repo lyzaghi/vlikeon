@@ -14,12 +14,17 @@ Features:
 
 import os
 import sys
+import json
+import hashlib
 import argparse
 import platform
 import subprocess
 import shutil
 from pathlib import Path
 from typing import Optional, List, Dict
+
+ROOT = Path(__file__).resolve().parents[2]
+RECEIPT_NAME = ".omniplay-install-receipt.json"
 
 EULA_TEXT = """================================================================================
                            OMNIPLAY LICENSE AGREEMENT
@@ -116,30 +121,101 @@ class InstallerWizard:
         print(f"[+] Target Installation Directory: {self.install_dir}")
         print(f"[+] User Data Directory:         {self.data_dir}")
 
-        # Step 4: Create target directories
+        # Step 4: Create target directories and stage real files atomically
         self.install_dir.mkdir(parents=True, exist_ok=True)
         self.data_dir.mkdir(parents=True, exist_ok=True)
+        for subdir in ("Saves", "NativeExports", "Logs"):
+            (self.data_dir / subdir).mkdir(parents=True, exist_ok=True)
 
-        # Step 5: Simulate file extraction & progress
-        print("[+] Extracting core application binaries...")
-        for step in [25, 50, 75, 100]:
-            print(f"    Progress: {step}% complete")
+        # Step 5: Copy available packaged artifacts and write EULA + install receipt
+        print("[+] Installing application files and manifests...")
+        installed_files = self._stage_application_files()
+        eula_path = self.install_dir / "LICENSE-EULA.txt"
+        eula_path.write_text(EULA_TEXT, encoding="utf-8")
+        installed_files.append("LICENSE-EULA.txt")
 
         # Step 6: Create Desktop Integration
-        self._create_integration()
+        integration_files = self._create_integration()
+        installed_files.extend(integration_files)
 
-        print("[+] Installation completed successfully!")
+        receipt = {
+            "schema_version": 1,
+            "os": self.os_type,
+            "install_dir": str(self.install_dir.resolve()),
+            "data_dir": str(self.data_dir.resolve()),
+            "eula_accepted": True,
+            "installed_files": sorted(set(installed_files)),
+        }
+        (self.install_dir / RECEIPT_NAME).write_text(
+            json.dumps(receipt, indent=2, sort_keys=True) + "\n",
+            encoding="utf-8",
+        )
+
+        print(f"[+] Installation completed successfully ({len(installed_files)} items recorded in receipt)!")
         return True
 
-    def _create_integration(self):
+    def _stage_application_files(self) -> List[str]:
+        staged: List[str] = []
+        bin_dir = self.install_dir / "bin"
+        bin_dir.mkdir(parents=True, exist_ok=True)
+
+        # Copy built release binaries if present in target/release
+        release_dir = ROOT / "target" / "release"
+        exe_suffix = ".exe" if self.os_type == "windows" else ""
+        for binary_name in ("omniplay-broker", "omniplay-local-service", "omniplay-updater"):
+            candidate = release_dir / f"{binary_name}{exe_suffix}"
+            if candidate.is_file() and not candidate.is_symlink():
+                dest = bin_dir / candidate.name
+                shutil.copy2(candidate, dest)
+                staged.append(dest.relative_to(self.install_dir).as_posix())
+
+        # Copy uninstaller script so installed product can self-uninstall
+        uninstaller_src = ROOT / "tools" / "installer" / "uninstaller.py"
+        if uninstaller_src.is_file():
+            dest = bin_dir / "uninstaller.py"
+            shutil.copy2(uninstaller_src, dest)
+            staged.append(dest.relative_to(self.install_dir).as_posix())
+
+        return staged
+
+    def _create_integration(self) -> List[str]:
+        created: List[str] = []
+        meta_dir = self.install_dir / "integration"
+        meta_dir.mkdir(parents=True, exist_ok=True)
+
         if self.os_type == "windows":
-            print("[+] Registering Windows URL protocol: omniplay://")
-            print("[+] Adding Windows Start Menu and Desktop shortcuts")
+            protocol_reg = meta_dir / "omniplay-protocol.reg"
+            protocol_reg.write_text(
+                "Windows Registry Editor Version 5.00\n\n"
+                "[HKEY_CURRENT_USER\\Software\\Classes\\omniplay]\n"
+                "@=\"URL:OmniPlay Protocol\"\n"
+                "\"URL Protocol\"=\"\"\n",
+                encoding="utf-8",
+            )
+            created.append(protocol_reg.relative_to(self.install_dir).as_posix())
+            print(f"[+] Prepared Windows protocol registration at {protocol_reg}")
         elif self.os_type == "linux":
-            print("[+] Creating XDG Desktop Entry at ~/.local/share/applications/omniplay.desktop")
-            print("[+] Registering MIME types and URL scheme handler")
+            desktop_src = ROOT / "packaging" / "linux" / "omniplay.desktop"
+            desktop_dst = meta_dir / "omniplay.desktop"
+            if desktop_src.is_file():
+                shutil.copy2(desktop_src, desktop_dst)
+            else:
+                desktop_dst.write_text(
+                    "[Desktop Entry]\nType=Application\nName=OmniPlay\nExec=omniplay\n Categories=Game;\n",
+                    encoding="utf-8",
+                )
+            created.append(desktop_dst.relative_to(self.install_dir).as_posix())
+            print(f"[+] Installed XDG Desktop Entry at {desktop_dst}")
         elif self.os_type == "darwin":
-            print("[+] Registering macOS URL scheme and LaunchServices handler")
+            plist_dst = meta_dir / "org.omniplay.protocol.plist"
+            plist_dst.write_text(
+                "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
+                "<plist version=\"1.0\"><dict><key>CFBundleURLName</key><string>org.omniplay.url</string></dict></plist>\n",
+                encoding="utf-8",
+            )
+            created.append(plist_dst.relative_to(self.install_dir).as_posix())
+            print(f"[+] Installed macOS protocol descriptor at {plist_dst}")
+        return created
 
 
 def main():

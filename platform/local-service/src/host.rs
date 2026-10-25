@@ -623,10 +623,16 @@ impl LocalHost {
                     .map(|j|j.records().iter().any(|r|r.phase()==omniplay_core::stream_credentials::Phase::Active&&r.expires_at_ms().map_or(true,|exp|exp>now)))
                     .unwrap_or(false);
                 let device_class=if device.touch{"mobile-arm64".to_string()}else{format!("{}-{}",std::env::consts::OS,std::env::consts::ARCH)};
+                let mut bench_registry = omniplay_core::benchmark_registry::BenchmarkRegistry::new();
+                bench_registry.load_from_database(&self.database, game_id, &device_class);
                 for c in &mut candidates{
                     if c.kind==RuntimeKind::Remote&&paired_host_available{c.available=true;c.distribution_approved=true;}
                     else if c.kind!=RuntimeKind::WebWasm{c.available=false;}
-                    c.benchmark=None;
+                    c.benchmark = if c.available {
+                        bench_registry.lookup(&c.id, &game.content_hash, &device_class, now).map(|b| b.to_runtime_benchmark())
+                    } else {
+                        None
+                    };
                 }
                 encode(router::rank(&game,&device,&candidates,&RoutingPolicy{native_allowed:false,remote_allowed:paired_host_available,paired_host_available,device_class},now)?)
             }

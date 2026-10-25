@@ -19,6 +19,7 @@ pub struct PruneSummary {
 }
 
 pub fn sweep_staging(store: &Store, max_age_seconds: u64) -> Result<SweepSummary> {
+    let _lock = store.lock()?;
     let staging_dir = store.root.join("staging");
     if !staging_dir.exists() {
         return Ok(SweepSummary {

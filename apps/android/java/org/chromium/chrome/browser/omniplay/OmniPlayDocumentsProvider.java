@@ -157,14 +157,33 @@ public final class OmniPlayDocumentsProvider extends DocumentsProvider {
         if (documentId == null || documentId.contains("..")) {
             throw new FileNotFoundException("Invalid document ID");
         }
+        final File allowedDir;
+        final String name;
         if (documentId.startsWith("saves/")) {
-            String name = documentId.substring("saves/".length());
-            return new File(new File(mBaseDir, "Saves"), name);
+            allowedDir = new File(mBaseDir, "Saves");
+            name = documentId.substring("saves/".length());
         } else if (documentId.startsWith("exports/")) {
-            String name = documentId.substring("exports/".length());
-            return new File(new File(mBaseDir, "NativeExports"), name);
+            allowedDir = new File(mBaseDir, "NativeExports");
+            name = documentId.substring("exports/".length());
+        } else {
+            throw new FileNotFoundException("Unrecognized document: " + documentId);
         }
-        throw new FileNotFoundException("Unrecognized document: " + documentId);
+
+        if (name.isEmpty() || name.startsWith(".") || name.contains("/") || name.contains("\\")) {
+            throw new FileNotFoundException("Rejected unsafe document filename: " + documentId);
+        }
+
+        File target = new File(allowedDir, name);
+        try {
+            String canonicalAllowed = allowedDir.getCanonicalPath() + File.separator;
+            String canonicalTarget = target.getCanonicalPath();
+            if (!canonicalTarget.startsWith(canonicalAllowed)) {
+                throw new FileNotFoundException("Document escaped sandbox boundary: " + documentId);
+            }
+        } catch (IOException e) {
+            throw new FileNotFoundException("Failed to canonicalize document path: " + documentId);
+        }
+        return target;
     }
 
     @Override

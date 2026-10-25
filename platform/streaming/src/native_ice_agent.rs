@@ -215,18 +215,23 @@ impl IceAgent {
         Ok(packet)
     }
 
-    /// Verifies an incoming STUN Binding Response and processes nomination.
+    /// Verifies an incoming STUN Binding Response (including RFC 5389 MESSAGE-INTEGRITY)
+    /// and processes nomination.
     pub fn handle_binding_response(
         &mut self,
         datagram: &[u8],
         expected_tx_id: &[u8; 12],
         pair_index: usize,
     ) -> Result<()> {
-        if self.retired || datagram.len() < 20 {
+        if self.retired || datagram.len() < 44 {
             return Err(denied());
         }
         let msg_type = u16::from_be_bytes(datagram[0..2].try_into().map_err(|_| denied())?);
         if msg_type != BINDING_RESPONSE {
+            return Err(denied());
+        }
+        let msg_len = u16::from_be_bytes(datagram[2..4].try_into().map_err(|_| denied())?) as usize;
+        if datagram.len() < 20 + msg_len || (msg_len % 4) != 0 {
             return Err(denied());
         }
         let magic = u32::from_be_bytes(datagram[4..8].try_into().map_err(|_| denied())?);
@@ -234,6 +239,45 @@ impl IceAgent {
             return Err(denied());
         }
         if &datagram[8..20] != expected_tx_id {
+            return Err(denied());
+        }
+
+        // Locate ATTR_MESSAGE_INTEGRITY (0x0008, length 20) in STUN attributes
+        let mut offset = 20usize;
+        let end = 20 + msg_len;
+        let mut integrity_attr_offset: Option<usize> = None;
+
+        while offset + 4 <= end {
+            let attr_type = u16::from_be_bytes(datagram[offset..offset + 2].try_into().map_err(|_| denied())?);
+            let attr_len = u16::from_be_bytes(datagram[offset + 2..offset + 4].try_into().map_err(|_| denied())?) as usize;
+            let padded_len = (attr_len + 3) & !3;
+            if offset + 4 + padded_len > end {
+                return Err(denied());
+            }
+            if attr_type == ATTR_MESSAGE_INTEGRITY {
+                if attr_len != 20 {
+                    return Err(denied());
+                }
+                integrity_attr_offset = Some(offset);
+                break;
+            }
+            offset += 4 + padded_len;
+        }
+
+        let mi_offset = integrity_attr_offset.ok_or_else(denied)?;
+        let received_mac = &datagram[mi_offset + 4..mi_offset + 24];
+
+        // Per RFC 5389 section 15.4, adjusted STUN header length includes up to the end of MESSAGE-INTEGRITY (mi_offset - 20 + 24)
+        let adjusted_len = ((mi_offset - 20) + 24) as u16;
+        let mut signed_input = Vec::with_capacity(mi_offset);
+        signed_input.extend_from_slice(&datagram[0..2]);
+        signed_input.extend_from_slice(&adjusted_len.to_be_bytes());
+        signed_input.extend_from_slice(&datagram[4..mi_offset]);
+
+        use ring::{constant_time::verify_slices_are_equal, hmac};
+        let s_key = hmac::Key::new(hmac::HMAC_SHA1_FOR_LEGACY_USE_ONLY, self.ice_password.as_bytes());
+        let expected_mac = hmac::sign(&s_key, &signed_input);
+        if verify_slices_are_equal(received_mac, expected_mac.as_ref()).is_err() {
             return Err(denied());
         }
 

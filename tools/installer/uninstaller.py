@@ -91,14 +91,19 @@ class Uninstaller:
         else:
             print("[!] Policy: REMOVE ALL (deleting user saves, profile database, and configurations).")
 
-        # Step 3: Remove binaries and version directories
+        # Step 3: Remove binaries and version directories after verifying receipt
+        receipt_path = self.install_dir / ".omniplay-install-receipt.json"
         if self.install_dir.exists():
+            if not receipt_path.is_file() and not self.force:
+                print(f"[-] Refusing to delete {self.install_dir} without .omniplay-install-receipt.json (use --force to override).")
+                return False
             print(f"[+] Removing application binaries from {self.install_dir}...")
             try:
                 shutil.rmtree(self.install_dir)
                 print("[+] Application binaries successfully removed.")
             except Exception as e:
-                print(f"[!] Warning removing install directory: {e}")
+                print(f"[-] Failed removing install directory: {e}")
+                return False
         else:
             print(f"[*] Install directory {self.install_dir} not present.")
 
@@ -110,7 +115,8 @@ class Uninstaller:
                     shutil.rmtree(self.data_dir)
                     print("[+] User data successfully wiped.")
                 except Exception as e:
-                    print(f"[!] Warning removing data directory: {e}")
+                    print(f"[-] Failed removing data directory: {e}")
+                    return False
 
         # Step 5: Platform-specific cleanup
         self._cleanup_system_integrations()
@@ -119,15 +125,12 @@ class Uninstaller:
         return True
 
     def _cleanup_system_integrations(self):
-        if self.os_type == "windows":
-            print("[+] Cleaning Windows Registry: HKCU\\Software\\OmniPlay")
-            print("[+] Cleaning Windows Registry: HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\OmniPlay")
-            print("[+] Removing Desktop and Start Menu shortcuts")
-        elif self.os_type == "linux":
-            print("[+] Removing systemd user units: omniplay-native-host.service / .socket")
-            print("[+] Removing XDG desktop entry: ~/.local/share/applications/omniplay.desktop")
-        elif self.os_type == "darwin":
-            print("[+] Unregistering macOS LaunchServices protocol handler")
+        if self.os_type == "linux":
+            xdg_data = Path(os.environ.get("XDG_DATA_HOME", str(Path.home() / ".local" / "share")))
+            desktop_entry = xdg_data / "applications" / "omniplay.desktop"
+            if desktop_entry.is_file():
+                desktop_entry.unlink()
+                print(f"[+] Removed XDG desktop entry: {desktop_entry}")
 
 
 def main():

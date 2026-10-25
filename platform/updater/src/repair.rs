@@ -26,10 +26,8 @@ pub fn repair_release(
     if cancel.load(Ordering::Relaxed) {
         return Err(PlatformError::new(ErrorCode::Cancelled, "Repair was cancelled"));
     }
-    let release = store.verify_release_files(id).or_else(|_| {
-        store.releases()?.into_iter().find(|r| r.id == id).ok_or_else(|| {
-            PlatformError::new(ErrorCode::NotFound, "Release to repair was not found")
-        })
+    let release = store.releases()?.into_iter().find(|r| r.id == id).ok_or_else(|| {
+        PlatformError::new(ErrorCode::NotFound, "Release to repair was not found")
     })?;
 
     let version_dir = store.version_directory(id);
@@ -52,8 +50,12 @@ pub fn repair_release(
             corrupted.push(file.path.clone());
             continue;
         }
-        if let Ok(h) = hash_file(&file_path) {
-            if h != file.sha256 {
+        if let Ok(mut opened) = File::open(&file_path) {
+            if let Ok((h, bytes)) = hash_file(&mut opened, file.bytes) {
+                if h != file.sha256 || bytes != file.bytes {
+                    corrupted.push(file.path.clone());
+                }
+            } else {
                 corrupted.push(file.path.clone());
             }
         } else {
@@ -62,6 +64,7 @@ pub fn repair_release(
     }
 
     if corrupted.is_empty() {
+        store.verify_installed(&release, true)?;
         return Ok(RepairReport {
             release_id: id,
             inspected_files: inspected,
@@ -76,20 +79,25 @@ pub fn repair_release(
     }
 
     let mut pkg_file = File::open(package_path).map_err(storage_error)?;
-    let pkg_manifest = package::read_manifest(&mut pkg_file)?;
-    if pkg_manifest.version != release.manifest.version {
-        return Err(rejected("Source package version does not match installed release version"));
+    let staging_dir = store.root.join("staging").join(format!("repair-{}", Uuid::new_v4()));
+    if let Some(parent) = staging_dir.parent() {
+        std::fs::create_dir_all(parent).map_err(storage_error)?;
     }
+    std::fs::create_dir(&staging_dir).map_err(storage_error)?;
 
-    let temp_dir = tempfile::tempdir().map_err(storage_error)?;
-    let _unpacked_manifest = package::unpack_cancellable(&mut pkg_file, temp_dir.path(), &release.manifest, cancel)?;
+    let unpack_res = package::unpack_matching_manifest(&mut pkg_file, &staging_dir, &release.manifest, cancel);
+    if let Err(err) = unpack_res {
+        let _ = std::fs::remove_dir_all(&staging_dir);
+        return Err(err);
+    }
 
     let mut repaired = Vec::new();
     for rel_path in &corrupted {
         if cancel.load(Ordering::Relaxed) {
+            let _ = std::fs::remove_dir_all(&staging_dir);
             return Err(PlatformError::new(ErrorCode::Cancelled, "Repair was cancelled"));
         }
-        let src = temp_dir.path().join(rel_path);
+        let src = staging_dir.join(rel_path);
         let dst = version_dir.join(rel_path);
         if let Some(parent) = dst.parent() {
             std::fs::create_dir_all(parent).map_err(storage_error)?;
@@ -98,6 +106,7 @@ pub fn repair_release(
         repaired.push(rel_path.clone());
     }
 
+    let _ = std::fs::remove_dir_all(&staging_dir);
     store.verify_installed(&release, true)?;
 
     Ok(RepairReport {
