@@ -47,5 +47,14 @@ offline dependencies outside a core directory, installation/update/recovery UX,
 quota/memory/performance behavior and remaining browser/device compatibility.
 Existing runtime/core/storage/account obligations retain their own scope.
 Final acceptance must include corrupt cache offline/online, duplicate fetches,
-parallel resources, partial quota failures, cancellation and closed clients,
+parallel resources, parallel resources, partial quota failures, cancellation and closed clients,
 worker termination, update coexistence, slow hashes and actual offline launches.
+
+## Offline Dependencies, PWA Lifecycle, Quota & Browser Compatibility (Batch 05)
+
+Source implementation added covering items 73–76:
+- `apps/web/platform/web-gamepad.js` & `audio-resampler.js` (Item 73): W3C Gamepad API bridge with 64-byte `StreamGamepadReport` serialization, 250ms gap check, neutral report fences; Float32 linear/cubic audio resampler for Web Audio API.
+- `apps/web/platform/pwa-install.js` (Item 74): `beforeinstallprompt` and `appinstalled` event handling; non-intrusive service worker updates (never interrupts running game sessions); `recoverCache()` for clean cache re-synchronization on detected corruption.
+- `apps/web/platform/quota-manager.js` (Item 75): `StorageManager` API integration, persistent storage grant requests, low-storage warning thresholds (80% / 100 MiB reserve), chunked streaming SHA-256 verification.
+- `qa/web_pwa_qualification.py` & `docs/WEB_PWA_QUALIFICATION.md` (Item 76): Automated test harness and cross-browser qualification matrix (`WAITING_PERMISSION_OR_RESOURCE`).
+
