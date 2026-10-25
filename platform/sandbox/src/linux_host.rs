@@ -56,11 +56,26 @@ fn host_values(policy:HostPolicy)->Result<Vec<(&'static CStr,String)>>{
     let descendants=u64::from(policy.maximum_profiles)*(1+2*u64::from(policy.profile.maximum_sessions));
     Ok(vec![(c"memory.max",total.to_string()),(c"memory.swap.max","0".into()),(c"memory.oom.group","1".into()),(c"pids.max",(u64::from(policy.maximum_profiles)*u64::from(policy.profile.maximum_sessions)*128).to_string()),(c"cpu.max",format!("{} 100000",u32::from(policy.cpu_cores)*100000)),(c"cgroup.max.depth","2".into()),(c"cgroup.max.descendants",descendants.to_string())])
 }
+fn profile_active(directory:&File)->Result<bool>{
+    Ok(!text(directory,c"cgroup.procs")?.is_empty()||field(&text(directory,c"cgroup.events")?,"populated")?!=0||text(directory,c"pids.current")?!="0\n"||field(&text(directory,c"cgroup.stat")?,"nr_descendants")?!=0||field(&text(directory,c"cgroup.stat")?,"nr_dying_descendants")?!=0)
+}
+fn active_profile_admissible(directory:&File,policy:DelegationPolicy)->Result<()>{
+    // Never mutate or reset cgroup knobs around live/dying children. Verify that
+    // the active profile tree still obeys fundamental containment bounds.
+    controllers(directory,c"cgroup.subtree_control")?;
+    if text(directory,c"memory.swap.max")?!="0\n"||text(directory,c"memory.oom.group")?!="1\n"||text(directory,c"cgroup.max.depth")?!="1\n"{return Err(unavailable());}
+    let mem_raw=text(directory,c"memory.max")?;let mem:u64=mem_raw.strip_suffix('\n').ok_or_else(unavailable)?.parse().map_err(|_|unavailable())?;
+    if mem<512*1024*1024||mem>policy.maximum_reserved_bytes{return Err(unavailable());}
+    Ok(())
+}
 fn profile_limits(directory:&File,policy:DelegationPolicy,cpu:u8,fresh:bool)->Result<()>{
     metadata(directory,true)?;
     if text(directory,c"cgroup.type")?!="domain\n"||!text(directory,c"cgroup.procs")?.is_empty()||text(directory,c"cgroup.freeze")?!="0\n"||field(&text(directory,c"cgroup.events")?,"frozen")?!=0{return Err(unavailable());}
     let values=[(c"memory.max",policy.maximum_reserved_bytes.to_string()),(c"memory.swap.max","0".into()),(c"memory.oom.group","1".into()),(c"pids.max",(u64::from(policy.maximum_sessions)*128).to_string()),(c"cpu.max",format!("{} 100000",u32::from(cpu)*100000)),(c"cgroup.max.depth","1".into()),(c"cgroup.max.descendants",(u64::from(policy.maximum_sessions)*2).to_string())];
     let exact=values.iter().all(|(name,value)|text(directory,name).is_ok_and(|raw|raw==format!("{value}\n")))&&controllers(directory,c"cgroup.subtree_control").is_ok();
+    if !fresh&&!exact&&profile_active(directory)?{
+        return active_profile_admissible(directory,policy);
+    }
     if fresh||!exact{empty_new(directory)?;for(name,value)in &values{set(directory,name,value)?;}controllers(directory,c"cgroup.controllers")?;entry(directory,c"cgroup.subtree_control",true)?.write_all(b"+cpu +memory +pids").map_err(|_|unavailable())?;}
     for(name,value)in values{if text(directory,name)?!=format!("{value}\n"){return Err(unavailable());}}controllers(directory,c"cgroup.subtree_control")
 }

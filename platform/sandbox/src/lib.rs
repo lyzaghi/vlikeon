@@ -11,6 +11,7 @@ pub mod linux_plan;
 #[cfg(all(target_os="linux",target_arch="x86_64"))]pub mod linux_host_channel;
 #[cfg(all(target_os="linux",target_arch="x86_64"))]pub mod linux_elf;
 #[cfg(all(target_os="linux",target_arch="x86_64"))]pub mod linux_images;
+#[cfg(all(target_os="linux",target_arch="x86_64"))]pub mod linux_quota;
 #[cfg(all(target_os="linux",target_arch="x86_64",target_env="gnu"))]pub mod linux_launch;
 #[cfg(all(target_os="linux",target_arch="x86_64",target_env="gnu"))]pub mod linux_presentation;
 
@@ -76,6 +77,18 @@ pub fn enforce_windows_session_write_quotas(profile_root:&Path,work_dir:&Path,al
     }
     #[cfg(not(windows))]{
         let _=(profile_root,work_dir,allow_legacy_os_writes);
+        Ok(())
+    }
+}
+
+pub fn enforce_linux_session_physical_quotas(profile_root:&Path,work_dir:&Path)->Result<()>{
+    #[cfg(all(target_os="linux",target_arch="x86_64"))]{
+        linux_quota::enforce_work_physical_quotas(work_dir)?;
+        linux_quota::enforce_profile_physical_quota(profile_root)?;
+        Ok(())
+    }
+    #[cfg(not(all(target_os="linux",target_arch="x86_64")))]{
+        let _=(profile_root,work_dir);
         Ok(())
     }
 }
