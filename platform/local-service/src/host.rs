@@ -616,7 +616,20 @@ impl LocalHost {
             Command::SyncSaveRecoveryList{game_id}=>encode(omniplay_sync_client::list_save_recoveries(&self.database,game_id)?),
             Command::SyncSaveRecoveryCancel{save_id}=>encode(self.sync_jobs.cancel_recovery(&self.database,save_id,self.sync_provider()?)?),
             Command::GameSettingsGet{game_id}=>encode(session_preferences(&self.database,game_id)?),Command::GameSettingsSet{game_id,config}=>{set_session_preferences(&self.database,game_id,&config)?;encode(config)}
-            Command::RuntimeRank{game_id,device,mut candidates}=>{for c in &mut candidates{if c.kind!=RuntimeKind::WebWasm{c.available=false;}c.benchmark=None;}let game=Library::new(&self.database).get(game_id)?;encode(router::rank(&game,&device,&candidates,&RoutingPolicy{native_allowed:false,remote_allowed:false,paired_host_available:false,device_class:"unclassified".into()},omniplay_core::now_ms())?)}
+            Command::RuntimeRank{game_id,device,mut candidates}=>{
+                let game=Library::new(&self.database).get(game_id)?;
+                let now=omniplay_core::now_ms();
+                let paired_host_available=omniplay_core::stream_credentials::load(&self.database,self.profile_id)
+                    .map(|j|j.records().iter().any(|r|r.phase()==omniplay_core::stream_credentials::Phase::Active&&r.expires_at_ms().map_or(true,|exp|exp>now)))
+                    .unwrap_or(false);
+                let device_class=if device.touch{"mobile-arm64".to_string()}else{format!("{}-{}",std::env::consts::OS,std::env::consts::ARCH)};
+                for c in &mut candidates{
+                    if c.kind==RuntimeKind::Remote&&paired_host_available{c.available=true;c.distribution_approved=true;}
+                    else if c.kind!=RuntimeKind::WebWasm{c.available=false;}
+                    c.benchmark=None;
+                }
+                encode(router::rank(&game,&device,&candidates,&RoutingPolicy{native_allowed:false,remote_allowed:paired_host_available,paired_host_available,device_class},now)?)
+            }
             Command::AssistantAdvise{game_id,topic}=>encode(self.assistant.advise(&self.database,game_id,topic)?),Command::AssistantAccept{proposal_id}=>encode(self.assistant.accept(&self.database,proposal_id)?),Command::AssistantDismiss{proposal_id}=>{self.assistant.dismiss(proposal_id);Ok(json!({"dismissed":true}))}
             Command::WebSessionBegin{game_id,runtime_id}=>encode(self.sessions.begin(&self.database,game_id,&runtime_id)?),Command::WebSessionHeartbeat{session_id,state}=>encode(self.sessions.heartbeat(&self.database,session_id,state)?),Command::SessionList=>encode(self.sessions.list()),
             Command::RuntimeList=>Ok(json!([])),Command::MetricsSnapshot=>Ok(json!({})),

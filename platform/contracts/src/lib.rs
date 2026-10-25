@@ -14,6 +14,7 @@ pub mod input;
 pub mod core_options;
 pub mod sync_actions;
 pub mod native_work;
+pub mod presentation_timing;
 
 pub use errors::{ErrorCode, PlatformError, Result};
 pub use game::*;
@@ -29,6 +30,7 @@ pub use input::*;
 pub use core_options::*;
 pub use sync_actions::*;
 pub use native_work::*;
+pub use presentation_timing::*;
 
 pub const PROTOCOL_MAJOR: u16 = 1;
 pub const PROTOCOL_MINOR: u16 = 0;

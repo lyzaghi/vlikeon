@@ -35,6 +35,7 @@ pub mod save_backup;
 pub mod library_recovery;
 pub mod save_orphan_recovery;
 pub mod manual_recovery;
+pub mod benchmark_registry;
 
 #[cfg(test)]
 mod backup_recovery_tests;

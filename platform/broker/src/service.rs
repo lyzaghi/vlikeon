@@ -34,6 +34,7 @@ pub struct Broker {
     device_probe:omniplay_device_info::DeviceProbe,
     native_work_jobs:crate::native_work_jobs::NativeWorkJobs,
     asset_ranges:std::sync::Arc<omniplay_local_service::asset_ranges::AssetRanges>,
+    benchmark_registry:omniplay_core::benchmark_registry::BenchmarkRegistry,
 }
 
 impl Broker {
@@ -62,6 +63,7 @@ impl Broker {
             gamepad_recovery:crate::stream_gamepad_recovery::RecoveryLane::default(),
             device_probe:omniplay_device_info::DeviceProbe::default(),
             native_work_jobs:crate::native_work_jobs::NativeWorkJobs::default(),
+            benchmark_registry:omniplay_core::benchmark_registry::BenchmarkRegistry::default(),
         };
         // The system-owned first pass has no renderer capability. It shares the
         // same single worker/collector lease with later explicit user passes.
@@ -340,12 +342,68 @@ impl Broker {
             Command::GameSettingsGet{game_id}=>encode(omniplay_core::assistance::session_preferences(&self.database,game_id)?),
             Command::GameSettingsSet{game_id,config}=>{omniplay_core::assistance::set_session_preferences(&self.database,game_id,&config)?;encode(config)}
             Command::RuntimeRank{game_id,device,mut candidates}=>{
-                // Candidates supplied by the privileged component are advisory only.
-                // Execution still requires the independent runtime registry. Do not
-                // endorse uninstalled native or remote paths based on renderer claims.
-                for candidate in &mut candidates{if candidate.kind!=RuntimeKind::WebWasm{candidate.available=false;}candidate.benchmark=None;}
                 let game=Library::new(&self.database).get(game_id)?;
-                encode(omniplay_core::router::rank(&game,&device,&candidates,&omniplay_core::router::RoutingPolicy{native_allowed:false,remote_allowed:false,paired_host_available:false,device_class:"unclassified".into()},omniplay_core::now_ms())?)
+                let now = omniplay_core::now_ms();
+                let installed_manifests = self.runtimes.list();
+                let paired_host_available = omniplay_core::stream_credentials::load(&self.database, self.profile_id)
+                    .map(|j| j.records().iter().any(|r| r.phase() == omniplay_core::stream_credentials::Phase::Active && r.expires_at_ms().map_or(true, |exp| exp > now)))
+                    .unwrap_or(false);
+                let native_allowed = !cfg!(target_arch = "wasm32");
+                let remote_allowed = true;
+                let device_class = if device.memory_mb.is_some_and(|m| m >= 8192) && device.webgpu {
+                    "desktop-x86_64-dedicated-gpu".to_string()
+                } else if device.touch {
+                    "mobile-arm64".to_string()
+                } else {
+                    format!("{}-{}", std::env::consts::OS, std::env::consts::ARCH)
+                };
+
+                for candidate in &mut candidates {
+                    match candidate.kind {
+                        RuntimeKind::WebWasm => {
+                            if !device.wasm {
+                                candidate.available = false;
+                            }
+                        }
+                        RuntimeKind::NativeEmulator => {
+                            if let Some(installed) = installed_manifests.iter().find(|m| m.id == candidate.id) {
+                                if installed.systems.contains(&game.system) {
+                                    candidate.available = true;
+                                    candidate.distribution_approved = true;
+                                } else {
+                                    candidate.available = false;
+                                }
+                            } else {
+                                candidate.available = false;
+                            }
+                        }
+                        RuntimeKind::Remote => {
+                            if paired_host_available && remote_allowed {
+                                candidate.available = true;
+                                candidate.distribution_approved = true;
+                            } else {
+                                candidate.available = false;
+                            }
+                        }
+                        RuntimeKind::InstalledGame => {
+                            let installed_list = self.installed.list(&self.database).unwrap_or_default();
+                            candidate.available = installed_list.iter().any(|entry| entry.game_id == game_id);
+                        }
+                    }
+                    if candidate.available {
+                        if let Some(bench) = self.benchmark_registry.lookup(&candidate.id, &game.content_hash, &device_class, now) {
+                            candidate.benchmark = Some(bench.to_runtime_benchmark());
+                        }
+                    }
+                }
+
+                let policy = omniplay_core::router::RoutingPolicy {
+                    native_allowed,
+                    remote_allowed,
+                    paired_host_available,
+                    device_class,
+                };
+                encode(omniplay_core::router::rank(&game, &device, &candidates, &policy, now)?)
             }
             Command::AssistantAdvise{game_id,topic}=>encode(self.assistant.advise(&self.database,game_id,topic)?),
             Command::AssistantAccept{proposal_id}=>encode(self.assistant.accept(&self.database,proposal_id)?),
