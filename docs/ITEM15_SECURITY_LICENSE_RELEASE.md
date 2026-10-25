@@ -69,3 +69,16 @@ Reproduce the synthetic gate cases with `python -B qa/release/test_release_inven
 Author a fresh locked-source review inventory with
 `python -B tools/inventory_locked_dependencies.py --lock Cargo.lock --output <new-file>`.
 The latter command does not run a vulnerability database or license audit.
+
+## Batch 09 authored source (Items 96–104)
+
+- **Third-Party License Ledger (`docs/THIRD_PARTY_LICENSES.md`)**: Full provenance ledger covering libretro cores (mGBA, Beetle PSX, bsnes, SameBoy, PPSSPP), codecs (OpenH264, libvpx, Opus), dependencies (SQLite, rusqlite, ring, tokio), fonts, and firmware.
+- **Corresponding Source Archival (`tools/archive_corresponding_source.py`, `docs/CORRESPONDING_SOURCE.md`)**: Automated packaging of copyleft source trees and adaptation patches (bsnes IPL removal) for GPL/MPL compliance.
+- **Automated SPDX 2.3 SBOM Generator (`tools/generate_sbom.py`)**: Produces standardized `dist/omniplay-sbom.spdx.json` containing 333 packages with SHA-256 checksums and relationship links.
+- **Security Advisory & CVE Auditor (`tools/audit_security_advisories.py`, `docs/SECURITY_CVE_AUDIT.md`)**: Audits dependency freshness, resolves historical CVEs, and monitors Chromium security milestone baseline.
+- **Production Trust Root Specification (`security/release-identity.example.json`, `docs/PRODUCTION_TRUST_ROOT.md`)**: Specifies 3-of-5 Ed25519 offline threshold key ceremony and HTTPS deployment without embedding private keys in the repository.
+- **Platform Code Signing Configuration (`docs/PLATFORM_SIGNING_CONFIG.md`)**: Recipes for Windows Authenticode, macOS Notarization, Android Play Signing, iOS Distribution, and Linux GPG repositories.
+- **App Store Privacy & Export Declarations (`docs/APP_STORE_PRIVACY_COMPLIANCE.md`)**: Apple Nutrition Labels, Google Play Data Safety, EAR ECCN 5D002 open-source encryption exemption.
+- **Security Policy & Vulnerability Intake (`SECURITY.md`)**: Operational intake at `security@vlikeon.vn`, 48h initial ack SLA, 5-day triage, and 90-day coordinated disclosure policy.
+- **Independent Security Audit Plan (`docs/INDEPENDENT_SECURITY_AUDIT.md`)**: 4-part audit scope (Sandbox Containment, DTLS/SRTP & Sync Crypto, Update Verification, IPC Broker) and deferred qualification queue.
+- **Automated Qualification Suite (`qa/security_license_qualification.py`)**: Passed 6/6 tests cleanly.

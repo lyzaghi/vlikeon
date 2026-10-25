@@ -1,0 +1,29 @@
+{
+  "schema_version": 1,
+  "service_name": "OmniPlay Production Update Service",
+  "channel": "stable",
+  "metadata_url": "https://updates.vlikeon.vn/v1/stable/metadata.json",
+  "package_base_url": "https://cdn.vlikeon.vn/releases/",
+  "tls": {
+    "minimum_version": "TLSv1.3",
+    "pinned_spki_hashes": [
+      "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
+    ]
+  },
+  "root_threshold": {
+    "algorithm": "ed25519",
+    "threshold": 3,
+    "total_keys": 5,
+    "key_holders": [
+      {"id": "vlikeon-release-key-01", "public_key": "1111111111111111111111111111111111111111111111111111111111111111"},
+      {"id": "vlikeon-release-key-02", "public_key": "2222222222222222222222222222222222222222222222222222222222222222"},
+      {"id": "vlikeon-release-key-03", "public_key": "3333333333333333333333333333333333333333333333333333333333333333"},
+      {"id": "vlikeon-release-key-04", "public_key": "4444444444444444444444444444444444444444444444444444444444444444"},
+      {"id": "vlikeon-release-key-05", "public_key": "5555555555555555555555555555555555555555555555555555555555555555"}
+    ]
+  },
+  "rotation_policy": {
+    "max_root_age_days": 365,
+    "re_signing_period_days": 30
+  }
+}
