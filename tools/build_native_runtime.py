@@ -8,7 +8,7 @@ import re
 import shutil
 import subprocess
 from web_core_options_policy import validate_policy
-from windows_actor_imports import require_device_free_imports
+from windows_actor_imports import require_device_free_imports, verify_windows_isolated_deployment
 
 ROOT = Path(__file__).resolve().parents[1]
 PINS = {"sdl3": "829a65d769d935c4852f8159e964312c0957260a",
@@ -173,6 +173,7 @@ def main():
     helpers=list(build.rglob('omniplay-presentation-host.exe'))if brokered else []
     if brokered and len(helpers)!=1:raise ValueError('A single private presentation helper executable was not produced')
     for helper in helpers:require_x64_pe(helper)
+    isolated_deployment=verify_windows_isolated_deployment(workers[0],library,helpers[0] if helpers else None,args.support_library)
     output.mkdir(parents=True)
     for source in [workers[0], library,*helpers,*args.support_library]:
         if source.is_symlink() or not source.is_file() or (output/source.name).exists():
@@ -270,6 +271,7 @@ def main():
         "presentation_source":str(ROOT/"engines/presentation"),"presentation_protocol":2,"default_presentation_mode":"direct","selected_presentation_mode":args.presentation_mode,
         "windows_actor_kind":"device_free_software" if brokered else "desktop_sdl",
         "windows_actor_static_imports":actor_imports,
+        "isolated_deployment_imports":isolated_deployment,
         "compiled_first_party_sources":compiled_sources,"worker_sha256":hashlib.sha256(workers[0].read_bytes()).hexdigest(),"presentation_sha256":hashlib.sha256(helpers[0].read_bytes()).hexdigest()if helpers else None,
         "dependencies": PINS, "build_recipe": str(Path(__file__).resolve()),
         "core_dependency_sources":receipt.get("dependency_sources",{}),"core_source_lock":receipt.get("source_lock"),

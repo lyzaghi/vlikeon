@@ -91,3 +91,64 @@ def require_device_free_imports(path: Path):
     if any(name in DESKTOP_DLLS or name.startswith(('sdl', 'xinput', 'd3d', 'xaudio')) for name in names):
         raise ValueError('Device-free actor statically imports a desktop/device DLL')
     return names
+
+
+SYSTEM32_CORE_ALLOWLIST = frozenset({
+    'kernel32.dll', 'kernelbase.dll', 'ntdll.dll', 'msvcrt.dll',
+    'vcruntime140.dll', 'vcruntime140_1.dll', 'msvcp140.dll',
+    'ucrtbase.dll', 'advapi32.dll', 'bcryptprimitives.dll', 'bcrypt.dll',
+})
+
+HELPER_SYSTEM32_ALLOWLIST = SYSTEM32_CORE_ALLOWLIST | DESKTOP_DLLS | frozenset({
+    'cfgmgr32.dll', 'version.dll', 'dwmapi.dll', 'uxtheme.dll',
+    'hid.dll', 'avrt.dll', 'mmdevapi.dll', 'powrprof.dll', 'wtsapi32.dll',
+})
+
+
+def verify_windows_isolated_deployment(
+    worker_path: Path,
+    core_dll_path: Path,
+    helper_path: Path | None = None,
+    support_dlls: list[Path] | None = None,
+) -> dict[str, object]:
+    """Verify dependency closure and isolation between the AppContainer core worker and presentation host."""
+    support_list = list(support_dlls or [])
+    packaged_dll_names = {core_dll_path.name.lower()} | {p.name.lower() for p in support_list}
+
+    worker_imports = require_device_free_imports(worker_path) if helper_path is not None else pe_imports(worker_path)
+    core_imports = require_device_free_imports(core_dll_path) if helper_path is not None else pe_imports(core_dll_path)
+
+    unresolved_core_deps = [
+        dll for dll in core_imports
+        if dll not in SYSTEM32_CORE_ALLOWLIST
+        and not dll.startswith('api-ms-win-')
+        and dll not in packaged_dll_names
+        and (helper_path is not None or dll not in DESKTOP_DLLS)
+    ]
+    if unresolved_core_deps:
+        raise ValueError(f'Core DLL imports unpackaged non-System32 dependencies: {unresolved_core_deps}')
+
+    support_imports: dict[str, list[str]] = {}
+    for support_dll in support_list:
+        imp = require_device_free_imports(support_dll) if helper_path is not None else pe_imports(support_dll)
+        support_imports[support_dll.name.lower()] = imp
+
+    helper_imports: list[str] = []
+    if helper_path is not None:
+        helper_imports = pe_imports(helper_path)
+        if core_dll_path.name.lower() in helper_imports:
+            raise ValueError('Presentation helper must never import the emulator core DLL')
+        disallowed_helper = [
+            dll for dll in helper_imports
+            if dll not in HELPER_SYSTEM32_ALLOWLIST and not dll.startswith('api-ms-win-')
+        ]
+        if disallowed_helper:
+            raise ValueError(f'Presentation helper imports unapproved DLLs: {disallowed_helper}')
+
+    return {
+        'mode': 'brokered_rgba' if helper_path is not None else 'direct',
+        'worker_imports': worker_imports,
+        'core_imports': core_imports,
+        'support_imports': support_imports,
+        'helper_imports': helper_imports,
+    }

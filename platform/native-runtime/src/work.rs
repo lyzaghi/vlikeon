@@ -231,6 +231,121 @@ pub fn collect_one(profile:&Path,profile_id:Uuid,work:&Path)->Result<()>{
     reclaim(profile,profile_id,work)
 }
 
+#[derive(Clone,Debug,Default,Serialize,Deserialize,PartialEq,Eq)]
+#[serde(deny_unknown_fields)]
+pub struct LegacyQuarantineReceipt {
+    pub schema_version:u32,
+    pub profile_id:Uuid,
+    pub work_id:Uuid,
+    pub windows_creation_protocol:u32,
+    pub preserved_files:u32,
+    pub preserved_bytes:u64,
+    pub quarantine_directory:String,
+}
+
+#[cfg(windows)]
+pub fn quarantine_unowned_windows_work(profile:&Path,profile_id:Uuid,id:Uuid)->Result<LegacyQuarantineReceipt>{
+    use std::os::windows::fs::OpenOptionsExt;
+    if profile_id.is_nil()||id.is_nil(){return Err(storage_error("legacy quarantine identity is invalid"));}
+    let _collector=recovery_lease(profile)?;
+    let _creator=creation_guard(profile)?;
+    let database=omniplay_core::Database::open(profile)?;
+    if omniplay_core::native_work_storage::macos_journal(&database,profile_id,id)?.is_some(){
+        return Err(PlatformError::new(ErrorCode::UnsupportedCapability,"macOS native work requires its own recovery path"));
+    }
+    let reservation=omniplay_core::native_work_storage::windows_recovery_reservation(&database,profile_id,id)?
+        .ok_or_else(||storage_error("legacy quarantine requires an owned reservation row"))?;
+    let work=profile.join("native-work").join(id.to_string());
+    let mut reason=RetainedReason::Unconfirmed;
+    if reclaim_reported(profile,profile_id,&work,&mut reason).is_ok(){
+        return Ok(LegacyQuarantineReceipt{
+            schema_version:1,
+            profile_id,
+            work_id:id,
+            windows_creation_protocol:reservation.windows_creation_protocol,
+            preserved_files:0,
+            preserved_bytes:0,
+            quarantine_directory:String::new(),
+        });
+    }
+    if !matches!(reason,RetainedReason::LegacyOwnership|RetainedReason::IncompleteOwnership){
+        return Err(storage_error("work is not eligible for legacy/incomplete ownership quarantine"));
+    }
+    let quarantine_root=profile.join("manual-recovery-staging");
+    if !ordinary(&quarantine_root,true)?{
+        fs::create_dir_all(&quarantine_root).map_err(storage_error)?;
+    }
+    let dest_dir=quarantine_root.join(id.to_string());
+    if !ordinary(&dest_dir,true)?{
+        fs::create_dir(&dest_dir).map_err(storage_error)?;
+    }
+    let mut preserved_files=0u32;
+    let mut preserved_bytes=0u64;
+    let mut lease_guard=None;
+    if ordinary(&work,true)?{
+        let (root,_)=confined(profile,&work)?;
+        if root.join("linux-work-owned.json").try_exists().map_err(storage_error)?||root.join("linux-work-intent.json").try_exists().map_err(storage_error)?{
+            return Err(PlatformError::new(ErrorCode::UnsupportedCapability,"Linux native work requires its own recovery path"));
+        }
+        if ordinary(&root.join("owner.lease"),false)?{
+            lease_guard=Some(OpenOptions::new().read(true).write(true).share_mode(0).open(root.join("owner.lease")).map_err(storage_error)?);
+        }
+        for proc_file in ["container-process.json","presentation-process.json"]{
+            let p=root.join(proc_file);
+            if p.try_exists().map_err(storage_error)?{
+                let observed:Worker=read(&p)?;
+                if observed.schema_version!=1||observed.work_id!=id||observed.process_id==0||observed.creation_time==0{
+                    return Err(storage_error("recorded process identity is invalid"));
+                }
+                omniplay_sandbox::confirmed_process_ended(omniplay_sandbox::ProcessIdentity{process_id:observed.process_id,creation_time:observed.creation_time})?;
+            }
+        }
+        let mut stack=vec![(root.clone(),dest_dir.clone(),0u8)];
+        while let Some((src_cur,dst_cur,depth))=stack.pop(){
+            if depth>8{return Err(storage_error("legacy quarantine depth exceeds bound"));}
+            for entry in fs::read_dir(&src_cur).map_err(storage_error)?{
+                let entry=entry.map_err(storage_error)?;
+                let name=entry.file_name();
+                let Some(name_str)=name.to_str()else{continue};
+                if name_str=="owner.lease"{continue;}
+                let src_path=entry.path();
+                let dst_path=dst_cur.join(&name);
+                let meta=fs::symlink_metadata(&src_path).map_err(storage_error)?;
+                if meta.is_dir(){
+                    ordinary(&src_path,true)?;
+                    if !ordinary(&dst_path,true)?{fs::create_dir(&dst_path).map_err(storage_error)?;}
+                    stack.push((src_path,dst_path,depth+1));
+                }else{
+                    ordinary(&src_path,false)?;
+                    preserved_files=preserved_files.checked_add(1).ok_or_else(||storage_error("quarantine file count overflow"))?;
+                    if preserved_files>256{return Err(storage_error("quarantine file count exceeds bound"));}
+                    preserved_bytes=preserved_bytes.checked_add(meta.len()).ok_or_else(||storage_error("quarantine byte overflow"))?;
+                    if preserved_bytes>256*1024*1024{return Err(storage_error("quarantine bytes exceed bound"));}
+                    fs::copy(&src_path,&dst_path).map_err(storage_error)?;
+                }
+            }
+        }
+    }
+    let receipt=LegacyQuarantineReceipt{
+        schema_version:1,
+        profile_id,
+        work_id:id,
+        windows_creation_protocol:reservation.windows_creation_protocol,
+        preserved_files,
+        preserved_bytes,
+        quarantine_directory:format!("manual-recovery-staging/{id}"),
+    };
+    record(&dest_dir,"legacy-quarantine-receipt.json",&receipt)?;
+    omniplay_core::native_work_storage::retiring(&database,profile_id,id)?;
+    omniplay_core::native_work_storage::require_retiring(&database,profile_id,id)?;
+    let ret_dir=recovery_directory(profile)?;
+    record(&ret_dir,&format!("{id}.json"),&Retirement{schema_version:1,profile_id,work_id:id,retirement_confirmed:true})?;
+    drop(lease_guard);
+    drop(_creator);
+    resume_retirement(profile,profile_id,id)?;
+    Ok(receipt)
+}
+
 #[cfg(all(test,windows))]
 #[path="work_windows_tests.rs"]
 mod windows_tests;

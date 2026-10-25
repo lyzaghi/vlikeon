@@ -138,3 +138,26 @@ fn recovery_keeps_other_platform_and_invalid_owner_data_distinct(){
     for work in[linux_work,damaged_work]{assert_eq!(fs::read(work.join("game.bin")).unwrap(),b"test-game");}
     assert_eq!(case.works(),2);
 }
+
+#[test]
+fn quarantine_unowned_windows_work_preserves_originals_and_releases_legacy_debt(){
+    let case=Case::new();let legacy=Uuid::new_v4();let incomplete=Uuid::new_v4();
+    case.reserve(legacy,true);let legacy_work=case.partial(legacy);
+    fs::create_dir_all(legacy_work.join("save")).unwrap();
+    fs::write(legacy_work.join("save").join("battery.srm"),b"user-save-data").unwrap();
+
+    case.reserve(incomplete,false);let inc_work=case.partial(incomplete);
+    creation_intent(&inc_work,case.profile,incomplete).unwrap();
+
+    let receipt1=quarantine_unowned_windows_work(&case.root,case.profile,legacy).unwrap();
+    assert_eq!(receipt1.windows_creation_protocol,0);
+    assert_eq!(receipt1.preserved_files,2);
+    assert!(!legacy_work.exists());
+    assert_eq!(fs::read(case.root.join("manual-recovery-staging").join(legacy.to_string()).join("save").join("battery.srm")).unwrap(),b"user-save-data");
+
+    let receipt2=quarantine_unowned_windows_work(&case.root,case.profile,incomplete).unwrap();
+    assert_eq!(receipt2.windows_creation_protocol,1);
+    assert_eq!(receipt2.preserved_files,2);
+    assert!(!inc_work.exists());
+    assert_eq!(case.works(),0);
+}

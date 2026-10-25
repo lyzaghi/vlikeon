@@ -155,13 +155,14 @@ impl RuntimeAdapter for NativeAdapter {
         if !discs.supported{self.package.manifest.capabilities.remove(&Capability::DiscControl);}
         let window=self.call("status",json!({}),Vec::new(),5)?;
         if window.result["close_requested"].as_bool()==Some(true){return Err(PlatformError::new(ErrorCode::Cancelled,"The native game window was closed during preparation"));}
+        omniplay_sandbox::enforce_windows_session_write_quotas(&self.profile_root,&work,legacy_os_writes)?;
         self.prepared=true;Ok(())
     }
     fn start(&mut self)->Result<()>{if let Some(presentation)=&self.presentation{presentation.activate()?;}self.call("start",json!({}),Vec::new(),5).map(|_|())}
     fn pause(&mut self)->Result<()>{self.call("pause",json!({}),Vec::new(),5).map(|_|())}
     fn resume(&mut self)->Result<()>{if let Some(presentation)=&self.presentation{presentation.activate()?;}self.call("resume",json!({}),Vec::new(),5).map(|_|())}
     fn stop(&mut self)->Result<()>{let result=if self.process.as_ref().is_some_and(|p|!p.has_exited()){self.call("stop",json!({}),Vec::new(),3).map(|_|())}else{Ok(())};self.cleanup();result}
-    fn save(&mut self,kind:SaveKind)->Result<Vec<u8>>{self.call("save",json!({"kind":kind}),Vec::new(),30).map(|r|r.payload)}
+    fn save(&mut self,kind:SaveKind)->Result<Vec<u8>>{if let Some(work)=&self.work{omniplay_sandbox::enforce_windows_session_write_quotas(&self.profile_root,work,self.package.legacy_os_writes())?;}self.call("save",json!({"kind":kind}),Vec::new(),30).map(|r|r.payload)}
     fn load(&mut self,kind:SaveKind,payload:&[u8])->Result<()>{if payload.is_empty()||payload.len()as u64>MAX_SAVE_BYTES{return Err(PlatformError::new(ErrorCode::ResourceLimit,"Native save size is invalid"));}self.call("load",json!({"kind":kind}),payload.to_vec(),30).map(|_|())}
     fn compatibility(&self,game:&GameManifest,_config:&SessionConfig,kind:SaveKind)->Result<SaveCompatibility>{
         let core=self.package.files.iter().find(|f|f.path==self.package.core_library).ok_or_else(||unavailable("The native core artifact is undeclared"))?;
@@ -205,6 +206,7 @@ impl RuntimeAdapter for NativeAdapter {
     }
     fn observe(&mut self)->Result<RuntimeObservation>{
         if !self.prepared{return Ok(RuntimeObservation::default());}
+        if let Some(work)=&self.work{omniplay_sandbox::enforce_windows_session_write_quotas(&self.profile_root,work,self.package.legacy_os_writes())?;}
         let value=self.call("status",json!({}),Vec::new(),2)?.result;
         let state=match value["state"].as_str(){Some("ready")=>SessionState::Ready,Some("running")=>SessionState::Running,Some("paused")=>SessionState::Paused,_=>return Err(PlatformError::new(ErrorCode::RuntimeCrashed,"The native runtime reported an invalid lifecycle"))};
         Ok(RuntimeObservation{state:Some(state),close_requested:value["close_requested"].as_bool().ok_or_else(||unavailable("Native window state is invalid"))?,active_playtime_ms:Some(value["active_playtime_ms"].as_u64().ok_or_else(||unavailable("Native playtime is invalid"))?)})
