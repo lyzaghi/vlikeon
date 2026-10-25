@@ -107,8 +107,56 @@ fn finish_retirement(profile_root:&Path,profile:Uuid,name:&str,resource:&omnipla
 fn retirement_record(work:&Path,group:&GroupRecord)->Result<()>{
     let name=match group.role{Role::Actor=>"linux-actor-retire-intent.json",Role::Presentation=>"linux-presentation-retire-intent.json"};if exists(&work.join(name))?{let previous:GroupAcknowledgement=recovery_read(work,name)?;if previous.schema_version!=1||previous.group!=*group{return Err(invalid());}Ok(())}else{publish(work,name,&GroupAcknowledgement{schema_version:1,group:group.clone()})}
 }
+fn recover_partial_creation(profile_root:&Path,profile:Uuid,id:Uuid,path:&Path,directory:&File,shape:&fs::Metadata,resource:&omniplay_sandbox::linux_delegation::RecoveryDelegation)->Result<()>{
+    let intent:Ownership=recovery_read(path,"linux-work-intent.json")?;
+    if intent.platform!="linux-x86_64-gnu"||intent.profile!=profile||intent.work!=id||intent.device!=shape.dev()||intent.inode!=shape.ino(){return Err(invalid());}
+    creator_ended(&intent)?;
+    if exists(&path.join("linux-work-owned.json"))?{
+        let owned:Ownership=recovery_read(path,"linux-work-owned.json")?;
+        if owned!=intent{return Err(invalid());}
+    }
+    let mut leases=Vec::new();
+    for name in["owner.lease","actor.lease","presentation.lease"]{
+        if exists(&path.join(name))?{
+            let lease=ordinary(&path.join(name))?;
+            lease.try_lock().map_err(|_|invalid())?;
+            leases.push(lease);
+        }
+    }
+    for role in[Role::Actor,Role::Presentation]{
+        if exists(&path.join(role.launch()))?||exists(&path.join(role.process()))?{return Err(invalid());}
+    }
+    if exists(&path.join("linux-pair-intent.json"))?{
+        let pair:PairIntent=recovery_read(path,"linux-pair-intent.json")?;
+        if pair.schema_version!=1||pair.work!=id||pair.parent!=parent(resource.identity())?{return Err(invalid());}
+    }
+    let session=id.to_string();
+    for(role,presentation)in[(Role::Actor,false),(Role::Presentation,true)]{
+        if exists(&path.join(role.group()))?{
+            let group_ack:GroupAcknowledgement=recovery_read(path,role.group())?;
+            if group_ack.schema_version!=1{return Err(invalid());}
+            let identity=recovery_group(&group_ack.group,profile,id,role,resource.identity())?;
+            resource.confirm_empty(&identity)?;
+            retirement_record(path,&group_ack.group)?;
+            resource.remove_empty(&identity)?;
+        }else{
+            resource.remove_unacknowledged_empty_leaf(&session,presentation)?;
+        }
+    }
+    if !resource.charges_retired()?{return Err(invalid());}
+    let current=linux_launch::private_directory(path)?;if !same_file(directory,&current)?{return Err(invalid());}
+    let database=omniplay_core::Database::open(profile_root)?;
+    omniplay_core::native_work_storage::retiring(&database,profile,id)?;
+    crate::work::remove(profile_root,path)?;sync_directory(&profile_root.join("native-work"))?;
+    omniplay_core::native_work_storage::release_removed(&database,profile,id)?;
+    drop(leases);Ok(())
+}
 fn recover_one(profile_root:&Path,profile:Uuid,path:&Path,resource:&omniplay_sandbox::linux_delegation::RecoveryDelegation)->Result<()>{
-    let id=uuid(path.file_name().and_then(|value|value.to_str()).ok_or_else(invalid)?)?;let directory=linux_launch::private_directory(path)?;let shape=directory.metadata().map_err(storage_error)?;let owned:Ownership=recovery_read(path,"linux-work-owned.json")?;let intent:Ownership=recovery_read(path,"linux-work-intent.json")?;
+    let id=uuid(path.file_name().and_then(|value|value.to_str()).ok_or_else(invalid)?)?;let directory=linux_launch::private_directory(path)?;let shape=directory.metadata().map_err(storage_error)?;
+    if !exists(&path.join("linux-work-owned.json"))?||!exists(&path.join("linux-pair-intent.json"))?||!exists(&path.join(Role::Actor.group()))?||!exists(&path.join(Role::Presentation.group()))?{
+        return recover_partial_creation(profile_root,profile,id,path,&directory,&shape,resource);
+    }
+    let owned:Ownership=recovery_read(path,"linux-work-owned.json")?;let intent:Ownership=recovery_read(path,"linux-work-intent.json")?;
     if owned!=intent{return Err(invalid());}for record in[&owned,&intent]{ownership_shape(record)?;if record.platform!="linux-x86_64-gnu"||record.profile!=profile||record.work!=id||record.device!=shape.dev()||record.inode!=shape.ino(){return Err(invalid());}}
     // Independently reopened descriptions must acquire all three locks; cloned
     // descriptions from a live session cannot be mistaken for abandoned work.
@@ -133,6 +181,16 @@ pub fn recover_linux_work(profile_root:&Path,profile:Uuid,resource:&omniplay_san
     let saved=omniplay_core::native_work_storage::linux_recovery_cursor(&database)?;let mut cursor:Cursor=match saved{Some(value)=>serde_json::from_str(&value).map_err(storage_error)?,None=>Cursor::default()};if cursor.receipt.len()>768||cursor.work.len()>768{return Err(invalid());}
     for name in recovery_candidates(&receipts,&cursor.receipt)?{summary.inspected+=1;cursor.receipt=name.clone();if let Some(id)=name.strip_suffix(".json").and_then(|value|uuid(value).ok()){resumed.insert(id);}if finish_retirement(&profile_root,profile,&name,resource).is_ok(){summary.removed+=1;}else{summary.retained+=1;}}
     if exists(&root)?{let _root=linux_launch::private_directory(&root)?;for name in recovery_candidates(&root,&cursor.work)?{cursor.work=name.clone();if uuid(&name).is_ok_and(|id|resumed.contains(&id)){continue;}summary.inspected+=1;if recover_one(&profile_root,profile,&root.join(name),resource).is_ok(){summary.removed+=1;}else{summary.retained+=1;}}}
+    for work_id in omniplay_core::native_work_storage::recovery_candidates(&database,profile)?{
+        if resumed.contains(&work_id)||exists(&root.join(work_id.to_string()))?{continue;}
+        summary.inspected+=1;
+        let released=match omniplay_core::native_work_storage::recovery_reservation(&database,profile,work_id)?{
+            Some(res)if res.phase==omniplay_core::native_work_storage::RecoveryPhase::Reserved=>omniplay_core::native_work_storage::release_uncreated(&database,profile,work_id),
+            Some(res)if res.phase==omniplay_core::native_work_storage::RecoveryPhase::Retiring=>omniplay_core::native_work_storage::release_removed(&database,profile,work_id),
+            _=>Err(invalid()),
+        };
+        if released.is_ok(){summary.removed+=1;}else{summary.retained+=1;}
+    }
     let encoded=serde_json::to_string(&cursor).map_err(storage_error)?;omniplay_core::native_work_storage::set_linux_recovery_cursor(&database,&encoded)?;
     Ok(summary)
 }
