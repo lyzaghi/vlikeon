@@ -92,7 +92,7 @@ final class BackgroundSync {
         value["scheduled"] = scheduled; value["scheduler_state"] = state; return value
     }
     private func start(_ task: BGAppRefreshTask) {
-        guard UIApplication.shared.applicationState != .active, UIApplication.shared.isProtectedDataAvailable else { scheduled = false; task.setTaskCompleted(success:false); refresh(); return }
+        guard UIApplication.shared.applicationState != .active, UIApplication.shared.isProtectedDataAvailable, !ProcessInfo.processInfo.isLowPowerModeEnabled else { scheduled = false; task.setTaskCompleted(success:false); refresh(); return }
         guard self.task == nil else { task.setTaskCompleted(success:false); return }
         scheduled = false
         let run = NativeBackgroundRun(); self.task = task; self.run = run

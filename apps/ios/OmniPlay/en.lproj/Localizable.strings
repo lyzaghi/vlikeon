@@ -1,0 +1,38 @@
+/* English Localizable.strings for OmniPlay iOS */
+
+"app_name" = "Vlikeon";
+"omniplay_game_hub" = "Vlikeon Game Hub";
+"omniplay_remote_play" = "Vlikeon Remote Play";
+"omniplay_settings" = "Settings";
+"omniplay_cloud_sync" = "Cloud Synchronization";
+"omniplay_pair_device" = "Pair Device";
+"omniplay_import_disc" = "Import Disc";
+"omniplay_export_save" = "Export Save";
+"omniplay_launch_game" = "Launch Game";
+"omniplay_pause_game" = "Pause Game";
+"omniplay_resume_game" = "Resume Game";
+"omniplay_stop_game" = "Stop Game";
+"omniplay_pairing_code" = "Pairing Code: %@";
+"omniplay_pairing_success" = "Device paired successfully";
+"omniplay_pairing_failed" = "Pairing failed or timed out";
+"omniplay_sync_running" = "Syncing game saves…";
+"omniplay_sync_completed" = "Synchronization completed";
+"omniplay_sync_failed" = "Synchronization failed";
+"omniplay_storage_low" = "Low storage: free up space to save progress";
+
+/* VoiceOver Accessibility Labels */
+"acc_omniplay_game_hub" = "Open Vlikeon Game Hub";
+"acc_dpad_up" = "Directional Pad Up";
+"acc_dpad_down" = "Directional Pad Down";
+"acc_dpad_left" = "Directional Pad Left";
+"acc_dpad_right" = "Directional Pad Right";
+"acc_button_a" = "Action Button A";
+"acc_button_b" = "Action Button B";
+"acc_button_x" = "Action Button X";
+"acc_button_y" = "Action Button Y";
+"acc_button_l1" = "Left Shoulder L1";
+"acc_button_r1" = "Right Shoulder R1";
+"acc_button_start" = "Start Button";
+"acc_button_select" = "Select Button";
+"acc_remote_play_surface" = "Remote Play stream presentation";
+"acc_sync_status" = "Sync status";

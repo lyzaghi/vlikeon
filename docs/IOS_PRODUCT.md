@@ -34,3 +34,14 @@ Explicit device snapshots now augment the bounded Rust base report on the main q
 Native profile opening now supplies a retained, serialized Keychain device-credential provider through a separate bounded C callback ABI. Fixed service/profile items use non-synchronizing WhenUnlockedThisDeviceOnly storage; the root/recovery seed is not persisted. Account commands and one explicit foreground sync worker are now authored with coalesced lifecycle cancellation independent of serialized request I/O; legacy opens keep sync unavailable. No account, network, credential, Keychain/Swift API, compiler, simulator, device or test has run. See `MOBILE_CREDENTIALS.md` and `MOBILE_SYNC.md` for cooperative cancellation limits and remaining background/device/store work.
 
 The shared disc importer now has a scoped native-reader source and bounded/profile-bound callback ABI; optional lengths and actual copied bytes feed the existing parser/hash/manifest path. The iOS adapter now uses a security-scoped selected root, bounded metadata enumeration, descriptor-relative no-follow traversal, lazy tokens, a coordinated producer with a bounded consumer slot, cooperative cancellation and final-owner scope/budget retirement. Document generation, pending reply deadlines, picker cancellation and native detach are connected in source. The privacy manifest includes user-selected file metadata. No provider/file/import API, SDK/compiler or test has run. See `IOS_DISC_IMPORT.md` and `NATIVE_DISC_PROVIDERS.md`.
+
+## Non-JIT Core Runtime, Remote Play Bridge, File Provider & L10n (Batch 04)
+
+Source implementation added covering items 67–72:
+- `NoJitCoreAdapter.swift` (Item 67): Non-JIT interpreter compliance (App Store Guideline 2.5.2), memory cap enforcement (max 512 MiB per instance), and memory pressure/jetsam avoidance.
+- `RemotePlayBridge.swift` (Item 68): Metal/AVFoundation presentation bridge, GameController framework (`GCController`) input integration, 64-byte bounded `StreamGamepadReport` serialization, 250ms gap check, and neutral release fencing.
+- `OmniPlayFileProvider.swift` & `BackgroundSync.swift` (Item 69): Sandboxed File Provider coordinator isolating internal SQLite and Keychain keys; low power mode cancellation in `BGTaskScheduler`.
+- `AccessibilityHelper.swift` & localized string resources (Item 70): VoiceOver accessibility labels, announcements, and 1:1 localized English/Vietnamese resources (`en.lproj/Localizable.strings` and `vi.lproj/Localizable.strings`).
+- `docs/IOS_BUILD_RECIPE.md` (Item 71): Official Xcode and XCFramework compilation recipes for device (arm64) and simulator (arm64-apple-ios-sim).
+- `qa/mobile/ios_qualification.py` & `docs/IOS_QUALIFICATION.md` (Item 72): Automated test suite and hardware qualification matrix (`WAITING_PERMISSION_OR_RESOURCE`).
+
