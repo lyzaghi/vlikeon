@@ -116,3 +116,11 @@ consent, sample formats, TCC or actual media. Item 54 still requires:
 6. Parent/document/peer loss, source/permission revocation and crash cleanup,
    package signing/permission UX, latency and actual memory budgets. Antigravity
    executes frozen tests; Codex diagnoses/fixes and accepts the item.
+
+## Antigravity App Batch 1 — Source Implementation Checkpoint
+
+Source work implemented:
+1. `platform/stream-input/src/game_process_macos.rs`: Child process lifetime inspection via `proc_pidinfo` (`PROC_PIDTBSDINFO`), verifying PID, PPID matching host, non-zombie state, and start time tv_sec/tv_usec. `GameWindow` mapping bound to the launched process.
+2. `platform/stream-input/src/capture_macos.rs`: ScreenCaptureKit adapter caller binding to `VLKMacCapture` and `VLKMacEncoder`, enforcing window isolation, bounded mailbox (max 2 video, max 8 audio samples), 100ms watchdog with 45s startup and 30m max session bounds, and clean teardown.
+3. `platform/core/src/installed.rs` & `platform/broker/src/stream_input.rs`: Enabled macOS target child admission, window listing, and capture selection.
+Status: `SOURCE_READY_UNVERIFIED`. Real macOS Xcode SDK build/device qualification remains in acceptance queue.

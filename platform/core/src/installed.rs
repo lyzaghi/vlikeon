@@ -3,8 +3,8 @@ use omniplay_contracts::{ContentHash,ErrorCode,GameManifest,GameSystem,PlatformE
 use rusqlite::{OptionalExtension,Transaction,TransactionBehavior,params};
 use serde::{Deserialize,Serialize};
 use std::{collections::HashMap,fs::{File,OpenOptions},path::{Path,PathBuf}};
-#[cfg(not(windows))]use std::process::{Child,Command,Stdio};
-#[cfg(windows)]use omniplay_stream_input::game_process::OwnedGameProcess as Child;
+#[cfg(not(any(windows, target_os = "linux", target_os = "macos")))]use std::process::{Child,Command,Stdio};
+#[cfg(any(windows, target_os = "linux", target_os = "macos"))]use omniplay_stream_input::OwnedGameProcess as Child;
 use uuid::Uuid;
 
 #[derive(Serialize,Deserialize)]
@@ -57,9 +57,9 @@ impl InstalledGames {
         database.record_audit("installed.launch_requested",Some(game_id))?;
         // Direct process creation: no shell, command interpreter, renderer arguments,
         // DLL injection, anti-cheat hooks or elevated execution.
-        #[cfg(not(windows))]
+        #[cfg(not(any(windows, target_os = "linux", target_os = "macos")))]
         let child=Command::new(&launch.executable).current_dir(&launch.working_directory).stdin(Stdio::null()).stdout(Stdio::null()).stderr(Stdio::null()).spawn().map_err(|_|PlatformError::new(ErrorCode::RuntimeUnavailable,"The selected installed game could not start").recover("Try opening it from its normal launcher"))?;
-        #[cfg(windows)]
+        #[cfg(any(windows, target_os = "linux", target_os = "macos"))]
         let child=Child::launch(&launch.executable,&launch.working_directory)?;
         let info=InstalledProcess{session_id:Uuid::new_v4(),game_id,started_at_ms:now_ms(),running:true,exited_at_ms:None,exit_success:None};
         self.running.insert(info.session_id,RunningGame{child,info:info.clone()});
@@ -95,14 +95,42 @@ impl InstalledGames {
 
     /// These native choices hold process objects, not caller-supplied PIDs.
     #[cfg(windows)]
-    pub fn stream_windows(&mut self,database:&Database,game_id:Uuid)->Result<Vec<omniplay_stream_input::game_process::GameWindow>>{
+    pub fn stream_windows(&mut self,database:&Database,game_id:Uuid)->Result<Vec<omniplay_stream_input::GameWindow>>{
+        self.poll(database)?;
+        let game=self.running.values().find(|value|value.info.game_id==game_id).ok_or_else(||PlatformError::new(ErrorCode::InvalidState,"The selected installed game session is no longer active"))?;
+        game.child.windows()
+    }
+
+    #[cfg(target_os = "linux")]
+    pub fn stream_windows(&mut self,database:&Database,game_id:Uuid)->Result<Vec<omniplay_stream_input::GameWindow>>{
+        self.poll(database)?;
+        let game=self.running.values().find(|value|value.info.game_id==game_id).ok_or_else(||PlatformError::new(ErrorCode::InvalidState,"The selected installed game session is no longer active"))?;
+        game.child.windows()
+    }
+
+    #[cfg(target_os = "macos")]
+    pub fn stream_windows(&mut self,database:&Database,game_id:Uuid)->Result<Vec<omniplay_stream_input::GameWindow>>{
         self.poll(database)?;
         let game=self.running.values().find(|value|value.info.game_id==game_id).ok_or_else(||PlatformError::new(ErrorCode::InvalidState,"The selected installed game session is no longer active"))?;
         game.child.windows()
     }
 
     #[cfg(windows)]
-    pub fn stream_window_process(&mut self,database:&Database,game_id:Uuid,selected:&omniplay_stream_input::game_process::GameWindow)->Result<std::os::windows::io::OwnedHandle>{
+    pub fn stream_window_process(&mut self,database:&Database,game_id:Uuid,selected:&omniplay_stream_input::GameWindow)->Result<std::os::windows::io::OwnedHandle>{
+        self.poll(database)?;
+        let game=self.running.values().find(|value|value.info.game_id==game_id).ok_or_else(||PlatformError::new(ErrorCode::InvalidState,"The selected installed game session is no longer active"))?;
+        game.child.admit_window(selected)
+    }
+
+    #[cfg(target_os = "linux")]
+    pub fn stream_window_process(&mut self,database:&Database,game_id:Uuid,selected:&omniplay_stream_input::GameWindow)->Result<std::os::fd::OwnedFd>{
+        self.poll(database)?;
+        let game=self.running.values().find(|value|value.info.game_id==game_id).ok_or_else(||PlatformError::new(ErrorCode::InvalidState,"The selected installed game session is no longer active"))?;
+        game.child.admit_window(selected)
+    }
+
+    #[cfg(target_os = "macos")]
+    pub fn stream_window_process(&mut self,database:&Database,game_id:Uuid,selected:&omniplay_stream_input::GameWindow)->Result<u32>{
         self.poll(database)?;
         let game=self.running.values().find(|value|value.info.game_id==game_id).ok_or_else(||PlatformError::new(ErrorCode::InvalidState,"The selected installed game session is no longer active"))?;
         game.child.admit_window(selected)
@@ -111,9 +139,9 @@ impl InstalledGames {
     fn poll(&mut self,database:&Database)->Result<()> {
         let mut exited=Vec::new();
         for (id,game) in &mut self.running {
-            #[cfg(not(windows))]
+            #[cfg(not(any(windows, target_os = "linux", target_os = "macos")))]
             let status=game.child.try_wait().map_err(storage_error)?.map(|value|Some(value.success()));
-            #[cfg(windows)]
+            #[cfg(any(windows, target_os = "linux", target_os = "macos"))]
             let status=game.child.poll_exit()?;
             if let Some(success)=status {
                 if game.info.running{game.info.running=false;game.info.exited_at_ms=Some(now_ms());game.info.exit_success=success;}exited.push(*id);

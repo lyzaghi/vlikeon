@@ -86,3 +86,11 @@ Antigravity batch `053a` passed Python syntax parsing and actual non-Linux
 refusal on Windows, with no Linux report created. The frozen probe remained
 unchanged. Evidence is in `qa/evidence/sequential/item-053/`; these two checks
 do not test the Linux path, portal interaction or media capture.
+
+## Antigravity App Batch 1 — Source Implementation Checkpoint
+
+Source work implemented:
+1. `platform/stream-input/src/game_process_linux.rs`: Linux child lifetime retained via `pidfd_open` (syscall 434) and `/proc/{pid}/stat` starttime verification against host PID. `GameWindow` candidate mapping without caller-supplied PID spoofing.
+2. `platform/stream-input/src/capture_linux.rs`: XDG ScreenCast portal integration architecture with window-only constraint (no monitor fallback), application-only audio stream isolation, bounded mailboxes (max 2 video, max 8 audio frames), 250ms gap check, and 30-minute max session watchdog with clean cancellation/retirement.
+3. `platform/core/src/installed.rs` & `platform/broker/src/stream_input.rs`: Enabled Linux child process retention, `stream_windows`, and `stream_window_process` admission.
+Status: `SOURCE_READY_UNVERIFIED`. Real Linux desktop/PipeWire qualification remains in acceptance queue.

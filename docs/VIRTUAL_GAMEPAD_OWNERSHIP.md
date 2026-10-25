@@ -654,3 +654,11 @@ the explicit slot tuples accepted by the private group.
    replay/release fences, partial OS writes, stale focus/target, expiry, provider
    loss, failed removal, owner/helper crash and no retained device after cleanup.
    Codex reviews results and decides fixes/acceptance. No current pass is claimed.
+
+## Antigravity App Batch 1 — Source Implementation Checkpoint
+
+Source work implemented:
+1. `platform/stream-input/src/gamepad_linux_host.rs`: Complete host channel client (`LinuxGamepadHostClient`) wrapping `Gamepads<UinputProvider>`, supporting up to 4 isolated slots, two-phase activation (prepare -> activate), neutral state reporting, release fences (1..=10,000,000), 250ms watchdog, and clean stop/retirement under session deadline.
+2. `platform/broker/src/stream_gamepad.rs`: Added `LinuxParentChannel`, `LinuxRecoveryObserver`, and `recover_linux_gamepad` implementing the parent broker supervisor protocol for Linux uinput controllers alongside existing Windows HID support.
+3. `platform/stream-input/src/lib.rs`: Exposed `gamepad_linux_host` for Linux x86_64 and aarch64.
+Status: `SOURCE_READY_UNVERIFIED`. Real Linux uinput device qualification remains in acceptance queue.

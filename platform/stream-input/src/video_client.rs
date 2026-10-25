@@ -1,19 +1,50 @@
 //! Candidate private Windows video transport. Installed artifact admission,
 //! actual capture/negotiation and live document/pair consent belong to the host.
 //! No current product command invokes this module.
+#[cfg(windows)]
 use crate::{failure,gamepad_child::{ChildProcess,HelperKind,SuspendedChild},gamepad_process::ProcessWitness};
+#[cfg(not(windows))]
+use crate::failure;
 use omniplay_contracts::{ContentHash,Result};
-use std::{collections::VecDeque,fs::File,io::{Read,Write},os::windows::io::{AsRawHandle,FromRawHandle,OwnedHandle},
+use std::{collections::VecDeque,fs::File,io::{Read,Write},
     path::Path,sync::{Arc,Mutex,OnceLock,atomic::{AtomicBool,Ordering},mpsc::{self,SyncSender}},
     thread::JoinHandle,time::{Duration,Instant}};
+#[cfg(windows)]
+use std::os::windows::io::{AsRawHandle,FromRawHandle,OwnedHandle};
 use uuid::Uuid;
+#[cfg(windows)]
 use windows_sys::Win32::{Foundation::*,System::{IO::CancelSynchronousIo,Threading::*}};
 
+#[cfg(windows)]
+fn native_tick_count_ms() -> u64 {
+    unsafe { windows_sys::Win32::System::SystemInformation::GetTickCount64() }
+}
+
+#[cfg(not(windows))]
+fn native_tick_count_ms() -> u64 {
+    let mut ts = libc::timespec { tv_sec: 0, tv_nsec: 0 };
+    #[cfg(target_os = "linux")]
+    let clock_id = libc::CLOCK_BOOTTIME;
+    #[cfg(not(target_os = "linux"))]
+    let clock_id = libc::CLOCK_MONOTONIC;
+    let res = unsafe { libc::clock_gettime(clock_id, &mut ts) };
+    if res == 0 && ts.tv_sec >= 0 && ts.tv_nsec >= 0 {
+        (ts.tv_sec as u64).saturating_mul(1000).saturating_add((ts.tv_nsec as u64) / 1_000_000)
+    } else {
+        0
+    }
+}
+
 const CONFIGURE:u16=1;const FRAME:u16=2;const POLL:u16=3;const STOP:u16=4;const KEYFRAME:u16=5;
+#[cfg(windows)]
 static LIVE:AtomicBool=AtomicBool::new(false);
+#[cfg(windows)]
 static RETAINED:OnceLock<(Arc<ChildProcess>,File,Vec<File>)>=OnceLock::new();
+#[cfg(windows)]
 struct Permit{release:bool}
+#[cfg(windows)]
 impl Permit{fn acquire()->Result<Self>{LIVE.compare_exchange(false,true,Ordering::AcqRel,Ordering::Acquire).map_err(|_|failure())?;Ok(Self{release:true})}}
+#[cfg(windows)]
 impl Drop for Permit{fn drop(&mut self){if self.release{LIVE.store(false,Ordering::Release);}}}
 #[derive(Clone,Copy,Debug,PartialEq,Eq)]
 pub struct VideoOwner{pub capture:Uuid,pub game:Uuid,pub pair:Uuid,pub session:Uuid,pub generation:u64}
@@ -33,28 +64,34 @@ impl DecoderReceipt{
     /// Caller must have proved SOFTWARE timestamp provenance, not NIC hardware
     /// counter units. This conversion does not configure or authenticate socket IO.
     pub fn from_software_qpc_ingress(received:i64)->Result<Self>{
-        let mut frequency=0i64;let mut current=0i64;
-        let tick=unsafe{windows_sys::Win32::System::SystemInformation::GetTickCount64()};let local=Instant::now();
-        if received<0||unsafe{windows_sys::Win32::System::Performance::QueryPerformanceFrequency(&mut frequency)}==0||frequency<=0||
-            unsafe{windows_sys::Win32::System::Performance::QueryPerformanceCounter(&mut current)}==0||current<received{return Err(failure());}
-        let delta=(current-received)as u128;let frequency=frequency as u128;
-        let nanos=delta.checked_mul(1_000_000_000).and_then(|n|n.checked_add(frequency-1)).ok_or_else(failure)?/frequency;
-        if nanos>100_000_000{return Err(failure());}
-        let millis=nanos.div_ceil(1_000_000);
-        let local=local.checked_sub(Duration::from_nanos(nanos as u64)).ok_or_else(failure)?;
-        let tick=tick.checked_sub(millis as u64).ok_or_else(failure)?;
-        let receipt=Self{tick,local};if !receipt.live(){return Err(failure());}Ok(receipt)
+        #[cfg(windows)]
+        {
+            let mut frequency=0i64;let mut current=0i64;
+            let tick=native_tick_count_ms();let local=Instant::now();
+            if received<0||unsafe{windows_sys::Win32::System::Performance::QueryPerformanceFrequency(&mut frequency)}==0||frequency<=0||
+                unsafe{windows_sys::Win32::System::Performance::QueryPerformanceCounter(&mut current)}==0||current<received{return Err(failure());}
+            let delta=(current-received)as u128;let frequency=frequency as u128;
+            let nanos=delta.checked_mul(1_000_000_000).and_then(|n|n.checked_add(frequency-1)).ok_or_else(failure)?/frequency;
+            if nanos>100_000_000{return Err(failure());}
+            let millis=nanos.div_ceil(1_000_000);
+            let local=local.checked_sub(Duration::from_nanos(nanos as u64)).ok_or_else(failure)?;
+            let tick=tick.checked_sub(millis as u64).ok_or_else(failure)?;
+            let receipt=Self{tick,local};if !receipt.live(){return Err(failure());}Ok(receipt)
+        }
+        #[cfg(not(windows))]
+        {
+            let _ = received;
+            Err(failure())
+        }
     }
     pub fn local_received_at(self)->Instant{self.local}
     pub fn within_receive_age(self)->bool{self.live()}
     pub fn at_native_ingress()->Self{
-        // Take the boot-clock reading first: both readings stay conservative
-        // deadlines, and an interrupted capture cannot make the tick newer.
-        let tick=unsafe{windows_sys::Win32::System::SystemInformation::GetTickCount64()};
+        let tick=native_tick_count_ms();
         Self{tick,local:Instant::now()}
     }
     fn live(self)->bool{
-        let tick=unsafe{windows_sys::Win32::System::SystemInformation::GetTickCount64()};
+        let tick=native_tick_count_ms();
         self.tick<=tick&&tick-self.tick<=100&&self.local.elapsed()<=Duration::from_millis(100)
     }
 }
@@ -71,21 +108,27 @@ impl DecodedVideoFrame{
     pub fn within_receive_age(&self)->bool{self.receipt.live()}
     pub fn completed_picture(&self)->&DecodedPictureReceipt{&self.completion}
 }
+#[cfg(windows)]
 struct Queued{packet:VideoPacket,deadline:Instant}
+#[cfg(windows)]
 struct Packets{queue:VecDeque<Queued>,bytes:usize}
+#[cfg(windows)]
 struct Lease{sequence:u64,deadline:Instant}
+#[cfg(windows)]
 struct Shared{
     process:Arc<ChildProcess>,target:Option<ProcessWitness>,owner:VideoOwner,deadline:Instant,window:Option<u64>,decode:bool,
     _permit:Permit,artifact:Option<File>,installation_guards:Vec<File>,closed:AtomicBool,revoking:AtomicBool,
     lease:Mutex<Lease>,stop_deadline:Mutex<Option<Instant>>,pending:Mutex<Option<Instant>>,
     packets:Mutex<Packets>,frames:Mutex<VecDeque<DecodedVideoFrame>>,io:OnceLock<OwnedHandle>,
 }
+#[cfg(windows)]
 impl Drop for Shared{fn drop(&mut self){
     if !self.process.exited().unwrap_or(false){
         self._permit.release=false;
         if let Some(artifact)=self.artifact.take(){if let Err(value)=RETAINED.set((self.process.clone(),artifact,std::mem::take(&mut self.installation_guards))){std::mem::forget(value);}}
     }
 }}
+#[cfg(windows)]
 impl Shared{
     fn authority_live(&self)->bool{
         !self.closed.load(Ordering::Acquire)&&!self.revoking.load(Ordering::Acquire)&&Instant::now()<self.deadline&&
@@ -106,7 +149,9 @@ impl Shared{
 }
 /// Only a trusted native observer refreshes this handle. A received media packet
 /// or an automatic Poll never establishes document/pair/capture authority.
+#[cfg(windows)]
 pub struct VideoAuthorityLease{shared:Arc<Shared>}
+
 /// Native-host observation, never deserialize this from a renderer/peer. Each
 /// source must recheck its own current state; caching a true bit is not evidence.
 pub struct VideoAuthorityObservation{
@@ -114,11 +159,13 @@ pub struct VideoAuthorityObservation{
     pub document_alive:bool,pub capture_authorized:bool,pub pair_authorized:bool,
 }
 impl VideoAuthorityObservation{
-    fn permits(&self,expected:VideoOwner,now:Instant)->bool{
+    pub fn permits(&self,expected:VideoOwner,now:Instant)->bool{
         self.owner==expected&&self.document_alive&&self.capture_authorized&&self.pair_authorized&&
             now.checked_duration_since(self.checked_at).is_some_and(|age|age<=Duration::from_millis(100))
     }
 }
+
+#[cfg(windows)]
 impl VideoAuthorityLease{
     pub fn owner(&self)->VideoOwner{self.shared.owner}
     pub fn observe(&self,sequence:u64,observation:VideoAuthorityObservation)->Result<()>{
@@ -130,7 +177,34 @@ impl VideoAuthorityLease{
     }
     pub fn close(&self){self.shared.close();}
 }
+#[cfg(windows)]
 impl Drop for VideoAuthorityLease{fn drop(&mut self){self.close();}}
+
+#[cfg(not(windows))]
+pub struct VideoAuthorityLease{owner:VideoOwner,closed:AtomicBool}
+#[cfg(not(windows))]
+impl VideoAuthorityLease{
+    pub fn new(owner:VideoOwner)->Self{Self{owner,closed:AtomicBool::new(false)}}
+    pub fn owner(&self)->VideoOwner{self.owner}
+    pub fn observe(&self,_sequence:u64,observation:VideoAuthorityObservation)->Result<()>{
+        let now=Instant::now();
+        if !observation.permits(self.owner,now)||self.closed.load(Ordering::Acquire){return Err(failure());}
+        Ok(())
+    }
+    pub fn close(&self){self.closed.store(true,Ordering::Release);}
+}
+#[cfg(not(windows))]
+impl Drop for VideoAuthorityLease{fn drop(&mut self){self.close();}}
+
+#[cfg(not(windows))]
+pub struct VideoWorker{owner:VideoOwner}
+#[cfg(not(windows))]
+impl VideoWorker{
+    pub fn new(owner:VideoOwner)->Self{Self{owner}}
+    pub fn owner(&self)->VideoOwner{self.owner}
+    pub fn stop(&mut self)->Result<()>{Ok(())}
+    pub fn stop_until(&mut self,_deadline:Instant)->Result<()>{Ok(())}
+}
 
 #[cfg(test)]
 mod authority_tests{
@@ -157,8 +231,11 @@ mod authority_tests{
         assert!(!observation(now+Duration::from_millis(1)).permits(owner(),now));
     }
 }
+#[cfg(windows)]
 struct Call{kind:u16,payload:Vec<u8>,reply:SyncSender<Result<Vec<u8>>>,timeout:Duration,receipt:Option<DecoderReceipt>}
+#[cfg(windows)]
 pub struct VideoWorker{shared:Arc<Shared>,sender:Option<SyncSender<Call>>,threads:Vec<JoinHandle<()>>,profile:Option<VideoProfile>,sha256:ContentHash,stop_acknowledged:bool,join_failed:bool}
+#[cfg(windows)]
 fn thread_handle(thread:&JoinHandle<()>)->Result<OwnedHandle>{
     let current=unsafe{GetCurrentProcess()};let mut handle=std::ptr::null_mut();
     if unsafe{DuplicateHandle(current,thread.as_raw_handle(),current,&mut handle,THREAD_TERMINATE|THREAD_SYNCHRONIZE,0,0)}==0||handle.is_null()||handle==INVALID_HANDLE_VALUE{return Err(failure());}

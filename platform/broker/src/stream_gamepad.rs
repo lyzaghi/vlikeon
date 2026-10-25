@@ -285,6 +285,85 @@ impl ParentChannel for WindowsParentChannel{
     fn stop_until(&mut self,deadline:Instant)->Result<()>{self.client.stop_until(deadline)}
 }
 
+#[cfg(all(target_os = "linux", any(target_arch = "x86_64", target_arch = "aarch64")))]
+pub struct LinuxParentChannel {
+    client: omniplay_stream_input::gamepad_linux_host::LinuxGamepadHostClient,
+    helper: ProcessIdentity,
+}
+
+#[cfg(all(target_os = "linux", any(target_arch = "x86_64", target_arch = "aarch64")))]
+impl LinuxParentChannel {
+    pub fn new(client: omniplay_stream_input::gamepad_linux_host::LinuxGamepadHostClient) -> Self {
+        let identity = client.helper_witness().map(|w| w.identity()).unwrap_or(omniplay_stream_input::gamepad_linux_host::LinuxProcessIdentity { process_id: 0, creation_time: 0 });
+        Self {
+            client,
+            helper: ProcessIdentity { process_id: identity.process_id, creation_time: identity.creation_time },
+        }
+    }
+}
+
+#[cfg(all(target_os = "linux", any(target_arch = "x86_64", target_arch = "aarch64")))]
+impl ParentChannel for LinuxParentChannel {
+    fn helper(&self) -> ProcessIdentity { self.helper }
+    fn helper_sha256(&self) -> &ContentHash { self.client.helper_sha256() }
+    fn exchange(&mut self, binding: Binding, action: Action, timeout: Duration) -> Result<(u64, Reply)> {
+        if binding.owner() != self.client.owner() { let _ = self.client.stop(); return Err(invalid()); }
+        self.client.exchange(action, timeout)
+    }
+    fn heartbeat(&mut self, binding: Binding) -> Result<u64> {
+        if binding.owner() != self.client.owner() { let _ = self.client.stop(); return Err(invalid()); }
+        self.client.heartbeat()
+    }
+    fn stop(&mut self) -> Result<()> { self.client.stop() }
+    fn stop_until(&mut self, deadline: Instant) -> Result<()> { self.client.stop_until(deadline) }
+}
+
+#[cfg(all(target_os = "linux", any(target_arch = "x86_64", target_arch = "aarch64")))]
+pub struct LinuxRecoveryObserver {
+    process: omniplay_stream_input::gamepad_linux_host::LinuxProcessWitness,
+}
+
+#[cfg(all(target_os = "linux", any(target_arch = "x86_64", target_arch = "aarch64")))]
+impl LinuxRecoveryObserver {
+    pub fn new(pid: u32, creation_time: u64) -> Self {
+        Self { process: omniplay_stream_input::gamepad_linux_host::LinuxProcessWitness::new(pid, creation_time) }
+    }
+}
+
+#[cfg(all(target_os = "linux", any(target_arch = "x86_64", target_arch = "aarch64")))]
+impl RecoveryObserver for LinuxRecoveryObserver {
+    fn helper_exited(&mut self, identity: ProcessIdentity) -> Result<bool> {
+        self.process.exited(omniplay_stream_input::gamepad_linux_host::LinuxProcessIdentity {
+            process_id: identity.process_id,
+            creation_time: identity.creation_time,
+        })
+    }
+    fn presence(&mut self, _container: Uuid) -> journal::Presence {
+        journal::Presence::Absent
+    }
+}
+
+#[cfg(all(target_os = "linux", any(target_arch = "x86_64", target_arch = "aarch64")))]
+pub fn recover_linux_gamepad(database: &mut Database, profile: Uuid, cancel: &std::sync::atomic::AtomicBool) -> Result<bool> {
+    use std::sync::atomic::Ordering;
+    if cancel.load(Ordering::Acquire) { return Err(stopped()); }
+    let directory = coordination_directory(&database.root, profile)?;
+    let mut arbitration = Arbitration::open(&directory)?;
+    let Some(saved) = journal::load(database, profile)? else { return Ok(arbitration.pending()?.is_none()); };
+    let identity = saved.record().helper();
+    let mut observer = LinuxRecoveryObserver::new(identity.process_id, identity.creation_time);
+    let (saved, ready) = journal::reconcile_retained(database, &saved, &mut observer)?;
+    if arbitration.pending()?.is_some_and(|record| record.reservation() == saved.record().reservation()) {
+        arbitration.mirror(database, &saved)?;
+    }
+    if !ready { return Ok(false); }
+    arbitration.release(database, &saved, &mut observer)?;
+    match journal::reconcile(database, &saved, &mut observer)? {
+        Reconciliation::Removed => Ok(true),
+        Reconciliation::Retained(_) => Ok(false),
+    }
+}
+
 /// Live-parent recovery from the actual launch handle plus native provider
 /// inventory. Startup after broker loss uses the separate read-only recovery
 /// witness below; this live observer never substitutes a newly opened PID.
