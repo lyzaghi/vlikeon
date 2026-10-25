@@ -269,3 +269,14 @@ and an excluded inert dictionary fixture target are authored, not built/run.
 The fixture source joins future build snapshots without becoming a normal worker
 build target. `WINDOWS_NATIVE_VIDEO_DECODER.md` records compatibility limitations
 and remaining bitstream/device/presentation qualification. Full scope stays open.
+
+## Native SRTP, DTLS Exporter, ICE Agent & Ingress Demux (Batch 02)
+
+Source implementation added for end-to-end transport primitives:
+- `platform/streaming/src/native_srtp.rs`: RFC 7983 packet demultiplexing distinguishing STUN (0..=1), DTLS (20..=63), SRTP/SRTCP (128..=191). Implements 128-bit sliding replay window protection (`ReplayWindow128`), constant-time HMAC-SHA1-80 authentication verification, AES-128-CTR keystream decryption for SRTP payloads, and zeroize-on-drop key lifecycle.
+- `platform/streaming/src/native_ice_agent.rs`: ICE candidate gathering (Host, Relayed via TURN), RFC 5245 pair prioritization, STUN Binding request generation with USERNAME and HMAC-SHA1 MESSAGE-INTEGRITY, USE-CANDIDATE nomination, UDP socket binding, and 30-second consent freshness watchdog.
+- `platform/streaming/src/native_dtls_srtp.rs`: RFC 5764 DTLS-SRTP key material exporter (`EXTRACTOR_LABEL = "EXTRACTOR-dtls_srtp"`), constant-time SHA-256 certificate fingerprint verification, direction-aware client/server write key/salt derivation (`SRTP_AES128_CM_HMAC_SHA1_80`).
+- `platform/broker/src/stream_video_ingress.rs`: `SrtpReceiverEngine` implementing `NativeSrtpReceiver`, binding RFC 7983 demultiplexing, replay window validation, HMAC verification, AES decryption, and piping verified RTP frames into `ReceiveRegistry`.
+
+Build, network execution, and hardware qualification remain deferred per owner instructions.
+

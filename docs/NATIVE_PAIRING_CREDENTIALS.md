@@ -2714,3 +2714,10 @@ This follow-up was authored without running build or tests.
 
 All earlier incomplete items and the original 51–109 scope remain open. The
 existing streaming policy is unchanged and disabled.
+
+## Crash Reconciliation & Immediate Revocation Fencing (Batch 02)
+
+Source implementation added for crash reconciliation and revocation:
+- `platform/broker/src/stream_credentials_recovery.rs`: Implements post-crash reconciliation (`reconcile_credentials_at_startup`) against `stream_credentials::recovery_plan`. Evaluates durable journal state, reaps unretired vault writers, validates absence of material for revoked keys, and executes mandatory relay revocations before enabling pairing services.
+- Immediate Revocation Fencing: `fence_revoked_generation` immediately fences in-memory key materials and producer pipes upon detecting Revoking state, preventing late publishes without waiting for background thread exit.
+

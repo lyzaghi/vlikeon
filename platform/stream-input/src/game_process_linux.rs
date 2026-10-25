@@ -99,6 +99,23 @@ pub struct OwnedGameProcess {
     starttime: u64,
     pidfd: Option<OwnedFd>,
     child: Child,
+    descendants: Vec<u32>,
+}
+
+fn scan_descendants(parent_pid: u32) -> Vec<u32> {
+    let mut descendants = Vec::new();
+    let task_children = format!("/proc/{}/task/{}/children", parent_pid, parent_pid);
+    if let Ok(mut file) = File::open(&task_children) {
+        let mut s = String::new();
+        if file.read_to_string(&mut s).is_ok() {
+            for part in s.split_whitespace() {
+                if let Ok(cpid) = part.parse::<u32>() {
+                    descendants.push(cpid);
+                }
+            }
+        }
+    }
+    descendants
 }
 
 impl OwnedGameProcess {
@@ -129,12 +146,34 @@ impl OwnedGameProcess {
             starttime,
             pidfd,
             child,
+            descendants: Vec::new(),
         })
     }
 
     pub fn poll_exit(&mut self) -> Result<Option<bool>> {
-        let status = self.child.try_wait().map_err(|_| unavailable())?;
-        Ok(status.map(|s| s.success()))
+        let root_status = self.child.try_wait().map_err(|_| unavailable())?;
+        
+        // Scan for new descendants before deciding on exit
+        let new_descendants = scan_descendants(self.pid);
+        for d in new_descendants {
+            if !self.descendants.contains(&d) {
+                self.descendants.push(d);
+            }
+        }
+
+        // Filter out descendants that have exited
+        self.descendants.retain(|&dpid| read_proc_stat(dpid).is_ok());
+
+        if let Some(status) = root_status {
+            if !self.descendants.is_empty() {
+                // Launcher exited, but child game process is still running!
+                // Keep the session open until the game process exits.
+                return Ok(None);
+            }
+            Ok(Some(status.success()))
+        } else {
+            Ok(None)
+        }
     }
 
     pub fn pid(&self) -> u32 {
@@ -146,48 +185,48 @@ impl OwnedGameProcess {
     }
 
     pub fn windows(&self) -> Result<Vec<GameWindow>> {
-        // Verify process is still alive and matches original starttime
-        let (ppid, starttime) = read_proc_stat(self.pid)?;
-        if starttime != self.starttime {
-            return Err(unavailable());
-        }
-        #[cfg(target_os = "linux")]
-        {
-            let host_pid = unsafe { libc::getpid() as u32 };
-            if ppid != host_pid {
-                return Err(unavailable());
+        let mut results = Vec::new();
+        if let Ok((_ppid, starttime)) = read_proc_stat(self.pid) {
+            if starttime == self.starttime {
+                let window_id = ((self.pid as u64) << 32) | (self.starttime & 0xFFFF_FFFF);
+                let title = format!("Game Window (PID {})", self.pid);
+                results.push(GameWindow::new(window_id, self.pid, self.starttime, title));
             }
         }
-
-        // On Linux, the window candidate is identified by its stable process-bound window handle.
-        // For window-only capture via PipeWire ScreenCast portal, candidate window ID is derived
-        // deterministically from the pid and starttime epoch, binding it to the launched instance.
-        let window_id = ((self.pid as u64) << 32) | (self.starttime & 0xFFFF_FFFF);
-        let title = format!("Game Window (PID {})", self.pid);
-        Ok(vec![GameWindow::new(window_id, self.pid, self.starttime, title)])
+        for &dpid in &self.descendants {
+            if let Ok((_ppid, d_starttime)) = read_proc_stat(dpid) {
+                let window_id = ((dpid as u64) << 32) | (d_starttime & 0xFFFF_FFFF);
+                let title = format!("Game Window (Child PID {})", dpid);
+                results.push(GameWindow::new(window_id, dpid, d_starttime, title));
+            }
+        }
+        if results.is_empty() {
+            return Err(unavailable());
+        }
+        Ok(results)
     }
 
     pub fn admit_window(&self, selected: &GameWindow) -> Result<OwnedFd> {
-        if selected.process_id != self.pid || selected.creation_time != self.starttime {
+        let target_pid = selected.process_id;
+        if target_pid != self.pid && !self.descendants.contains(&target_pid) {
             return Err(unavailable());
         }
-        // Re-verify process identity
-        let (_ppid, starttime) = read_proc_stat(self.pid)?;
-        if starttime != self.starttime {
+        let (_ppid, starttime) = read_proc_stat(target_pid)?;
+        if starttime != selected.creation_time {
             return Err(unavailable());
         }
-        // Return duplicated pidfd or open new pidfd
-        if let Some(pidfd) = &self.pidfd {
-            let dup_raw = unsafe { libc::dup(pidfd.as_raw_fd()) };
-            if dup_raw >= 0 {
-                return Ok(unsafe { OwnedFd::from_raw_fd(dup_raw) });
+        if target_pid == self.pid {
+            if let Some(pidfd) = &self.pidfd {
+                let dup_raw = unsafe { libc::dup(pidfd.as_raw_fd()) };
+                if dup_raw >= 0 {
+                    return Ok(unsafe { OwnedFd::from_raw_fd(dup_raw) });
+                }
             }
         }
-        if let Some(new_fd) = open_pidfd(self.pid) {
+        if let Some(new_fd) = open_pidfd(target_pid) {
             Ok(new_fd)
         } else {
-            // Fallback to /proc/{pid} fd for ownership proof
-            let proc_path = format!("/proc/{}", self.pid);
+            let proc_path = format!("/proc/{}", target_pid);
             let file = File::open(proc_path).map_err(|_| unavailable())?;
             Ok(file.into())
         }

@@ -11,6 +11,7 @@ mod native_work_jobs;
 mod stream_input;
 mod stream_gamepad;
 mod stream_gamepad_recovery;
+mod stream_credentials_recovery;
 #[cfg(windows)]mod stream_video;
 #[cfg(windows)]mod stream_video_authority;
 #[cfg(windows)]mod stream_video_installation;

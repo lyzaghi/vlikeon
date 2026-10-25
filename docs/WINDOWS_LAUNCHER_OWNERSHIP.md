@@ -146,3 +146,10 @@ The implementation follows Microsoft's documented
 [exact job membership query](https://learn.microsoft.com/en-us/windows/win32/api/jobapi/nf-jobapi-isprocessinjob)
 and [job accounting](https://learn.microsoft.com/en-us/windows/win32/api/winnt/ns-winnt-jobobject_basic_accounting_information).
 These contracts guide source review; they are not execution evidence.
+
+## Cross-Platform Descendant Ownership (Batch 02)
+
+Linux and macOS descendant tracking implemented in source:
+- `platform/stream-input/src/game_process_linux.rs`: Retains original child lifetime via `pidfd_open` (syscall 434) and `/proc/{pid}/stat` verification. Added descendant scanning via `/proc/{pid}/task/{pid}/children` with depth/breadth bounds, verifying PPID ancestry and non-zombie state so game sessions remain active and window candidates remain discoverable when intermediate launcher scripts exit.
+- `platform/stream-input/src/game_process_macos.rs`: Process BSD info inspection (`proc_pidinfo` / `PROC_PIDTBSDINFO`) verifying PID, host PPID, start time, and non-zombie flags. Added descendant tree traversal via `proc_listchildpids` / BSD info inspection to support launcher handoffs on macOS.
+

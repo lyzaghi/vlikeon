@@ -21,6 +21,9 @@ pub mod native_pair_exchange;
 pub mod native_signal;
 pub mod native_relay;
 pub mod native_ice;
+pub mod native_srtp;
+pub mod native_ice_agent;
+pub mod native_dtls_srtp;
 pub use protocol::*;
 
 use omniplay_contracts::{ErrorCode,PlatformError,Result};

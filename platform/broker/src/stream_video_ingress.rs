@@ -18,6 +18,53 @@ pub trait NativeSrtpReceiver{
     /// Success is actual retirement, not a request flag. No default backend.
     fn retire_until(&mut self,deadline:Instant)->Result<()>;
 }
+
+/// Concrete Native SRTP receiver backend implementing NativeSrtpReceiver
+pub struct SrtpReceiverEngine {
+    owner: VideoOwner,
+    session: omniplay_streaming::native_srtp::NativeSrtpSession,
+}
+
+impl SrtpReceiverEngine {
+    pub fn new(owner: VideoOwner, session: omniplay_streaming::native_srtp::NativeSrtpSession) -> Self {
+        Self { owner, session }
+    }
+}
+
+impl NativeSrtpReceiver for SrtpReceiverEngine {
+    fn owner(&self) -> VideoOwner {
+        self.owner
+    }
+
+    fn receive(&mut self, datagram: &[u8], receipt: DecoderReceipt) -> Result<Option<Vec<u8>>> {
+        if !receipt.within_receive_age() {
+            return Err(PlatformError::new(ErrorCode::DeadlineExceeded, "Datagram expired before SRTP processing"));
+        }
+        match omniplay_streaming::native_srtp::classify_datagram(datagram) {
+            omniplay_streaming::native_srtp::DemuxPacketType::Stun | omniplay_streaming::native_srtp::DemuxPacketType::Dtls => {
+                Ok(None)
+            }
+            omniplay_streaming::native_srtp::DemuxPacketType::Srtcp => {
+                Ok(None)
+            }
+            omniplay_streaming::native_srtp::DemuxPacketType::Srtp => {
+                let decrypted = self.session.unprotect(datagram)?;
+                Ok(Some(decrypted))
+            }
+            omniplay_streaming::native_srtp::DemuxPacketType::Unknown => {
+                Err(PlatformError::new(ErrorCode::PermissionDenied, "Unknown packet type in SRTP stream"))
+            }
+        }
+    }
+
+    fn retire_until(&mut self, deadline: Instant) -> Result<()> {
+        if Instant::now() >= deadline {
+            return Err(PlatformError::new(ErrorCode::DeadlineExceeded, "SRTP retirement deadline exceeded"));
+        }
+        self.session.retire();
+        Ok(())
+    }
+}
 pub struct VideoIngress<T:NativeSrtpReceiver>{owner:VideoOwner,transport:T,closed:bool,retired:bool,video_retired:bool}
 impl<T:NativeSrtpReceiver> VideoIngress<T>{
     pub fn new(owner:VideoOwner,transport:T)->Result<Self>{

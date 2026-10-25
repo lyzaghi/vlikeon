@@ -123,6 +123,7 @@ pub struct OwnedGameProcess {
     start_sec: u64,
     start_usec: u64,
     child: Child,
+    descendants: Vec<u32>,
 }
 
 impl OwnedGameProcess {
@@ -151,12 +152,31 @@ impl OwnedGameProcess {
             start_sec: info.pbi_start_tvsec,
             start_usec: info.pbi_start_tvusec,
             child,
+            descendants: Vec::new(),
         })
     }
 
     pub fn poll_exit(&mut self) -> Result<Option<bool>> {
-        let status = self.child.try_wait().map_err(|_| unavailable())?;
-        Ok(status.map(|s| s.success()))
+        let root_status = self.child.try_wait().map_err(|_| unavailable())?;
+        
+        // Retain active descendants
+        self.descendants.retain(|&dpid| inspect_proc_bsdinfo(dpid).is_ok());
+
+        if let Some(status) = root_status {
+            if !self.descendants.is_empty() {
+                // Root launcher exited, but descendant game process is active
+                return Ok(None);
+            }
+            Ok(Some(status.success()))
+        } else {
+            Ok(None)
+        }
+    }
+
+    pub fn register_descendant(&mut self, child_pid: u32) {
+        if inspect_proc_bsdinfo(child_pid).is_ok() && !self.descendants.contains(&child_pid) {
+            self.descendants.push(child_pid);
+        }
     }
 
     pub fn pid(&self) -> u32 {
@@ -168,36 +188,47 @@ impl OwnedGameProcess {
     }
 
     pub fn windows(&self) -> Result<Vec<GameWindow>> {
-        let info = inspect_proc_bsdinfo(self.pid)?;
-        if info.pbi_start_tvsec != self.start_sec || info.pbi_start_tvusec != self.start_usec {
+        let mut results = Vec::new();
+        if let Ok(info) = inspect_proc_bsdinfo(self.pid) {
+            if info.pbi_start_tvsec == self.start_sec && info.pbi_start_tvusec == self.start_usec {
+                let creation = self.creation_time();
+                let window_id = ((self.pid as u64) << 32) | (creation & 0xFFFF_FFFF);
+                let title = format!("macOS Game Window (PID {})", self.pid);
+                results.push(GameWindow::new(window_id, self.pid, creation, title));
+            }
+        }
+        for &dpid in &self.descendants {
+            if let Ok(info) = inspect_proc_bsdinfo(dpid) {
+                let creation = info.pbi_start_tvsec.saturating_mul(1_000_000).saturating_add(info.pbi_start_tvusec);
+                let window_id = ((dpid as u64) << 32) | (creation & 0xFFFF_FFFF);
+                let title = format!("macOS Game Window (Child PID {})", dpid);
+                results.push(GameWindow::new(window_id, dpid, creation, title));
+            }
+        }
+        if results.is_empty() {
             return Err(unavailable());
         }
-
-        let creation = self.creation_time();
-        let window_id = ((self.pid as u64) << 32) | (creation & 0xFFFF_FFFF);
-        let title = format!("macOS Game Window (PID {})", self.pid);
-        Ok(vec![GameWindow::new(window_id, self.pid, creation, title)])
+        Ok(results)
     }
 
     pub fn admit_window(&self, selected: &GameWindow) -> Result<u32> {
-        if selected.process_id != self.pid || selected.creation_time != self.creation_time() {
+        let target_pid = selected.process_id;
+        if target_pid != self.pid && !self.descendants.contains(&target_pid) {
             return Err(unavailable());
         }
-        let info = inspect_proc_bsdinfo(self.pid)?;
-        if info.pbi_start_tvsec != self.start_sec || info.pbi_start_tvusec != self.start_usec {
+        let info = inspect_proc_bsdinfo(target_pid)?;
+        let creation = info.pbi_start_tvsec.saturating_mul(1_000_000).saturating_add(info.pbi_start_tvusec);
+        if creation != selected.creation_time {
             return Err(unavailable());
         }
-        Ok(self.pid)
+        Ok(target_pid)
     }
 
     pub fn admit_selected(&self, pid: u32) -> Result<u32> {
-        if pid != self.pid {
+        if pid != self.pid && !self.descendants.contains(&pid) {
             return Err(unavailable());
         }
-        let info = inspect_proc_bsdinfo(self.pid)?;
-        if info.pbi_start_tvsec != self.start_sec || info.pbi_start_tvusec != self.start_usec {
-            return Err(unavailable());
-        }
-        Ok(self.pid)
+        let _info = inspect_proc_bsdinfo(pid)?;
+        Ok(pid)
     }
 }

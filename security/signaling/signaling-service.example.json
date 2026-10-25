@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "OmniPlay Signaling Service Configuration Template",
+  "description": "Production configuration for authenticated HTTPS/WSS WebRTC signaling gateway",
+  "service": {
+    "listen_address": "0.0.0.0:8443",
+    "public_audience": "https://signal.omniplay.vlikeon.internal",
+    "tls": {
+      "certificate_chain_path": "/etc/ssl/certs/signal.omniplay.vlikeon.internal.crt",
+      "private_key_path": "/etc/ssl/private/signal.omniplay.vlikeon.internal.key",
+      "min_version": "TLS1.3"
+    },
+    "authentication": {
+      "require_signed_invite": true,
+      "max_clock_skew_ms": 30000,
+      "ed25519_pinned_root_keys": []
+    },
+    "turn_service": {
+      "shared_secret_env_var": "TURN_STATIC_AUTH_SECRET",
+      "turn_urls": [
+        "turns:turn.omniplay.vlikeon.internal:5349?transport=udp",
+        "turns:turn.omniplay.vlikeon.internal:5349?transport=tcp"
+      ],
+      "token_ttl_seconds": 600
+    },
+    "limits": {
+      "max_concurrent_sessions": 200,
+      "max_message_bytes": 16384,
+      "session_idle_timeout_seconds": 120
+    }
+  }
+}

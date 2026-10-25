@@ -1,0 +1,61 @@
+# OmniPlay Production TURN/STUN Configuration Template (coturn)
+# RFC 5766 (TURN), RFC 5389 (STUN), RFC 6156 (IPv6 TURN), RFC 7065 (TURN URI)
+# DO NOT COMMIT REAL PRODUCTION SECRETS TO REPOSITORY.
+# Inject secrets via environment variables or secret store at deployment time.
+
+# Network listener ports
+listening-port=3478
+tls-listening-port=5349
+alt-listening-port=3479
+alt-tls-listening-port=5350
+
+# Bind IP addresses (replace with public production IPs)
+# listening-ip=203.0.113.10
+# relay-ip=203.0.113.10
+
+# External IP mapping for NAT environments
+# external-ip=203.0.113.10
+
+# Server realm and identity
+realm=turn.omniplay.vlikeon.internal
+server-name=turn.omniplay.vlikeon.internal
+
+# TURN REST API dynamic authentication (RFC 7635)
+# Generates short-lived credentials: username = <timestamp>:<key_id>, password = HMAC-SHA1(secret, username)
+use-auth-secret
+static-auth-secret=REPLACE_WITH_PRODUCTION_HMAC_SECRET_256BIT_HEX
+
+# Minimum and maximum relay ports (opened in firewall for UDP relay)
+min-port=49152
+max-port=65535
+
+# TLS Certificate configuration
+cert=/etc/ssl/certs/turn.omniplay.vlikeon.internal.crt
+pkey=/etc/ssl/private/turn.omniplay.vlikeon.internal.key
+cipher-list="ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384"
+no-tlsv1
+no-tlsv1_1
+
+# Security and Anti-Abuse Controls
+# Strictly deny relaying to local/private network ranges (SSRF protection)
+no-loopback-peers
+no-multicast-peers
+denied-peer-ip=10.0.0.0-10.255.255.255
+denied-peer-ip=172.16.0.0-172.31.255.255
+denied-peer-ip=192.168.0.0-192.168.255.255
+denied-peer-ip=127.0.0.0-127.255.255.255
+denied-peer-ip=169.254.0.0-169.254.255.255
+denied-peer-ip=::1
+
+# Rate limiting and resource quotas per session
+total-quota=1000
+user-quota=10
+bps-capacity=0
+stale-nonce=600
+channel-lifetime=600
+permission-lifetime=300
+
+# Logging
+log-file=/var/log/coturn/turnserver.log
+simple-log
+no-stdout-log
