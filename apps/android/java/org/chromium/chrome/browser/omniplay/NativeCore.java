@@ -50,13 +50,16 @@ public final class NativeCore {
     private File mRoot;
     private boolean mFailed;
     private boolean mPairingAttached;
+    private final ApprovedCores mApprovedCores;
 
+    public ApprovedCores getApprovedCores() { return mApprovedCores; }
     public static synchronized NativeCore get(Context context) {
         if (sInstance == null) sInstance = new NativeCore(context.getApplicationContext());
         return sInstance;
     }
     private NativeCore(Context context) {
         mContext=context.getApplicationContext();
+        mApprovedCores = new ApprovedCores(mContext);
         mBase = new File(context.getNoBackupFilesDir(), "OmniPlay");
         mIo.execute(() -> {
             try {
@@ -1061,6 +1064,12 @@ public final class NativeCore {
             }
             if(command!=null&&"hello".equals(command.optString("method"))&&"ok".equals(response.optString("status"))&&SelectedDiscTree.supported()){
                 JSONObject result=response.getJSONObject("result");result.getJSONArray("capabilities").put("disc_import");result.put("disc_provider_protocol",1);
+            }
+            if(command!=null&&"hello".equals(command.optString("method"))&&"ok".equals(response.optString("status"))){
+                try { response.getJSONObject("result").put("core_capabilities", mApprovedCores.getCapabilities()); } catch (Exception ignored) {}
+            }
+            if(command!=null&&"core_capabilities".equals(command.optString("method"))){
+                try { return success(request, mApprovedCores.getCapabilities()); } catch (Exception ignored) {}
             }
             return command!=null&&"device_snapshot".equals(command.optString("method"))?DeviceSnapshot.augment(mContext,response):response;
         }, response -> {

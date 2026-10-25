@@ -1,2 +1,40 @@
 <?xml version="1.0" encoding="utf-8"?>
-<resources><string name="omniplay_game_hub">Kho trò chơi Vlikeon</string></resources>
+<resources>
+    <item name="omniplay_game_hub_menu_id" type="id" />
+    <string name="omniplay_game_hub">Vlikeon Game Hub</string>
+    <string name="app_name">Vlikeon</string>
+    <string name="omniplay_remote_play">Vlikeon Remote Play</string>
+    <string name="omniplay_settings">Cài đặt</string>
+    <string name="omniplay_cloud_sync">Đồng bộ đám mây</string>
+    <string name="omniplay_pair_device">Ghép đôi thiết bị</string>
+    <string name="omniplay_import_disc">Nhập đĩa game</string>
+    <string name="omniplay_export_save">Xuất bản lưu</string>
+    <string name="omniplay_launch_game">Chạy game</string>
+    <string name="omniplay_pause_game">Tạm dừng game</string>
+    <string name="omniplay_resume_game">Tiếp tục game</string>
+    <string name="omniplay_stop_game">Dừng game</string>
+    <string name="omniplay_pairing_code">Mã ghép đôi: %1$s</string>
+    <string name="omniplay_pairing_success">Ghép đôi thiết bị thành công</string>
+    <string name="omniplay_pairing_failed">Ghép đôi thất bại hoặc quá thời gian</string>
+    <string name="omniplay_sync_running">Đang đồng bộ bản lưu game…</string>
+    <string name="omniplay_sync_completed">Đồng bộ hoàn tất</string>
+    <string name="omniplay_sync_failed">Đồng bộ thất bại</string>
+    <string name="omniplay_storage_low">Dung lượng thấp: giải phóng bộ nhớ để lưu tiến trình</string>
+
+    <!-- Accessibility / TalkBack content descriptions -->
+    <string name="acc_omniplay_game_hub">Mở Vlikeon Game Hub</string>
+    <string name="acc_dpad_up">Nút hướng Lên</string>
+    <string name="acc_dpad_down">Nút hướng Xuống</string>
+    <string name="acc_dpad_left">Nút hướng Trái</string>
+    <string name="acc_dpad_right">Nút hướng Phải</string>
+    <string name="acc_button_a">Nút hành động A</string>
+    <string name="acc_button_b">Nút hành động B</string>
+    <string name="acc_button_x">Nút hành động X</string>
+    <string name="acc_button_y">Nút hành động Y</string>
+    <string name="acc_button_l1">Nút vai trái L1</string>
+    <string name="acc_button_r1">Nút vai phải R1</string>
+    <string name="acc_button_start">Nút Bắt đầu</string>
+    <string name="acc_button_select">Nút Lựa chọn</string>
+    <string name="acc_remote_play_surface">Khu vực hiển thị stream Remote Play</string>
+    <string name="acc_sync_status">Trạng thái đồng bộ</string>
+</resources>

@@ -60,6 +60,8 @@ public final class BackgroundSyncService extends JobService {
 
     @Override public boolean onStartJob(JobParameters parameters) {
         if (parameters.getJobId() != JOB_ID || mParameters != null) return false;
+        android.os.PowerManager pm = getSystemService(android.os.PowerManager.class);
+        if (pm != null && pm.isPowerSaveMode()) return false;
         mParameters = parameters;
         try {
             IntentFilter filter = new IntentFilter(Intent.ACTION_SCREEN_OFF);
@@ -103,6 +105,12 @@ public final class BackgroundSyncService extends JobService {
     @Override public boolean onStopJob(JobParameters parameters) {
         if (mParameters == parameters) clear();
         return false;
+    }
+    @Override public void onTrimMemory(int level) {
+        super.onTrimMemory(level);
+        if (level >= android.content.ComponentCallbacks2.TRIM_MEMORY_RUNNING_CRITICAL && mParameters != null) {
+            finish(mParameters, false);
+        }
     }
     @Override public void onDestroy() { clear(); super.onDestroy(); }
 }

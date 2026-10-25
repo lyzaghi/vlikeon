@@ -2,4 +2,39 @@
 <resources>
     <item name="omniplay_game_hub_menu_id" type="id" />
     <string name="omniplay_game_hub">Vlikeon Game Hub</string>
+    <string name="app_name">Vlikeon</string>
+    <string name="omniplay_remote_play">Vlikeon Remote Play</string>
+    <string name="omniplay_settings">Settings</string>
+    <string name="omniplay_cloud_sync">Cloud Synchronization</string>
+    <string name="omniplay_pair_device">Pair Device</string>
+    <string name="omniplay_import_disc">Import Disc</string>
+    <string name="omniplay_export_save">Export Save</string>
+    <string name="omniplay_launch_game">Launch Game</string>
+    <string name="omniplay_pause_game">Pause Game</string>
+    <string name="omniplay_resume_game">Resume Game</string>
+    <string name="omniplay_stop_game">Stop Game</string>
+    <string name="omniplay_pairing_code">Pairing Code: %1$s</string>
+    <string name="omniplay_pairing_success">Device paired successfully</string>
+    <string name="omniplay_pairing_failed">Pairing failed or timed out</string>
+    <string name="omniplay_sync_running">Syncing game saves…</string>
+    <string name="omniplay_sync_completed">Synchronization completed</string>
+    <string name="omniplay_sync_failed">Synchronization failed</string>
+    <string name="omniplay_storage_low">Low storage: free up space to save progress</string>
+
+    <!-- Accessibility / TalkBack content descriptions -->
+    <string name="acc_omniplay_game_hub">Open Vlikeon Game Hub</string>
+    <string name="acc_dpad_up">Directional Pad Up</string>
+    <string name="acc_dpad_down">Directional Pad Down</string>
+    <string name="acc_dpad_left">Directional Pad Left</string>
+    <string name="acc_dpad_right">Directional Pad Right</string>
+    <string name="acc_button_a">Action Button A</string>
+    <string name="acc_button_b">Action Button B</string>
+    <string name="acc_button_x">Action Button X</string>
+    <string name="acc_button_y">Action Button Y</string>
+    <string name="acc_button_l1">Left Shoulder L1</string>
+    <string name="acc_button_r1">Right Shoulder R1</string>
+    <string name="acc_button_start">Start Button</string>
+    <string name="acc_button_select">Select Button</string>
+    <string name="acc_remote_play_surface">Remote Play stream presentation</string>
+    <string name="acc_sync_status">Sync status</string>
 </resources>
