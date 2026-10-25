@@ -1,0 +1,58 @@
+name: OmniPlay Continuous Integration
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  qualification:
+    name: Qualification Suites & Clean Clone Verification
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Verify Clean Clone Integrity
+        run: python tools/verify_clean_clone.py
+
+      - name: Run Android Qualification Suite
+        run: python qa/mobile/android_qualification.py
+
+      - name: Run iOS Qualification Suite
+        run: python qa/mobile/ios_qualification.py
+
+      - name: Run Web/PWA Qualification Suite
+        run: python qa/web_pwa_qualification.py
+
+      - name: Run Encrypted Sync Qualification Suite
+        run: python qa/sync_qualification.py
+
+      - name: Run Benchmark & Presentation Qualification Suite
+        run: python qa/benchmark_qualification.py
+
+      - name: Run Installer, Repair & Update Qualification Suite
+        run: python qa/installer_qualification.py
+
+      - name: Run Security, Licensing & Release Qualification Suite
+        run: python qa/security_license_qualification.py
