@@ -48,6 +48,8 @@ def test_installer_wizard_unattended():
         success = wizard.run(accept_eula=True)
         assert success, "Silent install failed with accept_eula"
         assert install_dir.exists(), "Target install directory not created"
+        assert (install_dir / ".omniplay-install-receipt.json").is_file(), "Install receipt not created"
+        assert (install_dir / "LICENSE-EULA.txt").is_file(), "EULA file not staged"
         assert data_dir.exists(), "Target data directory not created"
 
     print("  PASS: Unattended wizard lifecycle verified.")
@@ -157,6 +159,8 @@ def test_linux_packaging_specs():
     print("Running Test 5: Linux Debian/RPM/Flatpak Packaging Specifications...")
     deb_control = Path("packaging/linux/debian/control")
     assert deb_control.exists(), "Debian control file missing"
+    assert Path("packaging/linux/debian/rules").exists(), "Debian rules file missing"
+    assert Path("packaging/linux/debian/changelog").exists(), "Debian changelog file missing"
     control_text = deb_control.read_text(encoding="utf-8")
     assert "Package: omniplay" in control_text
     assert "Architecture: amd64" in control_text

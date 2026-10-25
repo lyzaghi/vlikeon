@@ -19,7 +19,7 @@ This document provides the consolidated evaluation across all **109 work items**
 | **84–87** | J | Benchmark Registry & Presentation Timing | `SOURCE_READY_UNVERIFIED` / `WAITING` (Commit `2de3d10`) | `antigravity-app` |
 | **88–95** | K | Installer, Repair, Update & Maintenance | `SOURCE_READY_UNVERIFIED` / `WAITING` (Commit `a7bf9de`) | `antigravity-app` |
 | **96–104** | L | Licensing, Provenance, SBOM & Security | `SOURCE_READY_UNVERIFIED` / `WAITING` (Commit `4eea67b`) | `antigravity-app` |
-| **105–109** | M | Fixtures, CI, Intake & Final Evaluation | `SOURCE_READY_UNVERIFIED` / `WAITING` (Batch 10) | `antigravity-app` |
+| **105–109** | M | Fixtures, CI, Intake & Final Evaluation | `SOURCE_READY_UNVERIFIED` / `WAITING` (Commits `5247e64`, `230bcc8`) | `antigravity-app` |
 
 ---
 
@@ -95,11 +95,19 @@ This document provides the consolidated evaluation across all **109 work items**
 - User feedback intake validator and PII scrubbing (`tools/feedback_intake.py`, `docs/USER_FEEDBACK_INTAKE.md`).
 - Final project sign-off and release gate evaluation (`docs/FINAL_RELEASE_READINESS_SIGNOFF.md`).
 
+### Batch 11 (Post-Audit Remediation across Items 53–109, Commit `230bcc8`)
+- Remediated all 22 audit findings across `omniplay-updater`, `omniplay-stream-input`, `omniplay-streaming`, `omniplay-core`, `omniplay-broker`, `omniplay-local-service`, Android, iOS, Web/PWA, and packaging tools:
+  - Fixed updater repair lock self-deadlock, `hash_file` signature, and `unpack_matching_manifest` payload extraction (`platform/updater/src/{package,repair,cleanup}.rs`).
+  - Added missing `#[cfg(windows)]` guards in `video_client.rs`, container-scoped `UinputProvider::cleanup_identity` in `gamepad_uinput.rs`, `/proc/{pid}/stat` `starttime` verification and full `gamepad_protocol::Action` dispatch in `gamepad_linux_host.rs`, and `NativeRecoveryOwner` integration in `stream_credentials_recovery.rs`.
+  - Hardened `native_srtp.rs` (session key derivation, ROC in HMAC-SHA1-80 tag, replay window update strictly after authentication, HMAC-SHA256 counter-mode keystream) and `native_ice_agent.rs` (`ATTR_MESSAGE_INTEGRITY` HMAC-SHA1 verification).
+  - Connected `BenchmarkRegistry::load_from_database` and `InstalledGames::is_registered` in `service.rs` and `host.rs`; removed fabricated flip timing estimates in `apps/web/platform/presentation-timing.js`.
+  - Fixed stateful fractional phase across audio chunks in `audio-resampler.js`, true 64 KiB slice streaming SHA-256 in `quota-manager.js`, `-32767..=32767` stick clamping & non-wrapping sequence exhaustion across Web/Android/iOS gamepads, canonical SAF/FileProvider path containment, and real packaging/installer/fixture scripts.
+
 ---
 
 ## 3. Strict Release Gate Status
 
 In strict compliance with project handover instructions:
-1. **Source Implementation**: **CODE COMPLETE** across all items 53–109. All required callers, adapters, protocols, validators, and packaging specifications are fully authored and committed.
-2. **Offline Verification**: **PASS** across all 7 automated qualification suites (`android`, `ios`, `web_pwa`, `sync`, `benchmark`, `installer`, `security_license`).
+1. **Source Implementation**: **CODE COMPLETE (`SOURCE_READY_UNVERIFIED`)** across all items 53–109. All required callers, adapters, protocols, validators, and packaging specifications are authored, audited, and committed.
+2. **Qualification Suites**: Prepared in `qa/` (`remote_play_qualification.py`, `mobile/android_qualification.py`, `mobile/ios_qualification.py`, `web_pwa_qualification.py`, `sync_qualification.py`, `benchmark_qualification.py`, `installer_qualification.py`, `security_license_qualification.py`); execution remains deferred per handover policy until target build/test phase.
 3. **Physical Deployment & Independent Verification**: Designated as `WAITING_PERMISSION_OR_RESOURCE`. Physical device lab benchmarks, external security penetration audits, live HSM key ceremonies, and store release submissions remain the final gate prior to production launch. No false claims of production `PASS` are made.
