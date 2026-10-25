@@ -43,3 +43,12 @@ artifact approval, enabled service policies, cross-language/interoperability,
 revocation, reconnect, transfer/reconciliation faults and real device qualification
 remain required. This pass fixes observed source races; it does not establish
 cryptographic correctness, end-to-end service availability or item completion.
+
+## Cryptographic Envelope, Resumable Chunking, Deployment & Fault Recovery (Batch 06)
+
+Source implementation and specifications added covering items 77–83:
+- `docs/ENCRYPTED_SYNC_CRYPTO_SPEC.md` (Items 77, 78, 80): XChaCha20-Poly1305 envelope, 44-byte immutable AAD structure, 256 KiB chunked streaming memory boundary (<= 512 KiB ceiling), cross-platform test vectors for Rust, WebCrypto, KeyStore, and Keychain.
+- `security/sync/sync-service.example.json` & `docs/SYNC_SERVICE_DEPLOYMENT.md` (Item 79): Authenticated sync service deployment template with TLS 1.3, JWT audience pinning, account storage quotas, and staging sweepers.
+- `docs/SYNC_RECONCILIATION_DESIGN.md` (Items 81, 82): State machine for resumable chunk uploads; lost `upload_commit` reply reconciliation via `already_stored` recovery; 24h orphan sweep TTL; save provenance ledger.
+- `qa/sync_qualification.py` & `docs/SYNC_QUALIFICATION.md` (Item 83): Automated qualification suite (9 unit tests passing) and end-to-end live fault matrix (`WAITING_PERMISSION_OR_RESOURCE`).
+
