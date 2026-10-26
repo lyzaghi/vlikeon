@@ -11,6 +11,7 @@ pub mod linux_plan;
 #[cfg(all(target_os="linux",target_arch="x86_64"))]pub mod linux_host_channel;
 #[cfg(all(target_os="linux",target_arch="x86_64"))]pub mod linux_elf;
 #[cfg(all(target_os="linux",target_arch="x86_64"))]pub mod linux_images;
+#[cfg(all(target_os="linux",target_arch="x86_64"))]pub mod linux_quota;
 #[cfg(all(target_os="linux",target_arch="x86_64",target_env="gnu"))]pub mod linux_launch;
 #[cfg(all(target_os="linux",target_arch="x86_64",target_env="gnu"))]pub mod linux_presentation;
 
@@ -66,4 +67,28 @@ pub fn retire_abandoned_profile(name:&str,process:Option<ProcessIdentity>)->Resu
 pub fn grant_public_runtime_read(directory:&Path)->Result<()> {
     #[cfg(windows)]{windows::grant_public_runtime_read(directory)}
     #[cfg(not(windows))]{let _=directory;Err(unavailable())}
+}
+
+pub fn enforce_windows_session_write_quotas(profile_root:&Path,work_dir:&Path,allow_legacy_os_writes:bool)->Result<()>{
+    #[cfg(windows)]{
+        windows::write_quota::enforce_work_write_quotas(work_dir,allow_legacy_os_writes)?;
+        windows::write_quota::enforce_profile_write_quota(profile_root)?;
+        Ok(())
+    }
+    #[cfg(not(windows))]{
+        let _=(profile_root,work_dir,allow_legacy_os_writes);
+        Ok(())
+    }
+}
+
+pub fn enforce_linux_session_physical_quotas(profile_root:&Path,work_dir:&Path)->Result<()>{
+    #[cfg(all(target_os="linux",target_arch="x86_64"))]{
+        linux_quota::enforce_work_physical_quotas(work_dir)?;
+        linux_quota::enforce_profile_physical_quota(profile_root)?;
+        Ok(())
+    }
+    #[cfg(not(all(target_os="linux",target_arch="x86_64")))]{
+        let _=(profile_root,work_dir);
+        Ok(())
+    }
 }

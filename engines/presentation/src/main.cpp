@@ -98,14 +98,26 @@ public:
   Pending ready(){Bytes b(24,0);put32(b,0,kProtocol);put32(b,4,max_width_);put32(b,8,max_height_);put32(b,12,192000);put32(b,16,kMaxAudioFrames);put32(b,20,haptics_?1:0);return{Kind::Ready,epoch_,std::move(b)};}
   void run(){
     while(!quit_&&!bus_.closed()){
-      if(owner_.stop_requested())break;if(owner_.take_focus()&&!SDL_RaiseWindow(window_))reason_=4;
+      if(owner_.stop_requested())break;
+      if(owner_.take_focus()){
+        const auto flags=SDL_GetWindowFlags(window_);
+        if((flags&SDL_WINDOW_MINIMIZED)!=0)SDL_RestoreWindow(window_);
+        if(!SDL_RaiseWindow(window_))reason_=4;
+        SDL_SyncWindow(window_);
+      }
       SDL_Event event;while(SDL_PollEvent(&event)){
         if(event.type==SDL_EVENT_QUIT||(event.type==SDL_EVENT_WINDOW_CLOSE_REQUESTED&&event.window.windowID==SDL_GetWindowID(window_))){reason_=1;quit_=true;}
         else if((event.type==SDL_EVENT_WINDOW_FOCUS_LOST||event.type==SDL_EVENT_WINDOW_MINIMIZED||event.type==SDL_EVENT_WINDOW_HIDDEN)&&event.window.windowID==SDL_GetWindowID(window_)){focused_=false;fence(2);}
+        else if((event.type==SDL_EVENT_WINDOW_FOCUS_GAINED||event.type==SDL_EVENT_WINDOW_RESTORED||event.type==SDL_EVENT_WINDOW_SHOWN)&&event.window.windowID==SDL_GetWindowID(window_)){
+          const auto flags=SDL_GetWindowFlags(window_);
+          const bool focused=SDL_GetKeyboardFocus()==window_&&(flags&(SDL_WINDOW_HIDDEN|SDL_WINDOW_MINIMIZED))==0;
+          if(focused&&!focused_){focused_=true;fence(2);}
+        }
         else if((event.type==SDL_EVENT_RENDER_DEVICE_LOST||event.type==SDL_EVENT_RENDER_DEVICE_RESET||event.type==SDL_EVENT_RENDER_TARGETS_RESET)&&event.render.windowID==SDL_GetWindowID(window_)){fence(4);throw Failure();}
         else if(event.type==SDL_EVENT_GAMEPAD_REMOVED){const bool owned=std::any_of(pads_.begin(),pads_.end(),[&](auto* pad){return pad&&SDL_GetGamepadID(pad)==event.gdevice.which;});update_pads();if(owned)fence(2);}
         else if(event.type==SDL_EVENT_GAMEPAD_ADDED)update_pads();
         else if(event.type==SDL_EVENT_KEY_DOWN&&!event.key.repeat&&event.key.windowID==SDL_GetWindowID(window_)&&event.key.scancode==SDL_SCANCODE_F11){if(!SDL_SetWindowFullscreen(window_,!(SDL_GetWindowFlags(window_)&SDL_WINDOW_FULLSCREEN)))reason_=4;}
+        else if(event.type==SDL_EVENT_KEY_DOWN&&!event.key.repeat&&event.key.windowID==SDL_GetWindowID(window_)&&event.key.scancode==SDL_SCANCODE_ESCAPE){if(playing_)fence(2);}
         else if(event.type==SDL_EVENT_MOUSE_WHEEL&&event.wheel.windowID==SDL_GetWindowID(window_)){wheel_x_=std::clamp(wheel_x_+event.wheel.x,-32767.0f,32767.0f);wheel_y_=std::clamp(wheel_y_+event.wheel.y,-32767.0f,32767.0f);}
         else if((event.type==SDL_EVENT_FINGER_DOWN||event.type==SDL_EVENT_FINGER_MOTION||event.type==SDL_EVENT_FINGER_UP||event.type==SDL_EVENT_FINGER_CANCELED)&&event.tfinger.windowID==SDL_GetWindowID(window_)){if(event.type==SDL_EVENT_FINGER_DOWN&&!finger_down_){finger_=event.tfinger.fingerID;finger_down_=true;}if(finger_down_&&finger_==event.tfinger.fingerID){finger_x_=event.tfinger.x;finger_y_=event.tfinger.y;if(event.type==SDL_EVENT_FINGER_UP||event.type==SDL_EVENT_FINGER_CANCELED)finger_down_=false;}}
       }

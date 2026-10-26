@@ -94,6 +94,24 @@ impl RecoveryDelegation{
             if unsafe{libc::unlinkat(self.inner.directory.as_raw_fd(),name.as_ptr(),libc::AT_REMOVEDIR)}!=0{return Err(unavailable());}drop(directory);
         }Ok(())
     }
+    /// Removes an unacknowledged leaf left by a creator proven to have exited
+    /// before group acknowledgement or process launch. Never signals any PID.
+    pub fn remove_unacknowledged_empty_leaf(&self,session:&str,presentation:bool)->Result<()>{
+        crate::linux_plan::session(session)?;self.inner.limits()?;
+        let name=CString::new(if presentation{format!("omniplay-ui-{session}")}else{format!("omniplay-{session}")}).map_err(|_|unavailable())?;
+        let raw=unsafe{libc::openat(self.inner.directory.as_raw_fd(),name.as_ptr(),libc::O_PATH|libc::O_DIRECTORY|libc::O_NOFOLLOW|libc::O_CLOEXEC)};
+        if raw<0{
+            return if std::io::Error::last_os_error().raw_os_error()==Some(libc::ENOENT){Ok(())}else{Err(unavailable())};
+        }
+        let directory=unsafe{File::from_raw_fd(raw)};
+        let shape=metadata(&directory)?;
+        if shape.dev()!=self.inner.identity.device||shape.ino()==0||shape.ino()==self.inner.identity.inode||text(&directory,c"cgroup.type")?!="domain\n"||!empty(&directory)?||!no_descendants(&directory)?||!text(&directory,c"cgroup.procs")?.is_empty(){
+            return Err(unavailable());
+        }
+        if unsafe{libc::unlinkat(self.inner.directory.as_raw_fd(),name.as_ptr(),libc::AT_REMOVEDIR)}!=0{return Err(unavailable());}
+        drop(directory);
+        Ok(())
+    }
     pub fn charges_retired(&self)->Result<bool>{self.inner.limits()?;no_dying(&self.inner.directory)}
     /// New launches remain impossible until the whole admitted subtree has no
     /// live, visible or dying descendants. Unknown leftovers prevent conversion.

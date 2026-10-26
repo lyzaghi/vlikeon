@@ -5,6 +5,7 @@ use windows_sys::Win32::{Foundation::*,Security::{*,Authorization::*,Isolation::
 mod presentation;
 mod storage;
 mod registry_storage;
+pub mod write_quota;
 #[cfg(test)]mod storage_tests;
 #[cfg(test)]mod device_free_tests;
 pub use presentation::PresentationHost;

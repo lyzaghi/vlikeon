@@ -78,6 +78,14 @@ impl NativeWorkJobs {
 
     pub fn cancel_all(&self){if let Some(active)=&self.current{active.cancel.store(true,Ordering::Release);}}
 
+    pub fn quarantine_legacy(&self,root:&Path,profile_id:Uuid,work_id:Uuid)->Result<omniplay_native_runtime::LegacyQuarantineReceipt>{
+        if !enabled(){return Err(unsupported());}
+        if profile_id.is_nil()||work_id.is_nil(){return Err(PlatformError::new(ErrorCode::PermissionDenied,"Legacy work quarantine requires an exact profile and work owner"));}
+        if self.busy(){return Err(PlatformError::new(ErrorCode::Busy,"A native temporary-session recovery is still finishing"));}
+        #[cfg(windows)]{omniplay_native_runtime::quarantine_unowned_windows_work(root,profile_id,work_id)}
+        #[cfg(not(windows))]{let _=(root,profile_id,work_id);Err(unsupported())}
+    }
+
     pub fn diagnostic(&self)->Result<Option<omniplay_core::diagnostics::NativeRecoveryDiagnostic>>{
         let Some(active)=&self.current else{return Ok(None)};
         // Export never waits on a worker-held snapshot lock and never exposes
