@@ -34,7 +34,7 @@ or change the separate source fork's item-53/54/55 deferrals.
 2. [x] Đồng bộ README, roadmap và tài liệu trạng thái với kết quả phát triển, kiểm thử thực tế. Đối chiếu: `DOCUMENTATION_ALIGNMENT.md`.
 3. [x] Build trình duyệt Chromium Vlikeon hoàn chỉnh trên Windows. Bằng chứng build x64 và giới hạn kiểm chứng: `WINDOWS_CHROMIUM_BUILD.md`.
 4. [x] Build trình duyệt Chromium Vlikeon hoàn chỉnh trên Linux. Batch 004-build-d exit 0; Antigravity kiểm thử và Codex duyệt ELF64 x86-64/frozen inputs. Phạm vi development build, chưa nghiệm thu runtime/release/reproducibility; xem LINUX_CHROMIUM_BUILD.md.
-5. [ ] Build trình duyệt Chromium Vlikeon hoàn chỉnh trên macOS.
+5. [x] Build trình duyệt Chromium Vlikeon hoàn chỉnh trên macOS. Batch 005-build-g exit 0; native/Antigravity PASS, Codex duyệt Mach-O ARM64/frozen inputs. Phạm vi development build; runtime/signing/release/reproducibility còn mở. Xem MACOS_CHROMIUM_BUILD.md.
 6. [ ] Kiểm chứng Game Hub, tab, hồ sơ thường/riêng tư, quyền truy cập và native bridge trong trình duyệt thật. Windows development đã qua 24 kiểm tra thực tế; giữ mở cho Linux/macOS. Bằng chứng và giới hạn: `BROWSER_RUNTIME_QUALIFICATION.md`.
 7. [ ] Kiểm chứng quy trình nâng phiên bản Chromium mà vẫn giữ đúng các bản vá Vlikeon.
 8. [ ] Hoàn thiện giới hạn dung lượng ghi của core, helper, bộ nhớ đệm và hồ sơ trên Windows.

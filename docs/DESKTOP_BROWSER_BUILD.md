@@ -8,7 +8,7 @@ completed a frozen Windows x64 development Chromium build with independently
 checked output integrity; see `WINDOWS_CHROMIUM_BUILD.md`. Browser runtime and
 release acceptance remain open. Task 4's accepted Linux x64 development build is recorded
 in `LINUX_CHROMIUM_BUILD.md`. The owner authorized parallel task 5 preparation
-in `MACOS_CHROMIUM_BUILD.md`; Mac batch 005-build-g is compiling; full build acceptance remains pending. Selected
+in `MACOS_CHROMIUM_BUILD.md`; Mac batch 005-build-g is accepted for development build integrity; runtime/release acceptance remains pending. Selected
 source/unit checks are in `SOURCE_INTEGRATION.md`. Preparing inputs does not
 establish compilation on another host or qualify later source changes.
 
