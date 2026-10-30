@@ -1,10 +1,34 @@
-# Task 4 — Linux x64 Chromium build, provisioning in progress
+# Task 4 — accepted Linux x64 development Chromium build
 
-Task 4 requires the full Vlikeon `chrome` target on Linux x64. It remains open.
-The Windows executable, a source archive, a Windows-hosted fixture and source
-preparation cannot satisfy this requirement. A remote Linux build host is now
-available and dependency provisioning has started. No Linux full-target success
-or acceptance test is recorded yet.
+Batch 004-build-d completed the full chrome target with exit 0 at
+2026-10-29T13:33:29Z (204083.92 seconds, one job).
+Antigravity independently executed the native checker in this chat's turn 0049:
+the raw command completed with exit 0 and passed: true. Codex reviewed the
+completed tool output and independently retrieved the remote report on
+2026-10-30. Its receipt, batch and selected artifact hashes match the earlier
+Codex native acceptance report.
+
+[acceptance-ag-d.json](../qa/evidence/sequential/item-004/acceptance-ag-d.json) preserves the returned report
+without SSH host details. It binds the unchanged 141 frozen inputs, completed
+build journal and receipt, dependency/GN digests, ELF64 x86-64 executable identity
+and five selected outputs.
+Receipt SHA-256: 65200b9e3daeb5e92171e9b7baef19472ab9bc8e0725ec71dc5435ead3d180ed.
+Batch result SHA-256: a6db7fed35c64d364e49f984d06f93f2c0e49040164cec91f60b17b8724253c5.
+
+The recipe records Git/Python identities and pinned depot_tools revision
+4be4e4628e093c4ad50210db5dcfa05a88280bda; Chromium revision is
+0e66b94549a8bd85f03fbdf189b752d6e7b63c32. Product source tree is
+c90b68c0cb3cf9bff4462473a3c8be5969bb54b0, independent of later parallel edits.
+The low-memory host had about 4 GB physical RAM and 28 GiB swap, below
+upstream's 8 GB physical RAM minimum. Earlier failed/interrupted batch logs
+remain preserved.
+
+Acceptance covers the full development build and selected output integrity.
+Runtime/native bridge, production cores, release signing/distribution and
+clean-clone reproducibility are separate, unaccepted scopes.
+See ../qa/evidence/sequential/item-004/preparation-summary.json.
+
+## Historical preparation and provisioning record
 
 ## Observed host constraint
 
@@ -29,8 +53,7 @@ confirmed its configuration changed to 4,101,849,088 bytes physical RAM,
 volume, with two logical CPUs. Storage now exceeds the pinned minimum; physical
 RAM still falls below upstream's stated 8 GB minimum. Codex is attempting one
 compiler job using the existing swap, recording this resource deviation rather
-than claiming the host meets that minimum. Compiler/linker success remains
-unproven. No swap, VM, OS-feature or restart change was made by this task.
+than claiming the host meets that minimum. The later batch D compiler/linker success is recorded above. No swap, VM, OS-feature or restart change was made by this task.
 
 The frozen archive transferred to a new task-owned remote workspace and passed
 its SHA-256 check. Batch `004-build-a` bootstrapped the clean pinned depot but
@@ -112,6 +135,4 @@ The authored checker is `qa/linux/accept-chromium-build.py`. It requires the
 actual Linux x64 host, a successful item-4 batch bound to the preparation,
 completed journal/receipt, dependency/GN digest bindings, unchanged prepared
 inputs, ELF64 x86-64 executable header/mode and selected nonempty output hashes.
-Its exclusive output creation preserves earlier reports. The checker has not
-been executed or qualified; Antigravity must run it against the actual successful
-Linux build before its result can establish task-4 acceptance.
+Its exclusive output creation preserves earlier reports. Native Codex and independent Antigravity execution both passed for batch D, as recorded above.

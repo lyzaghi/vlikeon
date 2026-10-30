@@ -1,0 +1,34 @@
+{
+  "schema_version": 1,
+  "item": 4,
+  "passed": true,
+  "scope": "Full development chrome target and selected output integrity only; no browser runtime or release acceptance",
+  "preparation_sha256": "a3a16d38cf0ee69a9171624d804c81dff1145bcd82a6e66407c9a3e639e540c3",
+  "receipt_sha256": "65200b9e3daeb5e92171e9b7baef19472ab9bc8e0725ec71dc5435ead3d180ed",
+  "batch_result_sha256": "a6db7fed35c64d364e49f984d06f93f2c0e49040164cec91f60b17b8724253c5",
+  "frozen_inputs_unchanged": true,
+  "architecture": "ELF64 x86-64 little-endian",
+  "artifacts": {
+    "chrome": {
+      "bytes": 1747746128,
+      "sha256": "f7ad864f70230128caabdab1d27c66ef773f0f2189056f310a58bb40a5ffaafd"
+    },
+    "resources.pak": {
+      "bytes": 47927348,
+      "sha256": "69d8908947363552c2461a9e2291c44ff3bc0dd278a06264b93d9230b6e7b133"
+    },
+    "icudtl.dat": {
+      "bytes": 10819840,
+      "sha256": "495c45cc7a65562ec461f860c310c6b66e006acd96833f61d1aa31f77fe18cf1"
+    },
+    "v8_context_snapshot.bin": {
+      "bytes": 4345632,
+      "sha256": "55b90420a7f0365bde69a1df7371e4ac39a5806ff6ca9156019cd70635fa288d"
+    },
+    "locales/en-US.pak": {
+      "bytes": 581919,
+      "sha256": "06abc1f51ba1460f86206fb4f01f754b9f4d59ad7c374fc2b443e8347a3bb6ba"
+    }
+  },
+  "distribution_approved": false
+}

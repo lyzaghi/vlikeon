@@ -6,9 +6,9 @@ authority, product-specific native-host discovery, and a repeatable build
 procedure for Windows x64, Linux x64 and macOS arm64. Sequential task 3 has
 completed a frozen Windows x64 development Chromium build with independently
 checked output integrity; see `WINDOWS_CHROMIUM_BUILD.md`. Browser runtime and
-release acceptance remain open. Task 4's active Linux compilation is recorded
+release acceptance remain open. Task 4's accepted Linux x64 development build is recorded
 in `LINUX_CHROMIUM_BUILD.md`. The owner authorized parallel task 5 preparation
-in `MACOS_CHROMIUM_BUILD.md`; actual Mac host qualification/build remain pending. Selected
+in `MACOS_CHROMIUM_BUILD.md`; Mac batch 005-build-g is compiling; full build acceptance remains pending. Selected
 source/unit checks are in `SOURCE_INTEGRATION.md`. Preparing inputs does not
 establish compilation on another host or qualify later source changes.
 
@@ -169,4 +169,3 @@ Upstream build contracts consulted for the recipe:
 - https://chromium.googlesource.com/chromium/src/+/HEAD/docs/windows_build_instructions.md
 - https://chromium.googlesource.com/chromium/src/+/HEAD/docs/linux/build_instructions.md
 - https://chromium.googlesource.com/chromium/src/+/HEAD/docs/mac_build_instructions.md
-
