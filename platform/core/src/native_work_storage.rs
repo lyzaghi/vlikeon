@@ -61,7 +61,7 @@ pub fn status(database:&Database,profile:Uuid)->Result<omniplay_contracts::Nativ
         "SELECT count(*),COALESCE(sum(phase='reserved'),0),COALESCE(sum(phase='staged'),0),COALESCE(sum(phase='retiring'),0),COALESCE(sum(reserved_bytes),0),COALESCE(sum(file_count),0),COALESCE(sum(profile_id!=?1),0) FROM native_work_storage",
         [profile.to_string()],|row|Ok((row.get(0)?,row.get(1)?,row.get(2)?,row.get(3)?,row.get(4)?,row.get(5)?,row.get(6)?))).map_err(storage_error)?;
     if foreign!=0||works>64||reserved+staged+retiring!=works||bytes>32*1024*1024*1024||files>4096{return Err(invalid());}
-    Ok(omniplay_contracts::NativeWorkStorageStatus{schema_version:1,works,reserved_works:reserved,staged_works:staged,retiring_works:retiring,reserved_bytes:bytes,reserved_files:files,maximum_works:64,maximum_bytes:32*1024*1024*1024,maximum_files:4096,physical_bytes:None,recovery_running:false})
+    Ok(omniplay_contracts::NativeWorkStorageStatus{schema_version:1,works,reserved_works:reserved,staged_works:staged,retiring_works:retiring,reserved_bytes:bytes,reserved_files:files,maximum_works:64,maximum_bytes:32*1024*1024*1024,maximum_files:4096,physical_bytes:Some(crate::storage_accounting::native_work_physical_bytes(&database.root)?),recovery_running:false})
 }
 pub fn linux_recovery_cursor(database:&Database)->Result<Option<String>>{let value:Option<String>=database.connection.query_row("SELECT value FROM preferences WHERE key='linux_native_recovery_cursor_v1'",[],|row|row.get(0)).optional().map_err(storage_error)?;if value.as_ref().is_some_and(|value|value.len()>2048){return Err(invalid());}Ok(value)}
 pub fn set_linux_recovery_cursor(database:&Database,value:&str)->Result<()>{if value.len()>2048{return Err(invalid());}database.connection.execute("INSERT INTO preferences(key,value) VALUES('linux_native_recovery_cursor_v1',?1) ON CONFLICT(key) DO UPDATE SET value=excluded.value",[value]).map_err(storage_error)?;Ok(())}
@@ -99,6 +99,7 @@ pub fn reserve_macos(database:&mut Database,journal:&MacWorkJournal)->Result<()>
 pub fn reserve_windows(database:&mut Database,profile:Uuid,work:Uuid,bytes:u64,files:u32)->Result<()>{reserve_with_protocol(database,profile,work,bytes,files,1,None)}
 fn reserve_with_protocol(database:&mut Database,profile:Uuid,work:Uuid,bytes:u64,files:u32,protocol:u32,macos_journal:Option<&str>)->Result<()>{
     if profile.is_nil()||work.is_nil()||bytes==0||bytes>8*1024*1024*1024||!(1..=144).contains(&files){return Err(full());}
+    crate::storage_accounting::enforce_physical_quota(database,bytes,files)?;
     let profile_root=database.root.clone();let tx=database.connection.transaction_with_behavior(TransactionBehavior::Immediate).map_err(storage_error)?;
     let mut query=tx.prepare("SELECT work_id FROM native_work_storage LIMIT 65").map_err(storage_error)?;let known=query.query_map([],|row|row.get::<_,String>(0)).map_err(storage_error)?.collect::<std::result::Result<BTreeSet<_>,_>>().map_err(storage_error)?;drop(query);if known.len()>64{return Err(invalid());}for value in &known{id(value)?;}known_tree(&profile_root,&known,work)?;
     let(count,total,file_count):(u64,u64,u64)=tx.query_row("SELECT count(*),COALESCE(sum(reserved_bytes),0),COALESCE(sum(file_count),0) FROM native_work_storage",[],|row|Ok((row.get(0)?,row.get(1)?,row.get(2)?))).map_err(storage_error)?;

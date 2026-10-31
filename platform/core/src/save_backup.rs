@@ -30,7 +30,7 @@ fn corrupt()->PlatformError{PlatformError::new(ErrorCode::CorruptData,"The backu
 fn limit()->PlatformError{PlatformError::new(ErrorCode::ResourceLimit,"A backup group allows at most 64 saves and 128 MiB; export smaller groups for larger history")}
 fn deadline(until:Instant)->Result<()>{if Instant::now()>=until{Err(PlatformError::new(ErrorCode::DeadlineExceeded,"The backup operation reached its time budget"))}else{Ok(())}}
 fn same_payload(a:&SaveMetadata,b:&SaveMetadata)->bool{a.game_content_hash==b.game_content_hash&&a.kind==b.kind&&a.slot==b.slot&&a.core_id==b.core_id&&a.core_version==b.core_version&&a.state_format_version==b.state_format_version&&a.platform==b.platform&&a.core_config_hash==b.core_config_hash&&a.payload_hash==b.payload_hash&&a.payload_bytes==b.payload_bytes}
-fn validate(entry:&Entry)->Result<()>{
+pub(crate) fn validate(entry:&Entry)->Result<()>{
     if entry.prior.len()>16{return Err(limit());}
     validate_origin(&entry.metadata,&entry.origin)?;for previous in &entry.prior{validate_origin(&previous.metadata,&previous.origin)?;}Ok(())
 }

@@ -100,6 +100,18 @@ fn run() -> omniplay_contracts::Result<()> {
         if profile_id.is_some_and(|profile|profile!=request.profile_id) {
             return Err(PlatformError::new(ErrorCode::PermissionDenied,"Native channel cannot switch browser profiles"));
         }
+        if broker.is_none() && matches!(&request.command,omniplay_contracts::Command::DatabaseHealthCheck|omniplay_contracts::Command::DatabaseRecoverCorrupt) {
+            profile_id = Some(request.profile_id);
+            let root = data_directory(request.profile_id)?;
+            let outcome = match &request.command {
+                omniplay_contracts::Command::DatabaseHealthCheck => Database::diagnose(&root).and_then(|v| serde_json::to_value(v).map_err(|_| PlatformError::new(ErrorCode::Internal,"Response encoding failed"))),
+                omniplay_contracts::Command::DatabaseRecoverCorrupt => Database::recover_corrupt(&root).and_then(|v| serde_json::to_value(v).map_err(|_| PlatformError::new(ErrorCode::Internal,"Response encoding failed"))),
+                _ => unreachable!(),
+            };
+            let encoded = Zeroizing::new(serde_json::to_vec(&Response::result(request.id, outcome)).map_err(|_| PlatformError::new(ErrorCode::Internal,"Response encoding failed"))?);
+            publish(&output, &encoded)?;
+            continue;
+        }
         if broker.is_none() {
             profile_id = Some(request.profile_id);
             let database = Database::open(&data_directory(request.profile_id)?)?;

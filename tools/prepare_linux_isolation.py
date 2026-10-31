@@ -30,6 +30,7 @@ INPUTS+=['docs/LINUX_RESUMABLE_RETIREMENT.md']
 INPUTS+=['docs/LINUX_CREATOR_RECOVERY.md']
 INPUTS+=['platform/native-runtime/src/work_windows_tests.rs','docs/WINDOWS_PRELAUNCH_RECOVERY.md']
 INPUTS+=['platform/broker/Cargo.toml','platform/broker/src/main.rs','platform/broker/src/linux_host_main.rs','packaging/linux/systemd/user/omniplay-native-host.service','packaging/linux/systemd/user/omniplay-native-host.socket','tools/install_user_release_posix.py','tools/unregister_user_release_posix.py','tools/replace_user_bootstrap_posix.py']
+INPUTS+=['platform/contracts/src/ipc.rs','platform/core/src/storage_accounting.rs','platform/core/src/library_reconstruct.rs','platform/core/src/database_recovery.rs','platform/core/src/profile_backup.rs','docs/PROFILE_RECOVERY_AND_QUOTA.md']
 
 def ordinary(path,base):
     if not path.resolve().is_relative_to(base.resolve()):raise ValueError('Isolation source must remain in its declared workspace root')

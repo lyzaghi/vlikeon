@@ -91,4 +91,29 @@ impl Database {
     pub fn set_mobile_background_sync(&self,enabled:bool)->Result<()>{
         self.connection.execute("INSERT INTO preferences(key,value) VALUES('mobile_background_sync_v1',?1) ON CONFLICT(key) DO UPDATE SET value=excluded.value",[if enabled{"true"}else{"false"}]).map_err(storage_error)?;Ok(())
     }
+
+    pub fn diagnose(root:&Path)->Result<crate::database_recovery::DatabaseHealthReport>{crate::database_recovery::diagnose(root)}
+    pub fn recover_corrupt(root:&Path)->Result<crate::database_recovery::DatabaseRecoveryOutcome>{crate::database_recovery::recover(root)}
+    pub fn recover_live(&mut self)->Result<crate::database_recovery::DatabaseRecoveryOutcome>{
+        let active:bool=self.connection.query_row("SELECT EXISTS(SELECT 1 FROM sessions WHERE state NOT IN ('stopped','failed'))",[],|r|r.get(0)).unwrap_or(false);
+        if active{return Err(PlatformError::new(ErrorCode::Busy,"Stop active games before recovering the profile database"));}
+        let scratch=Connection::open_in_memory().map_err(storage_error)?;
+        let previous=std::mem::replace(&mut self.connection,scratch);
+        drop(previous);
+        match crate::database_recovery::recover(&self.root){
+            Ok(outcome)=>{
+                let reopened=Self::open(&self.root)?;
+                self.connection=reopened.connection;
+                self.device_id=reopened.device_id;
+                Ok(outcome)
+            }
+            Err(error)=>{
+                if let Ok(reopened)=Self::open(&self.root){
+                    self.connection=reopened.connection;
+                    self.device_id=reopened.device_id;
+                }
+                Err(error)
+            }
+        }
+    }
 }

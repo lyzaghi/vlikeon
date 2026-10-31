@@ -61,7 +61,7 @@ impl StagedPayload{
 }
 pub(crate) fn stage(database:&mut Database,metadata:&SaveMetadata,payload:&[u8])->Result<StagedPayload>{
     metadata.validate()?;if payload.len()as u64!=metadata.payload_bytes||digest(payload)!=metadata.payload_hash{return Err(PlatformError::new(ErrorCode::ContentMismatch,"Staged save bytes do not match their metadata"));}
-    let lease=lease(&database.root)?;let _=cleanup_locked(database,8);let file_id=Uuid::new_v4();
+    let lease=lease(&database.root)?;let _=cleanup_locked(database,8);crate::storage_accounting::enforce_physical_quota(database,metadata.payload_bytes,1)?;let file_id=Uuid::new_v4();
     let tx=database.connection.transaction_with_behavior(TransactionBehavior::Immediate).map_err(storage_error)?;
     let game:Option<String>=tx.query_row("SELECT content_hash FROM games WHERE id=?1",[metadata.game_id.to_string()],|row|row.get(0)).optional().map_err(storage_error)?;
     if game.as_deref()!=Some(metadata.game_content_hash.0.as_str()){return Err(PlatformError::new(ErrorCode::ContentMismatch,"Save game content is not in this library"));}

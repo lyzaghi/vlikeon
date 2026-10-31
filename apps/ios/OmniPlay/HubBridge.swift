@@ -64,7 +64,7 @@ final class HubBridge: NSObject, WKScriptMessageHandlerWithReply, UIDocumentPick
                 guard epoch==self.generation,self.alive(request) else{self.reject(request,reply,code:"cancelled",message:"The operation belongs to an expired Game Hub request.");return}
                 switch value {
                 case .success(let response):
-                    if response["status"] as? String=="ok",["save_export","save_export_upload_commit","diagnostics_export","performance_run_export"].contains(method) {
+                    if response["status"] as? String=="ok",["save_export","save_backup_export","profile_backup_export","manual_recovery_export","save_export_upload_commit","diagnostics_export","performance_run_export"].contains(method) {
                         guard let grant=params["destination_grant_id"] as? String,let export=self.exports.removeValue(forKey:grant) else{self.reject(request,reply,code:"permission_expired",message:"The export selection expired. Choose a new destination.");return}
                         var delivered=response;var result=response["result"] as? [String:Any] ?? [:];result["delivery"]="document_provider";delivered["result"]=result
                         self.presentExport(export.url,request:request,response:delivered,reply:reply)

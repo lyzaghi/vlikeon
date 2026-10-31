@@ -111,7 +111,7 @@ pub fn import_bundle(database:&Database,scope:DiscScope,entry:&str,title:String,
     else{planner.file(selected,format.extension(system)?,Some(entry_name.clone()))?;}
     planner.assets.sort_by(|a,b|a.name.cmp(&b.name));
     let mut known=0u64;let mut complete_size=true;for asset in &planner.assets{if let Some(bytes)=asset.bytes{known=known.checked_add(bytes).filter(|value|*value<=MAX_ROM_BYTES).ok_or_else(||PlatformError::new(ErrorCode::ResourceLimit,"Disc set exceeds its total import bound"))?;}else{complete_size=false;}}let expected_total=if complete_size{known}else{0};
-    let count=planner.assets.len()as u16;let mut copied=0u64;let mut metadata=Vec::new();let directory=database.root.join("assets");
+    let count=planner.assets.len()as u16;crate::storage_accounting::enforce_physical_quota(database,known,u32::from(count))?;let mut copied=0u64;let mut metadata=Vec::new();let directory=database.root.join("assets");
     for(index,planned)in planner.assets.into_iter().enumerate(){
         if cancel.load(Ordering::Relaxed){return Err(cancelled());}let mut pending=PendingFile::create(&directory)?;let mut hasher=Sha256::new();let mut bytes=0u64;
         let mut copy=|reader:&mut dyn Read|->Result<()>{

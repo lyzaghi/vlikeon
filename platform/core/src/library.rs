@@ -28,6 +28,7 @@ impl<'a> Library<'a> {
         source.seek(SeekFrom::Start(0)).map_err(storage_error)?;
         let expected=source.metadata().map_err(storage_error)?.len();
         if expected==0||expected>omniplay_contracts::MAX_ROM_BYTES{return Err(PlatformError::new(ErrorCode::ResourceLimit,"Content exceeds the import limit"));}
+        crate::storage_accounting::enforce_physical_quota(self.database,expected,1)?;
         let directory = self.database.root.join("assets");
         let mut pending = PendingFile::create(&directory)?;
         let mut hasher = Sha256::new();

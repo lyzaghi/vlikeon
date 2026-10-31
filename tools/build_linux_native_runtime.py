@@ -18,6 +18,30 @@ PINS = {
     "sameboy": "26a56bd6a122a6318a456abd80558408742d5adf",
 }
 CORES = {
+    "sameboy": {
+        "id": "sameboy-native",
+        "revision": "26a56bd6a122a6318a456abd80558408742d5adf",
+        "name": "SameBoy",
+        "library_version": "1.0.4",
+        "version": "1.0.4",
+        "systems": ["gb", "gbc"],
+        "license": "MIT",
+        "notice": "LICENSE",
+        "memory_mb": 512,
+        "rom_bytes": 16 * 1024**2,
+    },
+    "fceumm": {
+        "id": "fceumm-native",
+        "revision": "ac0d00a7fc01166f84c7bac01d1084ebfd2b865e",
+        "name": "FCEUmm",
+        "library_version": "(SVN)",
+        "version": "0.0.0+ac0d00a7fc01",
+        "systems": ["nes"],
+        "license": "GPL-2.0-or-later",
+        "notice": "COPYING",
+        "memory_mb": 512,
+        "rom_bytes": 16 * 1024**2,
+    },
     "mgba": {
         "id": "mgba-native",
         "revision": "fd9dc5c2cbf234365068855851107e762fc6211b",

@@ -31,6 +31,7 @@ impl<'a> FirmwareVault<'a> {
         if !existing{
             let(count,total):(u64,u64)=self.database.connection.query_row("SELECT count(*),COALESCE(sum(byte_length),0) FROM firmware_assets",[],|r|Ok((r.get(0)?,r.get(1)?))).map_err(storage_error)?;
             if count>=128||total.saturating_add(payload.len()as u64)>1024*1024*1024{return Err(PlatformError::new(ErrorCode::ResourceLimit,"Firmware storage reached its local quota").recover("Delete firmware versions you no longer need before importing another"));}
+            crate::storage_accounting::enforce_physical_quota(self.database,payload.len()as u64,1)?;
             let directory=self.database.root.join("firmware");let target=directory.join(format!("{}.bin",hash.0));
             if target.exists(){let bytes=bounded_read(&mut File::open(&target).map_err(storage_error)?,payload.len()as u64)?;if digest(&bytes)!=hash{return Err(PlatformError::new(ErrorCode::CorruptData,"An existing firmware object failed its checksum"));}}
             else{let mut pending=PendingFile::create(&directory)?;pending.write_all(&payload)?;pending.commit_new(&target)?;}

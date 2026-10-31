@@ -82,6 +82,7 @@ fn snapshot(database:&Database,after:Option<&str>)->Result<Snapshot>{
     drop(rows);drop(statement);
     let active:bool=database.connection.query_row("SELECT EXISTS(SELECT 1 FROM sessions WHERE state NOT IN ('stopped','failed'))",[],|row|row.get(0)).map_err(storage_error)?;
     if active{return Err(PlatformError::new(ErrorCode::Busy,"Stop active games before collecting unused content"));}
+    for pinned in crate::storage_accounting::transient_asset_retainers(database)?{if let Some(value)=candidates.get_mut(&pinned){value.1=true;}}
     let mut statement=database.connection.prepare("SELECT id,game_id,metadata_json FROM saves ORDER BY id LIMIT 20001").map_err(storage_error)?;let mut rows=statement.query([]).map_err(storage_error)?;let mut count=0;
     while let Some(row)=rows.next().map_err(storage_error)?{
         count+=1;if count>20000||Instant::now()>=until{return Err(bounded());}

@@ -45,6 +45,9 @@ FILES = [
     "engines/macos-guest/CMakeLists.txt", "engines/macos-guest/init.c", "engines/macos-guest/kernel.config",
     "tools/author_macos_guest.py", "platform/native-runtime/src/mac_guest.rs",
     "docs/MACOS_DISKLESS_GUEST.md",
+    "platform/contracts/src/ipc.rs", "platform/core/src/storage_accounting.rs",
+    "platform/core/src/library_reconstruct.rs", "platform/core/src/database_recovery.rs",
+    "platform/core/src/profile_backup.rs", "docs/PROFILE_RECOVERY_AND_QUOTA.md",
 ]
 
 

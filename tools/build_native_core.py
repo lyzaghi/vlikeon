@@ -6,14 +6,185 @@ fiber backend keeps executable-heap trampolines out of the contained worker.
 """
 import argparse
 import json
+import os
 from pathlib import Path
 import re
 import shutil
 import subprocess
 
 ROOT = Path(__file__).resolve().parents[1]
-PINS = {"mgba": "fd9dc5c2cbf234365068855851107e762fc6211b",
+PINS = {"sameboy": "26a56bd6a122a6318a456abd80558408742d5adf",
+        "fceumm": "ac0d00a7fc01166f84c7bac01d1084ebfd2b865e",
+        "mgba": "fd9dc5c2cbf234365068855851107e762fc6211b",
         "bsnes": "63ee22f7af8f5d1ada295c2c98fd7bf261fa62a7"}
+SAMEBOY_SOURCES = ["gb", "sgb", "apu", "memory", "mbc", "timing", "display", "camera",
+                   "sm83_cpu", "joypad", "save_state", "random", "rumble"]
+SAMEBOY_BOOTS = ["agb", "cgb", "cgb0", "mgb", "dmg", "sgb", "sgb2"]
+
+
+def pb12(data):
+    """Portable translation of SameBoy BootROMs/pb12.c (Expat license)."""
+    data = data.rstrip(b"\0")
+    if len(data) > 0x4000:
+        raise ValueError("SameBoy logo exceeds the upstream compressor limit")
+    output = bytearray()
+    previous = [-1, -1]
+    literals = bytearray()
+    position = bits = control = 0
+    while True:
+        if position == len(data):
+            if bits == 0:
+                break
+            byte = 0
+        else:
+            byte = data[position]
+            position += 1
+        if byte in previous:
+            bits += 2
+            control = (control << 2) | 2 | (1 if byte == previous[1] else 0)
+        else:
+            bits += 2
+            control <<= 2
+            last = previous[1]
+            options = [(last | ((last << 1) & 255)) & 255, (last & (last << 1)) & 255,
+                       (last | ((last >> 1) & 255)) & 255, (last & (last >> 1)) & 255]
+            if byte in options:
+                control = ((control | 1) << 2) | options.index(byte)
+                bits += 2
+            else:
+                literals.append(byte)
+        previous = [previous[1], byte]
+        if bits >= 8:
+            out_control = control >> (bits - 8)
+            if out_control == 1:
+                raise ValueError("PB12 encoder emitted a reserved control byte")
+            output.append(out_control)
+            output.extend(literals)
+            bits -= 8
+            control &= (1 << bits) - 1
+            literals.clear()
+    output.append(1)
+    return bytes(output)
+
+
+def adapt_sameboy(source, rgbasm, rgbgfx, rgblink):
+    for tool in (rgbasm, rgbgfx, rgblink):
+        if tool is None or not tool.is_file():
+            raise ValueError("Native SameBoy requires explicit --rgbasm, --rgbgfx, and --rgblink binaries")
+    generated = source / "omniplay_bootroms"
+    generated.mkdir(parents=True, exist_ok=True)
+    tiles = generated / "SameBoyLogo.2bpp"
+    run([rgbgfx, "-Z", "-u", "-c", "embedded", "-o", tiles, source / "BootROMs/SameBoyLogo.png"], source)
+    (generated / "SameBoyLogo.pb12").write_bytes(pb12(tiles.read_bytes()))
+    boot_files = []
+    for name in SAMEBOY_BOOTS:
+        asm = source / "BootROMs" / f"{name}_boot.asm"
+        obj = generated / f"{name}_boot.o"
+        binary = generated / f"{name}_boot.bin"
+        run([rgbasm, "-I", str(generated) + os.sep, "-I", str(source / "BootROMs") + os.sep, "-o", obj, asm],
+            source / "BootROMs")
+        run([rgblink, "-x", "-o", binary, obj], source / "BootROMs")
+        data = binary.read_bytes()
+        if not data or len(data) > 65536:
+            raise ValueError("Assembled SameBoy open-source boot program has an invalid length")
+        c_file = generated / f"{name}_boot.c"
+        c_file.write_text(
+            "/* Generated from SameBoy open-source BootROMs. */\n"
+            + f"const unsigned char {name}_boot[] = {{"
+            + ",".join(f"0x{byte:02x}" for byte in data)
+            + "};\n"
+            + f"const unsigned {name}_boot_length = sizeof({name}_boot);\n",
+            encoding="utf-8",
+            newline="\n",
+        )
+        boot_files.append(c_file.relative_to(source).as_posix())
+    files = [f"Core/{name}.c" for name in SAMEBOY_SOURCES] + boot_files + ["libretro/libretro.c"]
+    listing = "\n".join(f'  "{name}"' for name in files)
+    cmake = f'''cmake_minimum_required(VERSION 3.25)
+project(OmniPlaySameBoy LANGUAGES C)
+set(CMAKE_C_STANDARD 11)
+set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+add_library(sameboy_libretro SHARED
+{listing})
+target_include_directories(sameboy_libretro PRIVATE . Core libretro)
+target_compile_definitions(sameboy_libretro PRIVATE
+  GB_INTERNAL __LIBRETRO__ GB_DISABLE_TIMEKEEPING GB_DISABLE_REWIND
+  GB_DISABLE_DEBUGGER GB_DISABLE_CHEATS GB_VERSION="1.0.4"
+  GB_COPYRIGHT_YEAR="2026" _GNU_SOURCE _USE_MATH_DEFINES _CRT_SECURE_NO_WARNINGS)
+set_target_properties(sameboy_libretro PROPERTIES PREFIX "" WINDOWS_EXPORT_ALL_SYMBOLS ON)
+if(MSVC)
+  target_compile_options(sameboy_libretro PRIVATE /O2 /GS /utf-8 /experimental:c11atomics)
+  target_link_options(sameboy_libretro PRIVATE /DYNAMICBASE /NXCOMPAT)
+else()
+  target_compile_options(sameboy_libretro PRIVATE -O3 -fPIC)
+  target_link_libraries(sameboy_libretro PRIVATE m)
+endif()
+'''
+    (source / "CMakeLists.txt").write_text(cmake, encoding="utf-8", newline="\n")
+
+
+def adapt_fceumm(source):
+    files = sorted(
+        path.relative_to(source).as_posix()
+        for folder in ("src/boards", "src/input")
+        for path in (source / folder).glob("*.c")
+    )
+    files += [
+        "src/ntsc/nes_ntsc.c",
+        "src/drivers/libretro/libretro.c",
+        "src/drivers/libretro/libretro_dipswitch.c",
+        "src/cart.c", "src/cheat.c", "src/crc32.c", "src/fceu-endian.c",
+        "src/fceu-memory.c", "src/fceu.c", "src/fds.c", "src/fds_apu.c",
+        "src/file.c", "src/filter.c", "src/general.c", "src/input.c",
+        "src/md5.c", "src/nsf.c", "src/palette.c", "src/ppu.c",
+        "src/sound.c", "src/state.c", "src/video.c", "src/vsuni.c",
+        "src/ines.c", "src/unif.c", "src/x6502.c",
+        "src/drivers/libretro/libretro-common/streams/memory_stream.c",
+        "src/drivers/libretro/libretro-common/compat/compat_posix_string.c",
+        "src/drivers/libretro/libretro-common/compat/compat_snprintf.c",
+        "src/drivers/libretro/libretro-common/compat/compat_strcasestr.c",
+        "src/drivers/libretro/libretro-common/compat/compat_strl.c",
+        "src/drivers/libretro/libretro-common/compat/fopen_utf8.c",
+        "src/drivers/libretro/libretro-common/encodings/encoding_utf.c",
+        "src/drivers/libretro/libretro-common/file/file_path.c",
+        "src/drivers/libretro/libretro-common/file/file_path_io.c",
+        "src/drivers/libretro/libretro-common/streams/file_stream.c",
+        "src/drivers/libretro/libretro-common/streams/file_stream_transforms.c",
+        "src/drivers/libretro/libretro-common/string/stdstring.c",
+        "src/drivers/libretro/libretro-common/time/rtime.c",
+        "src/drivers/libretro/libretro-common/vfs/vfs_implementation.c",
+    ]
+    if len(files) < 80 or any(not (source / name).is_file() for name in files):
+        raise ValueError("The pinned fceumm source inventory is incomplete")
+    listing = "\n".join(f'  "{name}"' for name in files)
+    cmake = f'''cmake_minimum_required(VERSION 3.25)
+project(OmniPlayFceumm LANGUAGES C)
+set(CMAKE_C_STANDARD 11)
+set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+add_library(fceumm_libretro SHARED
+{listing})
+target_include_directories(fceumm_libretro PRIVATE
+  src src/boards src/input src/ntsc src/drivers/libretro
+  src/drivers/libretro/libretro-common/include)
+target_compile_definitions(fceumm_libretro PRIVATE
+  __LIBRETRO__ PATH_MAX=1024 FCEU_VERSION_NUMERIC=9900
+  FRONTEND_SUPPORTS_RGB888 HAVE_NTSC_FILTER _CRT_SECURE_NO_WARNINGS)
+if(WIN32)
+  target_compile_definitions(fceumm_libretro PRIVATE PSS_STYLE=2)
+else()
+  target_compile_definitions(fceumm_libretro PRIVATE PSS_STYLE=1)
+endif()
+set_target_properties(fceumm_libretro PROPERTIES PREFIX "" WINDOWS_EXPORT_ALL_SYMBOLS ON)
+if(MSVC)
+  target_compile_definitions(fceumm_libretro PRIVATE INLINE=_inline)
+  target_compile_options(fceumm_libretro PRIVATE /O2 /GS /utf-8)
+  target_link_options(fceumm_libretro PRIVATE /DYNAMICBASE /NXCOMPAT)
+else()
+  target_compile_options(fceumm_libretro PRIVATE -O3 -fPIC)
+  target_link_libraries(fceumm_libretro PRIVATE m)
+endif()
+'''
+    (source / "CMakeLists.txt").write_text(cmake, encoding="utf-8", newline="\n")
 
 
 def run(command, cwd=None):
@@ -82,6 +253,9 @@ def main():
     parser.add_argument("--toolset")
     parser.add_argument("--c-compiler", type=Path)
     parser.add_argument("--cxx-compiler", type=Path)
+    parser.add_argument("--rgbasm", type=Path)
+    parser.add_argument("--rgbgfx", type=Path)
+    parser.add_argument("--rgblink", type=Path)
     parser.add_argument("--parallel", type=int, default=8)
     parser.add_argument("--git", default="git")
     args = parser.parse_args()
@@ -98,6 +272,10 @@ def main():
     shutil.copytree(original, source, ignore=shutil.ignore_patterns(".git"))
     if args.core == "bsnes":
         adapt_bsnes(source)
+    elif args.core == "sameboy":
+        adapt_sameboy(source, args.rgbasm, args.rgbgfx, args.rgblink)
+    elif args.core == "fceumm":
+        adapt_fceumm(source)
     build = output / "build"
     configure = [args.cmake, "-S", source, "-B", build, "-G", args.generator,
                  "-DCMAKE_BUILD_TYPE=Release", "-DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded"]
@@ -107,7 +285,7 @@ def main():
         configure += [f"-DCMAKE_C_COMPILER={args.c_compiler}"]
     if args.cxx_compiler:
         configure += [f"-DCMAKE_CXX_COMPILER={args.cxx_compiler}"]
-    target = "bsnes_libretro"
+    target = f"{args.core}_libretro"
     if args.core == "mgba":
         target = "mgba_libretro"
         configure += ["-DBUILD_LIBRETRO=ON", "-DBUILD_QT=OFF", "-DBUILD_SDL=OFF",

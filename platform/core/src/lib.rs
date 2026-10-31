@@ -36,6 +36,10 @@ pub mod library_recovery;
 pub mod save_orphan_recovery;
 pub mod manual_recovery;
 pub mod benchmark_registry;
+pub mod storage_accounting;
+pub mod library_reconstruct;
+pub mod database_recovery;
+pub mod profile_backup;
 
 #[cfg(test)]
 mod backup_recovery_tests;
