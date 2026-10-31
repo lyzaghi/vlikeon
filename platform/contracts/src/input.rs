@@ -3,10 +3,38 @@ use serde::{Serialize,Deserialize};
 use std::collections::BTreeSet;
 
 #[derive(Clone,Debug,Serialize)]
-pub struct GameInputProfile{pub schema_version:u32,pub keyboard:Vec<Option<String>>,pub analog_keyboard:Vec<Option<String>>,pub button_sources:Vec<u8>,pub haptics_enabled:bool,pub analog_deadzone_percent:u8,pub axis_tuning:Vec<AxisTuning>,pub raw_gamepads:Vec<RawGamepadProfile>}
+pub struct GameInputProfile{
+    pub schema_version:u32,
+    pub keyboard:Vec<Option<String>>,
+    pub analog_keyboard:Vec<Option<String>>,
+    pub button_sources:Vec<u8>,
+    pub haptics_enabled:bool,
+    pub analog_deadzone_percent:u8,
+    pub axis_tuning:Vec<AxisTuning>,
+    pub raw_gamepads:Vec<RawGamepadProfile>,
+    #[serde(skip_serializing_if="Vec::is_empty")]
+    pub sdl_raw_joysticks:Vec<SdlRawJoystickProfile>,
+    #[serde(skip_serializing_if="is_false")]
+    pub pressure_buttons_enabled:bool,
+    #[serde(skip_serializing_if="is_default_controller_ports")]
+    pub controller_ports:Vec<ControllerPortProfile>,
+}
+fn is_false(value:&bool)->bool{!*value}
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
-struct InputProfileFields{schema_version:u32,keyboard:Vec<Option<String>>,analog_keyboard:Vec<Option<String>>,button_sources:Vec<u8>,#[serde(default)]haptics_enabled:bool,#[serde(default="default_analog_deadzone_percent")]analog_deadzone_percent:u8,#[serde(default="default_axis_tuning")]axis_tuning:Vec<AxisTuning>,#[serde(default)]raw_gamepads:Vec<RawGamepadProfile>}
+struct InputProfileFields{
+    schema_version:u32,
+    keyboard:Vec<Option<String>>,
+    analog_keyboard:Vec<Option<String>>,
+    button_sources:Vec<u8>,
+    #[serde(default)]haptics_enabled:bool,
+    #[serde(default="default_analog_deadzone_percent")]analog_deadzone_percent:u8,
+    #[serde(default="default_axis_tuning")]axis_tuning:Vec<AxisTuning>,
+    #[serde(default)]raw_gamepads:Vec<RawGamepadProfile>,
+    #[serde(default)]sdl_raw_joysticks:Vec<SdlRawJoystickProfile>,
+    #[serde(default)]pressure_buttons_enabled:bool,
+    #[serde(default="default_controller_ports")]controller_ports:Vec<ControllerPortProfile>,
+}
 fn default_analog_deadzone_percent()->u8{15}
 // serde_json's ordinary struct decoder also accepts positional arrays. Profiles
 // require object keys; keep MapAccess so duplicate-field rejection is preserved.
@@ -20,10 +48,27 @@ fn object_fields<'de,D,T>(deserializer:D)->std::result::Result<T,D::Error>where 
     deserializer.deserialize_map(ObjectVisitor::<T>(std::marker::PhantomData))
 }
 impl<'de>Deserialize<'de>for GameInputProfile{
-    fn deserialize<D:serde::Deserializer<'de>>(deserializer:D)->std::result::Result<Self,D::Error>{let InputProfileFields{schema_version,keyboard,analog_keyboard,button_sources,haptics_enabled,analog_deadzone_percent,axis_tuning,raw_gamepads}=object_fields(deserializer)?;Ok(Self{schema_version,keyboard,analog_keyboard,button_sources,haptics_enabled,analog_deadzone_percent,axis_tuning,raw_gamepads})}
+    fn deserialize<D:serde::Deserializer<'de>>(deserializer:D)->std::result::Result<Self,D::Error>{
+        let InputProfileFields{schema_version,keyboard,analog_keyboard,button_sources,haptics_enabled,analog_deadzone_percent,axis_tuning,raw_gamepads,sdl_raw_joysticks,pressure_buttons_enabled,controller_ports}=object_fields(deserializer)?;
+        Ok(Self{schema_version,keyboard,analog_keyboard,button_sources,haptics_enabled,analog_deadzone_percent,axis_tuning,raw_gamepads,sdl_raw_joysticks,pressure_buttons_enabled,controller_ports})
+    }
 }
 impl Default for GameInputProfile{
-    fn default()->Self{Self{schema_version:1,keyboard:["KeyZ","KeyA","ShiftRight","Enter","ArrowUp","ArrowDown","ArrowLeft","ArrowRight","KeyX","KeyS","KeyQ","KeyW","KeyE","KeyR","KeyD","KeyF"].into_iter().map(|v|Some(v.into())).collect(),analog_keyboard:["KeyI","KeyK","KeyJ","KeyL"].into_iter().map(|v|Some(v.into())).collect(),button_sources:(0..16u8).collect(),haptics_enabled:false,analog_deadzone_percent:default_analog_deadzone_percent(),axis_tuning:default_axis_tuning(),raw_gamepads:Vec::new()}}
+    fn default()->Self{
+        Self{
+            schema_version:1,
+            keyboard:["KeyZ","KeyA","ShiftRight","Enter","ArrowUp","ArrowDown","ArrowLeft","ArrowRight","KeyX","KeyS","KeyQ","KeyW","KeyE","KeyR","KeyD","KeyF"].into_iter().map(|v|Some(v.into())).collect(),
+            analog_keyboard:["KeyI","KeyK","KeyJ","KeyL"].into_iter().map(|v|Some(v.into())).collect(),
+            button_sources:(0..16u8).collect(),
+            haptics_enabled:false,
+            analog_deadzone_percent:default_analog_deadzone_percent(),
+            axis_tuning:default_axis_tuning(),
+            raw_gamepads:Vec::new(),
+            sdl_raw_joysticks:Vec::new(),
+            pressure_buttons_enabled:false,
+            controller_ports:default_controller_ports(),
+        }
+    }
 }
 pub fn allowed_game_key(value:&str)->bool{
     matches!(value,"ArrowUp"|"ArrowDown"|"ArrowLeft"|"ArrowRight"|"Space"|"Enter"|"Tab"|"Backspace"|"ShiftLeft"|"ShiftRight")||value.strip_prefix("Key").is_some_and(|v|v.len()==1&&v.as_bytes()[0].is_ascii_uppercase())||value.strip_prefix("Digit").is_some_and(|v|v.len()==1&&v.as_bytes()[0].is_ascii_digit())
@@ -34,8 +79,11 @@ impl GameInputProfile{
         if self.schema_version!=1||self.keyboard.len()!=16||self.analog_keyboard.len()!=4||self.button_sources.len()!=16||self.analog_deadzone_percent>50{return Err(invalid());}
         let mut keys=BTreeSet::new();for value in self.keyboard.iter().chain(self.analog_keyboard.iter()).flatten(){if !allowed_game_key(value)||!keys.insert(value){return Err(invalid());}}
         let buttons:BTreeSet<u8>=self.button_sources.iter().copied().collect();if buttons.len()!=16||buttons.iter().any(|v|*v>15){return Err(invalid());}
-        if self.axis_tuning.len()!=4||self.axis_tuning.iter().any(|axis|axis.source>3||!(50..=200).contains(&axis.sensitivity_percent)||!(50..=300).contains(&axis.curve_percent))||self.axis_tuning.iter().map(|a|a.source).collect::<BTreeSet<_>>().len()!=4||self.raw_gamepads.len()>4{return Err(invalid());}
-        let mut devices=BTreeSet::new();for device in &self.raw_gamepads{device.validate()?;if !devices.insert((&device.device_id,device.axis_count,device.button_count)){return Err(invalid());}}Ok(())
+        if self.axis_tuning.len()!=4||self.axis_tuning.iter().any(|axis|axis.source>3||!(50..=200).contains(&axis.sensitivity_percent)||!(50..=300).contains(&axis.curve_percent))||self.axis_tuning.iter().map(|a|a.source).collect::<BTreeSet<_>>().len()!=4||self.raw_gamepads.len()>4||self.sdl_raw_joysticks.len()>4||self.controller_ports.len()!=4{return Err(invalid());}
+        let mut devices=BTreeSet::new();for device in &self.raw_gamepads{device.validate()?;if !devices.insert((&device.device_id,device.axis_count,device.button_count)){return Err(invalid());}}
+        let mut sdl_devices=BTreeSet::new();for device in &self.sdl_raw_joysticks{device.validate()?;if !sdl_devices.insert((&device.guid_hex,device.axis_count,device.button_count)){return Err(invalid());}}
+        for port in &self.controller_ports{port.validate()?;}
+        Ok(())
     }
 }
 
@@ -94,3 +142,49 @@ keyed_input_type!(CustomTouchLayout,CustomTouchFields,{height:u16,controls:Vec<T
 impl CustomTouchLayout{pub fn validate(&self)->Result<()>{
     if !(400..=1200).contains(&self.height)||self.controls.len()!=18||self.controls.iter().any(|v|v.id>17||v.x>1000||v.y>1000||!(50..=200).contains(&v.size_percent))||self.controls.iter().map(|v|v.id).collect::<BTreeSet<_>>().len()!=18{return Err(PlatformError::new(ErrorCode::InvalidRequest,"Custom touch layout needs 18 distinct bounded controls"));}Ok(())
 }}
+
+keyed_input_type!(SdlRawAxisCalibration,SdlRawAxisFields,{source:Option<u8>,minimum:i16,center:i16,maximum:i16});
+#[derive(Clone,Copy,Debug,PartialEq,Eq,Serialize,Deserialize)]#[serde(rename_all="snake_case")]
+pub enum SdlRawButtonKind{None,Button,AxisPositive,AxisNegative,Hat}
+keyed_input_type!(SdlRawButtonBinding,SdlRawButtonFields,{kind:SdlRawButtonKind,index:u8,hat_mask:u8,threshold_percent:u8});
+keyed_input_type!(SdlRawJoystickProfile,SdlRawJoystickFields,{guid_hex:String,axis_count:u8,button_count:u8,hat_count:u8,axes:Vec<SdlRawAxisCalibration>,buttons:Vec<SdlRawButtonBinding>});
+impl SdlRawJoystickProfile{
+    pub fn validate(&self)->Result<()>{
+        let invalid=||PlatformError::new(ErrorCode::InvalidRequest,"SDL raw joystick calibration is outside its device bounds");
+        if self.guid_hex.len()!=32||!self.guid_hex.bytes().all(|b|b.is_ascii_hexdigit())||self.axis_count>32||self.button_count>64||self.hat_count>8||(self.axis_count==0&&self.button_count==0&&self.hat_count==0)||self.axes.len()!=6||self.buttons.len()!=16{return Err(invalid());}
+        let mut axes=BTreeSet::new();
+        for axis in &self.axes{
+            if i32::from(axis.center)-i32::from(axis.minimum)<256||i32::from(axis.maximum)-i32::from(axis.center)<256||axis.source.is_some_and(|s|s>=self.axis_count||!axes.insert(s)){return Err(invalid());}
+        }
+        for b in &self.buttons{
+            if !(1..=100).contains(&b.threshold_percent){return Err(invalid());}
+            let ok=match b.kind{
+                SdlRawButtonKind::None=>b.index==0&&b.hat_mask==0,
+                SdlRawButtonKind::Button=>b.index<self.button_count&&b.hat_mask==0,
+                SdlRawButtonKind::AxisPositive|SdlRawButtonKind::AxisNegative=>b.index<self.axis_count&&b.hat_mask==0,
+                SdlRawButtonKind::Hat=>b.index<self.hat_count&&matches!(b.hat_mask,1|2|4|8),
+            };
+            if !ok{return Err(invalid());}
+        }
+        Ok(())
+    }
+}
+
+#[derive(Clone,Copy,Debug,PartialEq,Eq,Serialize,Deserialize)]
+#[serde(rename_all="snake_case")]
+pub enum ControllerDeviceKind{Auto,Joypad,AnalogJoypad,Mouse,Lightgun,None}
+keyed_input_type!(ControllerPortProfile,ControllerPortFields,{device:ControllerDeviceKind,subclass:u16,pressure_curve_percent:u16});
+pub fn default_controller_ports()->Vec<ControllerPortProfile>{
+    (0..4).map(|_|ControllerPortProfile{device:ControllerDeviceKind::Auto,subclass:0,pressure_curve_percent:100}).collect()
+}
+fn is_default_controller_ports(ports:&Vec<ControllerPortProfile>)->bool{
+    ports.len()==4&&ports.iter().all(|p|p.device==ControllerDeviceKind::Auto&&p.subclass==0&&p.pressure_curve_percent==100)
+}
+impl ControllerPortProfile{
+    pub fn validate(&self)->Result<()>{
+        if self.subclass>16||!(50..=300).contains(&self.pressure_curve_percent)||(self.device==ControllerDeviceKind::None&&self.subclass!=0){
+            return Err(PlatformError::new(ErrorCode::InvalidRequest,"Controller peripheral configuration is outside its supported bounds"));
+        }
+        Ok(())
+    }
+}

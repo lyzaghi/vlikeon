@@ -9,16 +9,17 @@ namespace omni {
 // the browser's graphics context or a handle to another process's surface.
 class GlVideo {
   SDL_Window* window_=nullptr;SDL_GLContext context_=nullptr;
-  retro_hw_render_callback callback_{};bool negotiated_=false,reset_called_=false;
+  retro_hw_render_callback callback_{};bool es_profile_=false,negotiated_=false,reset_called_=false;
   bool release_in_progress_=false,release_failed_=false;
   bool reset_in_progress_=false,reset_failed_=false;
   unsigned width_=0,height_=0;GLuint framebuffer_=0,color_=0,depth_=0;
+  using DrawBuffersProc = void (APIENTRYP)(GLsizei, const GLenum*);
   struct Functions {
     decltype(&glGetIntegerv) get_integer=nullptr;decltype(&glGetBooleanv) get_boolean=nullptr;decltype(&glGetFloatv) get_float=nullptr;
     decltype(&glIsEnabled) is_enabled=nullptr;decltype(&glEnable) enable=nullptr;decltype(&glDisable) disable=nullptr;
     decltype(&glClearColor) clear_color=nullptr;decltype(&glClear) clear=nullptr;decltype(&glColorMask) color_mask=nullptr;decltype(&glViewport) viewport=nullptr;
     decltype(&glGenTextures) gen_textures=nullptr;decltype(&glBindTexture) bind_texture=nullptr;decltype(&glTexParameteri) texture_parameter=nullptr;decltype(&glTexImage2D) texture_image=nullptr;decltype(&glDeleteTextures) delete_textures=nullptr;
-    decltype(&glReadBuffer) read_buffer=nullptr;decltype(&glDrawBuffer) draw_buffer=nullptr;
+    decltype(&glReadBuffer) read_buffer=nullptr;decltype(&glDrawBuffer) draw_buffer=nullptr;DrawBuffersProc draw_buffers=nullptr;
     PFNGLGENFRAMEBUFFERSPROC gen_framebuffers=nullptr;PFNGLBINDFRAMEBUFFERPROC bind_framebuffer=nullptr;PFNGLDELETEFRAMEBUFFERSPROC delete_framebuffers=nullptr;
     PFNGLFRAMEBUFFERTEXTURE2DPROC framebuffer_texture=nullptr;PFNGLCHECKFRAMEBUFFERSTATUSPROC framebuffer_status=nullptr;
     PFNGLGENRENDERBUFFERSPROC gen_renderbuffers=nullptr;PFNGLBINDRENDERBUFFERPROC bind_renderbuffer=nullptr;PFNGLRENDERBUFFERSTORAGEPROC renderbuffer_storage=nullptr;
@@ -27,10 +28,11 @@ class GlVideo {
   } gl_{};
   void load_functions();void allocate_target(bool depth,bool stencil);
 public:
-  static void window_attributes();
-  void configure(SDL_Window* window,unsigned width,unsigned height);
+  static void window_attributes(bool es_profile=false);
+  void configure(SDL_Window* window,unsigned width,unsigned height,bool es_profile=false);
   bool negotiate(retro_hw_render_callback& callback);
   bool negotiated()const{return negotiated_;}
+  bool es_profile()const{return es_profile_;}
   bool core_callback_active()const{return release_in_progress_||reset_in_progress_;}
   bool core_callback_failed()const{return release_failed_||reset_failed_;}
   std::uintptr_t framebuffer()const{return framebuffer_;}

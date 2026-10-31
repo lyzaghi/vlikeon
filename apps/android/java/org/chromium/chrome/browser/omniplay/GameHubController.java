@@ -38,6 +38,7 @@ public final class GameHubController implements AutoCloseable {
     private final ChromeTabbedActivity mActivity;
     private final Handler mMain=new Handler(Looper.getMainLooper());
     private final NativeCore mCore;
+    private final NativeInputController mNativeInput;
     private AssetServer mServer;
     private NativeDocuments mDocuments;
     private Tab mTab;
@@ -60,11 +61,11 @@ public final class GameHubController implements AutoCloseable {
         @Override public void onDestroyed(Tab tab){close();}
     };
 
-    public GameHubController(ChromeTabbedActivity activity){mActivity=activity;mCore=NativeCore.get(activity);mPauseFallback=()->{mSuspension=null;mCore.suspend();};}
+    public GameHubController(ChromeTabbedActivity activity){mActivity=activity;mCore=NativeCore.get(activity);mNativeInput=new NativeInputController(activity);mPauseFallback=()->{mSuspension=null;mNativeInput.deactivate();mCore.suspend();};}
     public boolean isClosed(){return mClosed;}
     public void onActivityPause(){mActivityResumed=false;suspend();}
     public void onActivityResume(){mActivityResumed=true;resume();}
-    public void resume(){if(!mClosed&&mActivityResumed&&mTab!=null&&mActivity.getActivityTab()==mTab&&!mTab.isIncognito()&&!mActivity.isFinishing()){mMain.removeCallbacks(mPauseFallback);mSuspension=null;mCore.setForeground(true);inspectPairingStartup();}}
+    public void resume(){if(!mClosed&&mActivityResumed&&mTab!=null&&mActivity.getActivityTab()==mTab&&!mTab.isIncognito()&&!mActivity.isFinishing()){mMain.removeCallbacks(mPauseFallback);mSuspension=null;mCore.setForeground(true);mNativeInput.activate(mTab.getView());inspectPairingStartup();}}
     public void open(){
         Tab current=mActivity.getActivityTab();
         if(mClosed||mOpening||mActivity.getTabModelSelector().isIncognitoSelected()||current!=null&&current.isIncognito())return;
@@ -143,6 +144,14 @@ public final class GameHubController implements AutoCloseable {
         channel.expiries.put(id,expiry);
         mMain.postDelayed(expiry,deadline-now);
         NativeCore.Reply reply=response->{if(finished[0]||!owns(channel))return;finished[0]=true;mMain.removeCallbacks(expiry);channel.expiries.remove(id);channel.requests.remove(id);try{response.put("id",id);}catch(Exception ignored){}send(channel,response);};
+        JSONObject command=request.getJSONObject("command");String method=command.optString("method");
+        if("native_input_poll".equals(method)){reply.accept(new JSONObject().put("protocol_major",1).put("protocol_minor",0).put("status","ok").put("result",mNativeInput.pollSnapshot()));return;}
+        if("native_input_haptics".equals(method)){
+            JSONObject params=command.optJSONObject("params");int port=params==null?-1:params.optInt("port",-1);
+            if(port<0||port>=NativeInputController.MAX_PORTS){reply.accept(NativeCore.failure(id,"invalid_request","Invalid controller port."));return;}
+            boolean applied=mActivityResumed&&mSuspension==null&&mNativeInput.applyHaptics(port,params.optBoolean("enabled",false),params.optInt("weak",0),params.optInt("strong",0),params.optInt("duration_ms",0));
+            reply.accept(new JSONObject().put("protocol_major",1).put("protocol_minor",0).put("status","ok").put("result",new JSONObject().put("applied",applied)));return;
+        }
         if(mDocuments.intercept(request,reply))return;
         mCore.request(request,()->!channel.closed,response->{if(!owns(channel)||finished[0])return;if(!mDocuments.finishExport(request,response,reply))reply.accept(response);});
     }
@@ -643,6 +652,7 @@ public final class GameHubController implements AutoCloseable {
     public void suspend(){
         if(mPairingStartupOwner!=null){mPairingStartupOwner.set(false);mPairingStartupOwner=null;mPairingStartupChecked=false;}
         cancelIdentityReview();
+        mNativeInput.deactivate();
         if(mClosed)return;
         mCore.setForeground(false);
         if(mChannel!=null&&owns(mChannel)){
@@ -655,6 +665,7 @@ public final class GameHubController implements AutoCloseable {
     private void disconnect(){
         if(mPairingStartupOwner!=null){mPairingStartupOwner.set(false);mPairingStartupOwner=null;mPairingStartupChecked=false;}
         cancelIdentityReview();
+        mNativeInput.deactivate();
         mCore.setForeground(false);
         ++mHandshake;
         Channel previous=mChannel;mChannel=null;

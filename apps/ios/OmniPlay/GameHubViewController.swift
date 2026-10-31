@@ -5,6 +5,7 @@ import AVFAudio
 @MainActor
 final class GameHubViewController: UIViewController, WKNavigationDelegate, WKUIDelegate, UITextFieldDelegate {
     private let core: NativeCore
+    private let nativeInput=NativeInputController()
     private var server: AssetServer?
     private var bridge: HubBridge?
     private(set) var webView: WKWebView?
@@ -57,7 +58,7 @@ final class GameHubViewController: UIViewController, WKNavigationDelegate, WKUID
     private func loadHub(_ url:URL,server:AssetServer){
         let configuration=WKWebViewConfiguration();configuration.websiteDataStore = .nonPersistent();configuration.allowsInlineMediaPlayback=true
         configuration.mediaTypesRequiringUserActionForPlayback = .all
-        let bridge=HubBridge(core:core,server:server,presenter:self);self.bridge=bridge
+        let bridge=HubBridge(core:core,server:server,presenter:self,nativeInput:nativeInput);self.bridge=bridge
         bridge.setGameFullscreen={ [weak self]enabled in guard let self=self else{return};self.fullScreenGame=enabled;self.pairingButton.isHidden=enabled;self.pairingButtonHeight?.constant=enabled ? 0:44;if enabled{self.cancelPairingIdentity()};self.tabBarController?.tabBar.isHidden=enabled;self.setNeedsStatusBarAppearanceUpdate();self.setNeedsUpdateOfHomeIndicatorAutoHidden();self.view.setNeedsLayout() }
         configuration.userContentController.addScriptMessageHandler(bridge,contentWorld:.page,name:"omniplay")
         let webView=WKWebView(frame:.zero,configuration:configuration);webView.isInspectable=false;webView.navigationDelegate=self;webView.uiDelegate=self;webView.scrollView.contentInsetAdjustmentBehavior = .never
@@ -65,7 +66,7 @@ final class GameHubViewController: UIViewController, WKNavigationDelegate, WKUID
         NSLayoutConstraint.activate([webView.leadingAnchor.constraint(equalTo:view.leadingAnchor),webView.trailingAnchor.constraint(equalTo:view.trailingAnchor),webView.topAnchor.constraint(equalTo:pairingButton.bottomAnchor),webView.bottomAnchor.constraint(equalTo:view.safeAreaLayoutGuide.bottomAnchor)])
         webView.load(URLRequest(url:url))
     }
-    private func showFailure(_ error:Error){cancelPairingIdentity();bridge?.resetDocument();core.setForeground(false);fullScreenGame=false;pairingButton.isHidden=false;pairingButtonHeight?.constant=44;tabBarController?.tabBar.isHidden=false;setNeedsStatusBarAppearanceUpdate();status.text=error.localizedDescription;status.isHidden=false;webView?.isHidden=true;showRetry()}
+    private func showFailure(_ error:Error){cancelPairingIdentity();nativeInput.deactivate();bridge?.resetDocument();core.setForeground(false);fullScreenGame=false;pairingButton.isHidden=false;pairingButtonHeight?.constant=44;tabBarController?.tabBar.isHidden=false;setNeedsStatusBarAppearanceUpdate();status.text=error.localizedDescription;status.isHidden=false;webView?.isHidden=true;showRetry()}
     private func showRetry(){
         retryButton?.removeFromSuperview()
         let retry=UIButton(type:.system);retryButton=retry;retry.setTitle("Mở lại Thư viện",for:.normal)
@@ -79,7 +80,7 @@ final class GameHubViewController: UIViewController, WKNavigationDelegate, WKUID
     func webView(_ webView:WKWebView,didFinish navigation:WKNavigation!){retryButton?.removeFromSuperview();retryButton=nil;status.isHidden=true;didActivate()}
     func webView(_ webView:WKWebView,didFailProvisionalNavigation navigation:WKNavigation!,withError error:Error){if (error as NSError).code != NSURLErrorCancelled{showFailure(error)}}
     func webView(_ webView:WKWebView,didFail navigation:WKNavigation!,withError error:Error){if (error as NSError).code != NSURLErrorCancelled{showFailure(error)}}
-    func webViewWebContentProcessDidTerminate(_ webView:WKWebView){core.suspend();showFailure(OmniFailure.message("Phiên WebKit đã dừng. Điểm đã lưu vẫn ở trên thiết bị. Mở lại Thư viện để tiếp tục."))}
+    func webViewWebContentProcessDidTerminate(_ webView:WKWebView){nativeInput.deactivate();core.suspend();showFailure(OmniFailure.message("Phiên WebKit đã dừng. Điểm đã lưu vẫn ở trên thiết bị. Mở lại Thư viện để tiếp tục."))}
     func webView(_ webView:WKWebView,decidePolicyFor navigationAction:WKNavigationAction,decisionHandler:@escaping(WKNavigationActionPolicy)->Void){
         guard let url=navigationAction.request.url else{decisionHandler(.cancel);return}
         if server?.owns(url)==true{decisionHandler(.allow);return}
@@ -631,7 +632,7 @@ final class GameHubViewController: UIViewController, WKNavigationDelegate, WKUID
     }
     @objc private func willResign(){suspend()}
     @objc private func didBackground(){suspend()}
-    @objc private func didActivate(){if !pendingSuspend&&hubVisible&&UIApplication.shared.applicationState == .active&&webView?.isHidden != true{core.setForeground(true);inspectPairingStartup()}}
+    @objc private func didActivate(){if !pendingSuspend&&hubVisible&&UIApplication.shared.applicationState == .active&&webView?.isHidden != true{core.setForeground(true);nativeInput.activate();inspectPairingStartup()}}
     private func inspectPairingStartup(){
         guard !pairingStartupChecked,pairingStartupOwner==nil,pairingFlow==nil,status.isHidden,UIApplication.shared.isProtectedDataAvailable else{return}
         pairingStartupChecked=true;let owner=NativeDocumentLifetime();pairingStartupOwner=owner
@@ -656,6 +657,7 @@ final class GameHubViewController: UIViewController, WKNavigationDelegate, WKUID
     func suspend(completion:@escaping()->Void = {}){
         if let owner=pairingStartupOwner{owner.invalidate();pairingStartupOwner=nil;pairingStartupChecked=false}
         cancelPairingIdentity()
+        nativeInput.deactivate()
         core.setForeground(false)
         if pendingSuspend{suspendWaiters.append(completion);return}
         guard let webView=webView else{core.suspend(completion:completion);return}

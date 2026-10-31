@@ -6,6 +6,10 @@
 #include "memory_files.hpp"
 #include "md_portable.hpp"
 #include "gl_video.hpp"
+#include "vk_video.hpp"
+#ifndef OMNIPLAY_DEVICE_FREE_ACTOR
+#include "../../presentation/src/touch_overlay.hpp"
+#endif
 #include "measurement.hpp"
 #include "input_profile.hpp"
 #include "audio_ring.hpp"
@@ -23,6 +27,7 @@
 #include <string>
 #include <type_traits>
 #include <utility>
+#include <vector>
 
 namespace omni {
 struct Failure:std::runtime_error {const char* code;explicit Failure(const char* value):std::runtime_error(value),code(value){}};
@@ -34,7 +39,17 @@ class Engine {
   CoreModule object_=nullptr;
   SDL_Window* window_=nullptr;SDL_Renderer* renderer_=nullptr;SDL_Texture* texture_=nullptr;SDL_AudioStream* audio_=nullptr;
   std::array<SDL_Gamepad*,4> pads_{};InputProfile input_profile_;
+  std::array<std::vector<unsigned>,4> declared_controllers_{};
   std::array<std::array<std::array<std::int16_t,2>,2>,4> stick_input_{};
+#ifndef OMNIPLAY_DEVICE_FREE_ACTOR
+  presentation::RawJoystickManager raw_joysticks_;
+  presentation::NativeTouchOverlay touch_overlay_;
+  std::array<presentation::SampledPadState,4> raw_pad_state_{};
+  presentation::TouchOverlayOutput touch_state_{};
+  float mouse_dx_=0,mouse_dy_=0,wheel_x_=0,wheel_y_=0;
+  std::int16_t polled_mouse_dx_=0,polled_mouse_dy_=0,polled_wheel_x_=0,polled_wheel_y_=0;
+  std::uint8_t polled_mouse_buttons_=0;
+#endif
   struct Rumble{std::mutex mutex;std::uint16_t strong=0,weak=0;bool available=false;std::uint16_t sent_strong=0,sent_weak=0;std::uint64_t sent_at=0;};std::array<Rumble,4> rumble_{};
   std::map<std::string,std::string> variables_;
   std::vector<std::uint8_t> rom_;std::string filename_,title_,core_path_;
@@ -49,7 +64,7 @@ class Engine {
   unsigned latency_frames_=2;double nominal_hz_=60.0,sample_rate_=48000.0;float volume_=0.8f;
   double active_time_ms_=0;
   bool reset_after_ram_load_=false;
-  GlVideo gl_video_;bool hardware_video_=false,analog_controls_=false;std::atomic<const char*> fault_code_{"runtime_crashed"};
+  GlVideo gl_video_;VkVideo vk_video_;bool hardware_video_=false,vulkan_video_=false,gles_video_=false,analog_controls_=false;std::atomic<const char*> fault_code_{"runtime_crashed"};
   std::mutex av_mutex_;std::optional<retro_system_av_info> pending_av_;std::optional<retro_game_geometry> pending_geometry_;
   SavedFiles saved_files_;std::string system_directory_=".",core_save_directory_="save";bool filesystem_save_memory_=false;
   MemoryFiles memory_files_;OmniWritableFilesV1 memory_files_interface_{};bool memory_files_installed_=false;
@@ -95,6 +110,10 @@ class Engine {
       omni_owned_actor_exit(1);
     }
   }
+  unsigned hw_max_width()const{return vulkan_video_?vk_video_.width():gl_video_.width();}
+  unsigned hw_max_height()const{return vulkan_video_?vk_video_.height():gl_video_.height();}
+  bool hw_callbacks_busy_or_failed()const{return vulkan_video_?(vk_video_.core_callback_active()||vk_video_.core_callback_failed()):(gl_video_.core_callback_active()||gl_video_.core_callback_failed());}
+  void apply_controller_ports();
   void prepare(const Json& params);void pause();void resume();void reset_audio();void read_av();
   bool restart_content();
   void pause_core();void retire_guest();void stop_content();void flush_files();

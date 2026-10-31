@@ -44,7 +44,7 @@ def project():
     for config in ("Debug","Release"):
         common='CLANG_ENABLE_MODULES = YES; SDKROOT = iphoneos; IPHONEOS_DEPLOYMENT_TARGET = 17.0; SWIFT_VERSION = 5.0; SWIFT_STRICT_CONCURRENCY = minimal;'
         project_configs.append(item("config.project."+config,f"isa = XCBuildConfiguration; name = {config}; buildSettings = {{{common}}};"))
-        flags='"-lz","-lc++","-framework","Security","-framework","SystemConfiguration","-framework","Network","-framework","WebKit","-framework","UIKit","-framework","AVFAudio","-framework","BackgroundTasks"'
+        flags='"-lz","-lc++","-framework","Security","-framework","SystemConfiguration","-framework","Network","-framework","WebKit","-framework","UIKit","-framework","AVFAudio","-framework","BackgroundTasks","-framework","GameController","-framework","CoreHaptics"'
         settings=common+f''' PRODUCT_NAME = OmniPlay; PRODUCT_BUNDLE_IDENTIFIER = org.omniplay.browser;
           INFOPLIST_FILE = OmniPlay/Info.plist; GENERATE_INFOPLIST_FILE = NO;
           SWIFT_OBJC_BRIDGING_HEADER = "OmniPlay/OmniPlay-Bridging-Header.h";

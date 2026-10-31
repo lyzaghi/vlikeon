@@ -10,7 +10,7 @@ final class HubBridge: NSObject, WKScriptMessageHandlerWithReply, UIDocumentPick
     private struct Pending {let expiry:DispatchWorkItem;let cancel:()->Void}
     private struct Export { let url: URL; let created: Date }
     private let core: NativeCore
-    private let server: AssetServer
+    private let server: AssetServer; private let nativeInput: NativeInputController
     private weak var presenter: UIViewController?
     weak var webView: WKWebView?
     var setGameFullscreen:((Bool)->Void)?
@@ -26,7 +26,7 @@ final class HubBridge: NSObject, WKScriptMessageHandlerWithReply, UIDocumentPick
     private let documentPermit=DispatchSemaphore(value:4)
     private func documentError(_ error:Error)->String{if error is OmniFailure{return error.localizedDescription};return "The selected document could not be read or stored. Check access and available space, then retry."}
 
-    init(core: NativeCore, server: AssetServer, presenter: UIViewController) { self.core=core;self.server=server;self.presenter=presenter }
+    init(core: NativeCore, server: AssetServer, presenter: UIViewController, nativeInput: NativeInputController) { self.core=core;self.server=server;self.presenter=presenter;self.nativeInput=nativeInput }
     private func response(_ request: [String:Any], result: Any) -> [String:Any] { ["protocol_major":1,"protocol_minor":0,"id":request["id"] ?? "","status":"ok","result":result] }
     private func reject(_ request: [String:Any], _ reply: Reply, code: String, message: String) { reply(["protocol_major":1,"protocol_minor":0,"id":request["id"] ?? "","status":"error","error":["code":code,"message":message,"recoverable":true]],nil) }
 
@@ -50,6 +50,8 @@ final class HubBridge: NSObject, WKScriptMessageHandlerWithReply, UIDocumentPick
         let params=command["params"] as? [String:Any] ?? [:]
         switch method {
         case "presentation_fullscreen":guard let enabled=params["enabled"] as? Bool else{reject(request,reply,code:"invalid_request",message:"Fullscreen selection is invalid.");return};setGameFullscreen?(enabled);reply(response(request,result:["enabled":enabled]),nil)
+        case "native_input_poll":reply(response(request,result:nativeInput.pollSnapshot()),nil)
+        case "native_input_haptics":guard let port=params["port"] as? Int,(0..<NativeInputController.maxPorts).contains(port) else{reject(request,reply,code:"invalid_request",message:"Controller port is invalid.");return};let applied=nativeInput.applyHaptics(port:port,enabled:(params["enabled"] as? Bool) ?? false,weakStrength:(params["weak"] as? Int) ?? 0,strongStrength:(params["strong"] as? Int) ?? 0,durationMs:(params["duration_ms"] as? Int) ?? 0);reply(response(request,result:["applied":applied]),nil)
         case "file_select_import": selectImport(request,reply:reply,firmware:nil)
         case "firmware_import_selected":
             guard let system=params["system"] as? String,let role=params["role"] as? String else {reject(request,reply,code:"invalid_request",message:"Firmware role is missing.");return}
@@ -167,7 +169,7 @@ final class HubBridge: NSObject, WKScriptMessageHandlerWithReply, UIDocumentPick
         if case .exportFile(_,_,let source)=current{removePrivateExport(source)}
     }
     func resetDocument(){
-        documentLifetime.invalidate();documentLifetime=NativeDocumentLifetime()
+        nativeInput.deactivate();documentLifetime.invalidate();documentLifetime=NativeDocumentLifetime()
         generation &+= 1;folders.cancelAll();preparingFolder=false
         if case .exportFile(_,_,let source)?=selection{removePrivateExport(source)}
         selection=nil;picker?.dismiss(animated:false);picker=nil

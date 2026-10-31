@@ -84,6 +84,20 @@ if(!running_)resume();measurement_.start(params.at("id").get<std::string>(),nomi
   return !quit_;
 }
 
+void Engine::apply_controller_ports(){
+  for(unsigned port=0;port<4;++port){
+    const auto& cfg=input_profile_.controller_ports[port];
+    const unsigned dev=cfg.retro_device_id();
+    if(cfg.device!=InputProfile::PortDevice::Auto&&dev!=RETRO_DEVICE_NONE&&!declared_controllers_[port].empty()){
+      const auto& allowed=declared_controllers_[port];
+      const bool exact=std::find(allowed.begin(),allowed.end(),dev)!=allowed.end();
+      const bool base_ok=cfg.subclass==0&&std::any_of(allowed.begin(),allowed.end(),[dev](unsigned id){return (id&RETRO_DEVICE_MASK)==(dev&RETRO_DEVICE_MASK);});
+      if(!exact&&!base_ok)throw Failure("unsupported_capability");
+    }
+    call_core(api_.controller,port,dev);
+  }
+}
+
 void Engine::prepare(const Json& params){
   if(initialized_||loaded_)throw Failure("invalid_state");
   filename_=params.at("filename").get<std::string>();title_=params.at("title").get<std::string>();const auto expected=params.at("bytes").get<std::uint64_t>();
@@ -123,21 +137,30 @@ void Engine::prepare(const Json& params){
   if(params.value("has_system_assets",false))system_directory_=executable_base_directory()+"assets";
   const auto& options=params.at("core_options");if(!options.is_object()||options.size()>128)throw Failure("runtime_crashed");
   for(auto it=options.begin();it!=options.end();++it){const auto value=it.value().get<std::string>();if(it.key().empty()||it.key().size()>128||value.size()>256)throw Failure("runtime_crashed");variables_.emplace(it.key(),value);}
-  const auto backend=params.value("video_backend",std::string("software"));if(backend!=OMNIPLAY_VIDEO_BACKEND)throw Failure("runtime_crashed");hardware_video_=backend=="opengl_core";
+  const auto backend=params.value("video_backend",std::string("software"));if(backend!=OMNIPLAY_VIDEO_BACKEND)throw Failure("runtime_crashed");
+  vulkan_video_=backend=="vulkan";
+  gles_video_=backend=="opengl_es";
+  hardware_video_=backend=="opengl_core"||gles_video_||vulkan_video_;
   analog_controls_=params.value("analog_controls",false);
   if(!input_profile_.load(params.value("input_profile",Json{})))throw Failure("invalid_request");
+#ifndef OMNIPLAY_DEVICE_FREE_ACTOR
+  raw_joysticks_.load_profiles(input_profile_.sdl_raw_joysticks);
+#endif
   if(presentation_){if(hardware_video_||!presentation_->snapshot().ready)throw Failure("runtime_unavailable");if(!presentation_->playback(false,static_cast<unsigned>(std::lround(volume_*100)),config.value("fullscreen",false)?2:1))throw Failure("runtime_unavailable");}
   else{
 #ifdef OMNIPLAY_DEVICE_FREE_ACTOR
     throw Failure("unsupported_capability");
 #else
-    if(hardware_video_)GlVideo::window_attributes();
-    window_=SDL_CreateWindow(("OmniPlay — "+title_).c_str(),768,672,SDL_WINDOW_RESIZABLE|(hardware_video_?SDL_WINDOW_OPENGL:0));if(!window_)throw Failure("runtime_unavailable");
-    if(hardware_video_)gl_video_.configure(window_,params.at("gpu_max_width").get<unsigned>(),params.at("gpu_max_height").get<unsigned>());
+    if(hardware_video_&&!vulkan_video_)GlVideo::window_attributes(gles_video_);
+    const SDL_WindowFlags win_flags=SDL_WINDOW_RESIZABLE|(vulkan_video_?SDL_WINDOW_VULKAN:(hardware_video_?SDL_WINDOW_OPENGL:0));
+    window_=SDL_CreateWindow(("OmniPlay — "+title_).c_str(),768,672,win_flags);if(!window_)throw Failure("runtime_unavailable");
+    if(vulkan_video_)vk_video_.configure(window_,params.at("gpu_max_width").get<unsigned>(),params.at("gpu_max_height").get<unsigned>());
+    else if(hardware_video_)gl_video_.configure(window_,params.at("gpu_max_width").get<unsigned>(),params.at("gpu_max_height").get<unsigned>(),gles_video_);
     else{renderer_=SDL_CreateRenderer(window_,"software");if(!renderer_)throw Failure("runtime_unavailable");}
     if(config.value("fullscreen",false)&&!SDL_SetWindowFullscreen(window_,true))throw Failure("runtime_unavailable");
 #endif
   }
+  for(auto& list:declared_controllers_)list.clear();
   core_phase_=CorePhase::Loading;call_core(api_.set_environment,environment);call_core(api_.set_video,video);call_core(api_.set_audio,audio_sample);call_core(api_.set_audio_batch,audio_batch);call_core(api_.set_input_poll,input_poll);call_core(api_.set_input_state,input_state);call_core(api_.init);initialized_=true;if(fault_)throw Failure(fault_code_.load());
   retro_game_info game{};game.path=filename_.c_str();
   if(!info_.need_fullpath){if(expected>512u*1024u*1024u)throw Failure("unsupported_capability");rom_.resize(static_cast<std::size_t>(expected));std::ifstream source(path,std::ios::binary);if(!source.read(reinterpret_cast<char*>(rom_.data()),static_cast<std::streamsize>(rom_.size())))throw Failure("runtime_crashed");game.data=rom_.data();game.size=rom_.size();}
@@ -149,11 +172,12 @@ void Engine::prepare(const Json& params){
   if(api_.flush_io_checked){flush_files();if(!call_core(api_.serialize_size)||call_core(api_.serialize_size)>kMaxSave)throw Failure("unsupported_capability");}
   const auto minimum_ram=params.value("minimum_system_ram_bytes",std::uint64_t(0));
   if(minimum_ram>64u*1024u*1024u||call_core(api_.memory_size,RETRO_MEMORY_SYSTEM_RAM)<minimum_ram)throw Failure("content_mismatch");
-  for(unsigned port=0;port<4;++port)call_core(api_.controller,port,RETRO_DEVICE_JOYPAD);read_av();
+  apply_controller_ports();read_av();
 #ifndef OMNIPLAY_DEVICE_FREE_ACTOR
   if(!presentation_){SDL_AudioSpec spec{};spec.format=SDL_AUDIO_S16;spec.channels=2;spec.freq=static_cast<int>(std::lround(sample_rate_));
     audio_=SDL_OpenAudioDeviceStream(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK,&spec,supply_audio,this);if(!audio_)throw Failure("runtime_crashed");
     int count=0;SDL_JoystickID* ids=SDL_GetGamepads(&count);for(int i=0;ids&&i<count;++i)pad_added(ids[i]);SDL_free(ids);
+    raw_joysticks_.refresh_devices(pads_);
   }
 #endif
   metrics_start_=Clock::now();presentation_due_=Clock::time_point{};previous_frame_=Clock::time_point{};
@@ -165,7 +189,11 @@ void Engine::read_av(){
 }
 void Engine::complete_preparation(){
 #ifndef OMNIPLAY_DEVICE_FREE_ACTOR
-  if(hardware_video_){if(!gl_video_.negotiated())throw Failure("runtime_unavailable");gl_video_.reset_core();if(fault_)throw Failure("runtime_unavailable");}
+  if(hardware_video_){
+    if(vulkan_video_){if(!vk_video_.negotiated())throw Failure("runtime_unavailable");vk_video_.reset_core();}
+    else{if(!gl_video_.negotiated())throw Failure("runtime_unavailable");gl_video_.reset_core();}
+    if(fault_)throw Failure("runtime_unavailable");
+  }
 #endif
   if(fault_)throw Failure(fault_code_.load());
   if(api_.finish_prepare&&!call_core(api_.finish_prepare))throw Failure(fault_?fault_code_.load():"content_mismatch");
@@ -178,7 +206,7 @@ bool Engine::valid_av(const retro_system_av_info& av)const{
   if(!geometry.base_width||!geometry.base_height||geometry.base_width>4096||geometry.base_height>4096||
       geometry.max_width<geometry.base_width||geometry.max_height<geometry.base_height||geometry.max_width>4096||geometry.max_height>4096||
       !std::isfinite(geometry.aspect_ratio)||geometry.aspect_ratio<0||geometry.aspect_ratio>10)return false;
-  return !hardware_video_||(av.geometry.base_width&&av.geometry.base_height&&av.geometry.max_width>=av.geometry.base_width&&av.geometry.max_height>=av.geometry.base_height&&av.geometry.max_width<=gl_video_.width()&&av.geometry.max_height<=gl_video_.height());
+  return !hardware_video_||(av.geometry.base_width&&av.geometry.base_height&&av.geometry.max_width>=av.geometry.base_width&&av.geometry.max_height>=av.geometry.base_height&&av.geometry.max_width<=hw_max_width()&&av.geometry.max_height<=hw_max_height());
 }
 bool Engine::consume_av_changes(){
   std::optional<retro_system_av_info> av;std::optional<retro_game_geometry> geometry;
@@ -242,7 +270,7 @@ void Engine::pause_core(){
   if(!api_.pause_guest){core_paused_=true;return;}
 
 #ifndef OMNIPLAY_DEVICE_FREE_ACTOR
-  if(hardware_video_)gl_video_.make_current();
+  if(hardware_video_){if(vulkan_video_)vk_video_.check_healthy();else gl_video_.make_current();}
 #endif
  // Retryable before callback entry.
   guest_pause_active_=true;int result=0;
@@ -254,6 +282,10 @@ void Engine::pause_core(){
 }
 void Engine::pause(){
   measurement_.cancel("playback_interrupted");running_=false;finger_down_=false;pointer_down_=false;pointer_inside_=false;audio_running_.store(false);
+#ifndef OMNIPLAY_DEVICE_FREE_ACTOR
+  touch_overlay_.clear_contacts();raw_joysticks_.close_ui();
+  mouse_dx_=mouse_dy_=wheel_x_=wheel_y_=0;polled_mouse_dx_=polled_mouse_dy_=polled_wheel_x_=polled_wheel_y_=0;polled_mouse_buttons_=0;
+#endif
   if(presentation_)presentation_->playback(false,static_cast<unsigned>(std::lround(volume_*100)));
 #ifdef OMNIPLAY_DEVICE_FREE_ACTOR
   const bool device_paused=true; // Playback control travels to the separate host.
@@ -322,8 +354,8 @@ void Engine::flush_rumble(){
 #endif
 }
 #ifndef OMNIPLAY_DEVICE_FREE_ACTOR
-void Engine::pad_added(SDL_JoystickID id){for(auto* pad:pads_)if(pad&&SDL_GetGamepadID(pad)==id)return;for(unsigned port=0;port<4;++port)if(!pads_[port]){auto* pad=SDL_OpenGamepad(id);if(!pad)return;pads_[port]=pad;auto& value=rumble_[port];const bool available=SDL_GetBooleanProperty(SDL_GetGamepadProperties(pad),SDL_PROP_GAMEPAD_CAP_RUMBLE_BOOLEAN,false);{std::lock_guard lock(value.mutex);value.strong=value.weak=0;value.available=available;}value.sent_strong=value.sent_weak=0;value.sent_at=0;return;}}
-void Engine::pad_removed(SDL_JoystickID id){for(unsigned port=0;port<4;++port)if(pads_[port]&&SDL_GetGamepadID(pads_[port])==id){auto& value=rumble_[port];{std::lock_guard lock(value.mutex);value.available=false;value.strong=value.weak=0;}SDL_RumbleGamepad(pads_[port],0,0,0);SDL_CloseGamepad(pads_[port]);pads_[port]=nullptr;value.sent_strong=value.sent_weak=0;}}
+void Engine::pad_added(SDL_JoystickID id){for(auto* pad:pads_)if(pad&&SDL_GetGamepadID(pad)==id)return;for(unsigned port=0;port<4;++port)if(!pads_[port]){auto* pad=SDL_OpenGamepad(id);if(!pad)return;pads_[port]=pad;auto& value=rumble_[port];const bool available=SDL_GetBooleanProperty(SDL_GetGamepadProperties(pad),SDL_PROP_GAMEPAD_CAP_RUMBLE_BOOLEAN,false);{std::lock_guard lock(value.mutex);value.strong=value.weak=0;value.available=available;}value.sent_strong=value.sent_weak=0;value.sent_at=0;raw_joysticks_.refresh_devices(pads_);return;}}
+void Engine::pad_removed(SDL_JoystickID id){for(unsigned port=0;port<4;++port)if(pads_[port]&&SDL_GetGamepadID(pads_[port])==id){auto& value=rumble_[port];{std::lock_guard lock(value.mutex);value.available=false;value.strong=value.weak=0;}SDL_RumbleGamepad(pads_[port],0,0,0);SDL_CloseGamepad(pads_[port]);pads_[port]=nullptr;value.sent_strong=value.sent_weak=0;}raw_joysticks_.refresh_devices(pads_);}
 #endif
 void Engine::poll(){
   if(presentation_){
@@ -342,18 +374,33 @@ void Engine::poll(){
   SDL_Event event;while(SDL_PollEvent(&event)){
   if(event.type==SDL_EVENT_QUIT||(event.type==SDL_EVENT_WINDOW_CLOSE_REQUESTED&&window_&&event.window.windowID==SDL_GetWindowID(window_))){close_requested_=true;pause();}
   else if((event.type==SDL_EVENT_WINDOW_FOCUS_LOST||event.type==SDL_EVENT_WINDOW_MINIMIZED||event.type==SDL_EVENT_WINDOW_HIDDEN)&&window_&&event.window.windowID==SDL_GetWindowID(window_))pause();
+  else if((event.type==SDL_EVENT_WINDOW_RESIZED||event.type==SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED)&&window_&&event.window.windowID==SDL_GetWindowID(window_)){touch_overlay_.clear_contacts();finger_down_=false;}
   else if((event.type==SDL_EVENT_RENDER_DEVICE_LOST||event.type==SDL_EVENT_RENDER_DEVICE_RESET||event.type==SDL_EVENT_RENDER_TARGETS_RESET)&&window_&&event.render.windowID==SDL_GetWindowID(window_)){fault_=true;throw Failure("runtime_unavailable");}
   else if(event.type==SDL_EVENT_GAMEPAD_ADDED)pad_added(event.gdevice.which);
   else if(event.type==SDL_EVENT_GAMEPAD_REMOVED)pad_removed(event.gdevice.which);
-  else if(event.type==SDL_EVENT_FINGER_DOWN&&running_&&!finger_down_&&window_&&event.tfinger.windowID==SDL_GetWindowID(window_)){
-    finger_=event.tfinger.fingerID;finger_down_=true;finger_x_=event.tfinger.x;finger_y_=event.tfinger.y;
-  }else if(event.type==SDL_EVENT_FINGER_MOTION&&finger_down_&&event.tfinger.fingerID==finger_){finger_x_=event.tfinger.x;finger_y_=event.tfinger.y;}
-  else if((event.type==SDL_EVENT_FINGER_UP||event.type==SDL_EVENT_FINGER_CANCELED)&&finger_down_&&event.tfinger.fingerID==finger_){finger_down_=false;pointer_down_=false;}
+  else if(event.type==SDL_EVENT_JOYSTICK_ADDED)raw_joysticks_.refresh_devices(pads_);
+  else if(event.type==SDL_EVENT_JOYSTICK_REMOVED){if(raw_joysticks_.remove_device(event.jdevice.which)&&running_)pause();}
+  else if(event.type==SDL_EVENT_MOUSE_MOTION&&window_&&event.motion.windowID==SDL_GetWindowID(window_)){mouse_dx_=std::clamp(mouse_dx_+event.motion.xrel,-32767.0f,32767.0f);mouse_dy_=std::clamp(mouse_dy_+event.motion.yrel,-32767.0f,32767.0f);}
+  else if(event.type==SDL_EVENT_MOUSE_WHEEL&&window_&&event.wheel.windowID==SDL_GetWindowID(window_)){wheel_x_=std::clamp(wheel_x_+event.wheel.x,-32767.0f,32767.0f);wheel_y_=std::clamp(wheel_y_+event.wheel.y,-32767.0f,32767.0f);}
+  else if((event.type==SDL_EVENT_FINGER_DOWN||event.type==SDL_EVENT_FINGER_MOTION||event.type==SDL_EVENT_FINGER_UP||event.type==SDL_EVENT_FINGER_CANCELED)&&window_&&event.tfinger.windowID==SDL_GetWindowID(window_)){
+    int ww=0,wh=0;SDL_GetWindowSize(window_,&ww,&wh);
+    if(!hardware_video_&&touch_overlay_.handle_finger(event.type,event.tfinger.fingerID,event.tfinger.x,event.tfinger.y,ww,wh)){
+      // Handled by virtual touch overlay.
+    }else if(event.type==SDL_EVENT_FINGER_DOWN&&running_&&!finger_down_){
+      finger_=event.tfinger.fingerID;finger_down_=true;finger_x_=event.tfinger.x;finger_y_=event.tfinger.y;
+    }else if(event.type==SDL_EVENT_FINGER_MOTION&&finger_down_&&event.tfinger.fingerID==finger_){finger_x_=event.tfinger.x;finger_y_=event.tfinger.y;}
+    else if((event.type==SDL_EVENT_FINGER_UP||event.type==SDL_EVENT_FINGER_CANCELED)&&finger_down_&&event.tfinger.fingerID==finger_){finger_down_=false;pointer_down_=false;}
+  }
   else if(event.type==SDL_EVENT_KEY_DOWN&&!event.key.repeat&&window_&&event.key.windowID==SDL_GetWindowID(window_)&&SDL_GetKeyboardFocus()==window_){
-    if(event.key.scancode==SDL_SCANCODE_ESCAPE&&!close_requested_){if(running_)pause();else if(loaded_)resume();}
-    if(event.key.scancode==SDL_SCANCODE_F11&&window_&&!SDL_SetWindowFullscreen(window_,!(SDL_GetWindowFlags(window_)&SDL_WINDOW_FULLSCREEN)))throw Failure("runtime_unavailable");
+    if(!hardware_video_&&touch_overlay_.handle_key(event.key.scancode,event.key.mod)){finger_down_=false;}
+    else if(!hardware_video_&&raw_joysticks_.handle_key(event.key.scancode)){}
+    else{
+      if(event.key.scancode==SDL_SCANCODE_ESCAPE&&!close_requested_){if(running_)pause();else if(loaded_)resume();}
+      if(event.key.scancode==SDL_SCANCODE_F11&&window_&&!SDL_SetWindowFullscreen(window_,!(SDL_GetWindowFlags(window_)&SDL_WINDOW_FULLSCREEN)))throw Failure("runtime_unavailable");
+    }
   }
 }
+  raw_joysticks_.tick();
   if(running_&&window_&&(SDL_GetKeyboardFocus()!=window_||(SDL_GetWindowFlags(window_)&(SDL_WINDOW_HIDDEN|SDL_WINDOW_MINIMIZED))))pause();
   const auto health_now=Clock::now();
   if(audio_&&health_now>=audio_health_due_){
@@ -372,7 +419,7 @@ void Engine::tick(){
   if(previous_frame_!=Clock::time_point{}){const auto elapsed=std::chrono::duration<double,std::milli>(before-previous_frame_).count();intervals_.push_back(elapsed);if(elapsed<=5000)active_time_ms_+=elapsed;if(intervals_.size()>1000){fault_=true;}}
   previous_frame_=before;
 #ifndef OMNIPLAY_DEVICE_FREE_ACTOR
-  if(hardware_video_)gl_video_.make_current();
+  if(hardware_video_){if(vulkan_video_)vk_video_.check_healthy();else gl_video_.make_current();}
 #endif
 call_core(api_.run);if(fault_)throw Failure(fault_code_.load());
   if(shutdown_requested_.exchange(false)){close_requested_=true;pause();return;}
@@ -394,10 +441,11 @@ void Engine::video_impl(const void* data,unsigned width,unsigned height,std::siz
   auto* e=active_;if(!e||!e->running_||!data)return;
 #ifndef OMNIPLAY_DEVICE_FREE_ACTOR
   if(e->hardware_video_){
-    if(data!=RETRO_HW_FRAME_BUFFER_VALID||!width||!height||width>e->gl_video_.width()||height>e->gl_video_.height())throw Failure("runtime_crashed");
+    if(data!=RETRO_HW_FRAME_BUFFER_VALID||!width||!height||width>e->hw_max_width()||height>e->hw_max_height())throw Failure("runtime_crashed");
     e->texture_width_=width;e->texture_height_=height;const auto now=Clock::now();if(e->battery_&&now<e->presentation_due_)return;
     if(e->battery_)e->presentation_due_=std::max(now,e->presentation_due_+std::chrono::duration_cast<Clock::duration>(std::chrono::duration<double>(1.0/30.0)));
-    if(e->gl_video_.present(width,height,e->aspect_ratio_)){++e->presented_;e->total_presented_.fetch_add(1);}return;
+    const bool ok=e->vulkan_video_?e->vk_video_.present(width,height,e->aspect_ratio_):e->gl_video_.present(width,height,e->aspect_ratio_);
+    if(ok){++e->presented_;e->total_presented_.fetch_add(1);}return;
   }
 #endif
   if(!e->renderer_&&!e->presentation_)throw Failure("runtime_crashed");
@@ -422,7 +470,11 @@ void Engine::video_impl(const void* data,unsigned width,unsigned height,std::siz
   for(unsigned y=0;y<height;++y)for(unsigned x=0;x<width;++x){std::uint32_t out=0xff000000u;if(bytes==4){std::uint32_t value=0;std::memcpy(&value,source+y*pitch+x*4,4);out|=value&0x00ffffffu;}else{std::uint16_t value=0;std::memcpy(&value,source+y*pitch+x*2,2);unsigned r=0,g=0,b=0;if(e->pixel_format_==RETRO_PIXEL_FORMAT_RGB565){r=((value>>11)&31)*255/31;g=((value>>5)&63)*255/63;b=(value&31)*255/31;}else{r=((value>>10)&31)*255/31;g=((value>>5)&31)*255/31;b=(value&31)*255/31;}out|=(r<<16)|(g<<8)|b;}e->pixels_[std::size_t(y)*width+x]=out;}
   if(e->presentation_){const auto stamp=std::chrono::duration_cast<std::chrono::microseconds>(now.time_since_epoch()).count();if(stamp<0||logical_width<1)throw Failure("runtime_crashed");e->presentation_->video(e->pixels_,width,height,static_cast<unsigned>(logical_width),static_cast<std::uint64_t>(stamp));return;}
 #ifndef OMNIPLAY_DEVICE_FREE_ACTOR
-  if(!SDL_UpdateTexture(e->texture_,nullptr,e->pixels_.data(),static_cast<int>(width*4))||!SDL_RenderClear(e->renderer_)||!SDL_RenderTexture(e->renderer_,e->texture_,nullptr,nullptr)||!SDL_RenderPresent(e->renderer_)){e->fault_=true;return;}++e->presented_;e->total_presented_.fetch_add(1);
+  if(!SDL_UpdateTexture(e->texture_,nullptr,e->pixels_.data(),static_cast<int>(width*4))||!SDL_SetRenderDrawColor(e->renderer_,0,0,0,255)||!SDL_RenderClear(e->renderer_)||!SDL_RenderTexture(e->renderer_,e->texture_,nullptr,nullptr)){e->fault_=true;return;}
+  e->touch_overlay_.render(e->renderer_,static_cast<unsigned>(logical_width),height);
+  e->raw_joysticks_.render_overlay(e->renderer_,static_cast<unsigned>(logical_width),height);
+  if(!SDL_RenderPresent(e->renderer_)){e->fault_=true;return;}
+  ++e->presented_;e->total_presented_.fetch_add(1);
 #else
   throw Failure("runtime_crashed"); // A device-free actor cannot render without its host.
 #endif
@@ -468,10 +520,16 @@ void SDLCALL Engine::supply_audio(void* context,SDL_AudioStream* stream,int addi
 }
 
 void Engine::update_pointer(){
-  pointer_down_=false;pointer_inside_=false;if(!running_||!window_||(!renderer_&&!hardware_video_)||!texture_height_)return;
+  pointer_down_=false;pointer_inside_=false;polled_mouse_buttons_=0;
+  polled_mouse_dx_=static_cast<std::int16_t>(std::lround(std::clamp(mouse_dx_,-32767.0f,32767.0f)));
+  polled_mouse_dy_=static_cast<std::int16_t>(std::lround(std::clamp(mouse_dy_,-32767.0f,32767.0f)));
+  polled_wheel_x_=static_cast<std::int16_t>(std::lround(std::clamp(wheel_x_,-32767.0f,32767.0f)));
+  polled_wheel_y_=static_cast<std::int16_t>(std::lround(std::clamp(wheel_y_,-32767.0f,32767.0f)));
+  mouse_dx_=mouse_dy_=wheel_x_=wheel_y_=0;
+  if(!running_||!window_||(!renderer_&&!hardware_video_)||!texture_height_)return;
   float x=0,y=0;bool pressed=false;
   if(finger_down_){int width=0,height=0;if(!SDL_GetWindowSize(window_,&width,&height))return;x=finger_x_*width;y=finger_y_*height;pressed=true;}
-  else{if(SDL_GetMouseFocus()!=window_)return;const auto buttons=SDL_GetMouseState(&x,&y);pressed=(buttons&SDL_BUTTON_LMASK)!=0;}
+  else{if(SDL_GetMouseFocus()!=window_)return;const auto buttons=SDL_GetMouseState(&x,&y);pressed=(buttons&SDL_BUTTON_LMASK)!=0;if(buttons&SDL_BUTTON_LMASK)polled_mouse_buttons_|=1u;if(buttons&SDL_BUTTON_RMASK)polled_mouse_buttons_|=2u;if(buttons&SDL_BUTTON_MMASK)polled_mouse_buttons_|=4u;}
   if(!std::isfinite(x)||!std::isfinite(y))return;double nx=0,ny=0;
   if(hardware_video_){
     int width=0,height=0;if(!SDL_GetWindowSize(window_,&width,&height)||width<=0||height<=0)return;
@@ -490,29 +548,99 @@ void Engine::update_pointer(){
 #endif
 void Engine::input_poll(){if(auto* e=active_){if(e->presentation_)return;
 #ifndef OMNIPLAY_DEVICE_FREE_ACTOR
-  e->update_pointer();for(unsigned port=0;port<4;++port)for(unsigned index=0;index<2;++index)e->stick_input_[port][index]=e->input_profile_.stick(e->pads_[port],index);
+  e->update_pointer();
+  int ww=0,wh=0;if(e->window_)SDL_GetWindowSize(e->window_,&ww,&wh);
+  e->touch_state_=e->hardware_video_?presentation::TouchOverlayOutput{}:e->touch_overlay_.state(ww,wh);
+  for(unsigned port=0;port<4;++port){
+    e->raw_pad_state_[port]=e->pads_[port]?presentation::SampledPadState{}:e->raw_joysticks_.sample_port(port);
+    for(unsigned index=0;index<2;++index){
+      if(e->pads_[port])e->stick_input_[port][index]=e->input_profile_.stick(e->pads_[port],index);
+      else if(e->raw_pad_state_[port].connected){
+        std::array<std::int16_t,4> raxes{e->raw_pad_state_[port].axes[0],e->raw_pad_state_[port].axes[1],e->raw_pad_state_[port].axes[2],e->raw_pad_state_[port].axes[3]};
+        e->stick_input_[port][index]=e->input_profile_.stick_values(raxes,index);
+      }else e->stick_input_[port][index]={0,0};
+      if(port==0&&e->touch_state_.active){
+        const auto tx=e->touch_state_.axes[index*2],ty=e->touch_state_.axes[index*2+1];
+        if(std::abs(int(tx))>std::abs(int(e->stick_input_[0][index][0])))e->stick_input_[0][index][0]=tx;
+        if(std::abs(int(ty))>std::abs(int(e->stick_input_[0][index][1])))e->stick_input_[0][index][1]=ty;
+      }
+    }
+  }
 #endif
 }}
 std::int16_t Engine::input_state(unsigned port,unsigned device,unsigned index,unsigned id){
   auto* e=active_;if(!e||!e->running_||port>=4)return 0;device&=RETRO_DEVICE_MASK;
   if(e->presentation_)return presentation_input(e->presentation_->snapshot(),e->input_profile_,e->analog_controls_,port,device,index,id);
 #ifndef OMNIPLAY_DEVICE_FREE_ACTOR
-  if(!e->window_||SDL_GetKeyboardFocus()!=e->window_||(SDL_GetWindowFlags(e->window_)&(SDL_WINDOW_HIDDEN|SDL_WINDOW_MINIMIZED)))return 0;
+  if(!e->window_||e->raw_joysticks_.calibration_active()||SDL_GetKeyboardFocus()!=e->window_||(SDL_GetWindowFlags(e->window_)&(SDL_WINDOW_HIDDEN|SDL_WINDOW_MINIMIZED)))return 0;
+  if(e->input_profile_.controller_ports[port].device==InputProfile::PortDevice::None&&device!=RETRO_DEVICE_POINTER)return 0;
   if(device==RETRO_DEVICE_POINTER){if(port||index)return 0;if(id==RETRO_DEVICE_ID_POINTER_X)return e->pointer_x_;if(id==RETRO_DEVICE_ID_POINTER_Y)return e->pointer_y_;if(id==RETRO_DEVICE_ID_POINTER_PRESSED)return e->pointer_down_?1:0;if(id==RETRO_DEVICE_ID_POINTER_COUNT)return e->pointer_down_?1:0;
 #ifdef RETRO_DEVICE_ID_POINTER_IS_OFFSCREEN
     if(id==RETRO_DEVICE_ID_POINTER_IS_OFFSCREEN)return e->pointer_inside_?0:1;
 #endif
     return 0;}
+  if(device==RETRO_DEVICE_MOUSE){
+    if(index)return 0;
+    switch(id){
+      case RETRO_DEVICE_ID_MOUSE_X:return e->polled_mouse_dx_;
+      case RETRO_DEVICE_ID_MOUSE_Y:return e->polled_mouse_dy_;
+      case RETRO_DEVICE_ID_MOUSE_LEFT:return (e->polled_mouse_buttons_&1u)?1:0;
+      case RETRO_DEVICE_ID_MOUSE_RIGHT:return (e->polled_mouse_buttons_&2u)?1:0;
+      case RETRO_DEVICE_ID_MOUSE_MIDDLE:return (e->polled_mouse_buttons_&4u)?1:0;
+      case RETRO_DEVICE_ID_MOUSE_WHEELUP:return e->polled_wheel_y_>0?1:0;
+      case RETRO_DEVICE_ID_MOUSE_WHEELDOWN:return e->polled_wheel_y_<0?1:0;
+      case RETRO_DEVICE_ID_MOUSE_HORIZ_WHEELUP:return e->polled_wheel_x_>0?1:0;
+      case RETRO_DEVICE_ID_MOUSE_HORIZ_WHEELDOWN:return e->polled_wheel_x_<0?1:0;
+      default:return 0;
+    }
+  }
+  if(device==RETRO_DEVICE_LIGHTGUN){
+    if(index)return 0;
+    switch(id){
+      case RETRO_DEVICE_ID_LIGHTGUN_SCREEN_X:return e->pointer_x_;
+      case RETRO_DEVICE_ID_LIGHTGUN_SCREEN_Y:return e->pointer_y_;
+      case RETRO_DEVICE_ID_LIGHTGUN_IS_OFFSCREEN:return e->pointer_inside_?0:1;
+      case RETRO_DEVICE_ID_LIGHTGUN_TRIGGER:return (e->pointer_down_||(e->polled_mouse_buttons_&1u))?1:0;
+      case RETRO_DEVICE_ID_LIGHTGUN_RELOAD:return (e->polled_mouse_buttons_&2u)?1:0;
+      case RETRO_DEVICE_ID_LIGHTGUN_AUX_A:return input_state(port,RETRO_DEVICE_JOYPAD,0,RETRO_DEVICE_ID_JOYPAD_A);
+      case RETRO_DEVICE_ID_LIGHTGUN_AUX_B:return (e->polled_mouse_buttons_&4u)?1:input_state(port,RETRO_DEVICE_JOYPAD,0,RETRO_DEVICE_ID_JOYPAD_B);
+      case RETRO_DEVICE_ID_LIGHTGUN_START:return input_state(port,RETRO_DEVICE_JOYPAD,0,RETRO_DEVICE_ID_JOYPAD_START);
+      case RETRO_DEVICE_ID_LIGHTGUN_SELECT:return input_state(port,RETRO_DEVICE_JOYPAD,0,RETRO_DEVICE_ID_JOYPAD_SELECT);
+      case RETRO_DEVICE_ID_LIGHTGUN_DPAD_UP:return input_state(port,RETRO_DEVICE_JOYPAD,0,RETRO_DEVICE_ID_JOYPAD_UP);
+      case RETRO_DEVICE_ID_LIGHTGUN_DPAD_DOWN:return input_state(port,RETRO_DEVICE_JOYPAD,0,RETRO_DEVICE_ID_JOYPAD_DOWN);
+      case RETRO_DEVICE_ID_LIGHTGUN_DPAD_LEFT:return input_state(port,RETRO_DEVICE_JOYPAD,0,RETRO_DEVICE_ID_JOYPAD_LEFT);
+      case RETRO_DEVICE_ID_LIGHTGUN_DPAD_RIGHT:return input_state(port,RETRO_DEVICE_JOYPAD,0,RETRO_DEVICE_ID_JOYPAD_RIGHT);
+      default:return 0;
+    }
+  }
   if(device==RETRO_DEVICE_JOYPAD&&index)return 0;
   if(device==RETRO_DEVICE_JOYPAD&&id==RETRO_DEVICE_ID_JOYPAD_MASK){std::uint16_t mask=0;for(unsigned bit=0;bit<16;++bit)if(input_state(port,RETRO_DEVICE_JOYPAD,0,bit))mask|=static_cast<std::uint16_t>(1u<<bit);return static_cast<std::int16_t>(mask);}
   if(device==RETRO_DEVICE_ANALOG){
+    if(index==RETRO_DEVICE_INDEX_ANALOG_BUTTON){
+      if(id>=16||!e->input_profile_.pressure_buttons)return 0;
+      const auto source=e->input_profile_.buttons[id];
+      if(source==12||source==13){
+        const unsigned trig_idx=source==12?4u:5u;
+        std::int16_t raw=0;
+        if(e->pads_[port])raw=SDL_GetGamepadAxis(e->pads_[port],source==12?SDL_GAMEPAD_AXIS_LEFT_TRIGGER:SDL_GAMEPAD_AXIS_RIGHT_TRIGGER);
+        else if(e->raw_pad_state_[port].connected)raw=e->raw_pad_state_[port].axes[trig_idx];
+        if(port==0&&e->touch_state_.active)raw=std::max(raw,e->touch_state_.axes[trig_idx]);
+        if(raw>0)return e->input_profile_.shape_pressure(raw,port);
+      }
+      return input_state(port,RETRO_DEVICE_JOYPAD,0,id)?32767:0;
+    }
     if(index>1||id>1)return 0;
-    if(port==0&&index==0&&e->analog_controls_){const auto* keys=SDL_GetKeyboardState(nullptr);const auto negative_key=e->input_profile_.analog[id==0?2:0],positive_key=e->input_profile_.analog[id==0?3:1];const bool negative=negative_key!=SDL_SCANCODE_UNKNOWN&&keys[negative_key],positive=positive_key!=SDL_SCANCODE_UNKNOWN&&keys[positive_key];if(negative||positive)return static_cast<std::int16_t>((int(positive)-int(negative))*32767);}
-    return e->pads_[port]?e->stick_input_[port][index][id]:0;
+    const bool use_analog=e->analog_controls_||e->input_profile_.controller_ports[port].device==InputProfile::PortDevice::AnalogJoypad;
+    if(port==0&&index==0&&use_analog){const auto* keys=SDL_GetKeyboardState(nullptr);const auto negative_key=e->input_profile_.analog[id==0?2:0],positive_key=e->input_profile_.analog[id==0?3:1];const bool negative=negative_key!=SDL_SCANCODE_UNKNOWN&&keys[negative_key],positive=positive_key!=SDL_SCANCODE_UNKNOWN&&keys[positive_key];if(negative||positive)return static_cast<std::int16_t>((int(positive)-int(negative))*32767);}
+    return (e->pads_[port]||e->raw_pad_state_[port].connected||(port==0&&e->touch_state_.active))?e->stick_input_[port][index][id]:0;
   }
   if(device!=RETRO_DEVICE_JOYPAD||id>=16)return 0;
   const std::array<SDL_GamepadButton,16> buttons{SDL_GAMEPAD_BUTTON_SOUTH,SDL_GAMEPAD_BUTTON_WEST,SDL_GAMEPAD_BUTTON_BACK,SDL_GAMEPAD_BUTTON_START,SDL_GAMEPAD_BUTTON_DPAD_UP,SDL_GAMEPAD_BUTTON_DPAD_DOWN,SDL_GAMEPAD_BUTTON_DPAD_LEFT,SDL_GAMEPAD_BUTTON_DPAD_RIGHT,SDL_GAMEPAD_BUTTON_EAST,SDL_GAMEPAD_BUTTON_NORTH,SDL_GAMEPAD_BUTTON_LEFT_SHOULDER,SDL_GAMEPAD_BUTTON_RIGHT_SHOULDER,SDL_GAMEPAD_BUTTON_INVALID,SDL_GAMEPAD_BUTTON_INVALID,SDL_GAMEPAD_BUTTON_LEFT_STICK,SDL_GAMEPAD_BUTTON_RIGHT_STICK};
-  if(e->pads_[port]){auto* pad=e->pads_[port];const auto source=e->input_profile_.buttons[id];if(buttons[source]!=SDL_GAMEPAD_BUTTON_INVALID&&SDL_GetGamepadButton(pad,buttons[source]))return 1;if(source==12&&SDL_GetGamepadAxis(pad,SDL_GAMEPAD_AXIS_LEFT_TRIGGER)>16000)return 1;if(source==13&&SDL_GetGamepadAxis(pad,SDL_GAMEPAD_AXIS_RIGHT_TRIGGER)>16000)return 1;if(!e->analog_controls_){const auto x=e->stick_input_[port][0][0],y=e->stick_input_[port][0][1];if((source==4&&y< -13107)||(source==5&&y>13107)||(source==6&&x< -13107)||(source==7&&x>13107))return 1;}}
+  const auto source=e->input_profile_.buttons[id];
+  const bool use_analog=e->analog_controls_||e->input_profile_.controller_ports[port].device==InputProfile::PortDevice::AnalogJoypad;
+  if(e->pads_[port]){auto* pad=e->pads_[port];if(buttons[source]!=SDL_GAMEPAD_BUTTON_INVALID&&SDL_GetGamepadButton(pad,buttons[source]))return 1;if(source==12&&SDL_GetGamepadAxis(pad,SDL_GAMEPAD_AXIS_LEFT_TRIGGER)>16000)return 1;if(source==13&&SDL_GetGamepadAxis(pad,SDL_GAMEPAD_AXIS_RIGHT_TRIGGER)>16000)return 1;if(!use_analog){const auto x=e->stick_input_[port][0][0],y=e->stick_input_[port][0][1];if((source==4&&y< -13107)||(source==5&&y>13107)||(source==6&&x< -13107)||(source==7&&x>13107))return 1;}}
+  else if(e->raw_pad_state_[port].connected){const auto& r=e->raw_pad_state_[port];if(buttons[source]!=SDL_GAMEPAD_BUTTON_INVALID&&(r.sdl_button_mask&(1u<<static_cast<unsigned>(buttons[source]))))return 1;if(source==12&&r.axes[4]>16000)return 1;if(source==13&&r.axes[5]>16000)return 1;if(!use_analog){const auto x=e->stick_input_[port][0][0],y=e->stick_input_[port][0][1];if((source==4&&y< -13107)||(source==5&&y>13107)||(source==6&&x< -13107)||(source==7&&x>13107))return 1;}}
+  if(port==0&&e->touch_state_.active){if(buttons[source]!=SDL_GAMEPAD_BUTTON_INVALID&&(e->touch_state_.sdl_button_mask&(1u<<static_cast<unsigned>(buttons[source]))))return 1;if(source==12&&e->touch_state_.axes[4]>16000)return 1;if(source==13&&e->touch_state_.axes[5]>16000)return 1;}
   if(port==0){const auto code=e->input_profile_.keyboard[id];return code!=SDL_SCANCODE_UNKNOWN&&SDL_GetKeyboardState(nullptr)[code]?1:0;}return 0;
 #else
   return 0;
@@ -520,7 +648,7 @@ std::int16_t Engine::input_state(unsigned port,unsigned device,unsigned index,un
 }
 
 void Engine::quiet_log(enum retro_log_level,const char*,...){}
-std::uintptr_t Engine::hardware_framebuffer(){return active_&&active_->hardware_video_?active_->gl_video_.framebuffer():0;}
+std::uintptr_t Engine::hardware_framebuffer(){return active_&&active_->hardware_video_&&!active_->vulkan_video_?active_->gl_video_.framebuffer():0;}
 bool Engine::environment(unsigned command,void* data){try{return environment_impl(command,data);}catch(const Failure& error){if(active_){active_->fault_code_=error.code;active_->fault_=true;}return false;}catch(...){if(active_){active_->fault_code_="runtime_crashed";active_->fault_=true;}return false;}}
 bool Engine::environment_impl(unsigned command,void* data){
   auto* e=active_;if(!e||(command&RETRO_ENVIRONMENT_PRIVATE))return false;
@@ -531,12 +659,23 @@ bool Engine::environment_impl(unsigned command,void* data){
   if(!data)return false;
   switch(command){
     case RETRO_ENVIRONMENT_GET_CAN_DUPE:*static_cast<bool*>(data)=true;return true;
-    case RETRO_ENVIRONMENT_GET_PREFERRED_HW_RENDER:*static_cast<retro_hw_context_type*>(data)=e->hardware_video_?RETRO_HW_CONTEXT_OPENGL_CORE:RETRO_HW_CONTEXT_NONE;return true;
+    case RETRO_ENVIRONMENT_GET_PREFERRED_HW_RENDER:*static_cast<retro_hw_context_type*>(data)=e->vulkan_video_?RETRO_HW_CONTEXT_VULKAN:(e->gles_video_?RETRO_HW_CONTEXT_OPENGLES3:(e->hardware_video_?RETRO_HW_CONTEXT_OPENGL_CORE:RETRO_HW_CONTEXT_NONE));return true;
     case RETRO_ENVIRONMENT_SET_HW_RENDER:{
 #ifdef OMNIPLAY_DEVICE_FREE_ACTOR
       return false;
 #else
-      if(!e->hardware_video_)return false;auto& callback=*static_cast<retro_hw_render_callback*>(data);if(!e->gl_video_.negotiate(callback))return false;callback.get_current_framebuffer=hardware_framebuffer;callback.get_proc_address=GlVideo::procedure;return true;
+      if(!e->hardware_video_)return false;auto& callback=*static_cast<retro_hw_render_callback*>(data);
+      if(e->vulkan_video_)return e->vk_video_.negotiate(callback);
+      if(!e->gl_video_.negotiate(callback))return false;
+      callback.get_current_framebuffer=hardware_framebuffer;callback.get_proc_address=GlVideo::procedure;return true;
+#endif
+    }
+    case RETRO_ENVIRONMENT_GET_HW_RENDER_INTERFACE:{
+#ifdef OMNIPLAY_DEVICE_FREE_ACTOR
+      return false;
+#else
+      if(!e->vulkan_video_||!e->vk_video_.negotiated())return false;
+      *static_cast<const void**>(data)=e->vk_video_.render_interface();return true;
 #endif
     }
     case RETRO_ENVIRONMENT_SET_PIXEL_FORMAT:{auto format=*static_cast<retro_pixel_format*>(data);if(format!=RETRO_PIXEL_FORMAT_0RGB1555&&format!=RETRO_PIXEL_FORMAT_RGB565&&format!=RETRO_PIXEL_FORMAT_XRGB8888)return false;e->pixel_format_=static_cast<unsigned>(format);return true;}
@@ -552,13 +691,22 @@ bool Engine::environment_impl(unsigned command,void* data){
     case RETRO_ENVIRONMENT_GET_DISK_CONTROL_INTERFACE_VERSION:*static_cast<unsigned*>(data)=1;return true;
     case RETRO_ENVIRONMENT_SET_DISK_CONTROL_EXT_INTERFACE:{const auto* d=static_cast<const retro_disk_control_ext_callback*>(data);e->discs_={d->set_eject_state,d->get_eject_state,d->get_image_index,d->set_image_index,d->get_num_images,d->replace_image_index,d->add_image_index};return true;}
     case RETRO_ENVIRONMENT_SET_SYSTEM_AV_INFO:{const auto av=*static_cast<const retro_system_av_info*>(data);if(!e->valid_av(av))throw Failure("unsupported_capability");std::lock_guard lock(e->av_mutex_);e->pending_av_=av;e->pending_geometry_.reset();return true;}
-    case RETRO_ENVIRONMENT_SET_GEOMETRY:{const auto geometry=*static_cast<const retro_game_geometry*>(data);if(!std::isfinite(geometry.aspect_ratio)||geometry.aspect_ratio<0||geometry.aspect_ratio>10)return false;if(e->hardware_video_&&(!geometry.base_width||!geometry.base_height||geometry.base_width>e->gl_video_.width()||geometry.base_height>e->gl_video_.height()))return false;std::lock_guard lock(e->av_mutex_);e->pending_geometry_=geometry;return true;}
+    case RETRO_ENVIRONMENT_SET_GEOMETRY:{const auto geometry=*static_cast<const retro_game_geometry*>(data);if(!std::isfinite(geometry.aspect_ratio)||geometry.aspect_ratio<0||geometry.aspect_ratio>10)return false;if(e->hardware_video_&&(!geometry.base_width||!geometry.base_height||geometry.base_width>e->hw_max_width()||geometry.base_height>e->hw_max_height()))return false;std::lock_guard lock(e->av_mutex_);e->pending_geometry_=geometry;return true;}
     case RETRO_ENVIRONMENT_GET_AUDIO_VIDEO_ENABLE:*static_cast<int*>(data)=3;return true;
     case RETRO_ENVIRONMENT_SET_CORE_OPTIONS:{const auto* definitions=static_cast<const retro_core_option_definition*>(data);for(unsigned n=0;n<512&&definitions[n].key;++n){const auto& d=definitions[n];const char* value=d.default_value?d.default_value:d.values[0].value;if(value&&std::strlen(d.key)<=128&&std::strlen(value)<=256)e->variables_.emplace(d.key,value);}return true;}
     case RETRO_ENVIRONMENT_SET_CORE_OPTIONS_V2:case RETRO_ENVIRONMENT_SET_CORE_OPTIONS_V2_INTL:{const auto* options=command==RETRO_ENVIRONMENT_SET_CORE_OPTIONS_V2?static_cast<const retro_core_options_v2*>(data):static_cast<const retro_core_options_v2_intl*>(data)->us;if(!options||!options->definitions)return false;for(unsigned n=0;n<512&&options->definitions[n].key;++n){const auto& d=options->definitions[n];const char* value=d.default_value?d.default_value:d.values[0].value;if(value&&std::strlen(d.key)<=128&&std::strlen(value)<=256)e->variables_.emplace(d.key,value);}return true;}
-    case RETRO_ENVIRONMENT_SET_INPUT_DESCRIPTORS:case RETRO_ENVIRONMENT_SET_CONTROLLER_INFO:case RETRO_ENVIRONMENT_SET_SUPPORT_NO_GAME:return true;
+    case RETRO_ENVIRONMENT_SET_CONTROLLER_INFO:{
+      const auto* info=static_cast<const retro_controller_info*>(data);
+      for(unsigned p=0;p<4&&info[p].types;++p){
+        e->declared_controllers_[p].clear();
+        const unsigned n=std::min<unsigned>(info[p].num_types,32u);
+        for(unsigned i=0;i<n;++i)e->declared_controllers_[p].push_back(info[p].types[i].id);
+      }
+      return true;
+    }
+    case RETRO_ENVIRONMENT_SET_INPUT_DESCRIPTORS:case RETRO_ENVIRONMENT_SET_SUPPORT_NO_GAME:return true;
     case RETRO_ENVIRONMENT_GET_RUMBLE_INTERFACE:if(!e->input_profile_.haptics)return false;static_cast<retro_rumble_interface*>(data)->set_rumble_state=rumble;return true;
-    case RETRO_ENVIRONMENT_GET_INPUT_DEVICE_CAPABILITIES:*static_cast<std::uint64_t*>(data)=(1ull<<RETRO_DEVICE_JOYPAD)|(1ull<<RETRO_DEVICE_ANALOG)|(1ull<<RETRO_DEVICE_POINTER);return true;
+    case RETRO_ENVIRONMENT_GET_INPUT_DEVICE_CAPABILITIES:*static_cast<std::uint64_t*>(data)=(1ull<<RETRO_DEVICE_JOYPAD)|(1ull<<RETRO_DEVICE_ANALOG)|(1ull<<RETRO_DEVICE_MOUSE)|(1ull<<RETRO_DEVICE_LIGHTGUN)|(1ull<<RETRO_DEVICE_POINTER);return true;
     case RETRO_ENVIRONMENT_GET_INPUT_BITMASKS:return true;
     case RETRO_ENVIRONMENT_GET_USERNAME:*static_cast<const char**>(data)="OmniPlay";return true;
     case RETRO_ENVIRONMENT_GET_INPUT_MAX_USERS:*static_cast<unsigned*>(data)=4;return true;
@@ -594,7 +742,7 @@ std::vector<std::uint8_t> Engine::save(const std::string& kind){
   if(kind!="in_game"&&kind!="emulator_state")throw Failure("unsupported_capability");
 
 #ifndef OMNIPLAY_DEVICE_FREE_ACTOR
-  if(hardware_video_)gl_video_.make_current();
+  if(hardware_video_){if(vulkan_video_)vk_video_.check_healthy();else gl_video_.make_current();}
 #endif
 flush_files();
   if(kind=="in_game"){
@@ -612,14 +760,14 @@ flush_files();
 }
 void Engine::retire_guest(){
   if(core_call_active_||core_call_failed_||guest_pause_active_||guest_pause_failed_)throw Failure("runtime_crashed");
-  if(hardware_video_&&(gl_video_.core_callback_active()||gl_video_.core_callback_failed()))throw Failure("invalid_state");
+  if(hardware_video_&&hw_callbacks_busy_or_failed())throw Failure("invalid_state");
   pause_core();core_phase_=CorePhase::Stopping;
   if(loaded_){
     call_core(api_.unload_game);loaded_=false;
   }
-  // GlVideo owns its own retry-before-entry/unknown-after-entry receipts.
+  // GlVideo and VkVideo own their retry-before-entry/unknown-after-entry receipts.
 #ifndef OMNIPLAY_DEVICE_FREE_ACTOR
-  if(hardware_video_)gl_video_.release_core();
+  if(hardware_video_){if(vulkan_video_)vk_video_.release_core();else gl_video_.release_core();}
 #endif
   if(initialized_){
     call_core(api_.deinit);initialized_=false;
@@ -644,15 +792,16 @@ void Engine::stop_content(){
 bool Engine::restart_content(){
   // All old guest handles/producers retire before the private directory swap.
   stop_content();fault_=false;fault_code_="runtime_crashed";shutdown_requested_=false;core_paused_=true;core_phase_=CorePhase::Loading;
+  for(auto& list:declared_controllers_)list.clear();
   call_core(api_.set_environment,environment);call_core(api_.set_video,video);call_core(api_.set_audio,audio_sample);call_core(api_.set_audio_batch,audio_batch);call_core(api_.set_input_poll,input_poll);call_core(api_.set_input_state,input_state);
   initialized_=true;call_core(api_.init);if(fault_)return false;retro_game_info game{};game.path=filename_.c_str();if(!info_.need_fullpath){game.data=rom_.data();game.size=rom_.size();}
   loaded_=call_core(api_.load_game,&game);if(loaded_)core_paused_=false;
-  if(!loaded_||fault_)return false;complete_preparation();for(unsigned port=0;port<4;++port)call_core(api_.controller,port,RETRO_DEVICE_JOYPAD);read_av();return !fault_;
+  if(!loaded_||fault_)return false;complete_preparation();apply_controller_ports();read_av();return !fault_;
 }
 void Engine::load(const std::string& kind,const std::vector<std::uint8_t>& payload){
   if(payload.empty()||payload.size()>kMaxSave)throw Failure("incompatible_save");const bool restore_running=running_;pause();
 #ifndef OMNIPLAY_DEVICE_FREE_ACTOR
-  if(hardware_video_)gl_video_.make_current();
+  if(hardware_video_){if(vulkan_video_)vk_video_.check_healthy();else gl_video_.make_current();}
 #endif
 
   if(saved_files_.enabled()){
@@ -710,7 +859,7 @@ void Engine::load(const std::string& kind,const std::vector<std::uint8_t>& paylo
 }
 void Engine::shutdown(){
   if(guest_pause_active_||guest_pause_failed_||core_call_active_||core_call_failed_)omni_owned_actor_exit(1);
-  if(hardware_video_&&(gl_video_.core_callback_active()||gl_video_.core_callback_failed()))omni_owned_actor_exit(1);
+  if(hardware_video_&&hw_callbacks_busy_or_failed())omni_owned_actor_exit(1);
   measurement_.cancel("runtime_stopped");
   core_phase_=CorePhase::Stopping;
   running_=false;audio_running_.store(false);
@@ -738,10 +887,13 @@ void Engine::shutdown(){
     object_=nullptr;
   }
 #ifndef OMNIPLAY_DEVICE_FREE_ACTOR
+  if(vulkan_video_)vk_video_.destroy();
   gl_video_.destroy();
 #endif
   stop_rumble();
 #ifndef OMNIPLAY_DEVICE_FREE_ACTOR
+  touch_overlay_.clear_contacts();
+  raw_joysticks_.shutdown();
   for(auto*& pad:pads_)if(pad){SDL_CloseGamepad(pad);pad=nullptr;}
   if(texture_){SDL_DestroyTexture(texture_);texture_=nullptr;}if(renderer_){SDL_DestroyRenderer(renderer_);renderer_=nullptr;}if(window_){SDL_DestroyWindow(window_);window_=nullptr;}
   SDL_Quit();

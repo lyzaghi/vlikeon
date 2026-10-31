@@ -92,7 +92,7 @@ def prepare(project):
     extras+=['qa/n64-memory/sinc_actual_cases.cpp']
     extras+=['engines/native/adapters/n64-ai-fifo.c.inc']
     extras+=['engines/native/adapters/n64-event-insert.c.inc','qa/n64-memory/event_insert_fixture.c','qa/n64-memory/event_insert_cases.cpp']
-    extras+=['engines/native/src/gl_video.hpp','engines/native/src/gl_video.cpp','qa/windows/NATIVE_ACCEPTANCE.md']
+    extras+=['engines/native/src/gl_video.hpp','engines/native/src/gl_video.cpp','engines/native/src/vk_video.hpp','engines/native/src/vk_video.cpp','engines/presentation/src/raw_joystick.hpp','engines/presentation/src/touch_overlay.hpp','qa/windows/NATIVE_ACCEPTANCE.md']
     extras+=['engines/native/src/audio_ring.hpp','qa/native-audio/CMakeLists.txt','qa/native-audio/audio_ring_cases.cpp','qa/native-audio/ACCEPTANCE.md']
     extras+=['engines/native/src/owned_actor_exit.h','engines/native/src/main.cpp','docs/NATIVE_GUEST_PAUSE.md','qa/native-lifecycle/CMakeLists.txt','qa/native-lifecycle/fixture_core.cpp','qa/native-lifecycle/run_cases.py','qa/native-lifecycle/ACCEPTANCE.md','tools/build_ppsspp.py']
     extras+=['engines/native/src/protocol.hpp','engines/native/src/protocol.cpp','docs/NATIVE_CONTROL_BOUNDARY.md','qa/native-lifecycle/wire_cases.py']

@@ -15,8 +15,8 @@ pub struct RuntimeFile {pub path:String,pub sha256:ContentHash,pub bytes:u64}
 #[serde(deny_unknown_fields)]
 pub struct FirmwareRequirement {pub role:String,pub filename:String,pub allowed_bytes:Vec<u64>,#[serde(default)]pub required_group:Option<String>,#[serde(default)]pub optional:bool}
 #[derive(Clone,Copy,Default,PartialEq,Eq,Serialize,Deserialize)]
-pub enum VideoBackend {#[default]#[serde(rename="software")]Software,#[serde(rename="opengl_core")]OpenGlCore}
-impl VideoBackend{pub fn as_str(self)->&'static str{match self{Self::Software=>"software",Self::OpenGlCore=>"opengl_core"}}}
+pub enum VideoBackend {#[default]#[serde(rename="software")]Software,#[serde(rename="opengl_core")]OpenGlCore,#[serde(rename="opengl_es")]OpenGlEs,#[serde(rename="vulkan")]Vulkan}
+impl VideoBackend{pub fn as_str(self)->&'static str{match self{Self::Software=>"software",Self::OpenGlCore=>"opengl_core",Self::OpenGlEs=>"opengl_es",Self::Vulkan=>"vulkan"}}}
 #[derive(Clone,Serialize,Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct PresentationPackage{pub protocol:u32,pub executable:String,pub maximum_width:u32,pub maximum_height:u32,pub memory_limit_mb:u32}
@@ -197,7 +197,7 @@ pub(crate) fn parse_catalog(raw:&[u8])->Result<Vec<RuntimePackage>>{
         if options.definitions.iter().any(|d|d.key=="beetle_psx_enable_memcard1")&&(package.filesystem_save_directory.is_none()||!package.pause_barrier||!package.filesystem_save_memory||package.file_io_protocol!=1){return Err(unavailable("A selectable native second card requires checked combined memory/file saves"));}
         match package.video_backend{
             VideoBackend::Software if package.gpu_max_width!=0||package.gpu_max_height!=0=>return Err(unavailable("Software runtime declares an unrelated GPU target")),
-            VideoBackend::OpenGlCore if !(16..=4096).contains(&package.gpu_max_width)||!(16..=4096).contains(&package.gpu_max_height)||u64::from(package.gpu_max_width)*u64::from(package.gpu_max_height)>16*1024*1024=>return Err(unavailable("Native GPU target exceeds its signed dimension policy")),
+            VideoBackend::OpenGlCore|VideoBackend::OpenGlEs|VideoBackend::Vulkan if !(16..=4096).contains(&package.gpu_max_width)||!(16..=4096).contains(&package.gpu_max_height)||u64::from(package.gpu_max_width)*u64::from(package.gpu_max_height)>16*1024*1024=>return Err(unavailable("Native GPU target exceeds its signed dimension policy")),
             _=>{}
         }
         if package.has_system_assets&&package.use_scratch_system_directory{return Err(unavailable("Native system assets and scratch directories are distinct declarations"));}

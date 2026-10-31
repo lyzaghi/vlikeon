@@ -8,18 +8,24 @@
      sources += [
        "//chrome/android/java/res_app/layout/main.xml",
        "//chrome/android/java/res_app/layout/main_forked_with_secondary_ui_container.xml",
-@@ -894,6 +895,19 @@
+@@ -894,6 +895,25 @@
      # From java_sources.gni.
      sources = chrome_java_sources
  
 +    # OmniPlay uses this Chromium renderer and the shared local Rust host.
 +    sources += [
++      "omniplay/java/org/chromium/chrome/browser/omniplay/AccessibilityHelper.java",
++      "omniplay/java/org/chromium/chrome/browser/omniplay/ApprovedCores.java",
 +      "omniplay/java/org/chromium/chrome/browser/omniplay/AssetServer.java",
 +      "omniplay/java/org/chromium/chrome/browser/omniplay/BackgroundSyncService.java",
 +      "omniplay/java/org/chromium/chrome/browser/omniplay/DeviceSnapshot.java",
 +      "omniplay/java/org/chromium/chrome/browser/omniplay/GameHubController.java",
 +      "omniplay/java/org/chromium/chrome/browser/omniplay/NativeCore.java",
 +      "omniplay/java/org/chromium/chrome/browser/omniplay/NativeDocuments.java",
++      "omniplay/java/org/chromium/chrome/browser/omniplay/NativeInputController.java",
++      "omniplay/java/org/chromium/chrome/browser/omniplay/OmniPlayDocumentsProvider.java",
++      "omniplay/java/org/chromium/chrome/browser/omniplay/PairingCredentials.java",
++      "omniplay/java/org/chromium/chrome/browser/omniplay/RemotePlayClient.java",
 +      "omniplay/java/org/chromium/chrome/browser/omniplay/SecureCredentials.java",
 +      "omniplay/java/org/chromium/chrome/browser/omniplay/SelectedDiscTree.java",
 +    ]

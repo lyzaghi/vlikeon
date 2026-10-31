@@ -135,8 +135,12 @@ impl RuntimeAdapter for NativeAdapter {
         if hello.result["haptics_protocol"].as_u64()!=Some(1){self.package.manifest.capabilities.remove(&Capability::Haptics);}
         input_profile.haptics_enabled&=self.package.manifest.capabilities.contains(&Capability::Haptics);
         // Browser device identifiers/calibration never enter the native core.
-        // SDL mappings and the shared physical-axis tuning apply here.
+        // SDL mappings and the shared physical-axis tuning apply here; brokered
+        // presentation actors also strip raw SDL GUIDs from actor IPC.
         input_profile.raw_gamepads.clear();
+        if self.package.presentation.is_some() {
+            input_profile.sdl_raw_joysticks.clear();
+        }
         if hello.result["measurement_protocol"].as_u64()!=Some(1){self.package.manifest.capabilities.remove(&Capability::PerformanceMeasurement);}
         let prepared=self.call("prepare",json!({"filename":filename,"input_profile":input_profile,"title":game.title,"bytes":primary_bytes,"config":config,"core_options":self.package.core_options,"minimum_system_ram_bytes":self.package.minimum_system_ram_bytes,"reset_after_ram_load":self.package.reset_after_ram_load,"filesystem_save_directory":self.package.filesystem_save_directory,"core_save_directory":self.package.core_save_directory,"filesystem_save_memory":self.package.filesystem_save_memory,"file_io_protocol":self.package.file_io_protocol,"writable_files_protocol":self.package.writable_files_protocol,"portable_files_profile":if portable_md{"ares_md_v1"}else{""},"has_system_assets":self.package.has_system_assets,"use_scratch_system_directory":self.package.use_scratch_system_directory,"video_backend":self.package.video_backend,"gpu_max_width":self.package.gpu_max_width,"gpu_max_height":self.package.gpu_max_height,"analog_controls":matches!(game.system,GameSystem::N64|GameSystem::Psp),"prepare_completion":self.package.prepare_completion,"pause_barrier":self.package.pause_barrier,"pause_barrier_protocol":self.package.pause_barrier_protocol}),Vec::new(),60)?;
         if portable_md&&prepared.result["portable_files_profile"].as_str()!=Some("ares_md_v1"){return Err(unavailable("The native worker did not acknowledge its portable save descriptor"));}

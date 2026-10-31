@@ -1,5 +1,7 @@
 #include "wire.hpp"
 #include "owner.hpp"
+#include "raw_joystick.hpp"
+#include "touch_overlay.hpp"
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_main.h>
 #include <algorithm>
@@ -49,15 +51,25 @@ class Host{
   Bus& bus_;Owner& owner_;std::uint32_t max_width_,max_height_,volume_ceiling_;bool haptics_,focused_=false,playing_=false,quit_=false;
   SDL_Window* window_=nullptr;SDL_Renderer* renderer_=nullptr;SDL_Texture* texture_=nullptr;SDL_AudioStream* audio_=nullptr;
   std::array<SDL_Gamepad*,4> pads_{};std::uint32_t width_=640,height_=480,logical_width_=640,audio_rate_=48000,reason_=0;std::uint64_t epoch_=1,presented_=0;
-  Clock::time_point last_activity_=Clock::now(),last_input_=Clock::now(),last_metrics_=Clock::now(),last_video_=Clock::now(),last_pads_=Clock::now();
-  bool finger_down_=false;SDL_FingerID finger_=0;float finger_x_=0,finger_y_=0,wheel_x_=0,wheel_y_=0;
+  Clock::time_point last_activity_=Clock::now(),last_input_=Clock::now(),last_metrics_=Clock::now(),last_video_=Clock::now(),last_pads_=Clock::now(),last_hud_=Clock::now();
+  bool finger_down_=false;SDL_FingerID finger_=0;float finger_x_=0,finger_y_=0,wheel_x_=0,wheel_y_=0,mouse_dx_=0,mouse_dy_=0;
+  RawJoystickManager raw_joysticks_;NativeTouchOverlay touch_overlay_;
   static std::int16_t number(float value){if(!std::isfinite(value))return 0;return static_cast<std::int16_t>(std::lround(std::clamp(value,-32767.0f,32767.0f)));}
+  static std::int16_t dominant_axis(std::int16_t a,std::int16_t b){return std::abs(int(b))>std::abs(int(a))?b:a;}
   void stop_haptics(){for(auto* pad:pads_)if(pad)SDL_RumbleGamepad(pad,0,0,0);}
-  void fence(std::uint32_t reason){check(epoch_<kMaxSequence);epoch_++;playing_=false;finger_down_=false;wheel_x_=wheel_y_=0;reason_=reason;stop_haptics();if(audio_)check(SDL_ClearAudioStream(audio_));send_input();}
+  void fence(std::uint32_t reason){check(epoch_<kMaxSequence);epoch_++;playing_=false;finger_down_=false;wheel_x_=wheel_y_=mouse_dx_=mouse_dy_=0;touch_overlay_.clear_contacts();raw_joysticks_.close_ui();reason_=reason;stop_haptics();if(audio_)check(SDL_ClearAudioStream(audio_));send_input();}
   bool admit(const Message& message){check(message.epoch<=epoch_);if(message.epoch!=epoch_)return false;last_activity_=Clock::now();return true;}
   void update_pads(){
     for(auto*& pad:pads_)if(pad&&!SDL_GamepadConnected(pad)){SDL_RumbleGamepad(pad,0,0,0);SDL_CloseGamepad(pad);pad=nullptr;}
-    int count=0;auto* ids=SDL_GetGamepads(&count);if(!ids)return;const auto bound=std::clamp(count,0,32);for(int i=0;i<bound;i++){if(std::any_of(pads_.begin(),pads_.end(),[&](auto* pad){return pad&&SDL_GetGamepadID(pad)==ids[i];}))continue;const auto free=std::find(pads_.begin(),pads_.end(),nullptr);if(free==pads_.end())break;*free=SDL_OpenGamepad(ids[i]);}SDL_free(ids);
+    int count=0;auto* ids=SDL_GetGamepads(&count);if(ids){const auto bound=std::clamp(count,0,32);for(int i=0;i<bound;i++){if(std::any_of(pads_.begin(),pads_.end(),[&](auto* pad){return pad&&SDL_GetGamepadID(pad)==ids[i];}))continue;const auto free=std::find(pads_.begin(),pads_.end(),nullptr);if(free==pads_.end())break;*free=SDL_OpenGamepad(ids[i]);}SDL_free(ids);}
+    raw_joysticks_.refresh_devices(pads_);
+  }
+  void draw_frame(){
+    check(SDL_SetRenderDrawColor(renderer_,0,0,0,255)&&SDL_RenderClear(renderer_));
+    if(texture_)check(SDL_RenderTexture(renderer_,texture_,nullptr,nullptr));
+    touch_overlay_.render(renderer_,logical_width_,height_);
+    raw_joysticks_.render_overlay(renderer_,logical_width_,height_);
+    check(SDL_RenderPresent(renderer_));
   }
   void control(const Message& message){
     if(!admit(message))return;const auto b=std::span<const std::uint8_t>(message.body);
@@ -69,7 +81,7 @@ class Host{
   void video(const Message& message){
     if(!admit(message))return;const auto b=std::span<const std::uint8_t>(message.body);const auto w=u32(b,0),h=u32(b,4);check(w<=max_width_&&h<=max_height_);
     if(!texture_||w!=width_||h!=height_){if(texture_)SDL_DestroyTexture(texture_);texture_=nullptr;width_=w;height_=h;texture_=SDL_CreateTexture(renderer_,SDL_PIXELFORMAT_RGBA32,SDL_TEXTUREACCESS_STREAMING,static_cast<int>(w),static_cast<int>(h));check(texture_&&SDL_SetTextureBlendMode(texture_,SDL_BLENDMODE_NONE));}logical_width_=u32(b,16);check(SDL_SetRenderLogicalPresentation(renderer_,static_cast<int>(logical_width_),static_cast<int>(h),SDL_LOGICAL_PRESENTATION_LETTERBOX));
-    check(SDL_UpdateTexture(texture_,nullptr,b.data()+32,static_cast<int>(u32(b,8)))&&SDL_SetRenderDrawColor(renderer_,0,0,0,255)&&SDL_RenderClear(renderer_)&&SDL_RenderTexture(renderer_,texture_,nullptr,nullptr)&&SDL_RenderPresent(renderer_));presented_++;
+    check(SDL_UpdateTexture(texture_,nullptr,b.data()+32,static_cast<int>(u32(b,8))));draw_frame();presented_++;
   }
   void audio(const Message& message){
     if(!admit(message)||!playing_||!focused_)return;const auto b=std::span<const std::uint8_t>(message.body);const auto rate=u32(b,0);if(rate!=audio_rate_){check(SDL_ClearAudioStream(audio_));SDL_AudioSpec spec{SDL_AUDIO_S16LE,2,static_cast<int>(rate)};check(SDL_SetAudioStreamFormat(audio_,&spec,nullptr));audio_rate_=rate;}
@@ -82,13 +94,34 @@ class Host{
     check(SDL_PutAudioStreamData(audio_,b.data()+16,static_cast<int>(bytes)));
   }
   void send_input(){
-    Bytes b(kInputBytes,0);if(focused_){b[144]=1;int count=0;const bool* keys=SDL_GetKeyboardState(&count);if(keys)for(int i=0;i<std::clamp(count,0,512);i++)if(keys[i])b[static_cast<unsigned>(i)/8]|=std::uint8_t(1u<<(static_cast<unsigned>(i)%8));
-      for(unsigned port=0;port<4;port++){auto* pad=pads_[port];if(!pad||!SDL_GamepadConnected(pad))continue;const auto at=64u+port*20u;b[at]=1;b[at+1]=haptics_&&SDL_GetBooleanProperty(SDL_GetGamepadProperties(pad),SDL_PROP_GAMEPAD_CAP_RUMBLE_BOOLEAN,false)?1:0;std::uint32_t mask=0;for(unsigned button=0;button<27;button++)if(button<SDL_GAMEPAD_BUTTON_COUNT&&SDL_GetGamepadButton(pad,SDL_GamepadButton(button)))mask|=1u<<button;put32(b,at+4,mask);for(unsigned axis=0;axis<6;axis++)put16(b,at+8+axis*2,static_cast<std::uint16_t>(SDL_GetGamepadAxis(pad,SDL_GamepadAxis(axis))));}
-      float x=0,y=0;bool down=false,available=false;if(finger_down_){int w=0,h=0;if(SDL_GetWindowSize(window_,&w,&h)&&w>0&&h>0){x=finger_x_*static_cast<float>(w);y=finger_y_*static_cast<float>(h);down=true;available=true;}}
-      else if(SDL_GetMouseFocus()==window_){down=(SDL_GetMouseState(&x,&y)&SDL_BUTTON_LMASK)!=0;available=true;}
+    Bytes b(kInputBytes,0);if(focused_&&!raw_joysticks_.calibration_active()){b[144]=1;int count=0;const bool* keys=SDL_GetKeyboardState(&count);if(keys)for(int i=0;i<std::clamp(count,0,512);i++)if(keys[i])b[static_cast<unsigned>(i)/8]|=std::uint8_t(1u<<(static_cast<unsigned>(i)%8));
+      int win_w=0,win_h=0;SDL_GetWindowSize(window_,&win_w,&win_h);
+      const auto touch=touch_overlay_.state(win_w,win_h);
+      for(unsigned port=0;port<4;port++){
+        auto* pad=pads_[port];const bool sdl_ok=pad&&SDL_GamepadConnected(pad);
+        const auto raw=sdl_ok?SampledPadState{}:raw_joysticks_.sample_port(port);
+        const bool touch_ok=(port==0&&touch.active);
+        if(!sdl_ok&&!raw.connected&&!touch_ok)continue;
+        const auto at=64u+port*20u;b[at]=1;
+        b[at+1]=sdl_ok&&haptics_&&SDL_GetBooleanProperty(SDL_GetGamepadProperties(pad),SDL_PROP_GAMEPAD_CAP_RUMBLE_BOOLEAN,false)?1:0;
+        std::uint32_t mask=raw.sdl_button_mask|(touch_ok?touch.sdl_button_mask:0u);
+        if(sdl_ok){for(unsigned button=0;button<27;button++)if(button<SDL_GAMEPAD_BUTTON_COUNT&&SDL_GetGamepadButton(pad,SDL_GamepadButton(button)))mask|=1u<<button;}
+        put32(b,at+4,mask);
+        for(unsigned axis=0;axis<6;axis++){
+          std::int16_t v=sdl_ok?SDL_GetGamepadAxis(pad,SDL_GamepadAxis(axis)):raw.axes[axis];
+          if(touch_ok)v=dominant_axis(v,touch.axes[axis]);
+          put16(b,at+8+axis*2,static_cast<std::uint16_t>(v));
+        }
+      }
+      float x=0,y=0;bool down=false,available=false;std::uint8_t mouse_buttons=0;
+      if(finger_down_){if(win_w>0&&win_h>0){x=finger_x_*static_cast<float>(win_w);y=finger_y_*static_cast<float>(win_h);down=true;available=true;}}
+      else if(SDL_GetMouseFocus()==window_){const auto mstate=SDL_GetMouseState(&x,&y);down=(mstate&SDL_BUTTON_LMASK)!=0;if(mstate&SDL_BUTTON_LMASK)mouse_buttons|=1u;if(mstate&SDL_BUTTON_RMASK)mouse_buttons|=2u;if(mstate&SDL_BUTTON_MMASK)mouse_buttons|=4u;available=true;}
+      b[147]=mouse_buttons;
       float lx=0,ly=0;if(available&&std::isfinite(x)&&std::isfinite(y)&&SDL_RenderCoordinatesFromWindow(renderer_,x,y,&lx,&ly)&&std::isfinite(lx)&&std::isfinite(ly)&&lx>=0&&ly>=0&&lx<static_cast<float>(logical_width_)&&ly<static_cast<float>(height_)){b[145]=1;b[146]=down?1:0;put16(b,148,static_cast<std::uint16_t>(number((lx/static_cast<float>(logical_width_)*2-1)*32767)));put16(b,150,static_cast<std::uint16_t>(number((ly/static_cast<float>(height_)*2-1)*32767)));}
+      put16(b,152,static_cast<std::uint16_t>(number(mouse_dx_)));put16(b,154,static_cast<std::uint16_t>(number(mouse_dy_)));
       put16(b,156,static_cast<std::uint16_t>(number(wheel_x_)));put16(b,158,static_cast<std::uint16_t>(number(wheel_y_)));
-    }wheel_x_=wheel_y_=0;bus_.outgoing({Kind::Input,epoch_,std::move(b)});last_input_=Clock::now();
+    }else if(focused_&&raw_joysticks_.calibration_active()){b[144]=1;}
+    wheel_x_=wheel_y_=mouse_dx_=mouse_dy_=0;bus_.outgoing({Kind::Input,epoch_,std::move(b)});last_input_=Clock::now();
   }
   void send_metrics(){const auto dropped=bus_.dropped();Bytes b(32,0);put64(b,0,presented_);put64(b,8,dropped[0]);put64(b,16,dropped[1]);put32(b,24,reason_);put32(b,28,playing_?1:0);bus_.outgoing({Kind::Metrics,epoch_,std::move(b)});last_metrics_=Clock::now();}
 public:
@@ -115,17 +148,33 @@ public:
         }
         else if((event.type==SDL_EVENT_RENDER_DEVICE_LOST||event.type==SDL_EVENT_RENDER_DEVICE_RESET||event.type==SDL_EVENT_RENDER_TARGETS_RESET)&&event.render.windowID==SDL_GetWindowID(window_)){fence(4);throw Failure();}
         else if(event.type==SDL_EVENT_GAMEPAD_REMOVED){const bool owned=std::any_of(pads_.begin(),pads_.end(),[&](auto* pad){return pad&&SDL_GetGamepadID(pad)==event.gdevice.which;});update_pads();if(owned)fence(2);}
-        else if(event.type==SDL_EVENT_GAMEPAD_ADDED)update_pads();
-        else if(event.type==SDL_EVENT_KEY_DOWN&&!event.key.repeat&&event.key.windowID==SDL_GetWindowID(window_)&&event.key.scancode==SDL_SCANCODE_F11){if(!SDL_SetWindowFullscreen(window_,!(SDL_GetWindowFlags(window_)&SDL_WINDOW_FULLSCREEN)))reason_=4;}
-        else if(event.type==SDL_EVENT_KEY_DOWN&&!event.key.repeat&&event.key.windowID==SDL_GetWindowID(window_)&&event.key.scancode==SDL_SCANCODE_ESCAPE){if(playing_)fence(2);}
+        else if(event.type==SDL_EVENT_GAMEPAD_ADDED||event.type==SDL_EVENT_JOYSTICK_ADDED)update_pads();
+        else if(event.type==SDL_EVENT_JOYSTICK_REMOVED){const bool owned=raw_joysticks_.remove_device(event.jdevice.which);update_pads();if(owned)fence(2);}
+        else if((event.type==SDL_EVENT_WINDOW_RESIZED||event.type==SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED)&&event.window.windowID==SDL_GetWindowID(window_)){touch_overlay_.clear_contacts();finger_down_=false;}
+        else if(event.type==SDL_EVENT_KEY_DOWN&&!event.key.repeat&&event.key.windowID==SDL_GetWindowID(window_)){
+          if(touch_overlay_.handle_key(event.key.scancode,event.key.mod)){finger_down_=false;draw_frame();}
+          else if(raw_joysticks_.handle_key(event.key.scancode)){draw_frame();}
+          else if(event.key.scancode==SDL_SCANCODE_F11){if(!SDL_SetWindowFullscreen(window_,!(SDL_GetWindowFlags(window_)&SDL_WINDOW_FULLSCREEN)))reason_=4;}
+          else if(event.key.scancode==SDL_SCANCODE_ESCAPE){if(playing_)fence(2);}
+        }
+        else if(event.type==SDL_EVENT_MOUSE_MOTION&&event.motion.windowID==SDL_GetWindowID(window_)){mouse_dx_=std::clamp(mouse_dx_+event.motion.xrel,-32767.0f,32767.0f);mouse_dy_=std::clamp(mouse_dy_+event.motion.yrel,-32767.0f,32767.0f);}
         else if(event.type==SDL_EVENT_MOUSE_WHEEL&&event.wheel.windowID==SDL_GetWindowID(window_)){wheel_x_=std::clamp(wheel_x_+event.wheel.x,-32767.0f,32767.0f);wheel_y_=std::clamp(wheel_y_+event.wheel.y,-32767.0f,32767.0f);}
-        else if((event.type==SDL_EVENT_FINGER_DOWN||event.type==SDL_EVENT_FINGER_MOTION||event.type==SDL_EVENT_FINGER_UP||event.type==SDL_EVENT_FINGER_CANCELED)&&event.tfinger.windowID==SDL_GetWindowID(window_)){if(event.type==SDL_EVENT_FINGER_DOWN&&!finger_down_){finger_=event.tfinger.fingerID;finger_down_=true;}if(finger_down_&&finger_==event.tfinger.fingerID){finger_x_=event.tfinger.x;finger_y_=event.tfinger.y;if(event.type==SDL_EVENT_FINGER_UP||event.type==SDL_EVENT_FINGER_CANCELED)finger_down_=false;}}
+        else if((event.type==SDL_EVENT_FINGER_DOWN||event.type==SDL_EVENT_FINGER_MOTION||event.type==SDL_EVENT_FINGER_UP||event.type==SDL_EVENT_FINGER_CANCELED)&&event.tfinger.windowID==SDL_GetWindowID(window_)){
+          int ww=0,wh=0;SDL_GetWindowSize(window_,&ww,&wh);
+          if(!touch_overlay_.handle_finger(event.type,event.tfinger.fingerID,event.tfinger.x,event.tfinger.y,ww,wh)){
+            if(event.type==SDL_EVENT_FINGER_DOWN&&!finger_down_){finger_=event.tfinger.fingerID;finger_down_=true;}
+            if(finger_down_&&finger_==event.tfinger.fingerID){finger_x_=event.tfinger.x;finger_y_=event.tfinger.y;if(event.type==SDL_EVENT_FINGER_UP||event.type==SDL_EVENT_FINGER_CANCELED)finger_down_=false;}
+          }
+        }
       }
       if(quit_||bus_.closed())break;
+      raw_joysticks_.tick();
       const auto flags=SDL_GetWindowFlags(window_);
       const bool focused=SDL_GetKeyboardFocus()==window_&&(flags&(SDL_WINDOW_HIDDEN|SDL_WINDOW_MINIMIZED))==0;
       if(focused!=focused_){focused_=focused;fence(2);}const auto now=Clock::now();if(playing_&&now-last_activity_>std::chrono::milliseconds(250))fence(3);
-      const bool present=now-last_video_>=std::chrono::microseconds(8333);auto batch=bus_.take(present);for(const auto& message:batch.controls){control(message);if(quit_||bus_.closed())break;}if(quit_||bus_.closed())break;for(const auto& message:batch.audio){if(bus_.closed())break;audio(message);}if(bus_.closed())break;if(batch.video){video(*batch.video);last_video_=Clock::now();}
+      const bool present=now-last_video_>=std::chrono::microseconds(8333);auto batch=bus_.take(present);for(const auto& message:batch.controls){control(message);if(quit_||bus_.closed())break;}if(quit_||bus_.closed())break;for(const auto& message:batch.audio){if(bus_.closed())break;audio(message);}if(bus_.closed())break;
+      if(batch.video){video(*batch.video);last_video_=Clock::now();last_hud_=last_video_;}
+      else if(raw_joysticks_.calibration_active()&&now-last_hud_>=std::chrono::milliseconds(33)){draw_frame();last_hud_=now;}
       if(now-last_pads_>=std::chrono::seconds(1)){
         update_pads();last_pads_=now;SDL_AudioSpec spec{};
         const auto device=SDL_GetAudioStreamDevice(audio_);
@@ -134,7 +183,7 @@ public:
       if(now-last_input_>=std::chrono::microseconds(8333))send_input();if(now-last_metrics_>=std::chrono::seconds(1))send_metrics();SDL_Delay(1);
     }
   }
-  void shutdown(){playing_=false;focused_=false;stop_haptics();for(auto*& pad:pads_)if(pad){SDL_CloseGamepad(pad);pad=nullptr;}if(audio_){SDL_DestroyAudioStream(audio_);audio_=nullptr;}if(texture_){SDL_DestroyTexture(texture_);texture_=nullptr;}if(renderer_){SDL_DestroyRenderer(renderer_);renderer_=nullptr;}if(window_){SDL_DestroyWindow(window_);window_=nullptr;}SDL_Quit();}
+  void shutdown(){playing_=false;focused_=false;touch_overlay_.clear_contacts();raw_joysticks_.shutdown();stop_haptics();for(auto*& pad:pads_)if(pad){SDL_CloseGamepad(pad);pad=nullptr;}if(audio_){SDL_DestroyAudioStream(audio_);audio_=nullptr;}if(texture_){SDL_DestroyTexture(texture_);texture_=nullptr;}if(renderer_){SDL_DestroyRenderer(renderer_);renderer_=nullptr;}if(window_){SDL_DestroyWindow(window_);window_=nullptr;}SDL_Quit();}
 };
 static unsigned argument(const char* raw,unsigned maximum,bool zero=false){check(raw&&std::strlen(raw)>0&&std::strlen(raw)<=4&&(raw[0]!='0'||raw[1]=='\0'));unsigned value=0;const auto end=raw+std::strlen(raw);const auto result=std::from_chars(raw,end,value);check(result.ec==std::errc{}&&result.ptr==end&&value<=maximum&&(zero||value>0));return value;}
 }

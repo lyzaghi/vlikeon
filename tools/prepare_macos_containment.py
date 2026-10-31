@@ -8,7 +8,11 @@ import shutil
 ROOT = Path(__file__).resolve().parents[1]
 FILES = [
     "platform/contracts/src/input.rs", "engines/native/src/input_profile.hpp",
-    "engines/native/src/presentation_input.hpp", "engines/native/src/engine.cpp",
+    "engines/native/src/presentation_input.hpp", "engines/native/src/engine.hpp",
+    "engines/native/src/engine.cpp", "engines/native/src/gl_video.hpp",
+    "engines/native/src/gl_video.cpp", "engines/native/src/vk_video.hpp",
+    "engines/native/src/vk_video.cpp", "engines/presentation/src/raw_joystick.hpp",
+    "engines/presentation/src/touch_overlay.hpp",
     "docs/ADVANCED_INPUT_CUSTOMIZATION.md",
     "Cargo.toml", "Cargo.lock", "platform/sandbox/Cargo.toml",
     "platform/sandbox/src/lib.rs", "platform/native-runtime/Cargo.toml",
