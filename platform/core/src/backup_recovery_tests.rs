@@ -196,40 +196,81 @@ fn corrupt_database_diagnosis_quarantine_and_interrupted_journal_reconciliation(
 fn library_reconstruct_rebuilds_normalized_cue_and_m3u_disc_sets() {
     let base = std::env::temp_dir().join(format!("vlikeon-reconstruct-{}", Uuid::new_v4()));
     let _guard = Directory(base.clone());
-    fs::create_dir_all(&base).unwrap();
-    let profile_root = base.join("profile");
-    let db = Database::open(&profile_root).unwrap();
+    for (case, entry, disc_count) in [("cue", "Disc A.cue", 1), ("m3u", "Collection.m3u", 2)] {
+        let case_root = base.join(case);
+        let selected = case_root.join("selected");
+        fs::create_dir_all(&selected).unwrap();
+        for (disc, value) in [("A", 0xAAu8), ("B", 0xBBu8)].into_iter().take(disc_count) {
+            fs::write(selected.join(format!("Original {disc}.bin")), vec![value; 2352 * 4]).unwrap();
+            fs::write(
+                selected.join(format!("Disc {disc}.cue")),
+                format!("FILE \"Original {disc}.bin\" BINARY\n  TRACK 01 MODE2/2352\n    INDEX 01 00:00:00\n"),
+            ).unwrap();
+        }
+        if disc_count == 2 {
+            fs::write(selected.join(entry), b"Disc A.cue\nDisc B.cue\n").unwrap();
+        }
 
-    let assets_dir = profile_root.join("assets");
-    fs::create_dir_all(&assets_dir).unwrap();
-    let track_bytes = vec![0xAAu8; 2352 * 4];
-    let track_hash = digest(&track_bytes);
-    // Content-addressed blobs in `assets/` are stored directly under `<sha256>` with no `.bin` suffix.
-    fs::write(assets_dir.join(&track_hash.0), &track_bytes).unwrap();
+        // Use the public importer so recovery consumes actual normalized producer output.
+        let imported_db = Database::open(&case_root.join("imported-profile")).unwrap();
+        let original = crate::media_import::import_bundle(
+            &imported_db,
+            crate::media_import::DiscScope::selected(&selected).unwrap(),
+            entry,
+            "Original PS1 Set".into(),
+            GameSystem::Ps1,
+            omniplay_contracts::CueEncoding::Utf8,
+            &std::sync::atomic::AtomicBool::new(false),
+            |_| {},
+        ).unwrap();
+        let expected_media = original.media.as_ref().unwrap();
+        assert_eq!(expected_media.disc_entries.len(), disc_count);
+        assert_eq!(expected_media.assets.len(), if disc_count == 1 { 2 } else { 5 });
+        assert_eq!(expected_media.entry_name, format!("game.{case}"));
+        assert!(expected_media.assets.iter().any(|asset| asset.name == "track-0001.bin"));
+        if disc_count == 2 {
+            assert_eq!(expected_media.disc_entries, ["disc-01.cue", "disc-02.cue"]);
+            assert!(expected_media.assets.iter().any(|asset| asset.name == "track-0002.bin"));
+        }
 
-    let cue_bytes = b"FILE \"disc.bin\" BINARY\n  TRACK 01 MODE2/2352\n    INDEX 01 00:00:00\n";
-    let cue_hash = digest(cue_bytes);
-    fs::write(assets_dir.join(&cue_hash.0), cue_bytes).unwrap();
-
-    let preview = crate::library_reconstruct::preview(&db).unwrap();
-    let cand = preview
-        .candidates
-        .iter()
-        .find(|c| c.entry_hash == cue_hash)
-        .expect("CUE candidate should be discovered in assets/");
-
-    let bindings = std::collections::BTreeMap::from([("disc.bin".to_string(), track_hash)]);
-    let manifest = crate::library_reconstruct::reconstruct(
-        &db,
-        &cand.candidate_id,
-        &cand.revision,
-        Some("Rebuilt PS1 Disc".into()),
-        Some(GameSystem::Ps1),
-        Some(bindings),
-    )
-    .unwrap();
-    assert_eq!(manifest.title, "Rebuilt PS1 Disc");
-    assert_eq!(manifest.system, GameSystem::Ps1);
+        // Model metadata loss by copying only immutable content-addressed blobs into an empty profile.
+        let db = Database::open(&case_root.join("recovered-profile")).unwrap();
+        let assets_dir = db.root.join("assets");
+        let mut expected_blobs = std::collections::BTreeMap::new();
+        let mut bindings = std::collections::BTreeMap::new();
+        for asset in &expected_media.assets {
+            let bytes = fs::read(imported_db.root.join("assets").join(&asset.content_hash.0)).unwrap();
+            fs::write(assets_dir.join(&asset.content_hash.0), &bytes).unwrap();
+            expected_blobs.insert(asset.content_hash.0.clone(), bytes);
+            if asset.name != expected_media.entry_name {
+                bindings.insert(asset.name.clone(), asset.content_hash.clone());
+            }
+        }
+        assert!(Library::new(&db).list(None, 0, 50).unwrap().is_empty());
+        let preview = crate::library_reconstruct::preview(&db).unwrap();
+        let cand = preview.candidates.iter()
+            .find(|candidate| candidate.entry_hash == expected_media.entry().unwrap().content_hash)
+            .unwrap_or_else(|| panic!("imported {case} entry should be discovered in assets/"));
+        let manifest = crate::library_reconstruct::reconstruct(
+            &db,
+            &cand.candidate_id,
+            &cand.revision,
+            Some("Rebuilt PS1 Set".into()),
+            Some(GameSystem::Ps1),
+            Some(bindings),
+        ).unwrap();
+        assert_eq!(manifest.title, "Rebuilt PS1 Set");
+        assert_eq!(manifest.system, GameSystem::Ps1);
+        assert_eq!(manifest.content_hash, original.content_hash, "{case} media identity");
+        assert_eq!(manifest.byte_length, original.byte_length);
+        assert_eq!(serde_json::to_value(manifest.media.as_ref().unwrap()).unwrap(),
+            serde_json::to_value(expected_media).unwrap(), "{case} asset names, hashes, lengths and disc order");
+        assert_eq!(Library::new(&db).list(None, 0, 50).unwrap().len(), 1);
+        assert_eq!(fs::read_dir(&assets_dir).unwrap().count(), expected_blobs.len());
+        for (hash, bytes) in expected_blobs {
+            assert_eq!(fs::read(assets_dir.join(hash)).unwrap(), bytes, "{case} payload must remain unchanged");
+        }
+    }
 }
 
 #[test]

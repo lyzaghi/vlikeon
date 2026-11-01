@@ -53,7 +53,7 @@ Implemented in [`library_reconstruct.rs`](file:///e:/V10/OmniPlay/platform/core/
 - **Content-Addressed Inspection Under `AssetLease`:**
   - Scans 64-hex-character `<sha256>` blobs in `assets/<sha256>` not referenced by `games`, verifying full SHA-256 digests and refusing symlinks/reparse points.
 - **Multi-File `.cue` & Multi-Disc `.m3u` Pairing:**
-  - Parses normalized `.cue` sheets (`disc.bin` / `track-NN.bin` / `.wav`) and `.m3u` playlists (`disc-01.<cue|chd|iso|pbp>` .. `disc-08.*`).
+  - Parses importer-normalized `.cue` sheets (`track-0001.bin` / `track-0001.wav`, with four-digit track numbers) and `.m3u` playlists (`disc-01.<cue|chd|iso|pbp>` .. `disc-08.*`). Original selected filenames are rewritten by the importer before storage.
   - Cross-references candidate [`GameMedia::identity_hash()`](file:///e:/V10/OmniPlay/platform/contracts/src/library.rs) permutations against surviving `saves` and `locally_removed_saves` (`game_content_hash`) to bind exact track/disc ordering automatically when proven by saved progress.
   - When multiple raw track candidates remain ambiguous without save-hash proof, sets `needs_track_binding = true` and requires explicit `track_bindings` in `LibraryReconstructCommit` rather than guessing.
 - **Single-File Container & Header Detection:**
