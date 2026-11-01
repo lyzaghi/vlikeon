@@ -236,6 +236,7 @@ fn library_reconstruct_rebuilds_normalized_cue_and_m3u_disc_sets() {
         // Model metadata loss by copying only immutable content-addressed blobs into an empty profile.
         let db = Database::open(&case_root.join("recovered-profile")).unwrap();
         let assets_dir = db.root.join("assets");
+        fs::create_dir_all(&assets_dir).unwrap();
         let mut expected_blobs = std::collections::BTreeMap::new();
         let mut bindings = std::collections::BTreeMap::new();
         for asset in &expected_media.assets {
