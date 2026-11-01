@@ -60,7 +60,7 @@ pub struct RetainerCounts {
     pub profile_restore_staging_hashes: u64,
 }
 
-#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct BlobRetentionSummary {
     pub content_hash: ContentHash,

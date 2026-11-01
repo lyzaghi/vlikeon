@@ -260,7 +260,9 @@ def verify_item44_gamepad_contracts() -> dict[str, Any]:
             and "SDL_RenderDebugText" in raw_hdr
         ),
         "pressure_buttons_and_core_peripherals": (
-            "RETRO_DEVICE_INDEX_ANALOG_BUTTON" in prof_hdr
+            "RETRO_DEVICE_INDEX_ANALOG_BUTTON" in pin_hdr
+            and "profile.shape_pressure" in pin_hdr
+            and "shape_pressure" in prof_hdr
             and "RETRO_DEVICE_MOUSE" in pin_hdr
             and "RETRO_DEVICE_LIGHTGUN" in pin_hdr
             and "ControllerDeviceKind" in input_rs
