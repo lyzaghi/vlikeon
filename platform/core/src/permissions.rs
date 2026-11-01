@@ -4,7 +4,7 @@ use std::{collections::HashMap, fs::{File, OpenOptions}, path::Path};
 use uuid::Uuid;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum FileAccess { ImportRead, ExportWrite }
+pub enum FileAccess { ImportRead, ProfileBackupRead, ExportWrite }
 
 struct Grant { owner: Uuid, access: FileAccess, file: File, expires_at_ms: u64, single_use: bool }
 
@@ -25,7 +25,7 @@ impl PermissionBroker {
         let mut options = OpenOptions::new();
         #[cfg(unix)]
         {use std::os::unix::fs::OpenOptionsExt;options.mode(0o600);}
-        match access { FileAccess::ImportRead => { options.read(true); }, FileAccess::ExportWrite => { options.write(true).create_new(true); } }
+        match access { FileAccess::ImportRead | FileAccess::ProfileBackupRead => { options.read(true); }, FileAccess::ExportWrite => { options.write(true).create_new(true); } }
         let file = options.open(path).map_err(storage_error)?;
         if !file.metadata().map_err(storage_error)?.is_file() { return Err(PlatformError::new(ErrorCode::PermissionDenied, "Select a regular file")); }
         let id = Uuid::new_v4();

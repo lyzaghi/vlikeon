@@ -496,14 +496,14 @@ pub unsafe extern "C" fn om_mobile_request(handle:u64,data:*const u8,length:usiz
 
 #[derive(Deserialize)]
 #[serde(tag="kind",rename_all="snake_case",deny_unknown_fields)]
-enum Authorization {Import{path:PathBuf},Export{path:PathBuf},Folder{path:PathBuf},Firmware{path:PathBuf,system:GameSystem,role:String}}
+enum Authorization {Import{path:PathBuf},ProfileBackup{path:PathBuf},Export{path:PathBuf},Folder{path:PathBuf},Firmware{path:PathBuf,system:GameSystem,role:String}}
 
 /// # Safety
 /// Input is created only by trusted native picker delegates, never forwarded from a
 /// renderer. The paths must have been selected or copied with OS-authorized access.
 #[no_mangle]
 pub unsafe extern "C" fn om_mobile_authorize(handle:u64,data:*const u8,length:usize)->OmniBuffer{
-    result((||{let authorization:Authorization=serde_json::from_slice(unsafe{input(data,length)?}).map_err(|_|error(ErrorCode::InvalidRequest,"Native picker authorization is invalid"))?;let host=host(handle)?;let mut host=host.lock().map_err(|_|error(ErrorCode::Internal,"Mobile profile is unavailable"))?;match authorization{Authorization::Import{path}=>host.selected_import(&path),Authorization::Export{path}=>host.selected_export(&path),Authorization::Folder{path}=>host.selected_folder(&path),Authorization::Firmware{path,system,role}=>host.import_selected_firmware(&path,system,&role)}})())
+    result((||{let authorization:Authorization=serde_json::from_slice(unsafe{input(data,length)?}).map_err(|_|error(ErrorCode::InvalidRequest,"Native picker authorization is invalid"))?;let host=host(handle)?;let mut host=host.lock().map_err(|_|error(ErrorCode::Internal,"Mobile profile is unavailable"))?;match authorization{Authorization::Import{path}=>host.selected_import(&path),Authorization::ProfileBackup{path}=>host.selected_profile_backup(&path),Authorization::Export{path}=>host.selected_export(&path),Authorization::Folder{path}=>host.selected_folder(&path),Authorization::Firmware{path,system,role}=>host.import_selected_firmware(&path,system,&role)}})())
 }
 #[derive(Deserialize)]#[serde(deny_unknown_fields)]struct MediaSelection{entries:Vec<String>,suggested_title:String}
 /// # Safety

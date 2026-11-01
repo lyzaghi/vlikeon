@@ -1,13 +1,15 @@
 //! Physical disk allocation and active data-retaining reference accounting.
 //!
-//! Tracks exact physical bytes (cluster/block-allocated bytes with `(dev, ino)`
-//! hard-link deduplication on Unix and 4 KiB cluster rounding on Windows) alongside
-//! every active database retainer (`games`, `GameMedia.assets`, `saves`, `save_heads`,
+//! Tracks OS-reported physical allocation bytes (cluster/block-allocated bytes with `(dev, ino)`
+//! hard-link deduplication on Unix and `GetFileInformationByHandleEx(FileStandardInfo)` +
+//! `(dwVolumeSerialNumber, file_index)` hard-link deduplication on Windows) alongside every
+//! active database retainer (`games`, `GameMedia.assets`, `saves`, `save_heads`,
 //! `save_repair_files`, `save_legacy_payloads`, `save_payload_gc`, `firmware_assets`,
-//! `firmware_selections`, active `sessions`, and `native_work_storage`).
+//! `firmware_selections`, active `sessions`, `native_work_storage`, and chunked
+//! `profile_restore_staging_v1` records).
 use crate::{Database, util::storage_error};
 use omniplay_contracts::{ContentHash, ErrorCode, GameManifest, GameSystem, PlatformError, Result};
-use rusqlite::{OptionalExtension, TransactionBehavior};
+use rusqlite::{OptionalExtension, Transaction, TransactionBehavior};
 use serde::{Deserialize, Serialize};
 use std::{
     collections::{BTreeMap, BTreeSet},
@@ -20,8 +22,16 @@ pub const DEFAULT_MAX_PROFILE_PHYSICAL_BYTES: u64 = 64 * 1024 * 1024 * 1024;
 pub const MIN_PROFILE_PHYSICAL_QUOTA_BYTES: u64 = 256 * 1024 * 1024;
 pub const MAX_PROFILE_PHYSICAL_QUOTA_BYTES: u64 = 512 * 1024 * 1024 * 1024;
 const QUOTA_PREFERENCE_KEY: &str = "storage_physical_quota_bytes_v1";
-const CLUSTER_BYTES: u64 = 4096;
+const DEFAULT_CLUSTER_BYTES: u64 = 4096;
 const SCAN_ENTRY_LIMIT: usize = 50_000;
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum StorageMeasurementQuality {
+    ExactOsAllocation,
+    ConservativeMissingIdentity,
+    DegradedUnmeasuredFiles,
+}
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
@@ -46,6 +56,8 @@ pub struct RetainerCounts {
     pub firmware_assets: u64,
     pub firmware_selections: u64,
     pub native_work_debts: u64,
+    #[serde(default)]
+    pub profile_restore_staging_hashes: u64,
 }
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
@@ -62,6 +74,13 @@ pub struct BlobRetentionSummary {
 #[serde(deny_unknown_fields)]
 pub struct StorageAccountingReport {
     pub schema_version: u32,
+    pub measurement_quality: StorageMeasurementQuality,
+    pub volume_cluster_bytes: u64,
+    pub unmeasured_files: u64,
+    pub unmeasured_logical_bytes: u64,
+    pub unverified_identity_files: u64,
+    #[serde(default)]
+    pub measurement_warnings: Vec<String>,
     pub logical_bytes: u64,
     pub physical_bytes: u64,
     pub unmaterialized_reserved_bytes: u64,
@@ -82,6 +101,25 @@ pub struct QuotaAdmission {
     pub requested_physical_bytes: u64,
     pub projected_physical_bytes: u64,
     pub maximum_physical_bytes: u64,
+    pub volume_cluster_bytes: u64,
+}
+
+#[derive(Default)]
+struct ScanMeasurementState {
+    seen_inodes: BTreeSet<(u64, u64)>,
+    hardlink_deduped: u64,
+    unmeasured_files: u64,
+    unmeasured_logical_bytes: u64,
+    unverified_identity_files: u64,
+    warnings: Vec<String>,
+}
+
+impl ScanMeasurementState {
+    fn push_warning(&mut self, msg: String) {
+        if self.warnings.len() < 8 && !self.warnings.contains(&msg) {
+            self.warnings.push(msg);
+        }
+    }
 }
 
 fn plain_entry(metadata: &fs::Metadata, expect_dir: bool) -> bool {
@@ -95,56 +133,143 @@ fn plain_entry(metadata: &fs::Metadata, expect_dir: bool) -> bool {
     !metadata.file_type().is_symlink() && if expect_dir { metadata.is_dir() } else { metadata.is_file() }
 }
 
-pub fn round_cluster_bytes(logical_bytes: u64) -> u64 {
+pub fn round_to_cluster_bytes(logical_bytes: u64, cluster_bytes: u64) -> u64 {
+    let unit = cluster_bytes.max(1);
     if logical_bytes == 0 {
         0
     } else {
-        let rem = logical_bytes % CLUSTER_BYTES;
+        let rem = logical_bytes % unit;
         if rem == 0 {
             logical_bytes
         } else {
-            logical_bytes.saturating_add(CLUSTER_BYTES - rem)
+            logical_bytes.saturating_add(unit - rem)
         }
     }
 }
 
-fn file_physical_bytes(
+pub fn round_cluster_bytes(logical_bytes: u64) -> u64 {
+    round_to_cluster_bytes(logical_bytes, DEFAULT_CLUSTER_BYTES)
+}
+
+fn detect_volume_cluster_bytes(root: &Path, state: &mut ScanMeasurementState) -> Option<u64> {
+    #[cfg(windows)]
+    {
+        match omniplay_stream_input::windows_volume_cluster_bytes(root) {
+            Ok(bytes) if bytes > 0 => Some(bytes),
+            Ok(_) => {
+                state.push_warning("Windows volume reported zero cluster bytes".into());
+                None
+            }
+            Err(err) => {
+                state.push_warning(format!(
+                    "Windows volume cluster query failed ({})",
+                    err.kind()
+                ));
+                None
+            }
+        }
+    }
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::MetadataExt;
+        match fs::metadata(root) {
+            Ok(meta) => Some(meta.blksize().max(512)),
+            Err(err) if err.kind() == std::io::ErrorKind::NotFound => Some(DEFAULT_CLUSTER_BYTES),
+            Err(err) => {
+                state.push_warning(format!("Unix filesystem blksize query failed ({})", err.kind()));
+                None
+            }
+        }
+    }
+    #[cfg(not(any(unix, windows)))]
+    {
+        let _ = root;
+        state.push_warning("Platform does not provide OS volume cluster queries".into());
+        None
+    }
+}
+
+/// Measures OS physical allocation for an ordinary file.
+/// Returns `None` ONLY if the file vanished concurrently (`ErrorKind::NotFound`) during scan.
+/// Never substitutes a heuristic 4 KiB estimate when an OS allocation query fails.
+fn measure_file_physical(
     path: &Path,
     metadata: &fs::Metadata,
-    seen_inodes: &mut BTreeSet<(u64, u64)>,
-    hardlink_deduped: &mut u64,
-) -> u64 {
+    state: &mut ScanMeasurementState,
+) -> Option<u64> {
     #[cfg(unix)]
     {
         let _ = path;
         use std::os::unix::fs::MetadataExt;
-        let key = (metadata.dev(), metadata.ino());
-        if metadata.nlink() > 1 && !seen_inodes.insert(key) {
-            *hardlink_deduped = hardlink_deduped.saturating_add(1);
-            return 0;
+        let blocks_bytes = metadata.blocks().saturating_mul(512);
+        if metadata.nlink() > 1 {
+            if metadata.ino() == 0 {
+                state.unverified_identity_files = state.unverified_identity_files.saturating_add(1);
+                state.push_warning(
+                    "Filesystem reported nlink > 1 with zero inode; hard-links counted conservatively without deduplication"
+                        .into(),
+                );
+                return Some(blocks_bytes);
+            }
+            let key = (metadata.dev(), metadata.ino());
+            if !state.seen_inodes.insert(key) {
+                state.hardlink_deduped = state.hardlink_deduped.saturating_add(1);
+                return Some(0);
+            }
+            return Some(blocks_bytes);
         }
-        seen_inodes.insert(key);
-        metadata.blocks().saturating_mul(512)
+        if metadata.ino() != 0 {
+            state.seen_inodes.insert((metadata.dev(), metadata.ino()));
+        }
+        Some(blocks_bytes)
     }
     #[cfg(windows)]
     {
-        if let Ok(win) = omniplay_stream_input::windows_file_physical(path) {
-            if win.file_index != 0 {
-                let key = (win.volume_serial, win.file_index);
-                if win.link_count > 1 && !seen_inodes.insert(key) {
-                    *hardlink_deduped = hardlink_deduped.saturating_add(1);
-                    return 0;
+        match omniplay_stream_input::windows_file_physical(path) {
+            Ok(win) => {
+                if win.link_count > 1 {
+                    if win.file_index == 0 {
+                        state.unverified_identity_files =
+                            state.unverified_identity_files.saturating_add(1);
+                        state.push_warning(
+                            "Windows filesystem reported nNumberOfLinks > 1 with zero file_index; hard-links counted conservatively without deduplication"
+                                .into(),
+                        );
+                        return Some(win.allocation_bytes);
+                    }
+                    let key = (win.volume_serial, win.file_index);
+                    if !state.seen_inodes.insert(key) {
+                        state.hardlink_deduped = state.hardlink_deduped.saturating_add(1);
+                        return Some(0);
+                    }
+                    return Some(win.allocation_bytes);
                 }
-                seen_inodes.insert(key);
+                if win.file_index != 0 {
+                    state.seen_inodes.insert((win.volume_serial, win.file_index));
+                }
+                Some(win.allocation_bytes)
             }
-            return win.allocation_bytes;
+            Err(err) if err.kind() == std::io::ErrorKind::NotFound => None,
+            Err(err) => {
+                state.unmeasured_files = state.unmeasured_files.saturating_add(1);
+                state.unmeasured_logical_bytes =
+                    state.unmeasured_logical_bytes.saturating_add(metadata.len());
+                state.push_warning(format!(
+                    "Windows physical allocation query failed ({})",
+                    err.kind()
+                ));
+                Some(0)
+            }
         }
-        round_cluster_bytes(metadata.len())
     }
     #[cfg(not(any(unix, windows)))]
     {
-        let _ = (path, seen_inodes, hardlink_deduped);
-        round_cluster_bytes(metadata.len())
+        let _ = path;
+        state.unmeasured_files = state.unmeasured_files.saturating_add(1);
+        state.unmeasured_logical_bytes =
+            state.unmeasured_logical_bytes.saturating_add(metadata.len());
+        state.push_warning("Platform does not provide OS file allocation queries".into());
+        Some(0)
     }
 }
 
@@ -193,22 +318,27 @@ pub fn set_physical_quota_bytes(database: &Database, max_physical_bytes: u64) ->
     Ok(max_physical_bytes)
 }
 
-/// Scans `native-work/` physical bytes for `NativeWorkStorageStatus`.
+/// Scans `native-work/` physical bytes for `NativeWorkStorageStatus`, failing closed if any file
+/// cannot be measured accurately by the OS.
 pub fn native_work_physical_bytes(root: &Path) -> Result<u64> {
     let target = root.join("native-work");
-    let mut seen_inodes = BTreeSet::new();
-    let mut deduped = 0u64;
+    let mut state = ScanMeasurementState::default();
     let mut visited = 0usize;
     let until = Instant::now() + Duration::from_secs(10);
-    let (_, physical, _, _) = scan_tree_recursive(&target, 4, &mut seen_inodes, &mut deduped, &mut visited, until)?;
+    let (_, physical, _, _) = scan_tree_recursive(&target, 4, &mut state, &mut visited, until)?;
+    if state.unmeasured_files > 0 {
+        return Err(PlatformError::new(
+            ErrorCode::StorageFailure,
+            "OS physical allocation query failed for one or more native-work files",
+        ));
+    }
     Ok(physical)
 }
 
 fn scan_tree_recursive(
     dir: &Path,
     max_depth: u8,
-    seen_inodes: &mut BTreeSet<(u64, u64)>,
-    hardlink_deduped: &mut u64,
+    state: &mut ScanMeasurementState,
     visited: &mut usize,
     until: Instant,
 ) -> Result<(u64, u64, u64, u64)> {
@@ -237,7 +367,11 @@ fn scan_tree_recursive(
         *visited += 1;
         let entry = entry.map_err(storage_error)?;
         let path = entry.path();
-        let entry_meta = fs::symlink_metadata(&path).map_err(storage_error)?;
+        let entry_meta = match fs::symlink_metadata(&path) {
+            Err(err) if err.kind() == std::io::ErrorKind::NotFound => continue,
+            Err(err) => return Err(storage_error(err)),
+            Ok(m) => m,
+        };
         if entry_meta.file_type().is_symlink() {
             unknown = unknown.saturating_add(1);
             continue;
@@ -256,15 +390,17 @@ fn scan_tree_recursive(
                 continue;
             }
             let (sub_l, sub_p, sub_f, sub_u) =
-                scan_tree_recursive(&path, max_depth - 1, seen_inodes, hardlink_deduped, visited, until)?;
+                scan_tree_recursive(&path, max_depth - 1, state, visited, until)?;
             logical = logical.saturating_add(sub_l);
             physical = physical.saturating_add(sub_p);
             files = files.saturating_add(sub_f);
             unknown = unknown.saturating_add(sub_u);
         } else if entry_meta.is_file() {
-            logical = logical.saturating_add(entry_meta.len());
-            physical = physical.saturating_add(file_physical_bytes(&path, &entry_meta, seen_inodes, hardlink_deduped));
-            files = files.saturating_add(1);
+            if let Some(phys) = measure_file_physical(&path, &entry_meta, state) {
+                logical = logical.saturating_add(entry_meta.len());
+                physical = physical.saturating_add(phys);
+                files = files.saturating_add(1);
+            }
         } else {
             unknown = unknown.saturating_add(1);
         }
@@ -274,7 +410,7 @@ fn scan_tree_recursive(
 
 #[derive(Default)]
 struct ReferenceMap {
-    /// Content hash -> set of retainer tags (`library:<uuid>`, `session:<uuid>`, `save_game:<uuid>`, `native_work:<uuid>`)
+    /// Content hash -> set of retainer tags (`library:<uuid>`, `active_session:<uuid>`, `save_game_ref:<uuid>`, `native_work_*`, `profile_restore_staging:<hash>`)
     asset_retainers: BTreeMap<String, BTreeSet<String>>,
     /// Repair file UUID (`<file_id>.bin`) -> retainer tags
     repair_file_retainers: BTreeMap<String, BTreeSet<String>>,
@@ -479,31 +615,27 @@ fn collect_retainers(database: &Database, until: Instant) -> Result<ReferenceMap
             map.asset_retainers.entry(sha).or_default().insert(format!("native_work_{phase}:{work_id}"));
         }
     }
+    drop(rows);
+    drop(stmt);
 
-    if let Some(staging_raw) = database
-        .connection
-        .query_row(
-            "SELECT substr(value,1,262145) FROM preferences WHERE key=?1",
-            [crate::profile_backup::PROFILE_RESTORE_STAGING_KEY],
-            |r| r.get::<_, String>(0),
-        )
-        .optional()
-        .map_err(storage_error)?
-    {
-        if staging_raw.len() <= 262_144 {
-            if let Ok(staging) = serde_json::from_str::<crate::profile_backup::ProfileRestoreStagingRecord>(&staging_raw) {
-                let tag = format!("profile_restore_staging:{}", staging.archive_hash.0);
-                for hash in staging.asset_hashes {
-                    map.asset_retainers.entry(hash.0).or_default().insert(tag.clone());
-                }
-            }
+    // 6. Durable chunked profile-restore staging retainers (fails closed if malformed/truncated)
+    let staged_by_archive = crate::profile_backup::read_restore_staging_retainers(database)?;
+    let mut unique_staged_hashes = BTreeSet::new();
+    for (archive_hex, hashes) in staged_by_archive {
+        let tag = format!("profile_restore_staging:{archive_hex}");
+        for hash in hashes {
+            unique_staged_hashes.insert(hash.0.clone());
+            map.asset_retainers.entry(hash.0).or_default().insert(tag.clone());
         }
     }
+    map.counts.profile_restore_staging_hashes = unique_staged_hashes.len() as u64;
+
     Ok(map)
 }
 
 /// Returns the set of asset hashes currently retained by active sessions, native-work staging,
-/// or in-progress profile restore staging, so `asset_storage` never collects a pinned blob.
+/// or in-progress/interrupted profile restore staging. Fails closed if any staging record is
+/// corrupt or truncated so `asset_storage` never deletes blobs under uncertain ownership.
 pub fn transient_asset_retainers(database: &Database) -> Result<BTreeSet<String>> {
     let until = Instant::now() + Duration::from_secs(10);
     let refs = collect_retainers(database, until)?;
@@ -533,8 +665,8 @@ pub fn report(database: &Database) -> Result<StorageAccountingReport> {
         (collect_retainers(database, until)?, get_physical_quota_bytes(database)?)
     };
 
-    let mut seen_inodes = BTreeSet::new();
-    let mut hardlink_deduped = 0u64;
+    let mut state = ScanMeasurementState::default();
+    let volume_cluster_opt = detect_volume_cluster_bytes(&database.root, &mut state);
     let mut visited = 0usize;
     let mut namespaces = Vec::new();
     let mut retained_blobs = Vec::new();
@@ -546,14 +678,11 @@ pub fn report(database: &Database) -> Result<StorageAccountingReport> {
             let path = database.root.join(suffix);
             if let Ok(meta) = fs::symlink_metadata(&path) {
                 if plain_entry(&meta, false) {
-                    ns.logical_bytes = ns.logical_bytes.saturating_add(meta.len());
-                    ns.physical_bytes = ns.physical_bytes.saturating_add(file_physical_bytes(
-                        &path,
-                        &meta,
-                        &mut seen_inodes,
-                        &mut hardlink_deduped,
-                    ));
-                    ns.file_count += 1;
+                    if let Some(phys) = measure_file_physical(&path, &meta, &mut state) {
+                        ns.logical_bytes = ns.logical_bytes.saturating_add(meta.len());
+                        ns.physical_bytes = ns.physical_bytes.saturating_add(phys);
+                        ns.file_count += 1;
+                    }
                 } else {
                     ns.retained_unknown_entries += 1;
                 }
@@ -577,7 +706,11 @@ pub fn report(database: &Database) -> Result<StorageAccountingReport> {
                 visited += 1;
                 let entry = entry.map_err(storage_error)?;
                 let entry_path = entry.path();
-                let meta = fs::symlink_metadata(&entry_path).map_err(storage_error)?;
+                let meta = match fs::symlink_metadata(&entry_path) {
+                    Err(err) if err.kind() == std::io::ErrorKind::NotFound => continue,
+                    Err(err) => return Err(storage_error(err)),
+                    Ok(m) => m,
+                };
                 if !plain_entry(&meta, false) {
                     ns.retained_unknown_entries += 1;
                     continue;
@@ -586,7 +719,9 @@ pub fn report(database: &Database) -> Result<StorageAccountingReport> {
                     ns.retained_unknown_entries += 1;
                     continue;
                 };
-                let phys = file_physical_bytes(&entry_path, &meta, &mut seen_inodes, &mut hardlink_deduped);
+                let Some(phys) = measure_file_physical(&entry_path, &meta, &mut state) else {
+                    continue;
+                };
                 ns.logical_bytes = ns.logical_bytes.saturating_add(meta.len());
                 ns.physical_bytes = ns.physical_bytes.saturating_add(phys);
                 ns.file_count += 1;
@@ -623,12 +758,18 @@ pub fn report(database: &Database) -> Result<StorageAccountingReport> {
                     visited += 1;
                     let entry = entry.map_err(storage_error)?;
                     let entry_path = entry.path();
-                    let meta = fs::symlink_metadata(&entry_path).map_err(storage_error)?;
+                    let meta = match fs::symlink_metadata(&entry_path) {
+                        Err(err) if err.kind() == std::io::ErrorKind::NotFound => continue,
+                        Err(err) => return Err(storage_error(err)),
+                        Ok(m) => m,
+                    };
                     if !plain_entry(&meta, false) {
                         ns.retained_unknown_entries += 1;
                         continue;
                     }
-                    let phys = file_physical_bytes(&entry_path, &meta, &mut seen_inodes, &mut hardlink_deduped);
+                    let Some(phys) = measure_file_physical(&entry_path, &meta, &mut state) else {
+                        continue;
+                    };
                     ns.logical_bytes = ns.logical_bytes.saturating_add(meta.len());
                     ns.physical_bytes = ns.physical_bytes.saturating_add(phys);
                     ns.file_count += 1;
@@ -652,7 +793,11 @@ pub fn report(database: &Database) -> Result<StorageAccountingReport> {
                 for game_entry in fs::read_dir(&dir).map_err(storage_error)? {
                     visited += 1;
                     let game_entry = game_entry.map_err(storage_error)?;
-                    let game_meta = fs::symlink_metadata(game_entry.path()).map_err(storage_error)?;
+                    let game_meta = match fs::symlink_metadata(game_entry.path()) {
+                        Err(err) if err.kind() == std::io::ErrorKind::NotFound => continue,
+                        Err(err) => return Err(storage_error(err)),
+                        Ok(m) => m,
+                    };
                     if !plain_entry(&game_meta, true) {
                         ns.retained_unknown_entries += 1;
                         continue;
@@ -662,12 +807,18 @@ pub fn report(database: &Database) -> Result<StorageAccountingReport> {
                         visited += 1;
                         let leaf = leaf.map_err(storage_error)?;
                         let leaf_path = leaf.path();
-                        let leaf_meta = fs::symlink_metadata(&leaf_path).map_err(storage_error)?;
+                        let leaf_meta = match fs::symlink_metadata(&leaf_path) {
+                            Err(err) if err.kind() == std::io::ErrorKind::NotFound => continue,
+                            Err(err) => return Err(storage_error(err)),
+                            Ok(m) => m,
+                        };
                         if !plain_entry(&leaf_meta, false) {
                             ns.retained_unknown_entries += 1;
                             continue;
                         }
-                        let phys = file_physical_bytes(&leaf_path, &leaf_meta, &mut seen_inodes, &mut hardlink_deduped);
+                        let Some(phys) = measure_file_physical(&leaf_path, &leaf_meta, &mut state) else {
+                            continue;
+                        };
                         ns.logical_bytes = ns.logical_bytes.saturating_add(leaf_meta.len());
                         ns.physical_bytes = ns.physical_bytes.saturating_add(phys);
                         ns.file_count += 1;
@@ -693,12 +844,18 @@ pub fn report(database: &Database) -> Result<StorageAccountingReport> {
                     visited += 1;
                     let entry = entry.map_err(storage_error)?;
                     let entry_path = entry.path();
-                    let meta = fs::symlink_metadata(&entry_path).map_err(storage_error)?;
+                    let meta = match fs::symlink_metadata(&entry_path) {
+                        Err(err) if err.kind() == std::io::ErrorKind::NotFound => continue,
+                        Err(err) => return Err(storage_error(err)),
+                        Ok(m) => m,
+                    };
                     if !plain_entry(&meta, false) {
                         ns.retained_unknown_entries += 1;
                         continue;
                     }
-                    let phys = file_physical_bytes(&entry_path, &meta, &mut seen_inodes, &mut hardlink_deduped);
+                    let Some(phys) = measure_file_physical(&entry_path, &meta, &mut state) else {
+                        continue;
+                    };
                     ns.logical_bytes = ns.logical_bytes.saturating_add(meta.len());
                     ns.physical_bytes = ns.physical_bytes.saturating_add(phys);
                     ns.file_count += 1;
@@ -733,8 +890,7 @@ pub fn report(database: &Database) -> Result<StorageAccountingReport> {
         let (logical, physical, files, unknown) = scan_tree_recursive(
             &database.root.join("native-work"),
             4,
-            &mut seen_inodes,
-            &mut hardlink_deduped,
+            &mut state,
             &mut visited,
             until,
         )?;
@@ -755,8 +911,7 @@ pub fn report(database: &Database) -> Result<StorageAccountingReport> {
         let (logical, physical, files, unknown) = scan_tree_recursive(
             &database.root.join("corrupt-db-quarantine"),
             2,
-            &mut seen_inodes,
-            &mut hardlink_deduped,
+            &mut state,
             &mut visited,
             until,
         )?;
@@ -779,30 +934,52 @@ pub fn report(database: &Database) -> Result<StorageAccountingReport> {
     let effective_committed = total_physical.saturating_add(unmaterialized_reserved);
     let available = quota_bytes.saturating_sub(effective_committed);
 
+    let measurement_quality = if state.unmeasured_files > 0 || volume_cluster_opt.is_none() {
+        StorageMeasurementQuality::DegradedUnmeasuredFiles
+    } else if state.unverified_identity_files > 0 {
+        StorageMeasurementQuality::ConservativeMissingIdentity
+    } else {
+        StorageMeasurementQuality::ExactOsAllocation
+    };
+
     Ok(StorageAccountingReport {
         schema_version: 1,
+        measurement_quality,
+        volume_cluster_bytes: volume_cluster_opt.unwrap_or(0),
+        unmeasured_files: state.unmeasured_files,
+        unmeasured_logical_bytes: state.unmeasured_logical_bytes,
+        unverified_identity_files: state.unverified_identity_files,
+        measurement_warnings: state.warnings,
         logical_bytes: total_logical,
         physical_bytes: total_physical,
         unmaterialized_reserved_bytes: unmaterialized_reserved,
         effective_committed_physical_bytes: effective_committed,
         maximum_physical_bytes: quota_bytes,
         available_physical_bytes: available,
-        hardlink_deduped_files: hardlink_deduped,
+        hardlink_deduped_files: state.hardlink_deduped,
         namespaces,
         retainer_counts: refs.counts,
         retained_blobs,
     })
 }
 
-/// Enforces the profile-wide physical storage quota before writing or reserving new bytes.
-pub fn enforce_physical_quota(
-    database: &Database,
+pub(crate) fn check_quota_admission(
+    summary: &StorageAccountingReport,
     additional_logical_bytes: u64,
     additional_files: u32,
 ) -> Result<QuotaAdmission> {
-    let summary = report(database)?;
-    let requested_physical = round_cluster_bytes(additional_logical_bytes)
-        .saturating_add(u64::from(additional_files).saturating_mul(CLUSTER_BYTES));
+    if summary.measurement_quality == StorageMeasurementQuality::DegradedUnmeasuredFiles
+        || summary.unmeasured_files > 0
+        || summary.volume_cluster_bytes == 0
+    {
+        return Err(PlatformError::new(
+            ErrorCode::StorageFailure,
+            "Physical storage allocation could not be verified from the operating system; resolve storage access before writing new profile data",
+        ));
+    }
+    let cluster_bytes = summary.volume_cluster_bytes.max(DEFAULT_CLUSTER_BYTES);
+    let requested_physical = round_to_cluster_bytes(additional_logical_bytes, cluster_bytes)
+        .saturating_add(u64::from(additional_files).saturating_mul(cluster_bytes));
     let projected = summary
         .effective_committed_physical_bytes
         .checked_add(requested_physical)
@@ -820,7 +997,16 @@ pub fn enforce_physical_quota(
         requested_physical_bytes: requested_physical,
         projected_physical_bytes: projected,
         maximum_physical_bytes: summary.maximum_physical_bytes,
+        volume_cluster_bytes: cluster_bytes,
     })
 }
 
-use rusqlite::Transaction;
+/// Enforces the profile-wide physical storage quota before writing or reserving new bytes.
+pub fn enforce_physical_quota(
+    database: &Database,
+    additional_logical_bytes: u64,
+    additional_files: u32,
+) -> Result<QuotaAdmission> {
+    let summary = report(database)?;
+    check_quota_admission(&summary, additional_logical_bytes, additional_files)
+}

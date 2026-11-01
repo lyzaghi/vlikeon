@@ -54,20 +54,40 @@ export class ProfileStorageQuotaPanel{
   }
   #render(){
     if(this.#closed)return;this.#root.replaceChildren();const section=node('section');section.className='panel';
-    section.append(node('h2',text('Hạn mức vật lý & tham chiếu giữ dữ liệu','Physical storage quota & active retainers')),node('p',text('Đo dung lượng cấp phát thực trên đĩa theo từng vùng lưu trữ, loại trùng hard-link và kiểm tra các tham chiếu đang giữ blob (thư viện, phiên chơi, save, firmware, native-work).','Measures actual OS on-disk allocation per namespace, deduplicates hard-links, and inspects active retainers keeping blobs alive (library, sessions, saves, firmware, native-work).')));
+    section.append(node('h2',text('Hạn mức vật lý & tham chiếu giữ dữ liệu','Physical storage quota & active retainers')),node('p',text('Truy vấn dung lượng cấp phát thực từ hệ điều hành theo từng vùng lưu trữ, hiển thị chất lượng số đo/cụm volume, loại trùng hard-link khi định danh tệp được xác minh, và kiểm tra các tham chiếu đang giữ blob (thư viện, phiên chơi, save, firmware, native-work, staging khôi phục).','Queries OS-reported physical allocation per namespace, surfaces measurement quality and volume cluster size, deduplicates hard-links only when file identity is verified, and inspects active retainers keeping blobs alive (library, sessions, saves, firmware, native-work, restore staging).')));
     const action=(label,callback)=>{const button=node('button',label);button.type='button';button.className='button button-secondary';button.disabled=this.#busy;button.addEventListener('click',()=>void this.#run(callback));return button;};
     section.append(action(text('Kiểm tra dung lượng vật lý','Inspect physical usage'),async()=>{this.#report=await this.#bridge.request('storage_accounting_report',undefined,60000);}));
     const r=this.#report;
     if(r){
       const mib=b=>(Number(b||0)/(1024*1024)).toFixed(1);
+      const kib=b=>(Number(b||0)/1024).toFixed(1);
+      const quality=r.measurement_quality||'exact_os_allocation';
+      const qualityLabel=quality==='exact_os_allocation'
+        ?text('Cấp phát OS chính xác','Exact OS allocation')
+        :quality==='conservative_missing_identity'
+          ?text('Bảo thủ (thiếu file-index, không loại trùng hard-link)','Conservative (missing file identity; hard-link dedup disabled)')
+          :text('Suy giảm (có tệp không truy vấn được cấp phát OS — chặn cấp phát quota mới)','Degraded (unmeasured OS allocation — new quota admission blocked)');
+      const physicalPrefix=quality==='exact_os_allocation'
+        ?text('Vật lý OS đã đo','Measured OS physical')
+        :text('Vật lý OS đã đo một phần (xem cảnh báo)','Partially measured OS physical (see warnings)');
       const summary=node('div');summary.className='save-item';
       summary.append(
-        node('p',text(`Vật lý trên đĩa: ${mib(r.physical_bytes)} MiB · Logic: ${mib(r.logical_bytes)} MiB · Đã giữ chỗ: ${mib(r.effective_committed_physical_bytes)} / ${mib(r.maximum_physical_bytes)} MiB · Còn trống: ${mib(r.available_physical_bytes)} MiB · Hard-link loại trùng: ${r.hardlink_deduped_files}`,`Physical on disk: ${mib(r.physical_bytes)} MiB · Logical: ${mib(r.logical_bytes)} MiB · Committed: ${mib(r.effective_committed_physical_bytes)} / ${mib(r.maximum_physical_bytes)} MiB · Available: ${mib(r.available_physical_bytes)} MiB · Hard-links deduplicated: ${r.hardlink_deduped_files}`)),
-        node('p',text(`Tham chiếu giữ dữ liệu: ${r.retainer_counts?.library_games??0} game · ${r.retainer_counts?.live_saves??0} save · ${r.retainer_counts?.firmware_assets??0} firmware · ${r.retainer_counts?.active_sessions??0} phiên đang mở · ${r.retainer_counts?.native_work_debts??0} native-work`,`Active retainers: ${r.retainer_counts?.library_games??0} games · ${r.retainer_counts?.live_saves??0} saves · ${r.retainer_counts?.firmware_assets??0} firmware · ${r.retainer_counts?.active_sessions??0} active sessions · ${r.retainer_counts?.native_work_debts??0} native-work`))
+        node('p',text(`Chất lượng số đo: ${qualityLabel} · Cụm volume: ${r.volume_cluster_bytes?`${kib(r.volume_cluster_bytes)} KiB`:'chưa xác định'}`, `Measurement quality: ${qualityLabel} · Volume cluster: ${r.volume_cluster_bytes?`${kib(r.volume_cluster_bytes)} KiB`:'unknown'}`)),
+        node('p',text(`${physicalPrefix}: ${mib(r.physical_bytes)} MiB · Logic: ${mib(r.logical_bytes)} MiB · Đã giữ chỗ: ${mib(r.effective_committed_physical_bytes)} / ${mib(r.maximum_physical_bytes)} MiB · Còn trống: ${mib(r.available_physical_bytes)} MiB · Hard-link loại trùng: ${r.hardlink_deduped_files}`,`${physicalPrefix}: ${mib(r.physical_bytes)} MiB · Logical: ${mib(r.logical_bytes)} MiB · Committed: ${mib(r.effective_committed_physical_bytes)} / ${mib(r.maximum_physical_bytes)} MiB · Available: ${mib(r.available_physical_bytes)} MiB · Hard-links deduplicated: ${r.hardlink_deduped_files}`)),
+        node('p',text(`Tham chiếu giữ dữ liệu: ${r.retainer_counts?.library_games??0} game · ${r.retainer_counts?.live_saves??0} save · ${r.retainer_counts?.firmware_assets??0} firmware · ${r.retainer_counts?.active_sessions??0} phiên đang mở · ${r.retainer_counts?.native_work_debts??0} native-work · ${r.retainer_counts?.profile_restore_staging_hashes??0} blob staging khôi phục`,`Active retainers: ${r.retainer_counts?.library_games??0} games · ${r.retainer_counts?.live_saves??0} saves · ${r.retainer_counts?.firmware_assets??0} firmware · ${r.retainer_counts?.active_sessions??0} active sessions · ${r.retainer_counts?.native_work_debts??0} native-work · ${r.retainer_counts?.profile_restore_staging_hashes??0} staged restore blobs`))
       );
+      if(Number(r.unmeasured_files||0)>0||Number(r.unverified_identity_files||0)>0){
+        summary.append(node('p',text(`Tệp chưa đo được cấp phát OS: ${r.unmeasured_files??0} (${mib(r.unmeasured_logical_bytes)} MiB logic) · Tệp thiếu file-index: ${r.unverified_identity_files??0}`,`Unmeasured OS-allocation files: ${r.unmeasured_files??0} (${mib(r.unmeasured_logical_bytes)} MiB logical) · Unverified file-identity entries: ${r.unverified_identity_files??0}`)));
+      }
+      if(Array.isArray(r.measurement_warnings)&&r.measurement_warnings.length){
+        for(const warning of r.measurement_warnings){
+          const warnNode=node('p',`⚠ ${warning}`);warnNode.setAttribute('role','alert');
+          summary.append(warnNode);
+        }
+      }
       if(Array.isArray(r.namespaces)){
         for(const ns of r.namespaces){
-          summary.append(node('p',`${ns.namespace}: ${mib(ns.physical_bytes)} MiB physical (${ns.file_count} files, ${ns.unreferenced_files} unreferenced)`));
+          summary.append(node('p',`${ns.namespace}: ${mib(ns.physical_bytes)} MiB (${ns.file_count} files, ${ns.unreferenced_files} unreferenced)`));
         }
       }
       const quotaWrap=node('div');quotaWrap.className='detail-actions';

@@ -29,8 +29,59 @@ use uuid::Uuid;
 
 const SQLITE_HEADER_MAGIC: &[u8; 16] = b"SQLite format 3\0";
 pub const RECOVERY_JOURNAL_FILE: &str = "database-recovery-journal.json";
-const STAGING_DB_FILE: &str = "omniplay.recovering.sqlite3";
-const SALVAGED_SNAPSHOT_FILE: &str = "salvaged-snapshot.json";
+pub(crate) const STAGING_DB_FILE: &str = "omniplay.recovering.sqlite3";
+pub(crate) const SALVAGED_SNAPSHOT_FILE: &str = "salvaged-snapshot.json";
+
+#[cfg(test)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum RecoveryFaultPoint {
+    AfterInitialJournalWrite,
+    BetweenQuarantineRenames,
+    MidStagingRebuild,
+    BeforePublishRename,
+    AfterPublishRenameBeforeJournalRemove,
+}
+
+#[cfg(test)]
+std::thread_local! {
+    static RECOVERY_FAULT_ONCE: std::cell::Cell<Option<RecoveryFaultPoint>> = const { std::cell::Cell::new(None) };
+}
+
+#[cfg(test)]
+pub(crate) fn with_recovery_fault_once<T>(
+    point: RecoveryFaultPoint,
+    f: impl FnOnce() -> Result<T>,
+) -> Result<T> {
+    struct ResetGuard;
+    impl Drop for ResetGuard {
+        fn drop(&mut self) {
+            RECOVERY_FAULT_ONCE.with(|slot| slot.set(None));
+        }
+    }
+    RECOVERY_FAULT_ONCE.with(|slot| slot.set(Some(point)));
+    let _guard = ResetGuard;
+    f()
+}
+
+#[cfg(test)]
+fn check_recovery_fault(point: RecoveryFaultPoint) -> Result<()> {
+    let triggered = RECOVERY_FAULT_ONCE.with(|slot| {
+        if slot.get() == Some(point) {
+            slot.set(None);
+            true
+        } else {
+            false
+        }
+    });
+    if triggered {
+        Err(PlatformError::new(
+            ErrorCode::StorageFailure,
+            "Simulated interruption at recovery journal fault point",
+        ))
+    } else {
+        Ok(())
+    }
+}
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -789,6 +840,10 @@ fn quarantine_database_files(
                         sha256: sha,
                     },
                 );
+                #[cfg(test)]
+                if name == "omniplay.sqlite3" {
+                    check_recovery_fault(RecoveryFaultPoint::BetweenQuarantineRenames)?;
+                }
             }
         }
     }
@@ -948,6 +1003,8 @@ fn execute_recovery_plan(
     // 3. Reconstruct any remaining unambiguous ROMs and multi-file disc sets from `assets/`
     let reconstructed = library_reconstruct::reconstruct_unambiguous_all(&database).unwrap_or_default();
     let reconstructed_games = reconstructed.len();
+    #[cfg(test)]
+    check_recovery_fault(RecoveryFaultPoint::MidStagingRebuild)?;
 
     // 4. Restore salvaged save generations against salvaged or reconstructed games
     let payload_index = index_disk_save_payloads(root);
@@ -1031,9 +1088,13 @@ fn execute_recovery_plan(
     // 5. Publish phase: atomically promote `omniplay.recovering.sqlite3` -> `omniplay.sqlite3`
     journal.phase = RecoveryJournalPhase::Publishing;
     write_recovery_journal(root, &journal)?;
+    #[cfg(test)]
+    check_recovery_fault(RecoveryFaultPoint::BeforePublishRename)?;
 
     fs::rename(root.join(STAGING_DB_FILE), root.join("omniplay.sqlite3")).map_err(storage_error)?;
     cleanup_staging_db_files(root);
+    #[cfg(test)]
+    check_recovery_fault(RecoveryFaultPoint::AfterPublishRenameBeforeJournalRemove)?;
     let _ = fs::remove_file(root.join(RECOVERY_JOURNAL_FILE));
     sync_directory(root)?;
 
@@ -1155,6 +1216,8 @@ pub fn recover(root: &Path) -> Result<DatabaseRecoveryOutcome> {
         quarantined_files: Vec::new(),
     };
     write_recovery_journal(root, &journal)?;
+    #[cfg(test)]
+    check_recovery_fault(RecoveryFaultPoint::AfterInitialJournalWrite)?;
 
     // 3. Execute quarantine -> staging rebuild -> atomic publish -> journal clearance
     execute_recovery_plan(root, journal, salvaged, Some(&health))

@@ -6,7 +6,8 @@ import WebKit
 @MainActor
 final class HubBridge: NSObject, WKScriptMessageHandlerWithReply, UIDocumentPickerDelegate {
     typealias Reply = (Any?, String?) -> Void
-    private enum Selection { case importFile([String:Any], Reply, [String:String]?), exportFile([String:Any], Reply, URL), discFolder([String:Any], Reply) }
+    private enum ImportKind { case content, firmware([String:String]), profileBackup }
+    private enum Selection { case importFile([String:Any], Reply, ImportKind), exportFile([String:Any], Reply, URL), discFolder([String:Any], Reply) }
     private struct Pending {let expiry:DispatchWorkItem;let cancel:()->Void}
     private struct Export { let url: URL; let created: Date }
     private let core: NativeCore
@@ -53,10 +54,11 @@ final class HubBridge: NSObject, WKScriptMessageHandlerWithReply, UIDocumentPick
         case "native_input_mode":let active=nativeInput.setGameplayMode(enabled:(params["enabled"] as? Bool) ?? false);reply(response(request,result:["enabled":active]),nil)
         case "native_input_poll":reply(response(request,result:nativeInput.pollSnapshot()),nil)
         case "native_input_haptics":guard let port=params["port"] as? Int,(0..<NativeInputController.maxPorts).contains(port) else{reject(request,reply,code:"invalid_request",message:"Controller port is invalid.");return};let applied=nativeInput.applyHaptics(port:port,enabled:(params["enabled"] as? Bool) ?? false,weakStrength:(params["weak"] as? Int) ?? 0,strongStrength:(params["strong"] as? Int) ?? 0,durationMs:(params["duration_ms"] as? Int) ?? 0);reply(response(request,result:["applied":applied]),nil)
-        case "file_select_import": selectImport(request,reply:reply,firmware:nil)
+        case "file_select_import": selectImport(request,reply:reply,kind:.content)
+        case "profile_backup_select_import": selectImport(request,reply:reply,kind:.profileBackup)
         case "firmware_import_selected":
             guard let system=params["system"] as? String,let role=params["role"] as? String else {reject(request,reply,code:"invalid_request",message:"Firmware role is missing.");return}
-            selectImport(request,reply:reply,firmware:["system":system,"role":role])
+            selectImport(request,reply:reply,kind:.firmware(["system":system,"role":role]))
         case "file_select_export": createExport(request,params:params,reply:reply)
         case "disc_select_folder":selectDisc(request,reply:reply)
         default:
@@ -75,9 +77,9 @@ final class HubBridge: NSObject, WKScriptMessageHandlerWithReply, UIDocumentPick
             }
         }
     }
-    private func selectImport(_ request:[String:Any],reply:@escaping Reply,firmware:[String:String]?) {
+    private func selectImport(_ request:[String:Any],reply:@escaping Reply,kind:ImportKind) {
         guard selection==nil,!preparingFolder,let presenter=presenter,presenter.presentedViewController==nil else{reject(request,reply,code:"busy",message:"Finish the current document selection first.");return}
-        selection = .importFile(request,reply,firmware)
+        selection = .importFile(request,reply,kind)
         let picker=UIDocumentPickerViewController(forOpeningContentTypes:[.data,.item],asCopy:false)
         self.picker=picker;picker.allowsMultipleSelection=false;picker.delegate=self;presenter.present(picker,animated:true)
     }
@@ -116,9 +118,9 @@ final class HubBridge: NSObject, WKScriptMessageHandlerWithReply, UIDocumentPick
         guard controller===picker,let selection=selection else{return};self.selection=nil;picker=nil
         switch selection {
         case .exportFile(let response,let reply,let source):removePrivateExport(source);reply(response,nil)
-        case .importFile(let request,let reply,let firmware):
+        case .importFile(let request,let reply,let kind):
             guard urls.count==1,let source=urls.first,alive(request) else{reject(request,reply,code:"cancelled",message:"No document was selected before the deadline.");return}
-            stageImport(source,request:request,reply:reply,firmware:firmware)
+            stageImport(source,request:request,reply:reply,kind:kind)
         case .discFolder(let request,let reply):
             guard urls.count==1,let source=urls.first,alive(request) else{reject(request,reply,code:"cancelled",message:"No disc folder was selected before the deadline.");return}
             prepareDisc(source,request:request,reply:reply)
@@ -178,43 +180,78 @@ final class HubBridge: NSObject, WKScriptMessageHandlerWithReply, UIDocumentPick
         let files=Array(exports.values);exports.removeAll();files.forEach{removePrivateExport($0.url)}
         core.detach()
     }
-    private func stageImport(_ source:URL,request:[String:Any],reply:@escaping Reply,firmware:[String:String]?) {
+    private func stageImport(_ source:URL,request:[String:Any],reply:@escaping Reply,kind:ImportKind) {
         let root=core.root,originalTitle=String(source.deletingPathExtension().lastPathComponent.prefix(120))
         let epoch=generation,deadline=(request["deadline_ms"] as? NSNumber)?.doubleValue ?? 0
-        let maximum:UInt64=firmware==nil ? 4*1024*1024*1024:128*1024*1024
+        let isProfileBackup:Bool;let maximum:UInt64
+        switch kind {
+        case .content:isProfileBackup=false;maximum=4*1024*1024*1024
+        case .firmware:isProfileBackup=false;maximum=128*1024*1024
+        case .profileBackup:isProfileBackup=true;maximum=16*1024*1024*1024
+        }
         guard documentPermit.wait(timeout:.now()) == .success else{reject(request,reply,code:"busy",message:"Document I/O is still finishing.");return}
         let lifetime=documentLifetime
         io.async {
             defer{self.documentPermit.signal()}
             let scoped=source.startAccessingSecurityScopedResource();defer{if scoped{source.stopAccessingSecurityScopedResource()}}
-            let extensionName=source.pathExtension.lowercased().filter{$0.isASCII&&($0.isLetter||$0.isNumber)}
-            let target=root.appendingPathComponent("NativeInbox",isDirectory:true).appendingPathComponent(UUID().uuidString.lowercased()+"."+String(extensionName.prefix(12)))
+            let rawExt=source.pathExtension.lowercased().filter{$0.isASCII&&($0.isLetter||$0.isNumber)}
+            let extensionName=rawExt.isEmpty ? (isProfileBackup ? "opprofile" : "bin") : String(rawExt.prefix(12))
+            let inboxDir=root.appendingPathComponent("NativeInbox",isDirectory:true)
+            let target=inboxDir.appendingPathComponent(UUID().uuidString.lowercased()+"."+extensionName)
             do {
                 guard scoped,lifetime.active,deadline>Date().timeIntervalSince1970*1000 else{throw OmniFailure.message("Document access was denied or expired.")}
-                try FileManager.default.createDirectory(at:target.deletingLastPathComponent(),withIntermediateDirectories:true,attributes:[.protectionKey:FileProtectionType.completeUntilFirstUserAuthentication])
+                try FileManager.default.createDirectory(at:inboxDir,withIntermediateDirectories:true,attributes:[.protectionKey:FileProtectionType.completeUntilFirstUserAuthentication])
                 var coordinationError:NSError?,copyError:Error?
                 NSFileCoordinator().coordinate(readingItemAt:source,options:[],error:&coordinationError){ readable in
                     do {
                         let values=try readable.resourceValues(forKeys:[.isRegularFileKey,.isSymbolicLinkKey,.fileSizeKey])
-                        guard values.isRegularFile==true,values.isSymbolicLink != true,(values.fileSize ?? 0)>0,UInt64(values.fileSize ?? 0)<=maximum else{throw OmniFailure.message("Choose a regular file within the content size limit.")}
+                        let fileSize=UInt64(max(0,values.fileSize ?? 0))
+                        guard values.isRegularFile==true,values.isSymbolicLink != true,fileSize>0,fileSize<=maximum,(!isProfileBackup || fileSize>=64) else{
+                            throw OmniFailure.message(isProfileBackup ? "Choose an OPPF0001 profile backup archive within the 16 GiB limit." : "Choose a regular file within the content size limit.")
+                        }
+                        let capValues=try? inboxDir.resourceValues(forKeys:[.volumeAvailableCapacityForImportantUsageKey,.volumeAvailableCapacityKey])
+                        let availableBytes=UInt64(max(0,capValues?.volumeAvailableCapacityForImportantUsage ?? Int64(capValues?.volumeAvailableCapacity ?? 0)))
+                        let headroom:UInt64=isProfileBackup ? 128*1024*1024 : 64*1024*1024
+                        if availableBytes>0 && fileSize+headroom>availableBytes {
+                            throw OmniFailure.message("Not enough free local storage to stage the selected archive safely.")
+                        }
                         guard FileManager.default.createFile(atPath:target.path,contents:nil,attributes:[.protectionKey:FileProtectionType.completeUntilFirstUserAuthentication])else{throw OmniFailure.message("The private import staging file could not be created.")}
                         let input=try FileHandle(forReadingFrom:readable),output=try FileHandle(forWritingTo:target);defer{try? input.close();try? output.close()}
                         var total:UInt64=0
-                        while let block=try input.read(upToCount:256*1024),!block.isEmpty{total+=UInt64(block.count);guard lifetime.active,total<=maximum,deadline>Date().timeIntervalSince1970*1000 else{throw OmniFailure.message("The selected file exceeds its import size or time limit.")};try output.write(contentsOf:block)}
-                        guard total==UInt64(values.fileSize ?? 0)else{throw OmniFailure.message("The document changed during import.")};try output.synchronize()
+                        var header=Data()
+                        let expectedMagic=Data("OPPF0001".utf8)
+                        while let block=try input.read(upToCount:256*1024),!block.isEmpty{
+                            if isProfileBackup && header.count<8 {
+                                header.append(block.prefix(8-header.count))
+                                if header.count==8 && header != expectedMagic {
+                                    throw OmniFailure.message("Selected file is not an OPPF0001 profile backup archive.")
+                                }
+                            }
+                            total+=UInt64(block.count)
+                            guard lifetime.active,total<=maximum,deadline>Date().timeIntervalSince1970*1000 else{throw OmniFailure.message("The selected file exceeds its import size or time limit.")}
+                            try output.write(contentsOf:block)
+                        }
+                        if isProfileBackup && (header != expectedMagic || total<64) {
+                            throw OmniFailure.message("Selected file is not a complete OPPF0001 profile backup archive.")
+                        }
+                        guard total==fileSize else{throw OmniFailure.message("The document changed during import.")};try output.synchronize()
                     }catch{copyError=error}
                 }
                 if let error=coordinationError{throw error};if let error=copyError{throw error}
                 DispatchQueue.main.async {
                     guard epoch==self.generation,self.alive(request) else{try? FileManager.default.removeItem(at:target);self.reject(request,reply,code:"cancelled",message:"Document import expired.");return}
-                    var authorization:[String:Any]=["kind":firmware==nil ? "import":"firmware","path":target.path]
-                    if let firmware=firmware{authorization["system"]=firmware["system"];authorization["role"]=firmware["role"]}
+                    var authorization:[String:Any]
+                    switch kind {
+                    case .content:authorization=["kind":"import","path":target.path]
+                    case .profileBackup:authorization=["kind":"profile_backup","path":target.path]
+                    case .firmware(let firmware):authorization=["kind":"firmware","path":target.path,"system":firmware["system"] as Any,"role":firmware["role"] as Any]
+                    }
                     self.core.authorize(authorization){ result in
                         // Rust retains the opened import descriptor. The private staging
                         // pathname can be unlinked without retaining a second ROM copy.
                         try? FileManager.default.removeItem(at:target)
                         guard epoch==self.generation,self.alive(request) else{self.reject(request,reply,code:"cancelled",message:"Document import expired.");return}
-                        switch result{case .success(var value):if firmware==nil{value["suggested_title"]=originalTitle};reply(self.response(request,result:value),nil)
+                        switch result{case .success(var value):if case .content=kind{value["suggested_title"]=originalTitle};reply(self.response(request,result:value),nil)
                         case .failure(let error):self.reject(request,reply,code:"storage_failure",message:error.localizedDescription)}
                     }
                 }

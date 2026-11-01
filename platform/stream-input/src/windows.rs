@@ -178,3 +178,42 @@ pub fn windows_file_physical(path: &std::path::Path) -> std::io::Result<WindowsF
         link_count,
     })
 }
+
+pub fn windows_volume_cluster_bytes(path: &std::path::Path) -> std::io::Result<u64> {
+    use std::os::windows::ffi::OsStrExt;
+    use windows_sys::Win32::Storage::FileSystem::{GetDiskFreeSpaceW, GetVolumePathNameW};
+
+    let mut wide: Vec<u16> = path.as_os_str().encode_wide().collect();
+    if wide.contains(&0) {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::InvalidInput,
+            "Path contains interior NUL",
+        ));
+    }
+    wide.push(0);
+    let mut root_buf = vec![0u16; wide.len().max(264) + 16];
+    if unsafe { GetVolumePathNameW(wide.as_ptr(), root_buf.as_mut_ptr(), root_buf.len() as u32) } == 0 {
+        return Err(std::io::Error::last_os_error());
+    }
+    let mut sectors_per_cluster = 0u32;
+    let mut bytes_per_sector = 0u32;
+    let mut free_clusters = 0u32;
+    let mut total_clusters = 0u32;
+    if unsafe {
+        GetDiskFreeSpaceW(
+            root_buf.as_ptr(),
+            &mut sectors_per_cluster,
+            &mut bytes_per_sector,
+            &mut free_clusters,
+            &mut total_clusters,
+        )
+    } == 0
+    {
+        return Err(std::io::Error::last_os_error());
+    }
+    let cluster = u64::from(sectors_per_cluster).saturating_mul(u64::from(bytes_per_sector));
+    if cluster == 0 {
+        return Err(std::io::Error::other("Volume reported zero bytes per cluster"));
+    }
+    Ok(cluster)
+}

@@ -23,6 +23,7 @@ pub struct LocalHost {
     identity_review:Option<NativeIdentityReview>,
     pairing_client:Option<NativePendingClient>,
     pairing_host:Option<NativePendingHost>,
+    profile_restores:omniplay_core::profile_backup::ProfileRestoreBroker,
 }
 impl LocalHost {
     pub fn open(root:&Path,profile_id:Uuid)->Result<Self>{
@@ -34,7 +35,7 @@ impl LocalHost {
     fn open_inner(root:&Path,profile_id:Uuid,credentials:Option<Arc<dyn omniplay_sync_client::CredentialStore>>)->Result<Self>{
         let database=Database::open(root)?;SessionManager::recover_interrupted(&database)?;
         let lifecycle=Arc::new(crate::SyncLifecycle::default());
-        Ok(Self{profile_id,database,credentials,sync_jobs:crate::sync_jobs::SyncJobs::new(lifecycle.clone()),lifecycle,owner:Uuid::new_v4(),closed:false,asset_ranges:Arc::new(crate::asset_ranges::AssetRanges::default()),permissions:PermissionBroker::default(),directories:DirectoryGrants::default(),transfers:crate::transfers::Transfers::default(),imports:crate::import_jobs::ImportJobs::default(),device_probe:omniplay_device_info::DeviceProbe::default(),sessions:WebSessions::default(),assistant:Assistant::default(),results:HashMap::new(),order:VecDeque::new(),identity_review:None,pairing_client:None,pairing_host:None})
+        Ok(Self{profile_id,database,credentials,sync_jobs:crate::sync_jobs::SyncJobs::new(lifecycle.clone()),lifecycle,owner:Uuid::new_v4(),closed:false,asset_ranges:Arc::new(crate::asset_ranges::AssetRanges::default()),permissions:PermissionBroker::default(),directories:DirectoryGrants::default(),transfers:crate::transfers::Transfers::default(),imports:crate::import_jobs::ImportJobs::default(),device_probe:omniplay_device_info::DeviceProbe::default(),sessions:WebSessions::default(),assistant:Assistant::default(),results:HashMap::new(),order:VecDeque::new(),identity_review:None,pairing_client:None,pairing_host:None,profile_restores:omniplay_core::profile_backup::ProfileRestoreBroker::default()})
     }
     pub fn credential_store(&self)->Option<Arc<dyn omniplay_sync_client::CredentialStore>>{self.credentials.clone()}
     fn ensure_open(&self)->Result<()>{if self.closed{Err(PlatformError::new(ErrorCode::NotFound,"Mobile profile is closed"))}else{Ok(())}}
@@ -503,9 +504,24 @@ impl LocalHost {
         if self.background_sync_policy()?["eligible"]!=true{return Err(PlatformError::new(ErrorCode::PermissionDenied,"Background synchronization is disabled or its account is unavailable"));}
         let provider=self.sync_provider()?;self.sync_jobs.start_background(&self.database.root,provider,budget_ms)
     }
-    pub fn expire_capabilities(&mut self){self.expire_native_pairing_client();self.expire_native_pairing_host();self.transfers.expire();self.permissions.expire();self.directories.expire();self.asset_ranges.expire();}
+    pub fn expire_capabilities(&mut self){self.expire_native_pairing_client();self.expire_native_pairing_host();self.transfers.expire();self.permissions.expire();self.directories.expire();self.asset_ranges.expire();self.profile_restores.expire();}
     fn sync_provider(&self)->Result<Arc<dyn omniplay_sync_client::CredentialStore>>{self.credentials.clone().ok_or_else(||PlatformError::new(ErrorCode::UnsupportedCapability,"Open this profile with its native secure credential provider"))}
     pub fn selected_import(&mut self,path:&Path)->Result<Value>{let grant_id=self.permissions.grant_selected_file(self.owner,path,FileAccess::ImportRead,300_000)?;Ok(json!({"grant_id":grant_id,"suggested_title":path.file_stem().and_then(|v|v.to_str()).unwrap_or("Game").chars().take(120).collect::<String>(),"format_hint":path.extension().and_then(|v|v.to_str()).and_then(ContentFormat::from_extension)}))}
+    pub fn selected_profile_backup(&mut self,path:&Path)->Result<Value>{
+        self.ensure_open()?;
+        let meta=std::fs::metadata(path).map_err(storage_error)?;
+        if !meta.is_file()||meta.len()==0{return Err(PlatformError::new(ErrorCode::InvalidRequest,"Selected profile backup archive is empty or not a regular file"));}
+        if meta.len()>MAX_PROFILE_ARCHIVE_BYTES{return Err(PlatformError::new(ErrorCode::ResourceLimit,"Profile backup archive exceeds the 16 GiB cross-device interchange limit"));}
+        {
+            use std::io::Read;
+            let mut probe=File::open(path).map_err(storage_error)?;
+            let mut magic=[0u8;8];
+            probe.read_exact(&mut magic).map_err(|_|PlatformError::new(ErrorCode::CorruptData,"Selected file is not an OPPF0001 profile backup archive"))?;
+            if &magic!=b"OPPF0001"{return Err(PlatformError::new(ErrorCode::CorruptData,"Selected file is not an OPPF0001 profile backup archive"));}
+        }
+        let grant_id=self.permissions.grant_selected_file(self.owner,path,FileAccess::ProfileBackupRead,300_000)?;
+        Ok(json!({"grant_id":grant_id,"byte_length":meta.len()}))
+    }
     pub fn selected_export(&mut self,path:&Path)->Result<Value>{let grant_id=self.permissions.grant_selected_file(self.owner,path,FileAccess::ExportWrite,300_000)?;Ok(json!({"grant_id":grant_id}))}
     pub fn selected_folder(&mut self,path:&Path)->Result<Value>{encode(self.directories.selected(self.owner,path)?)}
     pub fn selected_disc_provider(&mut self,provider:Arc<dyn omniplay_core::media_import::DiscProvider>,entries:Vec<String>,title:String)->Result<Value>{encode(self.directories.selected_provider(self.owner,provider,entries,title)?)}
@@ -542,7 +558,7 @@ impl LocalHost {
             Command::LibraryImportStart{grant_id,title,system,format_hint}=>{if self.imports.busy(){return Err(PlatformError::new(ErrorCode::Busy,"Wait for the current import to finish"));}let file=self.permissions.take(self.owner,grant_id,FileAccess::ImportRead)?;encode(self.imports.start(&self.database.root,title,system,crate::import_jobs::ImportSource::Single{file,format_hint})?)}
             Command::LibraryImportBundleStart{grant_id,entry_name,title,system,encoding}=>{if self.imports.busy(){return Err(PlatformError::new(ErrorCode::Busy,"Wait for the current import to finish"));}let scope=self.directories.take(self.owner,grant_id,&entry_name)?;encode(self.imports.start(&self.database.root,title,system,crate::import_jobs::ImportSource::Bundle{scope,entry:entry_name,encoding})?)}
             Command::LibraryImportStatus{job_id}=>encode(self.imports.status(job_id)?),Command::LibraryImportCancel{job_id}=>encode(self.imports.cancel(job_id)?),
-            Command::PermissionRevoke{grant_id}=>{self.permissions.revoke(self.owner,grant_id)?;self.directories.revoke(self.owner,grant_id)?;Ok(json!({"revoked":true}))}
+            Command::PermissionRevoke{grant_id}=>{self.permissions.revoke(self.owner,grant_id)?;self.directories.revoke(self.owner,grant_id)?;let _=self.profile_restores.cancel(self.owner,grant_id)?;Ok(json!({"revoked":true}))}
             Command::AssetReadStart{game_id,asset_name}=>{let library=Library::new(&self.database);let game=library.get(game_id)?;let(path,hash,bytes)=library.asset_details(&game,asset_name.as_deref())?;encode(self.transfers.open_download(File::open(path).map_err(storage_error)?,hash,bytes)?)}
             Command::AssetRangesStart{game_id}=>encode(self.asset_ranges.start(&self.database,self.owner,game_id)?),
             Command::FirmwareReadStart{game_id,role,expected_hash}=>{
@@ -584,9 +600,25 @@ impl LocalHost {
             Command::ManualRecoveryInspect{candidate_id}=>encode(omniplay_core::manual_recovery::inspect(&self.database,&candidate_id)?),
             Command::ManualRecoveryExport{candidate_id,revision,destination_grant_id}=>{let mut file=self.permissions.take(self.owner,destination_grant_id,FileAccess::ExportWrite)?;encode(omniplay_core::manual_recovery::export(&self.database,&candidate_id,&revision,&mut file)?)},
             Command::ManualRecoveryExtract{grant_id,destination_grant_id}=>{let mut source=self.permissions.take(self.owner,grant_id,FileAccess::ImportRead)?;let mut destination=self.permissions.take(self.owner,destination_grant_id,FileAccess::ExportWrite)?;encode(omniplay_core::manual_recovery::extract(&mut source,&mut destination)?)},
-            Command::ProfileBackupExport{include_rom_assets,destination_grant_id}=>{let mut file=self.permissions.take(self.owner,destination_grant_id,FileAccess::ExportWrite)?;encode(omniplay_core::profile_backup::export(&mut self.database,include_rom_assets,&mut file)?)},
-            Command::ProfileBackupInspect{grant_id}=>{let mut file=self.permissions.take(self.owner,grant_id,FileAccess::ImportRead)?;encode(omniplay_core::profile_backup::inspect(&mut file)?)},
-            Command::ProfileBackupRestore{grant_id}=>{let mut file=self.permissions.take(self.owner,grant_id,FileAccess::ImportRead)?;encode(omniplay_core::profile_backup::restore(&mut self.database,&mut file)?)},
+            Command::ProfileBackupSelectImport=>Err(PlatformError::new(ErrorCode::UnsupportedCapability,"Profile backup selection requires the trusted native document picker")),
+            Command::ProfileBackupExport{include_rom_assets,destination_grant_id}=>{if self.sessions.list().iter().any(|s|!s.state.is_terminal()){return Err(PlatformError::new(ErrorCode::Busy,"Stop active games before exporting a full profile backup"));}let mut file=self.permissions.take(self.owner,destination_grant_id,FileAccess::ExportWrite)?;encode(omniplay_core::profile_backup::export(&mut self.database,include_rom_assets,&mut file)?)},
+            Command::ProfileBackupInspect{grant_id}=>{let file=self.permissions.take(self.owner,grant_id,FileAccess::ProfileBackupRead)?;encode(self.profile_restores.inspect_and_stage(self.owner,file,300_000)?)},
+            Command::ProfileBackupCancel{restore_token}=>Ok(json!({"cancelled":self.profile_restores.cancel(self.owner,restore_token)?})),
+            Command::ProfileBackupRestore{grant_id,restore_token,expected_archive_hash}=>{
+                if self.sessions.list().iter().any(|s|!s.state.is_terminal()){return Err(PlatformError::new(ErrorCode::Busy,"Stop active games before restoring a full profile backup"));}
+                match (grant_id,restore_token){
+                    (None,Some(token))=>{
+                        let expected=expected_archive_hash.ok_or_else(||PlatformError::new(ErrorCode::InvalidRequest,"expected_archive_hash is required when confirming a staged profile restore"))?;
+                        let mut file=self.profile_restores.take_for_restore(self.owner,token,&expected)?;
+                        encode(omniplay_core::profile_backup::restore_verified(&mut self.database,&mut file,Some(&expected))?)
+                    }
+                    (Some(gid),None)=>{
+                        let mut file=self.permissions.take(self.owner,gid,FileAccess::ProfileBackupRead)?;
+                        encode(omniplay_core::profile_backup::restore_verified(&mut self.database,&mut file,expected_archive_hash.as_ref())?)
+                    }
+                    _=>Err(PlatformError::new(ErrorCode::InvalidRequest,"Provide either restore_token or grant_id, not both")),
+                }
+            },
             Command::DatabaseHealthCheck=>encode(omniplay_core::Database::diagnose(&self.database.root)?),
             Command::DatabaseRecoverCorrupt=>{if self.sessions.list().iter().any(|s|!s.state.is_terminal()){return Err(PlatformError::new(ErrorCode::Busy,"Stop active games before recovering the profile database"));}encode(self.database.recover_live()?)},
             Command::LibraryReconstructPreview=>encode(omniplay_core::library_reconstruct::preview(&self.database)?),
@@ -665,7 +697,7 @@ impl LocalHost {
             // potentially remote cleanup owner for exact close on this host.
             if !pending.registration_attempted{self.pairing_host=None;}
         }
-        self.asset_ranges.close_owner(self.owner);self.sync_jobs.cancel_all();self.sync_jobs.abandon_actions(self.owner);self.imports.cancel_all();self.sessions.close(&self.database);self.transfers.clear();self.permissions.revoke_owner(self.owner);self.directories.revoke_owner(self.owner);
+        self.asset_ranges.close_owner(self.owner);self.sync_jobs.cancel_all();self.sync_jobs.abandon_actions(self.owner);self.imports.cancel_all();self.sessions.close(&self.database);self.transfers.clear();self.permissions.revoke_owner(self.owner);self.directories.revoke_owner(self.owner);self.profile_restores.revoke_owner(self.owner);
     }
     pub fn close(&mut self){self.closed=true;self.lifecycle.set_foreground(false);self.clear_transient();}
     pub fn detach(&mut self){self.clear_transient();self.owner=Uuid::new_v4();self.transfers=crate::transfers::Transfers::default();self.results.clear();self.order.clear();}

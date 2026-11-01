@@ -50,7 +50,7 @@ export class ProfileBackupAndRecoveryPanel{
     if(this.#closed)return;this.#root.replaceChildren();
     if(this.#caps.backup){
       const sec=node('section');sec.className='panel';
-      sec.append(node('h2',text('Sao lưu & khôi phục toàn bộ hồ sơ (.opprofile)','Full profile backup & restore (.opprofile)')),node('p',text('Xuất, kiểm tra hoặc khôi phục gói OPPF0001 gồm cài đặt, lịch sử save đa thế hệ, firmware và (tùy chọn) tệp ROM/đĩa. Toàn bộ gói và SHA-256 được xác minh trước khi ghi cục bộ; hạn mức vật lý cục bộ không bị tự nâng khi khôi phục.','Export, inspect, or restore an OPPF0001 archive containing settings, multi-generation saves, firmware, and optional ROM/disc assets. Checksums and archive framing are verified before mutating local state, and local physical quota is preserved.')));
+      sec.append(node('h2',text('Sao lưu & khôi phục toàn bộ hồ sơ (.opprofile)','Full profile backup & restore (.opprofile)')),node('p',text('Xuất, kiểm tra hoặc khôi phục gói OPPF0001 (tối đa 16 GiB) gồm cài đặt, lịch sử save đa thế hệ, firmware và (tùy chọn) tệp ROM/đĩa. Toàn bộ gói và SHA-256 được xác minh trước khi ghi cục bộ; hạn mức vật lý cục bộ không bị tự nâng khi khôi phục.','Export, inspect, or restore an OPPF0001 archive (up to 16 GiB) containing settings, multi-generation saves, firmware, and optional ROM/disc assets. Checksums and archive framing are verified before mutating local state, and local physical quota is preserved.')));
       const toggleLabel=node('label');const toggle=node('input');toggle.type='checkbox';toggle.checked=this.#includeRoms;toggle.disabled=this.#busy;
       toggle.addEventListener('change',()=>{this.#includeRoms=toggle.checked;});
       toggleLabel.append(toggle,node('span',text(' Đính kèm tệp ROM/đĩa vào bản sao lưu',' Include ROM and disc assets in backup')));
@@ -166,27 +166,43 @@ export class ProfileBackupAndRecoveryPanel{
     }finally{await this.#bridge.request('permission_revoke',{grant_id:grant.grant_id}).catch(()=>{});}
   }
   async #inspectProfile(){
-    const grant=await this.#bridge.request('file_select_import',undefined,120000);
-    try{
-      if(this.#closed)return;
-      this.#inspectedBackup=await this.#bridge.request('profile_backup_inspect',{grant_id:grant.grant_id},120000);
-    }finally{await this.#bridge.request('permission_revoke',{grant_id:grant.grant_id}).catch(()=>{});}
-  }
-  async #restoreProfile(){
-    const grant=await this.#bridge.request('file_select_import',undefined,120000);
+    const grant=await this.#bridge.request('profile_backup_select_import',undefined,120000);
+    let stagedToken=null;
     try{
       if(this.#closed)return;
       const summary=await this.#bridge.request('profile_backup_inspect',{grant_id:grant.grant_id},120000);
+      stagedToken=summary?.restore_token||null;
+      if(!this.#closed)this.#inspectedBackup=summary?{...summary,restore_token:null}:null;
+    }finally{
+      if(stagedToken)await this.#bridge.request('profile_backup_cancel',{restore_token:stagedToken}).catch(()=>{});
+      await this.#bridge.request('permission_revoke',{grant_id:grant.grant_id}).catch(()=>{});
+    }
+  }
+  async #restoreProfile(){
+    const grant=await this.#bridge.request('profile_backup_select_import',undefined,120000);
+    let restoreToken=null;
+    try{
       if(this.#closed)return;
-      this.#inspectedBackup=summary;
-      if(!window.confirm(text(`Khôi phục gói sao lưu gồm ${summary.games} game và ${summary.saves} bản lưu vào hồ sơ hiện tại?`,`Restore backup archive with ${summary.games} games and ${summary.saves} saves into the current profile?`)))return;
-      const restored=await this.#bridge.request('profile_backup_restore',{grant_id:grant.grant_id},120000);
+      const summary=await this.#bridge.request('profile_backup_inspect',{grant_id:grant.grant_id},120000);
+      restoreToken=summary?.restore_token||null;
+      if(this.#closed)return;
+      this.#inspectedBackup=summary?{...summary,restore_token:null}:null;
+      if(!restoreToken||typeof summary?.archive_hash!=='string'||!/^[a-f0-9]{64}$/.test(summary.archive_hash)){
+        throw new Error(text('Không nhận được mã xác nhận khôi phục hợp lệ cho gói đã kiểm tra.','Missing verified restore token for the inspected archive.'));
+      }
+      const shortHash=summary.archive_hash.slice(0,12);
+      if(!window.confirm(text(`Khôi phục gói sao lưu đã xác minh (${shortHash}…) gồm ${summary.games} game và ${summary.saves} bản lưu vào hồ sơ hiện tại?`,`Restore verified backup archive (${shortHash}…) with ${summary.games} games and ${summary.saves} saves into the current profile?`)))return;
+      const confirmedToken=restoreToken;restoreToken=null;
+      const restored=await this.#bridge.request('profile_backup_restore',{restore_token:confirmedToken,expected_archive_hash:summary.archive_hash},120000);
       if(this.#closed)return;
       this.#lastRestore=restored;
       if(this.#onProfileChanged)await this.#onProfileChanged();
       document.dispatchEvent(new CustomEvent('omniplay_library_changed'));
       this.#notify(text(`Đã khôi phục hồ sơ (${restored.games_restored} game, ${restored.saves_restored} bản lưu).`,`Restored profile (${restored.games_restored} games, ${restored.saves_restored} saves).`));
-    }finally{await this.#bridge.request('permission_revoke',{grant_id:grant.grant_id}).catch(()=>{});}
+    }finally{
+      if(restoreToken)await this.#bridge.request('profile_backup_cancel',{restore_token:restoreToken}).catch(()=>{});
+      await this.#bridge.request('permission_revoke',{grant_id:grant.grant_id}).catch(()=>{});
+    }
   }
   async #run(body){
     if(this.#busy||this.#closed)return;this.#busy=true;this.#render();

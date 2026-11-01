@@ -35,6 +35,7 @@ pub struct Broker {
     native_work_jobs:crate::native_work_jobs::NativeWorkJobs,
     asset_ranges:std::sync::Arc<omniplay_local_service::asset_ranges::AssetRanges>,
     benchmark_registry:omniplay_core::benchmark_registry::BenchmarkRegistry,
+    profile_restores:omniplay_core::profile_backup::ProfileRestoreBroker,
 }
 
 impl Broker {
@@ -64,6 +65,7 @@ impl Broker {
             device_probe:omniplay_device_info::DeviceProbe::default(),
             native_work_jobs:crate::native_work_jobs::NativeWorkJobs::default(),
             benchmark_registry:omniplay_core::benchmark_registry::BenchmarkRegistry::default(),
+            profile_restores:omniplay_core::profile_backup::ProfileRestoreBroker::default(),
         };
         // The system-owned first pass has no renderer capability. It shares the
         // same single worker/collector lease with later explicit user passes.
@@ -101,7 +103,7 @@ impl Broker {
 
     fn execute(&mut self, command: Command, deadline_ms:u64) -> Result<Value> {
         self.web_sessions.expire(&self.database)?;
-        self.transfers.expire();self.permissions.expire();
+        self.transfers.expire();self.permissions.expire();self.profile_restores.expire();
         match command {
             Command::GameInputGet{game_id}=>encode(omniplay_core::input::load(&self.database,game_id)?),
             Command::GameInputSet{game_id,input}=>encode(omniplay_core::input::store(&self.database,game_id,input)?),
@@ -330,16 +332,58 @@ impl Broker {
             Command::ManualRecoveryInspect{candidate_id}=>encode(omniplay_core::manual_recovery::inspect(&self.database,&candidate_id)?),
             Command::ManualRecoveryExport{candidate_id,revision,destination_grant_id}=>{let mut file=self.permissions.take(self.client_id,destination_grant_id,FileAccess::ExportWrite)?;encode(omniplay_core::manual_recovery::export(&self.database,&candidate_id,&revision,&mut file)?)},
             Command::ManualRecoveryExtract{grant_id,destination_grant_id}=>{let mut source=self.permissions.take(self.client_id,grant_id,FileAccess::ImportRead)?;let mut destination=self.permissions.take(self.client_id,destination_grant_id,FileAccess::ExportWrite)?;encode(omniplay_core::manual_recovery::extract(&mut source,&mut destination)?)},
+            Command::ProfileBackupSelectImport => {
+                let path = rfd::FileDialog::new()
+                    .set_title("OmniPlay — chọn tệp sao lưu profile (.opprofile)")
+                    .add_filter("OmniPlay Profile Backup", &["opprofile"])
+                    .pick_file()
+                    .ok_or_else(|| PlatformError::new(ErrorCode::Cancelled, "No profile backup file was selected"))?;
+                let meta = std::fs::metadata(&path).map_err(storage_error)?;
+                if !meta.is_file() || meta.len() == 0 {
+                    return Err(PlatformError::new(ErrorCode::InvalidRequest, "Selected profile backup archive is empty or not a regular file"));
+                }
+                if meta.len() > MAX_PROFILE_ARCHIVE_BYTES {
+                    return Err(PlatformError::new(ErrorCode::ResourceLimit, "Profile backup archive exceeds the 16 GiB cross-device interchange limit"));
+                }
+                {
+                    use std::io::Read;
+                    let mut probe = std::fs::File::open(&path).map_err(storage_error)?;
+                    let mut magic = [0u8; 8];
+                    probe.read_exact(&mut magic).map_err(|_| PlatformError::new(ErrorCode::CorruptData, "Selected file is not an OPPF0001 profile backup archive"))?;
+                    if &magic != b"OPPF0001" {
+                        return Err(PlatformError::new(ErrorCode::CorruptData, "Selected file is not an OPPF0001 profile backup archive"));
+                    }
+                }
+                let grant_id = self.permissions.grant_selected_file(self.client_id, &path, FileAccess::ProfileBackupRead, 180_000)?;
+                Ok(json!({"grant_id": grant_id, "byte_length": meta.len()}))
+            }
             Command::ProfileBackupExport{include_rom_assets,destination_grant_id}=>{if self.installed.list(&self.database)?.iter().any(|s|s.running){return Err(PlatformError::new(ErrorCode::Busy,"Exit installed games before exporting a full profile backup"));}let mut file=self.permissions.take(self.client_id,destination_grant_id,FileAccess::ExportWrite)?;encode(omniplay_core::profile_backup::export(&mut self.database,include_rom_assets,&mut file)?)},
-            Command::ProfileBackupInspect{grant_id}=>{let mut file=self.permissions.take(self.client_id,grant_id,FileAccess::ImportRead)?;encode(omniplay_core::profile_backup::inspect(&mut file)?)},
-            Command::ProfileBackupRestore{grant_id}=>{if self.installed.list(&self.database)?.iter().any(|s|s.running){return Err(PlatformError::new(ErrorCode::Busy,"Exit installed games before restoring a full profile backup"));}let mut file=self.permissions.take(self.client_id,grant_id,FileAccess::ImportRead)?;encode(omniplay_core::profile_backup::restore(&mut self.database,&mut file)?)},
+            Command::ProfileBackupInspect{grant_id}=>{let file=self.permissions.take(self.client_id,grant_id,FileAccess::ProfileBackupRead)?;encode(self.profile_restores.inspect_and_stage(self.client_id,file,180_000)?)},
+            Command::ProfileBackupCancel{restore_token}=>Ok(json!({"cancelled":self.profile_restores.cancel(self.client_id,restore_token)?})),
+            Command::ProfileBackupRestore{grant_id,restore_token,expected_archive_hash}=>{
+                if self.installed.list(&self.database)?.iter().any(|s|s.running)||self.sessions.list().iter().any(|s|!s.state.is_terminal()){
+                    return Err(PlatformError::new(ErrorCode::Busy,"Exit active games before restoring a full profile backup"));
+                }
+                match (grant_id,restore_token) {
+                    (None,Some(token))=>{
+                        let expected=expected_archive_hash.ok_or_else(||PlatformError::new(ErrorCode::InvalidRequest,"expected_archive_hash is required when confirming a staged profile restore"))?;
+                        let mut file=self.profile_restores.take_for_restore(self.client_id,token,&expected)?;
+                        encode(omniplay_core::profile_backup::restore_verified(&mut self.database,&mut file,Some(&expected))?)
+                    }
+                    (Some(gid),None)=>{
+                        let mut file=self.permissions.take(self.client_id,gid,FileAccess::ProfileBackupRead)?;
+                        encode(omniplay_core::profile_backup::restore_verified(&mut self.database,&mut file,expected_archive_hash.as_ref())?)
+                    }
+                    _=>Err(PlatformError::new(ErrorCode::InvalidRequest,"Provide either restore_token or grant_id, not both")),
+                }
+            },
             Command::DatabaseHealthCheck=>encode(omniplay_core::Database::diagnose(&self.database.root)?),
             Command::DatabaseRecoverCorrupt=>{if self.installed.list(&self.database).is_ok_and(|list|list.iter().any(|s|s.running))||self.sessions.list().iter().any(|s|!s.state.is_terminal()){return Err(PlatformError::new(ErrorCode::Busy,"Stop active games before recovering the profile database"));}encode(self.database.recover_live()?)},
             Command::LibraryReconstructPreview=>encode(omniplay_core::library_reconstruct::preview(&self.database)?),
             Command::LibraryReconstructCommit{candidate_id,revision,title,system,track_bindings}=>encode(omniplay_core::library_reconstruct::reconstruct(&self.database,&candidate_id,&revision,title,system,track_bindings)?),
             Command::StorageAccountingReport=>encode(omniplay_core::storage_accounting::report(&self.database)?),
             Command::StorageQuotaSet{maximum_physical_bytes}=>Ok(json!({"maximum_physical_bytes":omniplay_core::storage_accounting::set_physical_quota_bytes(&self.database,maximum_physical_bytes)?})),
-            Command::PermissionRevoke { grant_id } => { self.permissions.revoke(self.client_id,grant_id)?;self.directory_grants.revoke(self.client_id,grant_id)?;Ok(json!({"revoked":true})) }
+            Command::PermissionRevoke { grant_id } => { self.permissions.revoke(self.client_id,grant_id)?;self.directory_grants.revoke(self.client_id,grant_id)?;let _=self.profile_restores.cancel(self.client_id,grant_id)?;Ok(json!({"revoked":true})) }
             Command::DiagnosticsPreview => encode(self.diagnostic_preview()?),
             Command::DiagnosticsExport { destination_grant_id } => {
                 let mut file = self.permissions.take(self.client_id,destination_grant_id,FileAccess::ExportWrite)?;
@@ -544,7 +588,7 @@ impl Broker {
         #[cfg(windows)]{self.receive_document.close();}
         #[cfg(windows)]{let _=self.receive_transport.close_until(&mut self.receive_video,&self.receive_document,std::time::Instant::now()+std::time::Duration::from_millis(1000));}
         #[cfg(windows)]{if !self.receive_transport.occupied(){let _=self.receive_video.close_until(std::time::Instant::now()+std::time::Duration::from_millis(1000));}}
-        self.gamepad_recovery.cancel();self.native_work_jobs.cancel_all();self.asset_ranges.close_owner(self.client_id);self.stream_inputs.close();self.jobs.cancel_all();self.update_jobs.cancel_all();self.import_jobs.cancel_all();self.preparations.cancel_all();let ids=self.sessions.list().into_iter().filter(|s|!s.state.is_terminal()).map(|s|s.id).collect::<Vec<_>>();for id in ids{let _=self.detach_session(id);}self.sessions.stop_all(&self.database);self.web_sessions.close(&self.database);self.transfers.clear();self.permissions.revoke_owner(self.client_id);self.directory_grants.revoke_owner(self.client_id);
+        self.gamepad_recovery.cancel();self.native_work_jobs.cancel_all();self.asset_ranges.close_owner(self.client_id);self.stream_inputs.close();self.jobs.cancel_all();self.update_jobs.cancel_all();self.import_jobs.cancel_all();self.preparations.cancel_all();let ids=self.sessions.list().into_iter().filter(|s|!s.state.is_terminal()).map(|s|s.id).collect::<Vec<_>>();for id in ids{let _=self.detach_session(id);}self.sessions.stop_all(&self.database);self.web_sessions.close(&self.database);self.transfers.clear();self.permissions.revoke_owner(self.client_id);self.directory_grants.revoke_owner(self.client_id);self.profile_restores.revoke_owner(self.client_id);
     }
 }
 

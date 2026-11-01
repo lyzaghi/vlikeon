@@ -42,7 +42,7 @@ mod client;
 pub use client::InputWorker;
 #[cfg(windows)]mod windows;
 #[cfg(windows)]mod activity;
-#[cfg(windows)]pub use windows::{target_identity,system_directory,WindowsFilePhysical,windows_file_physical};
+#[cfg(windows)]pub use windows::{target_identity,system_directory,WindowsFilePhysical,windows_file_physical,windows_volume_cluster_bytes};
 #[cfg(windows)]pub(crate) use windows::TargetInput;
 
 use omniplay_contracts::{ErrorCode,PlatformError};

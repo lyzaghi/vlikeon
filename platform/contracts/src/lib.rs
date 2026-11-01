@@ -37,3 +37,4 @@ pub const PROTOCOL_MINOR: u16 = 0;
 pub const MAX_CONTROL_MESSAGE_BYTES: usize = 1024 * 1024;
 pub const MAX_SAVE_BYTES: u64 = 256 * 1024 * 1024;
 pub const MAX_ROM_BYTES: u64 = 4 * 1024 * 1024 * 1024;
+pub const MAX_PROFILE_ARCHIVE_BYTES: u64 = 16 * 1024 * 1024 * 1024;

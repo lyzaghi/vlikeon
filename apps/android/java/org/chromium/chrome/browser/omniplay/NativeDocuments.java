@@ -23,6 +23,8 @@ import java.util.concurrent.Executors;
 
 /** SAF-only access. Single files use private staging; disc references stream through a scoped native tree. */
 public final class NativeDocuments implements AutoCloseable {
+    private enum ImportKind { CONTENT, FIRMWARE, PROFILE_BACKUP }
+    private static final byte[] PROFILE_MAGIC = new byte[]{'O','P','P','F','0','0','0','1'};
     private static final class Export {
         final File file; final long expiry;
         Export(File value) { file=value;expiry=System.currentTimeMillis()+300_000; }
@@ -45,7 +47,10 @@ public final class NativeDocuments implements AutoCloseable {
     public boolean intercept(JSONObject request,NativeCore.Reply reply) {
         prune();JSONObject command=request.optJSONObject("command");if(command==null)return false;
         JSONObject params=command.optJSONObject("params");String method=command.optString("method");
-        if(method.equals("file_select_import")||method.equals("firmware_import_selected")) {selectImport(request,params,method.equals("firmware_import_selected"),reply);return true;}
+        if(method.equals("file_select_import")||method.equals("firmware_import_selected")||method.equals("profile_backup_select_import")) {
+            ImportKind kind=method.equals("firmware_import_selected")?ImportKind.FIRMWARE:(method.equals("profile_backup_select_import")?ImportKind.PROFILE_BACKUP:ImportKind.CONTENT);
+            selectImport(request,params,kind,reply);return true;
+        }
         if(method.equals("disc_select_folder")) {selectDisc(request,reply);return true;}
         if(method.equals("file_select_export")) {createExport(request,params,reply);return true;}
         return false;
@@ -110,7 +115,7 @@ public final class NativeDocuments implements AutoCloseable {
                     try(ParcelFileDescriptor descriptor=resolver.openFileDescriptor(uri,"wt",cancellation)){
                         if(descriptor==null)throw new IllegalStateException();
                         try(FileInputStream input=new FileInputStream(export.file);FileOutputStream output=new ParcelFileDescriptor.AutoCloseOutputStream(descriptor)){
-                            copy(input,output,maxExportBytes,request,null);output.flush();
+                            copy(input,output,maxExportBytes,request,null,false);output.flush();
                         }
                     }
                     complete=true;
@@ -121,9 +126,9 @@ public final class NativeDocuments implements AutoCloseable {
         if(mPicker==WindowAndroid.START_INTENT_FAILURE){mSelecting=false;cleanup(export.file);reply.accept(fail(request,"runtime_unavailable","No document destination is available."));}
         return true;
     }
-    private void selectImport(JSONObject request,JSONObject params,boolean firmware,NativeCore.Reply reply) {
+    private void selectImport(JSONObject request,JSONObject params,ImportKind kind,NativeCore.Reply reply) {
         if(mSelecting||mCopying||!alive(request)){reply.accept(fail(request,"busy","Finish the current document selection first."));return;}
-        if(firmware&&(params==null||params.optString("system").isEmpty()||params.optString("role").isEmpty())){reply.accept(fail(request,"invalid_request","Choose the firmware system and role."));return;}
+        if(kind==ImportKind.FIRMWARE&&(params==null||params.optString("system").isEmpty()||params.optString("role").isEmpty())){reply.accept(fail(request,"invalid_request","Choose the firmware system and role."));return;}
         Intent intent=new Intent(Intent.ACTION_OPEN_DOCUMENT).addCategory(Intent.CATEGORY_OPENABLE).setType("*/*");
         mSelecting=true;
         mPicker=mWindow.showCancelableIntent(intent,(code,data)->{
@@ -133,56 +138,75 @@ public final class NativeDocuments implements AutoCloseable {
             if(!"content".equals(uri.getScheme())){reply.accept(fail(request,"permission_denied","Choose a document using the system picker."));return;}
             mCopying=true;
             NativeCore.Reply completed=value->{mCopying=false;reply.accept(value);};
-            mCore.storage(root->{if(!alive(request)){completed.accept(fail(request,"cancelled","Document import expired."));return;}mIo.execute(()->stage(uri,root,request,params,firmware,completed));},()->completed.accept(fail(request,"storage_failure","Local application storage is unavailable.")));
+            mCore.storage(root->{if(!alive(request)){completed.accept(fail(request,"cancelled","Document import expired."));return;}mIo.execute(()->stage(uri,root,request,params,kind,completed));},()->completed.accept(fail(request,"storage_failure","Local application storage is unavailable.")));
         },null);
         if(mPicker==WindowAndroid.START_INTENT_FAILURE){mSelecting=false;reply.accept(fail(request,"runtime_unavailable","No document picker is available."));}
     }
-    private void stage(Uri uri,File root,JSONObject request,JSONObject params,boolean firmware,NativeCore.Reply reply) {
+    private void stage(Uri uri,File root,JSONObject request,JSONObject params,ImportKind kind,NativeCore.Reply reply) {
         File target=null;
+        final boolean firmware=(kind==ImportKind.FIRMWARE),profileBackup=(kind==ImportKind.PROFILE_BACKUP);
         CancellationSignal cancellation=new CancellationSignal();mActiveCancellation=cancellation;
         Runnable cancel=()->cancellation.cancel();mMain.postDelayed(cancel,Math.max(1,request.optLong("deadline_ms")-System.currentTimeMillis()));
         try {
             if(!alive(request))throw new IllegalStateException();
-            String display="Game";ContentResolver resolver=mActivity.getContentResolver();
+            String display=profileBackup?"profile.opprofile":"Game";ContentResolver resolver=mActivity.getContentResolver();
             try(Cursor cursor=resolver.query(uri,new String[]{OpenableColumns.DISPLAY_NAME},null,null,null,cancellation)){
                 if(cursor!=null&&cursor.moveToFirst()){String name=cursor.getString(0);if(name!=null)display=name.substring(0,Math.min(256,name.length()));}
             }
             int dot=display.lastIndexOf('.');String extension=dot<0?"":display.substring(dot+1).toLowerCase(java.util.Locale.ROOT);
-            if(!extension.matches("[a-z0-9]{1,12}"))extension="bin";
+            if(!extension.matches("[a-z0-9]{1,12}"))extension=profileBackup?"opprofile":"bin";
             File inbox=new File(root,"NativeInbox");if(!inbox.isDirectory()&&!inbox.mkdirs())throw new IllegalStateException();
             target=new File(inbox,UUID.randomUUID()+"."+extension);
             if(!target.createNewFile())throw new IllegalStateException();
             try(ParcelFileDescriptor descriptor=resolver.openFileDescriptor(uri,"r",cancellation)){
                 if(descriptor==null)throw new IllegalStateException();
-                long size=descriptor.getStatSize(),maximum=firmware?128L*1024*1024:4L*1024*1024*1024;
-                if(size>maximum||size==0||size>0&&size+64L*1024*1024>inbox.getUsableSpace())throw new IllegalStateException();
+                long size=descriptor.getStatSize();
+                long maximum=firmware?128L*1024*1024:(profileBackup?16L*1024*1024*1024:4L*1024*1024*1024);
+                long headroom=profileBackup?128L*1024*1024:64L*1024*1024;
+                if(size>maximum||size==0||profileBackup&&size>=0&&size<64||size>0&&size+headroom>inbox.getUsableSpace())throw new IllegalStateException();
                 try(FileInputStream input=new ParcelFileDescriptor.AutoCloseInputStream(descriptor);FileOutputStream output=new FileOutputStream(target)) {
-                    long count=copy(input,output,maximum,request,inbox);if(count==0||size>=0&&count!=size)throw new IllegalStateException();output.getFD().sync();
+                    long count=copy(input,output,maximum,request,inbox,profileBackup);if(count==0||size>=0&&count!=size)throw new IllegalStateException();output.getFD().sync();
                 }
             }
             final File staged=target;final String title=(dot>0?display.substring(0,dot):display).replaceAll("[\\p{Cntrl}]","");
             mMain.post(()->{
                 if(!alive(request)){cleanup(staged);reply.accept(fail(request,"cancelled","Document import expired."));return;}
                 mCore.work(()->{
-                    try {if(!alive(request))throw new IllegalStateException();JSONObject authorization=new JSONObject().put("kind",firmware?"firmware":"import").put("path",staged.getAbsolutePath());
+                    try {if(!alive(request))throw new IllegalStateException();String authKind=firmware?"firmware":(profileBackup?"profile_backup":"import");JSONObject authorization=new JSONObject().put("kind",authKind).put("path",staged.getAbsolutePath());
                         if(firmware)authorization.put("system",params.getString("system")).put("role",params.getString("role"));
                         return mCore.authorize(authorization);
                     }finally{cleanup(staged);}
                 },value->{
                     if(!"ok".equals(value.optString("status"))){reply.accept(fail(request,"storage_failure","The selected document could not be imported."));return;}
-                    JSONObject result=value.optJSONObject("result");try{if(!firmware&&result!=null)result.put("suggested_title",title.substring(0,Math.min(120,title.length())));}catch(Exception ignored){}
+                    JSONObject result=value.optJSONObject("result");try{if(kind==ImportKind.CONTENT&&result!=null)result.put("suggested_title",title.substring(0,Math.min(120,title.length())));}catch(Exception ignored){}
                     reply.accept(NativeCore.success(request,result));
                 });
             });
-        }catch(Exception error){if(target!=null)cleanup(target);mMain.post(()->reply.accept(fail(request,"storage_failure","The selected document could not be read within its size, storage or time limit.")));}
+        }catch(Exception error){if(target!=null)cleanup(target);mMain.post(()->reply.accept(fail(request,"storage_failure",profileBackup?"The selected profile backup archive could not be verified or exceeds the 16 GiB / available-space limit.":"The selected document could not be read within its size, storage or time limit.")));}
         finally{mMain.removeCallbacks(cancel);mActiveCancellation=null;}
     }
-    private long copy(FileInputStream input,FileOutputStream output,long maximum,JSONObject request,File storage)throws Exception {
+    private long copy(FileInputStream input,FileOutputStream output,long maximum,JSONObject request,File storage,boolean requireProfileMagic)throws Exception {
         byte[] block=new byte[256*1024];long total=0;int count;
+        byte[] magicBuf=requireProfileMagic?new byte[8]:null;int magicFilled=0;
+        long minFree=requireProfileMagic?(64L*1024*1024):(16L*1024*1024);
         // A provider may return a pipe. Closing the descriptors also bounds blocked IO.
         Runnable abort=()->{try{input.close();}catch(Exception ignored){}try{output.close();}catch(Exception ignored){}};
         mMain.postDelayed(abort,Math.max(1,request.optLong("deadline_ms")-System.currentTimeMillis()));
-        try {while((count=input.read(block))!=-1){total+=count;if(!alive(request)||total>maximum||storage!=null&&storage.getUsableSpace()<16L*1024*1024)throw new IllegalStateException();output.write(block,0,count);}return total;}
+        try {
+            while((count=input.read(block))!=-1){
+                if(requireProfileMagic&&magicFilled<8){
+                    int take=Math.min(8-magicFilled,count);
+                    System.arraycopy(block,0,magicBuf,magicFilled,take);
+                    magicFilled+=take;
+                    if(magicFilled==8&&!java.util.Arrays.equals(magicBuf,PROFILE_MAGIC))throw new IllegalArgumentException("Not an OPPF0001 archive");
+                }
+                total+=count;
+                if(!alive(request)||total>maximum||storage!=null&&storage.getUsableSpace()<minFree)throw new IllegalStateException();
+                output.write(block,0,count);
+            }
+            if(requireProfileMagic&&(magicFilled<8||total<64))throw new IllegalArgumentException("Incomplete OPPF0001 archive");
+            return total;
+        }
         finally{mMain.removeCallbacks(abort);}
     }
     private void createExport(JSONObject request,JSONObject params,NativeCore.Reply reply) {

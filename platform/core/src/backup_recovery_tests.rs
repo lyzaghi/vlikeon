@@ -266,3 +266,205 @@ fn storage_accounting_tracks_active_retainers_hardlinks_and_enforces_physical_qu
         crate::storage_accounting::enforce_physical_quota(&f.database, min_quota + 1, 1).is_err()
     );
 }
+
+// ---- Round-2 review fixtures (authored, not executed) ----
+
+fn export_profile_archive(f: &mut Fixture, name: &str) -> (PathBuf, crate::profile_backup::ProfileBackupExported) {
+    let path = f._directory.0.join(name);
+    let mut file = OpenOptions::new().read(true).write(true).create_new(true).open(&path).unwrap();
+    let exported = crate::profile_backup::export(&mut f.database, true, &mut file).unwrap();
+    (path, exported)
+}
+
+#[test]
+fn profile_restore_broker_inspect_confirm_restore_cancel_and_archive_swap() {
+    use crate::{permissions::{FileAccess, PermissionBroker}, profile_backup::{ProfileRestoreBroker, restore_verified}};
+    use omniplay_contracts::ErrorCode;
+    let mut src = Fixture::new();
+    src.save(b"restore-token-save");
+    let (archive, _) = export_profile_archive(&mut src, "token.opprofile");
+    let owner = Uuid::new_v4();
+    let mut grants = PermissionBroker::default();
+    let mut broker = ProfileRestoreBroker::default();
+
+    // Inspect consumes the single-use grant; restore must use the scoped token instead.
+    let grant = grants.grant_selected_file(owner, &archive, FileAccess::ProfileBackupRead, 60_000).unwrap();
+    // An ImportRead consumer cannot take a ProfileBackupRead grant.
+    assert_eq!(grants.take(owner, grant, FileAccess::ImportRead).err().unwrap().code, ErrorCode::PermissionDenied);
+    let file = grants.take(owner, grant, FileAccess::ProfileBackupRead).unwrap();
+    assert_eq!(grants.take(owner, grant, FileAccess::ProfileBackupRead).err().unwrap().code, ErrorCode::PermissionExpired);
+    let summary = broker.inspect_and_stage(owner, file, 60_000).unwrap();
+    let token = summary.restore_token.unwrap();
+
+    // Wrong owner is refused; cancel invalidates; a cancelled token cannot restore.
+    assert_eq!(broker.take_for_restore(Uuid::new_v4(), token, &summary.archive_hash).err().unwrap().code, ErrorCode::PermissionDenied);
+    assert!(broker.cancel(owner, token).unwrap());
+    assert_eq!(broker.take_for_restore(owner, token, &summary.archive_hash).err().unwrap().code, ErrorCode::PermissionExpired);
+
+    // Wrong expected hash fails closed before any local write.
+    let g2 = grants.grant_selected_file(owner, &archive, FileAccess::ProfileBackupRead, 60_000).unwrap();
+    let s2 = broker.inspect_and_stage(owner, grants.take(owner, g2, FileAccess::ProfileBackupRead).unwrap(), 60_000).unwrap();
+    let wrong = ContentHash("0".repeat(64));
+    assert_eq!(broker.take_for_restore(owner, s2.restore_token.unwrap(), &wrong).err().unwrap().code, ErrorCode::ContentMismatch);
+
+    // Valid restore succeeds exactly once.
+    let dest_root = src._directory.0.join("restored-token");
+    let mut dest = Database::open(&dest_root).unwrap();
+    let g3 = grants.grant_selected_file(owner, &archive, FileAccess::ProfileBackupRead, 60_000).unwrap();
+    let s3 = broker.inspect_and_stage(owner, grants.take(owner, g3, FileAccess::ProfileBackupRead).unwrap(), 60_000).unwrap();
+    let t3 = s3.restore_token.unwrap();
+    let mut staged = broker.take_for_restore(owner, t3, &s3.archive_hash).unwrap();
+    let restored = restore_verified(&mut dest, &mut staged, Some(&s3.archive_hash)).unwrap();
+    assert_eq!(restored.games_restored, 1);
+    assert_eq!(broker.take_for_restore(owner, t3, &s3.archive_hash).err().unwrap().code, ErrorCode::PermissionExpired);
+
+    // Archive mutated (same length) after inspection: full-stream hash check rejects before writes.
+    let g4 = grants.grant_selected_file(owner, &archive, FileAccess::ProfileBackupRead, 60_000).unwrap();
+    let s4 = broker.inspect_and_stage(owner, grants.take(owner, g4, FileAccess::ProfileBackupRead).unwrap(), 60_000).unwrap();
+    {
+        let mut w = OpenOptions::new().read(true).write(true).open(&archive).unwrap();
+        w.seek(SeekFrom::Start(100)).unwrap();
+        let mut b = [0u8; 1];
+        w.read_exact(&mut b).unwrap();
+        w.seek(SeekFrom::Start(100)).unwrap();
+        std::io::Write::write_all(&mut w, &[b[0] ^ 0xFF]).unwrap();
+    }
+    let other_root = src._directory.0.join("restored-swapped");
+    let mut other = Database::open(&other_root).unwrap();
+    let mut swapped = broker.take_for_restore(owner, s4.restore_token.unwrap(), &s4.archive_hash).unwrap();
+    assert!(restore_verified(&mut other, &mut swapped, Some(&s4.archive_hash)).is_err());
+    assert!(Library::new(&other).list(None, 0, 10).unwrap().is_empty());
+}
+
+#[test]
+fn chunked_restore_staging_over_256kib_survives_reopen_keeps_other_archives_and_fails_closed() {
+    use omniplay_contracts::ErrorCode;
+    let base = std::env::temp_dir().join(format!("vlikeon-staging-{}", Uuid::new_v4()));
+    let _guard = Directory(base.clone());
+    let root = base.join("profile");
+    let archive_a = ContentHash("a".repeat(64));
+    let archive_b = ContentHash("b".repeat(64));
+    let hashes: Vec<ContentHash> = (0..4200u32).map(|i| digest(format!("asset-{i}").as_bytes())).collect();
+    {
+        let db = Database::open(&root).unwrap();
+        fs::create_dir_all(root.join("assets")).unwrap();
+        for h in &hashes { fs::write(root.join("assets").join(&h.0), b"x").unwrap(); }
+        crate::profile_backup::persist_restore_staging_retainers(&db, &archive_a, &hashes).unwrap();
+        crate::profile_backup::persist_restore_staging_retainers(&db, &archive_b, &hashes[..3]).unwrap();
+    }
+    // Simulated restart before manifest publication.
+    let db = Database::open(&root).unwrap();
+    let pinned = crate::storage_accounting::transient_asset_retainers(&db).unwrap();
+    for h in &hashes { assert!(pinned.contains(&h.0)); }
+    let preview = crate::asset_storage::preview(&db, None).unwrap();
+    assert_eq!(preview.unused_assets, 0);
+    // Corrupt one chunk row: accounting and cleanup fail closed rather than dropping pins.
+    db.connection.execute(
+        "UPDATE preferences SET value='{bad' WHERE key=?1",
+        [format!("{}{}:chunk:0000", crate::profile_backup::PROFILE_RESTORE_STAGING_PREFIX, archive_a.0)],
+    ).unwrap();
+    assert_eq!(crate::storage_accounting::transient_asset_retainers(&db).err().unwrap().code, ErrorCode::CorruptData);
+    assert_eq!(crate::asset_storage::preview(&db, None).err().unwrap().code, ErrorCode::CorruptData);
+}
+
+#[test]
+fn storage_cluster_rounding_uses_volume_cluster_size() {
+    assert_eq!(crate::storage_accounting::round_to_cluster_bytes(1, 65_536), 65_536);
+    assert_eq!(crate::storage_accounting::round_to_cluster_bytes(65_537, 65_536), 131_072);
+    assert_eq!(crate::storage_accounting::round_to_cluster_bytes(4_097, 4_096), 8_192);
+}
+
+fn make_corrupt_profile(base: &PathBuf) -> (PathBuf, ContentHash, Uuid) {
+    let rom_path = base.join("cart.nes");
+    let mut rom = vec![0u8; 16 + 16384];
+    rom[..4].copy_from_slice(b"NES\x1a");
+    rom[4] = 1;
+    fs::write(&rom_path, &rom).unwrap();
+    let root = base.join("profile");
+    let (hash, save_id) = {
+        let mut db = Database::open(&root).unwrap();
+        let game = Library::new(&db).import(File::open(&rom_path).unwrap(), "Fault NES".into(), GameSystem::Nes).unwrap();
+        let metadata = SaveMetadata {
+            schema_version: 1, id: Uuid::new_v4(), game_id: game.id, game_content_hash: game.content_hash.clone(),
+            kind: SaveKind::InGame, slot: 0, generation: 1, parent_id: None, core_id: "fceumm-web".into(),
+            core_version: "1.0.0".parse().unwrap(), state_format_version: "1".into(), platform: "web".into(),
+            core_config_hash: ContentHash("b".repeat(64)), payload_hash: digest(b"sram-bytes"), payload_bytes: 10,
+            created_at_ms: crate::now_ms(), device_id: db.device_id, label: None, conflict: false,
+        };
+        let saved = SaveStore::new(&mut db).commit(metadata, b"sram-bytes", None).unwrap();
+        (game.content_hash, saved.id)
+    };
+    fs::write(root.join("omniplay.sqlite3"), b"corrupt-sqlite-header").unwrap();
+    let _ = fs::write(root.join("omniplay.sqlite3-wal"), b"stale-wal");
+    (root, hash, save_id)
+}
+
+#[test]
+fn corrupt_database_recovery_resumes_after_every_injected_interruption() {
+    use crate::database_recovery::{RecoveryFaultPoint, with_recovery_fault_once, RECOVERY_JOURNAL_FILE};
+    for point in [
+        RecoveryFaultPoint::AfterInitialJournalWrite,
+        RecoveryFaultPoint::BetweenQuarantineRenames,
+        RecoveryFaultPoint::MidStagingRebuild,
+        RecoveryFaultPoint::BeforePublishRename,
+        RecoveryFaultPoint::AfterPublishRenameBeforeJournalRemove,
+    ] {
+        let base = std::env::temp_dir().join(format!("vlikeon-fault-{}", Uuid::new_v4()));
+        let _guard = Directory(base.clone());
+        fs::create_dir_all(&base).unwrap();
+        let (root, hash, _save) = make_corrupt_profile(&base);
+        let interrupted = with_recovery_fault_once(point, || crate::database_recovery::recover(&root).map(|_| ()));
+        assert!(interrupted.is_err(), "fault {point:?} must interrupt recovery");
+        assert!(root.join(RECOVERY_JOURNAL_FILE).exists(), "journal must persist after {point:?}");
+
+        // Restart: startup reconciliation resumes and publishes a healthy database.
+        let reopened = Database::open(&root).unwrap();
+        assert!(!root.join(RECOVERY_JOURNAL_FILE).exists());
+        let games = Library::new(&reopened).list(None, 0, 50).unwrap();
+        assert_eq!(games.len(), 1);
+        assert_eq!(games[0].content_hash, hash);
+        let saves: i64 = reopened.connection.query_row("SELECT count(*) FROM saves", [], |r| r.get(0)).unwrap();
+        assert_eq!(saves, 1);
+        let heads: i64 = reopened.connection.query_row("SELECT count(*) FROM save_heads", [], |r| r.get(0)).unwrap();
+        assert_eq!(heads, 1);
+        let qroot = root.join("corrupt-db-quarantine");
+        let receipts = fs::read_dir(&qroot).unwrap().flatten().filter(|e| e.path().join("quarantine-receipt.json").is_file()).count();
+        assert_eq!(receipts, 1);
+        drop(reopened);
+        // Idempotent: a second open changes nothing.
+        let again = Database::open(&root).unwrap();
+        assert_eq!(Library::new(&again).list(None, 0, 50).unwrap().len(), 1);
+    }
+}
+
+#[test]
+fn interrupted_recovery_fails_closed_on_missing_or_tampered_snapshot_and_journal() {
+    use crate::database_recovery::{RecoveryFaultPoint, with_recovery_fault_once, RECOVERY_JOURNAL_FILE};
+    use omniplay_contracts::ErrorCode;
+    let setup = |label: &str| {
+        let base = std::env::temp_dir().join(format!("vlikeon-{label}-{}", Uuid::new_v4()));
+        fs::create_dir_all(&base).unwrap();
+        let (root, _, _) = make_corrupt_profile(&base);
+        let _ = with_recovery_fault_once(RecoveryFaultPoint::AfterInitialJournalWrite, || crate::database_recovery::recover(&root).map(|_| ()));
+        (base, root)
+    };
+    // Tampered snapshot checksum.
+    let (base, root) = setup("snap");
+    let _g = Directory(base.clone());
+    let qdir = fs::read_dir(root.join("corrupt-db-quarantine")).unwrap().flatten().next().unwrap().path();
+    fs::write(qdir.join("salvaged-snapshot.json"), b"{}").unwrap();
+    assert_eq!(Database::open(&root).err().unwrap().code, ErrorCode::CorruptData);
+    // Missing snapshot.
+    let (base2, root2) = setup("nosnap");
+    let _g2 = Directory(base2.clone());
+    let q2 = fs::read_dir(root2.join("corrupt-db-quarantine")).unwrap().flatten().next().unwrap().path();
+    fs::remove_file(q2.join("salvaged-snapshot.json")).unwrap();
+    assert_eq!(Database::open(&root2).err().unwrap().code, ErrorCode::CorruptData);
+    // Tampered journal checksum while the live DB is still corrupt: fail closed, no blank DB.
+    let (base3, root3) = setup("jrnl");
+    let _g3 = Directory(base3.clone());
+    let jpath = root3.join(RECOVERY_JOURNAL_FILE);
+    let text = fs::read_to_string(&jpath).unwrap().replace("\"journal_sha256\"", "\"journal_sha256\": \"") ;
+    fs::write(&jpath, text).unwrap();
+    assert!(Database::open(&root3).is_err());
+}

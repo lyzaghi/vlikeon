@@ -1052,7 +1052,9 @@ pub fn reconstruct(
         media: Some(media),
     };
     manifest.validate()?;
-    Library::new(database).insert_manifest(manifest)
+    let inserted = Library::new(database).insert_manifest(manifest)?;
+    let _ = crate::profile_backup::reconcile_completed_restore_staging_under_lease(database);
+    Ok(inserted)
 }
 
 /// Reconstructs all unambiguous single-file and multi-file candidates (used during corrupted DB recovery).
@@ -1105,5 +1107,6 @@ pub(crate) fn reconstruct_unambiguous_all(database: &Database) -> Result<Vec<Gam
             }
         }
     }
+    let _ = crate::profile_backup::reconcile_completed_restore_staging_under_lease(database);
     Ok(restored)
 }

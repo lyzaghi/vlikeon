@@ -19,14 +19,14 @@ use crate::{
 use omniplay_contracts::{
     ContentHash, ErrorCode, GameCoreOptions, GameInputProfile, GameManifest, GameSystem,
     GameTouchProfile, PlatformError, Result, SaveMetadata, SessionConfig, UserSettings,
-    MAX_ROM_BYTES, MAX_SAVE_BYTES,
+    MAX_PROFILE_ARCHIVE_BYTES, MAX_ROM_BYTES, MAX_SAVE_BYTES,
 };
 use rusqlite::{params, OptionalExtension, Transaction, TransactionBehavior};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::{
-    collections::{BTreeMap, BTreeSet},
-    fs::File,
+    collections::{BTreeMap, BTreeSet, HashMap},
+    fs::{self, File},
     io::{Read, Seek, SeekFrom, Write},
     path::{Path, PathBuf},
     time::{Duration, Instant},
@@ -131,9 +131,15 @@ pub struct ProfileBackupSummary {
     pub locally_removed_saves: usize,
     pub blobs: usize,
     pub total_payload_bytes: u64,
+    #[serde(default)]
+    pub restore_token: Option<Uuid>,
 }
 
 pub const PROFILE_RESTORE_STAGING_KEY: &str = "profile_restore_staging_v1";
+pub const PROFILE_RESTORE_STAGING_PREFIX: &str = "profile_restore_staging_v1:";
+pub const MAX_STAGING_HASHES_PER_CHUNK: usize = 512;
+pub const MAX_STAGING_CHUNKS: usize = 64;
+pub const MAX_STAGING_ROW_BYTES: usize = 65_536;
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
@@ -141,7 +147,135 @@ pub struct ProfileRestoreStagingRecord {
     pub schema_version: u32,
     pub archive_hash: ContentHash,
     pub started_at_ms: u64,
+    #[serde(default)]
+    pub chunk_count: u32,
+    #[serde(default)]
+    pub total_hashes: u32,
+    #[serde(default)]
     pub asset_hashes: Vec<ContentHash>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct ProfileRestoreStagingChunk {
+    pub schema_version: u32,
+    pub archive_hash: ContentHash,
+    pub chunk_index: u32,
+    pub asset_hashes: Vec<ContentHash>,
+}
+
+struct StagedRestoreToken {
+    owner: Uuid,
+    file: File,
+    archive_hash: ContentHash,
+    byte_length: u64,
+    expires_at_ms: u64,
+}
+
+/// Holds verified, single-use restore capabilities produced by `ProfileBackupInspect`
+/// so confirmation does not reuse a consumed `ImportRead`/`ProfileBackupRead` grant or
+/// accept an archive whose content changed after inspection.
+#[derive(Default)]
+pub struct ProfileRestoreBroker {
+    tokens: HashMap<Uuid, StagedRestoreToken>,
+}
+
+impl ProfileRestoreBroker {
+    pub fn inspect_and_stage(&mut self, owner: Uuid, mut file: File, ttl_ms: u64) -> Result<ProfileBackupSummary> {
+        self.expire();
+        if self.tokens.len() >= 4 || ttl_ms == 0 || ttl_ms > 300_000 {
+            return Err(PlatformError::new(
+                ErrorCode::ResourceLimit,
+                "Too many pending profile restore confirmations; finish or cancel the current inspection",
+            ));
+        }
+        let meta = file.metadata().map_err(storage_error)?;
+        if !meta.is_file() || meta.len() == 0 {
+            return Err(PlatformError::new(
+                ErrorCode::InvalidRequest,
+                "Selected profile backup archive is empty or not a regular file",
+            ));
+        }
+        if meta.len() > MAX_PROFILE_ARCHIVE_BYTES {
+            return Err(PlatformError::new(
+                ErrorCode::ResourceLimit,
+                "Profile backup archive exceeds the 16 GiB cross-device interchange limit",
+            ));
+        }
+        let byte_length = meta.len();
+        let mut summary = inspect(&mut file)?;
+        file.seek(SeekFrom::Start(0)).map_err(storage_error)?;
+        let token = Uuid::new_v4();
+        self.tokens.insert(
+            token,
+            StagedRestoreToken {
+                owner,
+                file,
+                archive_hash: summary.archive_hash.clone(),
+                byte_length,
+                expires_at_ms: now_ms().saturating_add(ttl_ms),
+            },
+        );
+        summary.restore_token = Some(token);
+        Ok(summary)
+    }
+
+    pub fn take_for_restore(
+        &mut self,
+        owner: Uuid,
+        token: Uuid,
+        expected_archive_hash: &ContentHash,
+    ) -> Result<File> {
+        ContentHash::parse(expected_archive_hash.0.clone())?;
+        self.expire();
+        if self.tokens.get(&token).is_some_and(|entry| entry.owner != owner) {
+            return Err(PlatformError::new(
+                ErrorCode::PermissionDenied,
+                "Profile restore confirmation belongs to another client",
+            ));
+        }
+        let mut entry = self.tokens.remove(&token).ok_or_else(|| {
+            PlatformError::new(
+                ErrorCode::PermissionExpired,
+                "Profile restore confirmation is missing, cancelled, or expired",
+            )
+            .recover("Select and inspect the profile backup archive again")
+        })?;
+        if &entry.archive_hash != expected_archive_hash {
+            return Err(PlatformError::new(
+                ErrorCode::ContentMismatch,
+                "Profile restore confirmation does not match the inspected archive hash",
+            ));
+        }
+        let current_meta = entry.file.metadata().map_err(storage_error)?;
+        if !current_meta.is_file() || current_meta.len() != entry.byte_length {
+            return Err(PlatformError::new(
+                ErrorCode::ContentMismatch,
+                "Selected profile backup archive changed after inspection",
+            ));
+        }
+        entry.file.seek(SeekFrom::Start(0)).map_err(storage_error)?;
+        Ok(entry.file)
+    }
+
+    pub fn cancel(&mut self, owner: Uuid, token: Uuid) -> Result<bool> {
+        if self.tokens.get(&token).is_some_and(|entry| entry.owner != owner) {
+            return Err(PlatformError::new(
+                ErrorCode::PermissionDenied,
+                "Profile restore confirmation belongs to another client",
+            ));
+        }
+        Ok(self.tokens.remove(&token).is_some())
+    }
+
+    pub fn revoke_owner(&mut self, owner: Uuid) {
+        self.tokens.retain(|_, entry| entry.owner != owner);
+    }
+
+    pub fn expire(&mut self) {
+        let now = now_ms();
+        self.tokens.retain(|_, entry| entry.expires_at_ms > now);
+    }
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
@@ -675,6 +809,17 @@ pub fn export(
             "Full-profile manifest exceeds its 32 MiB JSON limit",
         ));
     }
+    let projected_total_bytes = 12u64
+        .checked_add(manifest_bytes.len() as u64)
+        .and_then(|v| v.checked_add(payload_total))
+        .and_then(|v| v.checked_add(32))
+        .ok_or_else(|| PlatformError::new(ErrorCode::ResourceLimit, "Full-profile archive size overflow"))?;
+    if projected_total_bytes > MAX_PROFILE_ARCHIVE_BYTES {
+        return Err(PlatformError::new(
+            ErrorCode::ResourceLimit,
+            "Full-profile backup exceeds the 16 GiB cross-device archive limit; export without ROM assets for oversized libraries",
+        ));
+    }
 
     destination.seek(SeekFrom::Start(0)).map_err(storage_error)?;
     destination.set_len(0).map_err(storage_error)?;
@@ -787,6 +932,17 @@ fn verify_archive_stream<R: Read + Seek>(
     let manifest: ProfileManifest =
         serde_json::from_slice(&manifest_bytes).map_err(|_| corrupt("Full-profile backup manifest JSON is invalid"))?;
     let payload_total = validate_manifest(&manifest)?;
+    let expected_archive_bytes = 12u64
+        .checked_add(json_len as u64)
+        .and_then(|v| v.checked_add(payload_total))
+        .and_then(|v| v.checked_add(32))
+        .ok_or_else(|| corrupt("Full-profile backup size overflow"))?;
+    if expected_archive_bytes > MAX_PROFILE_ARCHIVE_BYTES {
+        return Err(PlatformError::new(
+            ErrorCode::ResourceLimit,
+            "Full-profile backup exceeds the 16 GiB cross-device archive limit",
+        ));
+    }
 
     let payload_base = 12u64 + json_len as u64;
     let mut package_hasher = Sha256::new();
@@ -851,6 +1007,7 @@ pub fn inspect<R: Read + Seek>(source: &mut R) -> Result<ProfileBackupSummary> {
         locally_removed_saves: manifest.locally_removed_saves.len(),
         blobs: manifest.blobs.len(),
         total_payload_bytes,
+        restore_token: None,
     })
 }
 
@@ -979,13 +1136,289 @@ fn copy_verified_blob_from_archive<R: Read + Seek>(
     Ok(true)
 }
 
-fn cleanup_failed_restore_staging(database: &Database, staged_paths: &[PathBuf]) {
+pub fn persist_restore_staging_retainers(
+    database: &Database,
+    archive_hash: &ContentHash,
+    hashes: &[ContentHash],
+) -> Result<()> {
+    ContentHash::parse(archive_hash.0.clone())?;
+    let mut deduped = BTreeSet::new();
+    for h in hashes {
+        ContentHash::parse(h.0.clone())?;
+        deduped.insert(h.0.clone());
+    }
+    if deduped.is_empty() {
+        return Ok(());
+    }
+    let ordered: Vec<ContentHash> = deduped.into_iter().map(ContentHash).collect();
+    let chunks: Vec<&[ContentHash]> = ordered.chunks(MAX_STAGING_HASHES_PER_CHUNK).collect();
+    if chunks.len() > MAX_STAGING_CHUNKS {
+        return Err(PlatformError::new(
+            ErrorCode::ResourceLimit,
+            "Profile restore exceeds its bounded asset-retainer chunk limit",
+        ));
+    }
+
+    let prefix_like = format!("{PROFILE_RESTORE_STAGING_PREFIX}{}:%", archive_hash.0);
+    let tx = Transaction::new_unchecked(&database.connection, TransactionBehavior::Immediate)
+        .map_err(storage_error)?;
+    tx.execute("DELETE FROM preferences WHERE key LIKE ?1", [&prefix_like])
+        .map_err(storage_error)?;
+
+    for (idx, slice) in chunks.iter().enumerate() {
+        let chunk_rec = ProfileRestoreStagingChunk {
+            schema_version: 1,
+            archive_hash: archive_hash.clone(),
+            chunk_index: idx as u32,
+            asset_hashes: slice.to_vec(),
+        };
+        let chunk_json = serde_json::to_string(&chunk_rec).map_err(storage_error)?;
+        if chunk_json.len() > MAX_STAGING_ROW_BYTES {
+            return Err(PlatformError::new(
+                ErrorCode::ResourceLimit,
+                "Profile restore staging chunk exceeds its 64 KiB row bound",
+            ));
+        }
+        let chunk_key = format!("{PROFILE_RESTORE_STAGING_PREFIX}{}:chunk:{idx:04}", archive_hash.0);
+        tx.execute(
+            "INSERT INTO preferences(key,value) VALUES(?1,?2)",
+            params![chunk_key, chunk_json],
+        )
+        .map_err(storage_error)?;
+    }
+
+    let meta_rec = ProfileRestoreStagingRecord {
+        schema_version: 1,
+        archive_hash: archive_hash.clone(),
+        started_at_ms: now_ms(),
+        chunk_count: chunks.len() as u32,
+        total_hashes: ordered.len() as u32,
+        asset_hashes: Vec::new(),
+    };
+    let meta_json = serde_json::to_string(&meta_rec).map_err(storage_error)?;
+    if meta_json.len() > MAX_STAGING_ROW_BYTES {
+        return Err(PlatformError::new(
+            ErrorCode::ResourceLimit,
+            "Profile restore staging metadata exceeds its 64 KiB row bound",
+        ));
+    }
+    let meta_key = format!("{PROFILE_RESTORE_STAGING_PREFIX}{}:meta", archive_hash.0);
+    tx.execute(
+        "INSERT INTO preferences(key,value) VALUES(?1,?2)",
+        params![meta_key, meta_json],
+    )
+    .map_err(storage_error)?;
+    tx.commit().map_err(storage_error)
+}
+
+/// Reads all durable restore staging retainers across legacy and per-archive chunked rows.
+/// Fails closed (`ErrorCode::CorruptData`) if any staging row exceeds `MAX_STAGING_ROW_BYTES`,
+/// fails JSON/schema validation, or is missing a declared chunk, so asset cleanup never sweeps
+/// blobs when staging provenance is unreadable.
+pub fn read_restore_staging_retainers(database: &Database) -> Result<BTreeMap<String, Vec<ContentHash>>> {
+    let corrupt_staging = || {
+        PlatformError::new(
+            ErrorCode::CorruptData,
+            "Profile restore staging retainer record is unreadable or incomplete; asset cleanup is blocked until reconciled",
+        )
+    };
+    let mut stmt = database
+        .connection
+        .prepare(
+            "SELECT key, length(CAST(value AS BLOB)), substr(value, 1, 65537)
+             FROM preferences
+             WHERE key = ?1 OR key LIKE ?2
+             ORDER BY key
+             LIMIT 4097",
+        )
+        .map_err(storage_error)?;
+    let prefix_like = format!("{PROFILE_RESTORE_STAGING_PREFIX}%");
+    let mut rows = stmt
+        .query(params![PROFILE_RESTORE_STAGING_KEY, prefix_like])
+        .map_err(storage_error)?;
+
+    let mut row_count = 0usize;
+    let mut legacy_records: BTreeMap<String, Vec<ContentHash>> = BTreeMap::new();
+    let mut metas: BTreeMap<String, ProfileRestoreStagingRecord> = BTreeMap::new();
+    let mut chunks_by_archive: BTreeMap<String, BTreeMap<u32, Vec<ContentHash>>> = BTreeMap::new();
+
+    while let Some(row) = rows.next().map_err(storage_error)? {
+        row_count += 1;
+        if row_count > 4096 {
+            return Err(corrupt_staging());
+        }
+        let key: String = row.get(0).map_err(storage_error)?;
+        let byte_len: usize = row.get::<_, u64>(1).map_err(storage_error)? as usize;
+        let raw: String = row.get(2).map_err(storage_error)?;
+        if byte_len > MAX_STAGING_ROW_BYTES || raw.len() > MAX_STAGING_ROW_BYTES {
+            return Err(corrupt_staging());
+        }
+
+        if key == PROFILE_RESTORE_STAGING_KEY {
+            let rec: ProfileRestoreStagingRecord =
+                serde_json::from_str(&raw).map_err(|_| corrupt_staging())?;
+            if rec.schema_version != 1 || rec.chunk_count != 0 {
+                return Err(corrupt_staging());
+            }
+            ContentHash::parse(rec.archive_hash.0.clone()).map_err(|_| corrupt_staging())?;
+            for h in &rec.asset_hashes {
+                ContentHash::parse(h.0.clone()).map_err(|_| corrupt_staging())?;
+            }
+            legacy_records.insert(rec.archive_hash.0, rec.asset_hashes);
+            continue;
+        }
+
+        let Some(rest) = key.strip_prefix(PROFILE_RESTORE_STAGING_PREFIX) else {
+            return Err(corrupt_staging());
+        };
+        let Some((archive_hex, suffix)) = rest.split_once(':') else {
+            return Err(corrupt_staging());
+        };
+        ContentHash::parse(archive_hex.to_owned()).map_err(|_| corrupt_staging())?;
+
+        if suffix == "meta" {
+            let rec: ProfileRestoreStagingRecord =
+                serde_json::from_str(&raw).map_err(|_| corrupt_staging())?;
+            if rec.schema_version != 1
+                || rec.archive_hash.0 != archive_hex
+                || rec.chunk_count == 0
+                || rec.chunk_count as usize > MAX_STAGING_CHUNKS
+                || !rec.asset_hashes.is_empty()
+            {
+                return Err(corrupt_staging());
+            }
+            if metas.insert(archive_hex.to_owned(), rec).is_some() {
+                return Err(corrupt_staging());
+            }
+        } else if let Some(idx_str) = suffix.strip_prefix("chunk:") {
+            if idx_str.len() != 4 || !idx_str.bytes().all(|b| b.is_ascii_digit()) {
+                return Err(corrupt_staging());
+            }
+            let idx: u32 = idx_str.parse().map_err(|_| corrupt_staging())?;
+            let chunk: ProfileRestoreStagingChunk =
+                serde_json::from_str(&raw).map_err(|_| corrupt_staging())?;
+            if chunk.schema_version != 1
+                || chunk.archive_hash.0 != archive_hex
+                || chunk.chunk_index != idx
+                || chunk.asset_hashes.is_empty()
+                || chunk.asset_hashes.len() > MAX_STAGING_HASHES_PER_CHUNK
+            {
+                return Err(corrupt_staging());
+            }
+            for h in &chunk.asset_hashes {
+                ContentHash::parse(h.0.clone()).map_err(|_| corrupt_staging())?;
+            }
+            if chunks_by_archive
+                .entry(archive_hex.to_owned())
+                .or_default()
+                .insert(idx, chunk.asset_hashes)
+                .is_some()
+            {
+                return Err(corrupt_staging());
+            }
+        } else {
+            return Err(corrupt_staging());
+        }
+    }
+
+    for archive_hex in chunks_by_archive.keys() {
+        if !metas.contains_key(archive_hex) {
+            return Err(corrupt_staging());
+        }
+    }
+
+    let mut out = legacy_records;
+    for (archive_hex, meta) in metas {
+        let Some(chunk_map) = chunks_by_archive.remove(&archive_hex) else {
+            return Err(corrupt_staging());
+        };
+        if chunk_map.len() != meta.chunk_count as usize {
+            return Err(corrupt_staging());
+        }
+        let mut combined = Vec::with_capacity(meta.total_hashes as usize);
+        for expected_idx in 0..meta.chunk_count {
+            let Some(hashes) = chunk_map.get(&expected_idx) else {
+                return Err(corrupt_staging());
+            };
+            combined.extend(hashes.iter().cloned());
+        }
+        if combined.len() != meta.total_hashes as usize {
+            return Err(corrupt_staging());
+        }
+        out.entry(archive_hex).or_default().extend(combined);
+    }
+
+    Ok(out)
+}
+
+/// Reconciles prior interrupted restore staging markers once every staged hash in an archive
+/// has either been adopted into `games` or is absent on disk, while preserving pins for any
+/// archive that still has unreferenced staged blobs on disk.
+pub fn reconcile_stale_restore_staging(database: &Database) -> Result<usize> {
+    let _lease = AssetLease::acquire(database)?;
+    reconcile_completed_restore_staging_under_lease(database)
+}
+
+pub(crate) fn reconcile_completed_restore_staging_under_lease(database: &Database) -> Result<usize> {
+    let staged = match read_restore_staging_retainers(database) {
+        Ok(s) if s.is_empty() => return Ok(0),
+        Ok(s) => s,
+        Err(err) => return Err(err),
+    };
+
+    let mut adopted = BTreeSet::new();
+    let mut stmt = database
+        .connection
+        .prepare("SELECT content_hash, manifest_json FROM games LIMIT 20001")
+        .map_err(storage_error)?;
+    let mut rows = stmt.query([]).map_err(storage_error)?;
+    while let Some(row) = rows.next().map_err(storage_error)? {
+        let chash: String = row.get(0).map_err(storage_error)?;
+        let raw_json: String = row.get(1).map_err(storage_error)?;
+        adopted.insert(chash);
+        if let Ok(manifest) = serde_json::from_str::<GameManifest>(&raw_json) {
+            if let Some(media) = manifest.media {
+                for a in media.assets {
+                    adopted.insert(a.content_hash.0);
+                }
+            }
+        }
+    }
+    drop(rows);
+    drop(stmt);
+
+    let assets_dir = database.root.join("assets");
+    let mut pruned = 0usize;
+    for (archive_hex, hashes) in staged {
+        let has_unreferenced_on_disk = hashes
+            .iter()
+            .any(|h| !adopted.contains(&h.0) && assets_dir.join(&h.0).exists());
+        if !has_unreferenced_on_disk {
+            let prefix_like = format!("{PROFILE_RESTORE_STAGING_PREFIX}{archive_hex}:%");
+            let deleted = database
+                .connection
+                .execute("DELETE FROM preferences WHERE key LIKE ?1", [&prefix_like])
+                .map_err(storage_error)?;
+            if deleted > 0 {
+                pruned += 1;
+            }
+        }
+    }
+    Ok(pruned)
+}
+
+fn cleanup_failed_restore_staging(
+    database: &Database,
+    archive_hash: &ContentHash,
+    staged_paths: &[PathBuf],
+) {
     for path in staged_paths {
         let _ = fs::remove_file(path);
     }
+    let prefix_like = format!("{PROFILE_RESTORE_STAGING_PREFIX}{}:%", archive_hash.0);
     let _ = database
         .connection
-        .execute("DELETE FROM preferences WHERE key=?1", [PROFILE_RESTORE_STAGING_KEY]);
+        .execute("DELETE FROM preferences WHERE key LIKE ?1", [&prefix_like]);
 }
 
 /// Verifies an entire `OPPF0001` archive before mutating state, checks physical quota admission
@@ -993,15 +1426,33 @@ fn cleanup_failed_restore_staging(database: &Database, staged_paths: &[PathBuf])
 /// holds `AssetLease` across blob staging through manifest publication, commits metadata atomically,
 /// and restores save branches from exact bounded payload slices.
 pub fn restore<R: Read + Seek>(database: &mut Database, source: &mut R) -> Result<ProfileBackupRestored> {
+    restore_verified(database, source, None)
+}
+
+pub fn restore_verified<R: Read + Seek>(
+    database: &mut Database,
+    source: &mut R,
+    expected_archive_hash: Option<&ContentHash>,
+) -> Result<ProfileBackupRestored> {
     let until = Instant::now() + Duration::from_secs(90);
     require_no_active_sessions(database)?;
 
     // Hold AssetLease across the entire restore lifecycle so asset_storage cleanup cannot
     // reclaim newly staged ROM/disc blobs before Library manifests are durably committed.
     let _asset_lease = AssetLease::acquire(database)?;
+    let _ = reconcile_completed_restore_staging_under_lease(database);
 
     // 1. Full structural + payload + trailer verification BEFORE any local write
     let (manifest, payload_base, archive_hash) = verify_archive_stream(source, until)?;
+    if let Some(expected) = expected_archive_hash {
+        ContentHash::parse(expected.0.clone())?;
+        if &archive_hash != expected {
+            return Err(PlatformError::new(
+                ErrorCode::ContentMismatch,
+                "Selected profile backup archive changed after inspection; inspect the archive again before restoring",
+            ));
+        }
+    }
 
     let blob_lookup: BTreeMap<String, &PayloadBlobDescriptor> = manifest
         .blobs
@@ -1034,23 +1485,9 @@ pub fn restore<R: Read + Seek>(database: &mut Database, source: &mut R) -> Resul
     }
     storage_accounting::enforce_physical_quota(database, missing_bytes, missing_files)?;
 
-    // Persist durable staging retainer in preferences so crash/restart before manifest commit
-    // still retains staged blobs in storage_accounting until reconciled or cleaned up.
-    if !staged_asset_hashes.is_empty() {
-        let staging_record = ProfileRestoreStagingRecord {
-            archive_hash: archive_hash.clone(),
-            started_at_ms: now_ms(),
-            asset_hashes: staged_asset_hashes,
-        };
-        let staging_json = serde_json::to_string(&staging_record).map_err(storage_error)?;
-        database
-            .connection
-            .execute(
-                "INSERT INTO preferences(key,value) VALUES(?1,?2) ON CONFLICT(key) DO UPDATE SET value=excluded.value",
-                params![PROFILE_RESTORE_STAGING_KEY, staging_json],
-            )
-            .map_err(storage_error)?;
-    }
+    // Persist bounded per-archive chunked staging retainers in preferences without overwriting
+    // pins belonging to any earlier interrupted restore.
+    persist_restore_staging_retainers(database, &archive_hash, &staged_asset_hashes)?;
 
     let mut newly_staged_paths: Vec<PathBuf> = Vec::new();
     let mut wrote_firmware_blobs: BTreeSet<String> = BTreeSet::new();
@@ -1079,7 +1516,7 @@ pub fn restore<R: Read + Seek>(database: &mut Database, source: &mut R) -> Resul
     })();
 
     if let Err(err) = stage_result {
-        cleanup_failed_restore_staging(database, &newly_staged_paths);
+        cleanup_failed_restore_staging(database, &archive_hash, &newly_staged_paths);
         return Err(err);
     }
 
@@ -1088,7 +1525,7 @@ pub fn restore<R: Read + Seek>(database: &mut Database, source: &mut R) -> Resul
     let current_settings = match database.settings() {
         Ok(s) => s,
         Err(err) => {
-            cleanup_failed_restore_staging(database, &newly_staged_paths);
+            cleanup_failed_restore_staging(database, &archive_hash, &newly_staged_paths);
             return Err(err);
         }
     };
@@ -1097,13 +1534,13 @@ pub fn restore<R: Read + Seek>(database: &mut Database, source: &mut R) -> Resul
         merged_settings.cloud_sync_opt_in = false;
     }
     if let Err(err) = merged_settings.validate() {
-        cleanup_failed_restore_staging(database, &newly_staged_paths);
+        cleanup_failed_restore_staging(database, &archive_hash, &newly_staged_paths);
         return Err(err);
     }
     let merged_settings_json = match serde_json::to_string(&merged_settings).map_err(storage_error) {
         Ok(j) => j,
         Err(err) => {
-            cleanup_failed_restore_staging(database, &newly_staged_paths);
+            cleanup_failed_restore_staging(database, &archive_hash, &newly_staged_paths);
             return Err(err);
         }
     };
@@ -1351,14 +1788,15 @@ pub fn restore<R: Read + Seek>(database: &mut Database, source: &mut R) -> Resul
             }
         }
 
-        // Manifests are now registered in `games`; clear the temporary staging retainer atomically.
-        tx.execute("DELETE FROM preferences WHERE key=?1", [PROFILE_RESTORE_STAGING_KEY])
+        // Manifests are now registered in `games`; clear only this archive's staging retainers atomically.
+        let staging_prefix = format!("{PROFILE_RESTORE_STAGING_PREFIX}{}:%", archive_hash.0);
+        tx.execute("DELETE FROM preferences WHERE key LIKE ?1", [&staging_prefix])
             .map_err(storage_error)?;
         tx.commit().map_err(storage_error)
     })();
 
     if let Err(err) = metadata_commit {
-        cleanup_failed_restore_staging(database, &newly_staged_paths);
+        cleanup_failed_restore_staging(database, &archive_hash, &newly_staged_paths);
         return Err(err);
     }
 
