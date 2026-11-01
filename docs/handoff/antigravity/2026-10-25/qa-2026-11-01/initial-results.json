@@ -1,0 +1,127 @@
+[
+  {
+    "name": "rust-recovery-tests",
+    "command": [
+      "cmd.exe",
+      "/d",
+      "/c",
+      "E:\\V10\\work\\vlikeon-flash-qa-20261101-b7db0d9\\rust-recovery-tests.cmd"
+    ],
+    "exit_code": 101,
+    "timed_out": false,
+    "seconds": 85.5,
+    "log": "E:\\V10\\work\\vlikeon-flash-qa-20261101-b7db0d9\\evidence\\rust-recovery-tests.log"
+  },
+  {
+    "name": "rust-callers-check",
+    "command": [
+      "cmd.exe",
+      "/d",
+      "/c",
+      "E:\\V10\\work\\vlikeon-flash-qa-20261101-b7db0d9\\rust-callers-check.cmd"
+    ],
+    "exit_code": 101,
+    "timed_out": false,
+    "seconds": 29.31,
+    "log": "E:\\V10\\work\\vlikeon-flash-qa-20261101-b7db0d9\\evidence\\rust-callers-check.log"
+  },
+  {
+    "name": "media-input-contract",
+    "command": [
+      "C:\\Users\\lyzag\\AppData\\Local\\Programs\\Python\\Python312\\python.exe",
+      "qa/native-lifecycle/media_input_qualification.py",
+      "--suite",
+      "all",
+      "--output",
+      "E:\\V10\\work\\vlikeon-flash-qa-20261101-b7db0d9\\evidence\\media-input-contract"
+    ],
+    "exit_code": 1,
+    "timed_out": false,
+    "seconds": 0.19,
+    "log": "E:\\V10\\work\\vlikeon-flash-qa-20261101-b7db0d9\\evidence\\media-input-contract.log"
+  },
+  {
+    "name": "web-assemble",
+    "command": [
+      "C:\\Users\\lyzag\\AppData\\Local\\Programs\\Python\\Python312\\python.exe",
+      "tools/assemble_web.py",
+      "--without-cores"
+    ],
+    "exit_code": 0,
+    "timed_out": false,
+    "seconds": 0.51,
+    "log": "E:\\V10\\work\\vlikeon-flash-qa-20261101-b7db0d9\\evidence\\web-assemble.log"
+  },
+  {
+    "name": "js-syntax-app",
+    "command": [
+      "C:\\Program Files\\nodejs\\node.exe",
+      "--check",
+      "apps/game-hub/app.js"
+    ],
+    "exit_code": 0,
+    "timed_out": false,
+    "seconds": 0.08,
+    "log": "E:\\V10\\work\\vlikeon-flash-qa-20261101-b7db0d9\\evidence\\js-syntax-app.log"
+  },
+  {
+    "name": "js-syntax-bridge",
+    "command": [
+      "C:\\Program Files\\nodejs\\node.exe",
+      "--check",
+      "apps/game-hub/bridge.js"
+    ],
+    "exit_code": 0,
+    "timed_out": false,
+    "seconds": 0.07,
+    "log": "E:\\V10\\work\\vlikeon-flash-qa-20261101-b7db0d9\\evidence\\js-syntax-bridge.log"
+  },
+  {
+    "name": "js-syntax-gamepad-ports",
+    "command": [
+      "C:\\Program Files\\nodejs\\node.exe",
+      "--check",
+      "apps/game-hub/gamepad-ports.js"
+    ],
+    "exit_code": 0,
+    "timed_out": false,
+    "seconds": 0.07,
+    "log": "E:\\V10\\work\\vlikeon-flash-qa-20261101-b7db0d9\\evidence\\js-syntax-gamepad-ports.log"
+  },
+  {
+    "name": "js-syntax-library-recovery",
+    "command": [
+      "C:\\Program Files\\nodejs\\node.exe",
+      "--check",
+      "apps/game-hub/library-recovery.js"
+    ],
+    "exit_code": 0,
+    "timed_out": false,
+    "seconds": 0.06,
+    "log": "E:\\V10\\work\\vlikeon-flash-qa-20261101-b7db0d9\\evidence\\js-syntax-library-recovery.log"
+  },
+  {
+    "name": "js-syntax-player",
+    "command": [
+      "C:\\Program Files\\nodejs\\node.exe",
+      "--check",
+      "apps/game-hub/player.js"
+    ],
+    "exit_code": 0,
+    "timed_out": false,
+    "seconds": 0.07,
+    "log": "E:\\V10\\work\\vlikeon-flash-qa-20261101-b7db0d9\\evidence\\js-syntax-player.log"
+  },
+  {
+    "name": "js-syntax-unused-content",
+    "command": [
+      "C:\\Program Files\\nodejs\\node.exe",
+      "--check",
+      "apps/game-hub/unused-content.js"
+    ],
+    "exit_code": 0,
+    "timed_out": false,
+    "seconds": 0.07,
+    "log": "E:\\V10\\work\\vlikeon-flash-qa-20261101-b7db0d9\\evidence\\js-syntax-unused-content.log"
+  }
+]

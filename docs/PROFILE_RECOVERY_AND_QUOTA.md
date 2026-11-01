@@ -84,7 +84,9 @@ Implemented in [`storage_accounting.rs`](file:///e:/V10/OmniPlay/platform/core/s
 - **Mobile Export Delivery:**
   - Android SAF export completion in [`NativeDocuments.java`](file:///e:/V10/OmniPlay/apps/android/java/org/chromium/chrome/browser/omniplay/NativeDocuments.java) (`finishExport` supporting `save_backup_export`, `profile_backup_export` up to `16 GiB`, and `manual_recovery_export`) and iOS export delivery in [`HubBridge.swift`](file:///e:/V10/OmniPlay/apps/ios/OmniPlay/HubBridge.swift).
 
-## Round-2 review fixes (SOURCE_READY_UNVERIFIED — nothing below has been compiled or run)
+## Round-2 source-authoring checkpoint (historical SOURCE_READY_UNVERIFIED)
+
+Execution update, 2026-11-01: the subsequent [Codex QA review](handoff/antigravity/2026-10-25/CODEX_QA_REVIEW_2026-11-01.md) records successful Rust checks, scoped recovery tests and CUE/M3U reconstruction, with exact source snapshots and remaining integration/device gaps. The unexecuted statements below describe the earlier authoring checkpoint, not the latest QA state.
 
 - **Scoped restore capability.** `profile_backup_select_import` issues a single-use `FileAccess::ProfileBackupRead` grant (cannot be used by library/save/firmware import). `profile_backup_inspect` consumes it and stages the open file in `ProfileRestoreBroker` (owner-bound, TTL ≤ 5 min, max 4 pending) returning `restore_token`. `profile_backup_restore {restore_token, expected_archive_hash}` re-verifies length and the full-stream SHA-256 before any write; `profile_backup_cancel` and `permission_revoke` drop it. General `ImportRead` grants stay single-use and unchanged.
 - **Staging retainers.** Per-archive rows `profile_restore_staging_v1:<archive_hash>:meta|chunk:NNNN` (≤512 hashes and ≤64 KiB per row, ≤64 chunks). Readers fail closed with `CorruptData` on oversized/malformed/incomplete rows, so asset cleanup and accounting never treat unreadable pins as absent. Interrupted restores of different archives keep separate pins.

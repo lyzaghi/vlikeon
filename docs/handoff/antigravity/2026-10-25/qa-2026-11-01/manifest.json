@@ -1,0 +1,159 @@
+{
+  "schema_version": 1,
+  "tester": "Antigravity gemini-3.8-flash-high",
+  "reviewer": "Codex",
+  "scope": "scoped_checks_only_not_batch_acceptance",
+  "final_source_checkpoint": "f9f4d5577e4ed6acf46b3dcf4b85c91cae2a0c27",
+  "rounds": [
+    {
+      "round": "initial",
+      "source_commit": "b7db0d9b77294814306f1121389a76da98365f9e",
+      "artifacts": [
+        {
+          "path": "initial-results.json",
+          "bytes": 3674,
+          "sha256": "484d0c5eef11009416afe543ea928507b7dde355a0baa95eaa51626f74468b9b"
+        },
+        {
+          "path": "initial-integrity.json",
+          "bytes": 200,
+          "sha256": "cbb672f9b5277988b27500f7b865f7785e9454503f9f3eccaf3faa816fe9ed98"
+        },
+        {
+          "path": "initial-web-assemble.log",
+          "bytes": 218,
+          "sha256": "39f14b656c1279b415451e785600870f2471de9f5537bf26d8a32e91123705bb"
+        },
+        {
+          "path": "initial-js-syntax-app.log",
+          "bytes": 75,
+          "sha256": "5b486561340983c929b67ca5d7e5b1d1dc0de647427d5f29a5d74ab394223294"
+        },
+        {
+          "path": "initial-js-syntax-bridge.log",
+          "bytes": 78,
+          "sha256": "b137a23aa18df8a829c1ccf915bddea95b59be559add03d0a631f05a8c055d1b"
+        },
+        {
+          "path": "initial-js-syntax-gamepad-ports.log",
+          "bytes": 85,
+          "sha256": "9655effdc45a1bca1d403b5b2185945308bb24af4f71d52f27dff0b0b807c140"
+        },
+        {
+          "path": "initial-js-syntax-library-recovery.log",
+          "bytes": 88,
+          "sha256": "3f1fba566d9500d705b40da8b17942a8709ed935ba666104854bff1a35e7dac7"
+        },
+        {
+          "path": "initial-js-syntax-player.log",
+          "bytes": 78,
+          "sha256": "2b05030f14a35c1042f36aea96a33f8b5ab51b357449c7d11a3a1365fe57ba37"
+        },
+        {
+          "path": "initial-js-syntax-unused-content.log",
+          "bytes": 86,
+          "sha256": "7a3930ae86f67435970a44a097cacf5b288229816314f60dfca672ab07f3a831"
+        }
+      ]
+    },
+    {
+      "round": "round2",
+      "source_commit": "6a67d648d154de299a9f1fc3a83262a1ebd4e3c0",
+      "artifacts": [
+        {
+          "path": "round2-results.json",
+          "bytes": 1761,
+          "sha256": "94d6abb9f93f24da84c7b35bd7bd82af6f02dce6a26e68a60fea9f02193c3e16"
+        },
+        {
+          "path": "round2-integrity.json",
+          "bytes": 158,
+          "sha256": "c9da5f1527d31a1f2b92d95f4d6777168aa7cf33afe02e8e249cb21f1299a00c"
+        },
+        {
+          "path": "round2-harness-regressions.log",
+          "bytes": 532,
+          "sha256": "086d93948d7cbf95a8a5b41bef7924efb061ca07b953e166cccef913331ae47b"
+        }
+      ]
+    },
+    {
+      "round": "round3",
+      "source_commit": "fb3d85468d51b2f1bf3102bb36b191fff1d79f17",
+      "artifacts": [
+        {
+          "path": "round3-results.json",
+          "bytes": 1355,
+          "sha256": "f45651508dee5994c9e33fa92abcb34b09318459dd903e51f8a4f73af99c17f6"
+        },
+        {
+          "path": "round3-integrity.json",
+          "bytes": 158,
+          "sha256": "769d329f8b49599aa75bd6683775c457fd15b7556cc43c58a6402d6226a6ef26"
+        },
+        {
+          "path": "round3-rust-recovery-tests.log",
+          "bytes": 8916,
+          "sha256": "f913441bffc99ccbded7eeaad3e6020b5f7ecf90637dc86b12e7634fc4389e0d"
+        },
+        {
+          "path": "round3-rust-callers-check.log",
+          "bytes": 39452,
+          "sha256": "aabee27b30107fe336ac4a858d7cb194ccf7e98b456550da22ca03f531efb235"
+        },
+        {
+          "path": "round3-media-input-contract.log",
+          "bytes": 425,
+          "sha256": "9e7cd85583274df3e20c5671a3e98819b62b03f90415dc3e0db9e9e914b57f22"
+        },
+        {
+          "path": "round3-media-input-contract-evidence.json",
+          "bytes": 1894,
+          "sha256": "74a8437ce9ece4bedebf5b5aba8e0c08180c0ce07a66373260058e428de3d427"
+        }
+      ]
+    },
+    {
+      "round": "round4",
+      "source_commit": "f64e9d25ce666eae466f13f3c4be5933580f6765",
+      "artifacts": [
+        {
+          "path": "round4-results.json",
+          "bytes": 398,
+          "sha256": "414f76a981bd7b8ba6e890e4ce5e9f22c7227de0f19b20d86f3ba1f0956383b5"
+        },
+        {
+          "path": "round4-integrity.json",
+          "bytes": 158,
+          "sha256": "cacbd688df477489f40cbe47ff34a4f736f57670f88a4c9277b385f422517413"
+        },
+        {
+          "path": "round4-rust-cue-m3u-test.log",
+          "bytes": 7504,
+          "sha256": "42f8bb2bc781491b92d6d6502fba0388dfd1eff534ff0e075988046b383bca1d"
+        }
+      ]
+    },
+    {
+      "round": "round5",
+      "source_commit": "f9f4d5577e4ed6acf46b3dcf4b85c91cae2a0c27",
+      "artifacts": [
+        {
+          "path": "round5-results.json",
+          "bytes": 396,
+          "sha256": "d941c45d386803fd825d7c7ced9a7d2b60c5a1e8cbaa9c1a01ab94797da2cfbf"
+        },
+        {
+          "path": "round5-integrity.json",
+          "bytes": 158,
+          "sha256": "b675b7b2e60c5f7bbac79440c4e1da3a2d2f69355c5800772430f80b5df62e2b"
+        },
+        {
+          "path": "round5-rust-cue-m3u-test.log",
+          "bytes": 6847,
+          "sha256": "69f30711a4c319fd3ac4dfe66e93fff4ac5e692adcead567114edf5014db6373"
+        }
+      ]
+    }
+  ]
+}

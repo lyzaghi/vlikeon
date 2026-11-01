@@ -1,0 +1,59 @@
+{
+  "schema_version": 1,
+  "verification_level": "source_contract_and_synthetic_protocol",
+  "timestamp_utc": "2026-11-01T15:12:58Z",
+  "suite": "all",
+  "items": {
+    "item_42_video": {
+      "checks": {
+        "opengl_and_gles3_backends_present": true,
+        "gl_robustness_context_loss_detection": true,
+        "vulkan_backend_and_libretro_v5_interface": true,
+        "resize_fullscreen_dpi_handling": true,
+        "render_device_lost_recovery_and_retirement": true,
+        "registry_approved_gpu_bounds": true
+      },
+      "passed": true,
+      "live_gpu_executed": false,
+      "failed_checks": []
+    },
+    "item_43_audio": {
+      "checks": {
+        "bounded_audio_ring_non_blocking_producer": true,
+        "device_switch_and_loss_recovery": true,
+        "pause_interruption_stream_flush": true,
+        "wedged_consumer_bounded_wire_queue": true
+      },
+      "passed": true,
+      "live_audio_fault_executed": false,
+      "failed_checks": []
+    },
+    "item_44_gamepad": {
+      "checks": {
+        "sdl_raw_joystick_calibration_ui_and_provider": true,
+        "pressure_buttons_and_core_peripherals": true,
+        "hotplug_rumble_and_focus_loss_release": true,
+        "wire_frame_160_byte_layout_valid": true
+      },
+      "passed": true,
+      "live_controller_executed": false,
+      "failed_checks": []
+    },
+    "item_45_touch": {
+      "checks": {
+        "native_touch_overlay_18_controls_and_editor": true,
+        "android_native_input_wired_to_game_hub": true,
+        "ios_native_input_wired_to_game_hub_and_bridge": true,
+        "game_hub_player_consumes_mobile_native_input_and_haptics": true
+      },
+      "passed": true,
+      "live_touch_device_executed": false,
+      "failed_checks": []
+    }
+  },
+  "live_worker": {
+    "executed": false
+  },
+  "failed_items": [],
+  "passed": true
+}

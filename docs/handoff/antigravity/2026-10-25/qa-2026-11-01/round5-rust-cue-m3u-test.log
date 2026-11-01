@@ -1,0 +1,139 @@
+["cmd.exe", "/d", "/c", "E:\\V10\\work\\vlikeon-flash-qa-20261101-b7db0d9\\round5-f9f4d55\\rust-cue-m3u-test.cmd"]
+   Compiling omniplay-contracts v0.1.0 (E:\V10\work\vlikeon-flash-qa-20261101-b7db0d9\round5-f9f4d55\source\platform\contracts)
+   Compiling omniplay-stream-input v0.1.0 (E:\V10\work\vlikeon-flash-qa-20261101-b7db0d9\round5-f9f4d55\source\platform\stream-input)
+   Compiling omniplay-streaming v0.1.0 (E:\V10\work\vlikeon-flash-qa-20261101-b7db0d9\round5-f9f4d55\source\platform\streaming)
+warning: unused import: `std::time::Instant`
+ --> platform\streaming\src\native_srtp.rs:6:5
+  |
+6 | use std::time::Instant;
+  |     ^^^^^^^^^^^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: use of deprecated function `ring::deprecated_constant_time::verify_slices_are_equal`: To be removed. Internal function not intended for external use with no promises regarding side channels.
+   --> platform\streaming\src\native_srtp.rs:230:34
+    |
+230 |         use ring::constant_time::verify_slices_are_equal;
+    |                                  ^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: `#[warn(deprecated)]` on by default
+
+warning: use of deprecated function `ring::deprecated_constant_time::verify_slices_are_equal`: To be removed. Internal function not intended for external use with no promises regarding side channels.
+   --> platform\streaming\src\native_srtp.rs:231:12
+    |
+231 |         if verify_slices_are_equal(auth_tag, expected_tag).is_err() {
+    |            ^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated function `ring::deprecated_constant_time::verify_slices_are_equal`: To be removed. Internal function not intended for external use with no promises regarding side channels.
+   --> platform\streaming\src\native_ice_agent.rs:277:35
+    |
+277 |         use ring::{constant_time::verify_slices_are_equal, hmac};
+    |                                   ^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated function `ring::deprecated_constant_time::verify_slices_are_equal`: To be removed. Internal function not intended for external use with no promises regarding side channels.
+   --> platform\streaming\src\native_ice_agent.rs:280:12
+    |
+280 |         if verify_slices_are_equal(received_mac, expected_mac.as_ref()).is_err() {
+    |            ^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated function `ring::deprecated_constant_time::verify_slices_are_equal`: To be removed. Internal function not intended for external use with no promises regarding side channels.
+  --> platform\streaming\src\native_dtls_srtp.rs:59:34
+   |
+59 |         use ring::constant_time::verify_slices_are_equal;
+   |                                  ^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated function `ring::deprecated_constant_time::verify_slices_are_equal`: To be removed. Internal function not intended for external use with no promises regarding side channels.
+  --> platform\streaming\src\native_dtls_srtp.rs:60:9
+   |
+60 |         verify_slices_are_equal(current_hex.as_bytes(), normalized_expected.as_bytes()).is_ok()
+   |         ^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: variable does not need to be mutable
+   --> platform\streaming\src\native_ice_agent.rs:131:13
+    |
+131 |         let mut local_candidates = vec![IceCandidate::new_host(local_addr)];
+    |             ----^^^^^^^^^^^^^^^^
+    |             |
+    |             help: remove this `mut`
+    |
+    = note: `#[warn(unused_mut)]` (part of `#[warn(unused)]`) on by default
+
+warning: constant `ATTR_XOR_MAPPED_ADDRESS` is never used
+  --> platform\streaming\src\native_ice_agent.rs:33:7
+   |
+33 | const ATTR_XOR_MAPPED_ADDRESS: u16 = 0x0020;
+   |       ^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: constant `ATTR_FINGERPRINT` is never used
+  --> platform\streaming\src\native_ice_agent.rs:36:7
+   |
+36 | const ATTR_FINGERPRINT: u16 = 0x8028;
+   |       ^^^^^^^^^^^^^^^^
+
+warning: field `last_consent_check` is never read
+   --> platform\streaming\src\native_ice_agent.rs:121:5
+    |
+113 | pub struct IceAgent {
+    |            -------- field in this struct
+...
+121 |     last_consent_check: Instant,
+    |     ^^^^^^^^^^^^^^^^^^
+
+warning: fields `peer_fingerprint` and `expected_fingerprint` are never read
+  --> platform\streaming\src\native_dtls_srtp.rs:78:5
+   |
+73 | pub struct DtlsSrtpExporter {
+   |            ---------------- fields in this struct
+...
+78 |     peer_fingerprint: CertificateFingerprint,
+   |     ^^^^^^^^^^^^^^^^
+79 |     expected_fingerprint: String,
+   |     ^^^^^^^^^^^^^^^^^^^^
+
+warning: `omniplay-streaming` (lib) generated 12 warnings (run `cargo fix --lib -p omniplay-streaming` to apply 2 suggestions)
+   Compiling omniplay-core v0.1.0 (E:\V10\work\vlikeon-flash-qa-20261101-b7db0d9\round5-f9f4d55\source\platform\core)
+warning: unused import: `io::Write`
+ --> platform\core\src\firmware.rs:5:34
+  |
+5 | use std::{fs::{File,OpenOptions},io::Write};
+  |                                  ^^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: variable does not need to be mutable
+  --> platform\core\src\save_payloads.rs:35:19
+   |
+35 |     if create{let mut builder=fs::DirBuilder::new();
+   |                   ----^^^^^^^
+   |                   |
+   |                   help: remove this `mut`
+   |
+   = note: `#[warn(unused_mut)]` (part of `#[warn(unused)]`) on by default
+
+warning: variable does not need to be mutable
+  --> platform\core\src\save_orphan_recovery.rs:40:66
+   |
+40 |     let lease=save_payloads::lease(&database.root)?;let(metadata,mut file)={let tx=Transaction::new_unchecked(&database.connection,T...
+   |                                                                  ----^^^^
+   |                                                                  |
+   |                                                                  help: remove this `mut`
+
+warning: unused variable: `s`
+   --> platform\core\src\profile_backup.rs:352:14
+    |
+352 |         Some(s) => Some(storage_accounting::get_physical_quota_bytes(database)?),
+    |              ^ help: if this is intentional, prefix it with an underscore: `_s`
+    |
+    = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: `omniplay-core` (lib test) generated 4 warnings (run `cargo fix --lib -p omniplay-core --tests` to apply 3 suggestions)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 33.39s
+     Running unittests src\lib.rs (E:\V10\work\vlikeon-flash-qa-20261101-b7db0d9\target\debug\deps\omniplay_core-6c238ccd2325257a.exe)
+
+running 1 test
+test backup_recovery_tests::library_reconstruct_rebuilds_normalized_cue_and_m3u_disc_sets ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 39 filtered out; finished in 0.40s
+

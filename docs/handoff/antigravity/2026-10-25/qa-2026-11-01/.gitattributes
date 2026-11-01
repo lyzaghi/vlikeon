@@ -1,0 +1,2 @@
+# Preserve captured bytes, including CRLF/trailing blanks, for manifest SHA-256.
+* -text -whitespace

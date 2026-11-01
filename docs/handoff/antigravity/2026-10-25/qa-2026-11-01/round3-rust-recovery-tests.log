@@ -1,0 +1,166 @@
+["cmd.exe", "/d", "/c", "E:\\V10\\work\\vlikeon-flash-qa-20261101-b7db0d9\\round3-fb3d854\\rust-recovery-tests.cmd"]
+   Compiling omniplay-contracts v0.1.0 (E:\V10\work\vlikeon-flash-qa-20261101-b7db0d9\round3-fb3d854\source\platform\contracts)
+   Compiling omniplay-stream-input v0.1.0 (E:\V10\work\vlikeon-flash-qa-20261101-b7db0d9\round3-fb3d854\source\platform\stream-input)
+   Compiling omniplay-streaming v0.1.0 (E:\V10\work\vlikeon-flash-qa-20261101-b7db0d9\round3-fb3d854\source\platform\streaming)
+warning: unused import: `std::time::Instant`
+ --> platform\streaming\src\native_srtp.rs:6:5
+  |
+6 | use std::time::Instant;
+  |     ^^^^^^^^^^^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: use of deprecated function `ring::deprecated_constant_time::verify_slices_are_equal`: To be removed. Internal function not intended for external use with no promises regarding side channels.
+   --> platform\streaming\src\native_srtp.rs:230:34
+    |
+230 |         use ring::constant_time::verify_slices_are_equal;
+    |                                  ^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: `#[warn(deprecated)]` on by default
+
+warning: use of deprecated function `ring::deprecated_constant_time::verify_slices_are_equal`: To be removed. Internal function not intended for external use with no promises regarding side channels.
+   --> platform\streaming\src\native_srtp.rs:231:12
+    |
+231 |         if verify_slices_are_equal(auth_tag, expected_tag).is_err() {
+    |            ^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated function `ring::deprecated_constant_time::verify_slices_are_equal`: To be removed. Internal function not intended for external use with no promises regarding side channels.
+   --> platform\streaming\src\native_ice_agent.rs:277:35
+    |
+277 |         use ring::{constant_time::verify_slices_are_equal, hmac};
+    |                                   ^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated function `ring::deprecated_constant_time::verify_slices_are_equal`: To be removed. Internal function not intended for external use with no promises regarding side channels.
+   --> platform\streaming\src\native_ice_agent.rs:280:12
+    |
+280 |         if verify_slices_are_equal(received_mac, expected_mac.as_ref()).is_err() {
+    |            ^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated function `ring::deprecated_constant_time::verify_slices_are_equal`: To be removed. Internal function not intended for external use with no promises regarding side channels.
+  --> platform\streaming\src\native_dtls_srtp.rs:59:34
+   |
+59 |         use ring::constant_time::verify_slices_are_equal;
+   |                                  ^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated function `ring::deprecated_constant_time::verify_slices_are_equal`: To be removed. Internal function not intended for external use with no promises regarding side channels.
+  --> platform\streaming\src\native_dtls_srtp.rs:60:9
+   |
+60 |         verify_slices_are_equal(current_hex.as_bytes(), normalized_expected.as_bytes()).is_ok()
+   |         ^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: variable does not need to be mutable
+   --> platform\streaming\src\native_ice_agent.rs:131:13
+    |
+131 |         let mut local_candidates = vec![IceCandidate::new_host(local_addr)];
+    |             ----^^^^^^^^^^^^^^^^
+    |             |
+    |             help: remove this `mut`
+    |
+    = note: `#[warn(unused_mut)]` (part of `#[warn(unused)]`) on by default
+
+warning: constant `ATTR_XOR_MAPPED_ADDRESS` is never used
+  --> platform\streaming\src\native_ice_agent.rs:33:7
+   |
+33 | const ATTR_XOR_MAPPED_ADDRESS: u16 = 0x0020;
+   |       ^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: constant `ATTR_FINGERPRINT` is never used
+  --> platform\streaming\src\native_ice_agent.rs:36:7
+   |
+36 | const ATTR_FINGERPRINT: u16 = 0x8028;
+   |       ^^^^^^^^^^^^^^^^
+
+warning: field `last_consent_check` is never read
+   --> platform\streaming\src\native_ice_agent.rs:121:5
+    |
+113 | pub struct IceAgent {
+    |            -------- field in this struct
+...
+121 |     last_consent_check: Instant,
+    |     ^^^^^^^^^^^^^^^^^^
+
+warning: fields `peer_fingerprint` and `expected_fingerprint` are never read
+  --> platform\streaming\src\native_dtls_srtp.rs:78:5
+   |
+73 | pub struct DtlsSrtpExporter {
+   |            ---------------- fields in this struct
+...
+78 |     peer_fingerprint: CertificateFingerprint,
+   |     ^^^^^^^^^^^^^^^^
+79 |     expected_fingerprint: String,
+   |     ^^^^^^^^^^^^^^^^^^^^
+
+warning: `omniplay-streaming` (lib) generated 12 warnings (run `cargo fix --lib -p omniplay-streaming` to apply 2 suggestions)
+   Compiling omniplay-core v0.1.0 (E:\V10\work\vlikeon-flash-qa-20261101-b7db0d9\round3-fb3d854\source\platform\core)
+warning: unused import: `io::Write`
+ --> platform\core\src\firmware.rs:5:34
+  |
+5 | use std::{fs::{File,OpenOptions},io::Write};
+  |                                  ^^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: variable does not need to be mutable
+  --> platform\core\src\save_payloads.rs:35:19
+   |
+35 |     if create{let mut builder=fs::DirBuilder::new();
+   |                   ----^^^^^^^
+   |                   |
+   |                   help: remove this `mut`
+   |
+   = note: `#[warn(unused_mut)]` (part of `#[warn(unused)]`) on by default
+
+warning: variable does not need to be mutable
+  --> platform\core\src\save_orphan_recovery.rs:40:66
+   |
+40 |     let lease=save_payloads::lease(&database.root)?;let(metadata,mut file)={let tx=Transaction::new_unchecked(&database.connection,T...
+   |                                                                  ----^^^^
+   |                                                                  |
+   |                                                                  help: remove this `mut`
+
+warning: unused variable: `s`
+   --> platform\core\src\profile_backup.rs:352:14
+    |
+352 |         Some(s) => Some(storage_accounting::get_physical_quota_bytes(database)?),
+    |              ^ help: if this is intentional, prefix it with an underscore: `_s`
+    |
+    = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: `omniplay-core` (lib test) generated 4 warnings (run `cargo fix --lib -p omniplay-core --tests` to apply 3 suggestions)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 39.91s
+     Running unittests src\lib.rs (E:\V10\work\vlikeon-flash-qa-20261101-b7db0d9\target\debug\deps\omniplay_core-6c238ccd2325257a.exe)
+
+running 15 tests
+test backup_recovery_tests::active_session_returns_explicit_restore_failure_without_changing_head ... ok
+test backup_recovery_tests::archive_roundtrip_preserves_heads_origin_references_and_retry_identity ... ok
+test backup_recovery_tests::chunked_restore_staging_over_256kib_survives_reopen_keeps_other_archives_and_fails_closed ... ok
+test backup_recovery_tests::corrupt_database_diagnosis_quarantine_and_interrupted_journal_reconciliation ... ok
+test backup_recovery_tests::corrupt_database_recovery_resumes_after_every_injected_interruption ... ok
+test backup_recovery_tests::damaged_archive_refuses_before_any_generation_is_imported ... ok
+test backup_recovery_tests::exact_orphan_payload_repairs_a_copy_without_adopting_unknown_metadata ... ok
+test backup_recovery_tests::full_profile_backup_roundtrip_restores_single_and_multiple_saves_without_trailer_overread ... ok
+test backup_recovery_tests::interrupted_recovery_fails_closed_on_missing_or_tampered_snapshot_and_journal ... ok
+test backup_recovery_tests::library_reconstruct_rebuilds_normalized_cue_and_m3u_disc_sets ... FAILED
+test backup_recovery_tests::profile_restore_broker_inspect_confirm_restore_cancel_and_archive_swap ... ok
+test backup_recovery_tests::salvaged_save_heads_recover_after_every_injected_interruption ... ok
+test backup_recovery_tests::staging_meta_with_inflated_counts_fails_closed_without_allocating ... ok
+test backup_recovery_tests::storage_accounting_tracks_active_retainers_hardlinks_and_enforces_physical_quota ... ok
+test backup_recovery_tests::storage_cluster_rounding_uses_volume_cluster_size ... ok
+
+failures:
+
+---- backup_recovery_tests::library_reconstruct_rebuilds_normalized_cue_and_m3u_disc_sets stdout ----
+
+thread 'backup_recovery_tests::library_reconstruct_rebuilds_normalized_cue_and_m3u_disc_sets' (25048) panicked at platform\core\src\backup_recovery_tests.rs:219:10:
+CUE candidate should be discovered in assets/
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    backup_recovery_tests::library_reconstruct_rebuilds_normalized_cue_and_m3u_disc_sets
+
+test result: FAILED. 14 passed; 1 failed; 0 ignored; 0 measured; 25 filtered out; finished in 7.41s
+
+error: test failed, to rerun pass `-p omniplay-core --lib`

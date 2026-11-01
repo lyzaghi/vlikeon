@@ -1,0 +1,2 @@
+["C:\\Users\\lyzag\\AppData\\Local\\Programs\\Python\\Python312\\python.exe", "qa/native-lifecycle/media_input_qualification.py", "--suite", "all", "--output", "E:\\V10\\work\\vlikeon-flash-qa-20261101-b7db0d9\\round3-fb3d854\\evidence\\media-input-contract"]
+{"passed": true, "failed_items": [], "evidence": "E:\\V10\\work\\vlikeon-flash-qa-20261101-b7db0d9\\round3-fb3d854\\evidence\\media-input-contract\\evidence.json"}

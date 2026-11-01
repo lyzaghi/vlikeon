@@ -1,0 +1,927 @@
+["cmd.exe", "/d", "/c", "E:\\V10\\work\\vlikeon-flash-qa-20261101-b7db0d9\\round3-fb3d854\\rust-callers-check.cmd"]
+    Checking omniplay-contracts v0.1.0 (E:\V10\work\vlikeon-flash-qa-20261101-b7db0d9\round3-fb3d854\source\platform\contracts)
+   Compiling omniplay-sandbox v0.1.0 (E:\V10\work\vlikeon-flash-qa-20261101-b7db0d9\round3-fb3d854\source\platform\sandbox)
+    Checking omniplay-stream-input v0.1.0 (E:\V10\work\vlikeon-flash-qa-20261101-b7db0d9\round3-fb3d854\source\platform\stream-input)
+    Checking omniplay-streaming v0.1.0 (E:\V10\work\vlikeon-flash-qa-20261101-b7db0d9\round3-fb3d854\source\platform\streaming)
+warning: unused import: `std::time::Instant`
+ --> platform\streaming\src\native_srtp.rs:6:5
+  |
+6 | use std::time::Instant;
+  |     ^^^^^^^^^^^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: use of deprecated function `ring::deprecated_constant_time::verify_slices_are_equal`: To be removed. Internal function not intended for external use with no promises regarding side channels.
+   --> platform\streaming\src\native_srtp.rs:230:34
+    |
+230 |         use ring::constant_time::verify_slices_are_equal;
+    |                                  ^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: `#[warn(deprecated)]` on by default
+
+warning: use of deprecated function `ring::deprecated_constant_time::verify_slices_are_equal`: To be removed. Internal function not intended for external use with no promises regarding side channels.
+   --> platform\streaming\src\native_srtp.rs:231:12
+    |
+231 |         if verify_slices_are_equal(auth_tag, expected_tag).is_err() {
+    |            ^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated function `ring::deprecated_constant_time::verify_slices_are_equal`: To be removed. Internal function not intended for external use with no promises regarding side channels.
+   --> platform\streaming\src\native_ice_agent.rs:277:35
+    |
+277 |         use ring::{constant_time::verify_slices_are_equal, hmac};
+    |                                   ^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated function `ring::deprecated_constant_time::verify_slices_are_equal`: To be removed. Internal function not intended for external use with no promises regarding side channels.
+   --> platform\streaming\src\native_ice_agent.rs:280:12
+    |
+280 |         if verify_slices_are_equal(received_mac, expected_mac.as_ref()).is_err() {
+    |            ^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated function `ring::deprecated_constant_time::verify_slices_are_equal`: To be removed. Internal function not intended for external use with no promises regarding side channels.
+  --> platform\streaming\src\native_dtls_srtp.rs:59:34
+   |
+59 |         use ring::constant_time::verify_slices_are_equal;
+   |                                  ^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated function `ring::deprecated_constant_time::verify_slices_are_equal`: To be removed. Internal function not intended for external use with no promises regarding side channels.
+  --> platform\streaming\src\native_dtls_srtp.rs:60:9
+   |
+60 |         verify_slices_are_equal(current_hex.as_bytes(), normalized_expected.as_bytes()).is_ok()
+   |         ^^^^^^^^^^^^^^^^^^^^^^^
+
+    Checking omniplay-sync v0.1.0 (E:\V10\work\vlikeon-flash-qa-20261101-b7db0d9\round3-fb3d854\source\platform\sync)
+warning: unused import: `Signer`
+ --> platform\sync\src\account.rs:3:32
+  |
+3 | use ed25519_dalek::{SigningKey,Signer};
+  |                                ^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: variable does not need to be mutable
+   --> platform\streaming\src\native_ice_agent.rs:131:13
+    |
+131 |         let mut local_candidates = vec![IceCandidate::new_host(local_addr)];
+    |             ----^^^^^^^^^^^^^^^^
+    |             |
+    |             help: remove this `mut`
+    |
+    = note: `#[warn(unused_mut)]` (part of `#[warn(unused)]`) on by default
+
+warning: constant `ATTR_XOR_MAPPED_ADDRESS` is never used
+  --> platform\streaming\src\native_ice_agent.rs:33:7
+   |
+33 | const ATTR_XOR_MAPPED_ADDRESS: u16 = 0x0020;
+   |       ^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: constant `ATTR_FINGERPRINT` is never used
+  --> platform\streaming\src\native_ice_agent.rs:36:7
+   |
+36 | const ATTR_FINGERPRINT: u16 = 0x8028;
+   |       ^^^^^^^^^^^^^^^^
+
+warning: field `last_consent_check` is never read
+   --> platform\streaming\src\native_ice_agent.rs:121:5
+    |
+113 | pub struct IceAgent {
+    |            -------- field in this struct
+...
+121 |     last_consent_check: Instant,
+    |     ^^^^^^^^^^^^^^^^^^
+
+warning: fields `peer_fingerprint` and `expected_fingerprint` are never read
+  --> platform\streaming\src\native_dtls_srtp.rs:78:5
+   |
+73 | pub struct DtlsSrtpExporter {
+   |            ---------------- fields in this struct
+...
+78 |     peer_fingerprint: CertificateFingerprint,
+   |     ^^^^^^^^^^^^^^^^
+79 |     expected_fingerprint: String,
+   |     ^^^^^^^^^^^^^^^^^^^^
+
+warning: variable does not need to be mutable
+  --> platform\sync\src\transfer_files.rs:29:36
+   |
+29 |     let path=parent.join(name);let mut builder=std::fs::DirBuilder::new();
+   |                                    ----^^^^^^^
+   |                                    |
+   |                                    help: remove this `mut`
+   |
+   = note: `#[warn(unused_mut)]` (part of `#[warn(unused)]`) on by default
+
+warning: `omniplay-sync` (lib) generated 2 warnings (run `cargo fix --lib -p omniplay-sync` to apply 2 suggestions)
+    Checking omniplay-device-info v0.1.0 (E:\V10\work\vlikeon-flash-qa-20261101-b7db0d9\round3-fb3d854\source\platform\device-info)
+warning: `omniplay-streaming` (lib) generated 12 warnings (run `cargo fix --lib -p omniplay-streaming` to apply 2 suggestions)
+    Checking omniplay-core v0.1.0 (E:\V10\work\vlikeon-flash-qa-20261101-b7db0d9\round3-fb3d854\source\platform\core)
+warning: method `total_physical_bytes` is never used
+  --> platform\sandbox\src\windows\write_quota.rs:44:12
+   |
+43 | impl WindowsWorkWriteUsage {
+   | -------------------------- method in this implementation
+44 |     pub fn total_physical_bytes(&self) -> u64 {
+   |            ^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: `omniplay-sandbox` (lib) generated 1 warning
+warning: unused import: `io::Write`
+ --> platform\core\src\firmware.rs:5:34
+  |
+5 | use std::{fs::{File,OpenOptions},io::Write};
+  |                                  ^^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: variable does not need to be mutable
+  --> platform\core\src\save_payloads.rs:35:19
+   |
+35 |     if create{let mut builder=fs::DirBuilder::new();
+   |                   ----^^^^^^^
+   |                   |
+   |                   help: remove this `mut`
+   |
+   = note: `#[warn(unused_mut)]` (part of `#[warn(unused)]`) on by default
+
+warning: variable does not need to be mutable
+  --> platform\core\src\save_orphan_recovery.rs:40:66
+   |
+40 |     let lease=save_payloads::lease(&database.root)?;let(metadata,mut file)={let tx=Transaction::new_unchecked(&database.connection,T...
+   |                                                                  ----^^^^
+   |                                                                  |
+   |                                                                  help: remove this `mut`
+
+warning: unused variable: `s`
+   --> platform\core\src\profile_backup.rs:352:14
+    |
+352 |         Some(s) => Some(storage_accounting::get_physical_quota_bytes(database)?),
+    |              ^ help: if this is intentional, prefix it with an underscore: `_s`
+    |
+    = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: `omniplay-core` (lib) generated 4 warnings (run `cargo fix --lib -p omniplay-core` to apply 3 suggestions)
+    Checking omniplay-sync-client v0.1.0 (E:\V10\work\vlikeon-flash-qa-20261101-b7db0d9\round3-fb3d854\source\platform\sync-client)
+    Checking omniplay-updater v0.1.0 (E:\V10\work\vlikeon-flash-qa-20261101-b7db0d9\round3-fb3d854\source\platform\updater)
+warning: unused import: `rejected`
+ --> platform\updater\src\repair.rs:1:22
+  |
+1 | use crate::{package, rejected, store::Store};
+  |                      ^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused import: `rejected`
+ --> platform\updater\src\cleanup.rs:1:13
+  |
+1 | use crate::{rejected, store::Store};
+  |             ^^^^^^^^
+
+warning: unused imports: `ErrorCode` and `PlatformError`
+ --> platform\updater\src\cleanup.rs:2:26
+  |
+2 | use omniplay_contracts::{ErrorCode, PlatformError, Result};
+  |                          ^^^^^^^^^  ^^^^^^^^^^^^^
+
+warning: unused import: `omniplay_core::util::storage_error`
+ --> platform\updater\src\cleanup.rs:3:5
+  |
+3 | use omniplay_core::util::storage_error;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: `omniplay-updater` (lib) generated 4 warnings (run `cargo fix --lib -p omniplay-updater` to apply 4 suggestions)
+    Checking omniplay-native-runtime v0.1.0 (E:\V10\work\vlikeon-flash-qa-20261101-b7db0d9\round3-fb3d854\source\platform\native-runtime)
+    Checking omniplay-local-service v0.1.0 (E:\V10\work\vlikeon-flash-qa-20261101-b7db0d9\round3-fb3d854\source\platform\local-service)
+    Checking omniplay-mobile v0.1.0 (E:\V10\work\vlikeon-flash-qa-20261101-b7db0d9\round3-fb3d854\source\platform\mobile)
+warning: variable does not need to be mutable
+  --> platform\native-runtime\src\runtime.rs:65:55
+   |
+65 |         let work=parent.join(work_id.to_string());let mut directory=std::fs::DirBuilder::new();
+   |                                                       ----^^^^^^^^^
+   |                                                       |
+   |                                                       help: remove this `mut`
+   |
+   = note: `#[warn(unused_mut)]` (part of `#[warn(unused)]`) on by default
+
+warning: method `call` is never used
+  --> platform\native-runtime\src\channel.rs:72:12
+   |
+59 | impl WorkerChannel {
+   | ------------------ method in this implementation
+...
+72 |     pub fn call(&mut self,process:&impl WorkerProcess,method:&str,params:Value,payload:Vec<u8>,timeout:Duration)->Result<Reply> {
+   |            ^^^^
+   |
+   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: function `collect_abandoned_work` is never used
+   --> platform\native-runtime\src\registry.rs:142:4
+    |
+142 | fn collect_abandoned_work(profile_root:&Path,profile_id:Uuid){crate::work::collect_abandoned(profile_root,profile_id);}
+    |    ^^^^^^^^^^^^^^^^^^^^^^
+
+warning: function `collect_abandoned` is never used
+   --> platform\native-runtime\src\work.rs:175:8
+    |
+175 | pub fn collect_abandoned(profile:&Path,profile_id:Uuid){
+    |        ^^^^^^^^^^^^^^^^^
+
+warning: `omniplay-native-runtime` (lib) generated 4 warnings (run `cargo fix --lib -p omniplay-native-runtime` to apply 1 suggestion)
+    Checking omniplay-broker v0.1.0 (E:\V10\work\vlikeon-flash-qa-20261101-b7db0d9\round3-fb3d854\source\platform\broker)
+warning: methods `open_native_receive` and `attach_native_video_transport` are never used
+   --> platform\broker\src\service.rs:577:19
+    |
+ 41 | impl Broker {
+    | ----------- methods in this implementation
+...
+577 |     pub(crate) fn open_native_receive(&mut self,configuration:crate::stream_video_session::WindowsReceiveConfiguration,source:impl ...
+    |                   ^^^^^^^^^^^^^^^^^^^
+...
+588 |     pub(crate) fn attach_native_video_transport<T:crate::stream_video_ingress::NativeSrtpReceiver+'static,C:crate::stream_video_ing...
+    |                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: method `quarantine_legacy` is never used
+  --> platform\broker\src\native_work_jobs.rs:81:12
+   |
+27 | impl NativeWorkJobs {
+   | ------------------- method in this implementation
+...
+81 |     pub fn quarantine_legacy(&self,root:&Path,profile_id:Uuid,work_id:Uuid)->Result<omniplay_native_runtime::LegacyQuarantineReceipt>{
+   |            ^^^^^^^^^^^^^^^^^
+
+warning: field `video_started` is never read
+  --> platform\broker\src\stream_input.rs:21:80
+   |
+21 | struct Capture{id:Uuid,game:Uuid,pair:Uuid,session:Uuid,expires:u64,window:u64,video_started:bool,#[cfg(windows)]_process:std::os::w...
+   |        ------- field in this struct                                            ^^^^^^^^^^^^^
+
+warning: method `spawn_owned_video` is never used
+   --> platform\broker\src\stream_input.rs:117:19
+    |
+ 27 | impl StreamInputs{
+    | ----------------- method in this implementation
+...
+117 |     pub(crate) fn spawn_owned_video(&mut self,expected:omniplay_stream_input::video_client::VideoOwner,window:u64,deadline_ms:u64)
+    |                   ^^^^^^^^^^^^^^^^^
+
+warning: function `invalid` is never used
+  --> platform\broker\src\stream_gamepad.rs:13:4
+   |
+13 | fn invalid()->PlatformError{PlatformError::new(ErrorCode::PermissionDenied,
+   |    ^^^^^^^
+
+warning: function `stopped` is never used
+  --> platform\broker\src\stream_gamepad.rs:15:4
+   |
+15 | fn stopped()->PlatformError{PlatformError::new(ErrorCode::RuntimeUnavailable,
+   |    ^^^^^^^
+
+warning: function `journal_owner` is never used
+  --> platform\broker\src\stream_gamepad.rs:17:4
+   |
+17 | fn journal_owner(value:Owner)->journal::Owner{journal::Owner{grant:value.grant,game:value.game,pair:value.pair,
+   |    ^^^^^^^^^^^^^
+
+warning: function `ids` is never used
+  --> platform\broker\src\stream_gamepad.rs:20:4
+   |
+20 | fn ids(value:&[Identity])->Vec<DeviceIdentity>{value.iter().map(|id|DeviceIdentity{slot:id.slot,container:id.container}).collect()}
+   |    ^^^
+
+warning: function `valid_ids` is never used
+  --> platform\broker\src\stream_gamepad.rs:21:4
+   |
+21 | fn valid_ids(value:&[Identity],empty:bool)->bool{
+   |    ^^^^^^^^^
+
+warning: trait `ParentChannel` is never used
+  --> platform\broker\src\stream_gamepad.rs:31:11
+   |
+31 | pub trait ParentChannel{
+   |           ^^^^^^^^^^^^^
+
+warning: struct `Authority` is never constructed
+  --> platform\broker\src\stream_gamepad.rs:49:12
+   |
+49 | pub struct Authority{
+   |            ^^^^^^^^^
+
+warning: method `permits` is never used
+  --> platform\broker\src\stream_gamepad.rs:54:8
+   |
+53 | impl Authority{
+   | -------------- method in this implementation
+54 |     fn permits(&self,expected:Owner)->bool{
+   |        ^^^^^^^
+
+warning: struct `GamepadSupervisor` is never constructed
+  --> platform\broker\src\stream_gamepad.rs:60:12
+   |
+60 | pub struct GamepadSupervisor<T:ParentChannel>{
+   |            ^^^^^^^^^^^^^^^^^
+
+warning: multiple associated items are never used
+   --> platform\broker\src\stream_gamepad.rs:70:12
+    |
+ 65 | impl<T:ParentChannel> GamepadSupervisor<T>{
+    | ------------------------------------------ associated items in this implementation
+...
+ 70 |     pub fn prepared(database:&mut Database,profile:Uuid,client:Uuid,owner:Owner,
+    |            ^^^^^^^^
+...
+ 97 |     fn exchange(&mut self,action:Action,timeout:Duration)->Result<(u64,Reply)>{
+    |        ^^^^^^^^
+...
+102 |     fn permitted(&self,authority:&Authority)->bool{
+    |        ^^^^^^^^^
+...
+106 |     fn validate(&self,reply:&Reply,id:u64)->Result<()>{
+    |        ^^^^^^^^
+...
+116 |     fn retain_cleanup(&mut self,database:&mut Database,reply:Option<&Reply>)->Result<()>{
+    |        ^^^^^^^^^^^^^^
+...
+119 |     fn retain_cleanup_inner(&mut self,database:&mut Database,reply:Option<&Reply>,deadline:Option<Instant>)->Result<()>{
+    |        ^^^^^^^^^^^^^^^^^^^^
+...
+140 |     pub fn activate(&mut self,database:&mut Database,authority:&Authority)->Result<()>{
+    |            ^^^^^^^^
+...
+168 |     pub fn heartbeat(&mut self,database:&mut Database,authority:&Authority)->Result<()>{
+    |            ^^^^^^^^^
+...
+178 |     pub fn input(&mut self,database:&mut Database,authority:&Authority,sequence:u64,frames:Vec<(u8,RemotePad)>)->Result<()>{
+    |            ^^^^^
+...
+191 |     pub fn release(&mut self,database:&mut Database,authority:&Authority,sequence:u64)->Result<()>{
+    |            ^^^^^^^
+...
+199 |     fn active_call(&mut self,database:&mut Database,action:Action)->Result<()>{
+    |        ^^^^^^^^^^^
+...
+211 |     pub fn revoke(&mut self,database:&mut Database)->Result<()>{
+    |            ^^^^^^
+...
+216 |     pub fn revoke_until(&mut self,database:&mut Database,deadline:Instant)->Result<()>{
+    |            ^^^^^^^^^^^^
+...
+229 |     pub fn reconcile(&mut self,database:&mut Database,observer:&mut impl RecoveryObserver)->Result<bool>{
+    |            ^^^^^^^^^
+
+warning: struct `WindowsParentChannel` is never constructed
+   --> platform\broker\src\stream_gamepad.rs:260:12
+    |
+260 | pub struct WindowsParentChannel{
+    |            ^^^^^^^^^^^^^^^^^^^^
+
+warning: associated items `from_prepared` and `witness` are never used
+   --> platform\broker\src\stream_gamepad.rs:266:12
+    |
+265 | impl WindowsParentChannel{
+    | ------------------------- associated items in this implementation
+266 |     pub fn from_prepared(client:omniplay_stream_input::gamepad_client::GamepadClient)->Result<Self>{
+    |            ^^^^^^^^^^^^^
+...
+270 |     pub fn witness(&self)->Result<omniplay_stream_input::gamepad_process::ProcessWitness>{self.client.helper_witness()}
+    |            ^^^^^^^
+
+warning: function `coordination_directory` is never used
+   --> platform\broker\src\stream_gamepad.rs:445:8
+    |
+445 | pub fn coordination_directory(root:&std::path::Path,profile:Uuid)->Result<std::path::PathBuf>{
+    |        ^^^^^^^^^^^^^^^^^^^^^^
+
+warning: method `state` is never used
+  --> platform\broker\src\stream_gamepad_recovery.rs:38:12
+   |
+18 | impl RecoveryLane{
+   | ----------------- method in this implementation
+...
+38 |     pub fn state(&self)->State{
+   |            ^^^^^
+
+warning: struct `BrokerCredentialRecoveryOwner` is never constructed
+  --> platform\broker\src\stream_credentials_recovery.rs:22:12
+   |
+22 | pub struct BrokerCredentialRecoveryOwner {
+   |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: associated function `new` is never used
+  --> platform\broker\src\stream_credentials_recovery.rs:31:12
+   |
+30 | impl BrokerCredentialRecoveryOwner {
+   | ---------------------------------- associated function in this implementation
+31 |     pub fn new(
+   |            ^^^
+
+warning: function `reconcile_credentials_after_crash` is never used
+  --> platform\broker\src\stream_credentials_recovery.rs:86:8
+   |
+86 | pub fn reconcile_credentials_after_crash(
+   |        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: function `revoke_credential` is never used
+   --> platform\broker\src\stream_credentials_recovery.rs:133:8
+    |
+133 | pub fn revoke_credential(
+    |        ^^^^^^^^^^^^^^^^^
+
+warning: enum `PumpResult` is never used
+ --> platform\broker\src\stream_video.rs:8:10
+  |
+8 | pub enum PumpResult{NoFrame,Accepted,DroppedRaw}
+  |          ^^^^^^^^^^
+
+warning: struct `UnnegotiatedVideoPacket` is never constructed
+  --> platform\broker\src\stream_video.rs:11:12
+   |
+11 | pub struct UnnegotiatedVideoPacket{pub owner:VideoOwner,pub packet:VideoPacket}
+   |            ^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: struct `WindowsVideoFrames` is never constructed
+  --> platform\broker\src\stream_video.rs:12:12
+   |
+12 | pub struct WindowsVideoFrames{
+   |            ^^^^^^^^^^^^^^^^^^
+
+warning: function `unavailable` is never used
+  --> platform\broker\src\stream_video.rs:15:4
+   |
+15 | fn unavailable()->PlatformError{PlatformError::new(ErrorCode::RuntimeUnavailable,"The native video frame generation is unavailable o...
+   |    ^^^^^^^^^^^
+
+warning: associated items `attach`, `producer`, `pump`, `take_unnegotiated`, `revoke`, and `revoke_until` are never used
+  --> platform\broker\src\stream_video.rs:19:12
+   |
+16 | impl WindowsVideoFrames{
+   | ----------------------- associated items in this implementation
+...
+19 |     pub fn attach(mut worker:VideoWorker,profile:Profile,source_format:PixelFormat,require_hardware:bool)->Result<Self>{
+   |            ^^^^^^
+...
+30 |     pub fn producer(&self)->Result<Arc<FrameMailbox>>{
+   |            ^^^^^^^^
+...
+33 |     pub fn pump(&mut self,keyframe:bool)->Result<PumpResult>{
+   |            ^^^^
+...
+51 |     pub fn take_unnegotiated(&mut self)->Result<Option<UnnegotiatedVideoPacket>>{
+   |            ^^^^^^^^^^^^^^^^^
+...
+58 |     pub fn revoke(&mut self)->Result<()>{
+   |            ^^^^^^
+...
+61 |     pub fn revoke_until(&mut self,deadline:Instant)->Result<()>{
+   |            ^^^^^^^^^^^^
+
+warning: struct `WindowsOwnedVideo` is never constructed
+  --> platform\broker\src\stream_video.rs:69:12
+   |
+69 | pub struct WindowsOwnedVideo{worker:VideoWorker,closed:bool}
+   |            ^^^^^^^^^^^^^^^^^
+
+warning: associated items `attach`, `request_keyframe`, `take_unnegotiated`, `revoke`, and `revoke_until` are never used
+  --> platform\broker\src\stream_video.rs:71:12
+   |
+70 | impl WindowsOwnedVideo{
+   | ---------------------- associated items in this implementation
+71 |     pub fn attach(mut worker:VideoWorker,profile:Profile,require_hardware:bool)->Result<Self>{
+   |            ^^^^^^
+...
+76 |     pub fn request_keyframe(&mut self)->Result<u64>{
+   |            ^^^^^^^^^^^^^^^^
+...
+80 |     pub fn take_unnegotiated(&mut self)->Result<Option<UnnegotiatedVideoPacket>>{
+   |            ^^^^^^^^^^^^^^^^^
+...
+87 |     pub fn revoke(&mut self)->Result<()>{
+   |            ^^^^^^
+...
+90 |     pub fn revoke_until(&mut self,deadline:Instant)->Result<()>{
+   |            ^^^^^^^^^^^^
+
+warning: struct `UnpresentedVideoFrame` is never constructed
+  --> platform\broker\src\stream_video.rs:96:12
+   |
+96 | pub struct UnpresentedVideoFrame{pub owner:VideoOwner,pub frame:omniplay_stream_input::video_client::DecodedVideoFrame}
+   |            ^^^^^^^^^^^^^^^^^^^^^
+
+warning: struct `WindowsVideoDecoder` is never constructed
+  --> platform\broker\src\stream_video.rs:99:12
+   |
+99 | pub struct WindowsVideoDecoder{worker:VideoWorker,closed:bool,profile:Profile}
+   |            ^^^^^^^^^^^^^^^^^^^
+
+warning: multiple associated items are never used
+   --> platform\broker\src\stream_video.rs:101:12
+    |
+100 | impl WindowsVideoDecoder{
+    | ------------------------ associated items in this implementation
+101 |     pub fn profile(&self)->Profile{self.profile}
+    |            ^^^^^^^
+102 |     pub fn owner(&self)->VideoOwner{self.worker.owner()}
+    |            ^^^^^
+103 |     pub fn check_authority(&self)->Result<()>{if self.closed{return Err(unavailable());}self.worker.remaining_authorized().map(|_|())}
+    |            ^^^^^^^^^^^^^^^
+104 |     pub fn attach(mut worker:VideoWorker,profile:Profile)->Result<Self>{
+    |            ^^^^^^
+...
+109 |     pub fn submit_admitted(&mut self,annex_b:Vec<u8>,timestamp_100ns:i64,receipt:omniplay_stream_input::video_client::DecoderReceip...
+    |            ^^^^^^^^^^^^^^^
+...
+112 |     pub fn submit_admitted_borrowed(&mut self,annex_b:&[u8],timestamp_100ns:i64,receipt:omniplay_stream_input::video_client::Decode...
+    |            ^^^^^^^^^^^^^^^^^^^^^^^^
+...
+118 |     pub fn take_unpresented(&mut self)->Result<Option<UnpresentedVideoFrame>>{
+    |            ^^^^^^^^^^^^^^^^
+...
+125 |     pub fn revoke(&mut self)->Result<()>{
+    |            ^^^^^^
+...
+128 |     pub fn revoke_until(&mut self,deadline:Instant)->Result<()>{
+    |            ^^^^^^^^^^^^
+
+warning: trait `NativeVideoAuthority` is never used
+  --> platform\broker\src\stream_video_authority.rs:11:11
+   |
+11 | pub trait NativeVideoAuthority:Send+'static{
+   |           ^^^^^^^^^^^^^^^^^^^^
+
+warning: static `RUNNING` is never used
+  --> platform\broker\src\stream_video_authority.rs:14:8
+   |
+14 | static RUNNING:AtomicBool=AtomicBool::new(false);
+   |        ^^^^^^^
+
+warning: struct `Permit` is never constructed
+  --> platform\broker\src\stream_video_authority.rs:15:8
+   |
+15 | struct Permit;
+   |        ^^^^^^
+
+warning: struct `VideoAuthorityLane` is never constructed
+  --> platform\broker\src\stream_video_authority.rs:17:12
+   |
+17 | pub struct VideoAuthorityLane{
+   |            ^^^^^^^^^^^^^^^^^^
+
+warning: struct `ObserverOwner` is never constructed
+  --> platform\broker\src\stream_video_authority.rs:22:8
+   |
+22 | struct ObserverOwner<S>{source:S,lease:VideoAuthorityLease,_permit:Permit}
+   |        ^^^^^^^^^^^^^
+
+warning: associated items `start`, `close`, `finished`, and `retirement_confirmed` are never used
+  --> platform\broker\src\stream_video_authority.rs:25:12
+   |
+24 | impl VideoAuthorityLane{
+   | ----------------------- associated items in this implementation
+25 |     pub fn start(source:impl NativeVideoAuthority,lease:VideoAuthorityLease)->Result<Self>{
+   |            ^^^^^
+...
+53 |     pub fn close(&mut self){
+   |            ^^^^^
+...
+59 |     pub fn finished(&self)->bool{self.thread.as_ref().is_none_or(|thread|thread.is_finished())}
+   |            ^^^^^^^^
+60 |     pub fn retirement_confirmed(&self)->bool{self.thread.is_none()&&!self.join_failed}
+   |            ^^^^^^^^^^^^^^^^^^^^
+
+warning: constant `ENTRY` is never used
+ --> platform\broker\src\stream_video_installation.rs:7:7
+  |
+7 | const ENTRY:&str="helpers/omniplay-video-worker.exe";
+  |       ^^^^^
+
+warning: function `denied` is never used
+ --> platform\broker\src\stream_video_installation.rs:8:4
+  |
+8 | fn denied()->PlatformError{PlatformError::new(ErrorCode::UnsupportedCapability,"The installed native video worker is not admitted for...
+  |    ^^^^^^
+
+warning: struct `InstalledVideoWorker` is never constructed
+ --> platform\broker\src\stream_video_installation.rs:9:12
+  |
+9 | pub struct InstalledVideoWorker{pub path:PathBuf,pub artifact:File,pub directories:Vec<File>,pub sha256:ContentHash}
+  |            ^^^^^^^^^^^^^^^^^^^^
+
+warning: function `directory` is never used
+  --> platform\broker\src\stream_video_installation.rs:10:4
+   |
+10 | fn directory(path:&Path)->Result<File>{
+   |    ^^^^^^^^^
+
+warning: function `admit` is never used
+  --> platform\broker\src\stream_video_installation.rs:17:8
+   |
+17 | pub fn admit()->Result<InstalledVideoWorker>{
+   |        ^^^^^
+
+warning: trait `NativeH264Admission` is never used
+  --> platform\broker\src\stream_video_receive.rs:15:11
+   |
+15 | pub trait NativeH264Admission{
+   |           ^^^^^^^^^^^^^^^^^^^
+
+warning: trait `NativePictureBackend` is never used
+  --> platform\broker\src\stream_video_receive.rs:33:11
+   |
+33 | pub trait NativePictureBackend{
+   |           ^^^^^^^^^^^^^^^^^^^^
+
+warning: struct `ParameterAdmission` is never constructed
+  --> platform\broker\src\stream_video_receive.rs:39:12
+   |
+39 | pub struct ParameterAdmission<B:NativePictureBackend>{owner:VideoOwner,parameters:ParameterSets,decode:FrameDecodeState,backend:B,cl...
+   |            ^^^^^^^^^^^^^^^^^^
+
+warning: struct `ParameterAdmissionProof` is never constructed
+  --> platform\broker\src\stream_video_receive.rs:40:12
+   |
+40 | pub struct ParameterAdmissionProof<P>{binding:ParameterBinding,plan:FrameDecodePlan,backend:P,hash:[u8;32],timestamp:u32,received:In...
+   |            ^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: associated items `new` and `fence` are never used
+  --> platform\broker\src\stream_video_receive.rs:42:12
+   |
+41 | impl<B:NativePictureBackend> ParameterAdmission<B>{
+   | -------------------------------------------------- associated items in this implementation
+42 |     pub fn new(owner:VideoOwner,backend:B)->Self{Self{owner,parameters:ParameterSets::new(),decode:FrameDecodeState::new(),backend,c...
+   |            ^^^
+43 |     fn fence(&mut self){self.closed=true;self.parameters.close();self.decode.close();}
+   |        ^^^^^
+
+warning: function `unavailable` is never used
+  --> platform\broker\src\stream_video_receive.rs:91:4
+   |
+91 | fn unavailable()->PlatformError{PlatformError::new(ErrorCode::RuntimeUnavailable,"The native receive generation is unavailable or re...
+   |    ^^^^^^^^^^^
+
+warning: struct `Timeline` is never constructed
+  --> platform\broker\src\stream_video_receive.rs:93:8
+   |
+93 | struct Timeline{last:Option<u32>,ticks:u64}
+   |        ^^^^^^^^
+
+warning: method `advance` is never used
+  --> platform\broker\src\stream_video_receive.rs:95:8
+   |
+94 | impl Timeline{
+   | ------------- method in this implementation
+95 |     fn advance(&mut self,timestamp:u32)->Result<i64>{
+   |        ^^^^^^^
+
+warning: struct `Pending` is never constructed
+   --> platform\broker\src\stream_video_receive.rs:104:8
+    |
+104 | struct Pending<P>{frame:ReceivedAccessUnit,proof:Option<P>,timestamp:i64,receipt:DecoderReceipt}
+    |        ^^^^^^^
+
+warning: struct `NativeVideoReceiver` is never constructed
+   --> platform\broker\src\stream_video_receive.rs:107:12
+    |
+107 | pub struct NativeVideoReceiver<A:NativeH264Admission>{
+    |            ^^^^^^^^^^^^^^^^^^^
+
+warning: multiple associated items are never used
+   --> platform\broker\src\stream_video_receive.rs:112:12
+    |
+111 | impl<A:NativeH264Admission> NativeVideoReceiver<A>{
+    | -------------------------------------------------- associated items in this implementation
+112 |     pub fn new(ordered:OrderedReceiver<DecoderReceipt>,decoder:WindowsVideoDecoder,admission:A)->Self{
+    |            ^^^
+...
+115 |     pub fn state(&self)->ReceiveState{self.state}
+    |            ^^^^^
+...
+119 |     pub fn push_authenticated(&mut self,bytes:&[u8],receipt:DecoderReceipt)->Result<()>{
+    |            ^^^^^^^^^^^^^^^^^^
+...
+132 |     fn pump_inner(&mut self)->Result<()>{
+    |        ^^^^^^^^^^
+...
+154 |     pub fn tick(&mut self)->Result<()>{
+    |            ^^^^
+...
+157 |     pub fn take_unpresented(&mut self)->Result<Option<UnpresentedVideoFrame>>{
+    |            ^^^^^^^^^^^^^^^^
+...
+170 |     fn retire(&mut self){
+    |        ^^^^^^
+...
+176 |     pub fn revoke_until(&mut self,deadline:Instant)->Result<()>{
+    |            ^^^^^^^^^^^^
+...
+186 |     pub fn revoke(&mut self)->Result<()>{
+    |            ^^^^^^
+
+warning: function `unavailable` is never used
+  --> platform\broker\src\stream_video_codec.rs:11:4
+   |
+11 | fn unavailable()->PlatformError{PlatformError::new(ErrorCode::UnsupportedCapability,"The negotiated H.264 picture is incompatible wi...
+   |    ^^^^^^^^^^^
+
+warning: struct `WindowsH264Backend` is never constructed
+  --> platform\broker\src\stream_video_codec.rs:14:12
+   |
+14 | pub struct WindowsH264Backend<S:NativeVideoAuthority>{owner:VideoOwner,profile:Profile,profile_idc:u8,constraints:u8,level:u8,source:S}
+   |            ^^^^^^^^^^^^^^^^^^
+
+warning: struct `WindowsH264Proof` is never constructed
+  --> platform\broker\src\stream_video_codec.rs:15:12
+   |
+15 | pub struct WindowsH264Proof{binding:ParameterBinding,timestamp:u32,received:Instant}
+   |            ^^^^^^^^^^^^^^^^
+
+warning: associated items `into_receiver`, `new`, `live`, and `format` are never used
+  --> platform\broker\src\stream_video_codec.rs:17:12
+   |
+16 | impl<S:NativeVideoAuthority> WindowsH264Backend<S>{
+   | -------------------------------------------------- associated items in this implementation
+17 |     pub fn into_receiver(self,ordered:OrderedReceiver<omniplay_stream_input::video_client::DecoderReceipt>,decoder:crate::stream_vid...
+   |            ^^^^^^^^^^^^^
+...
+23 |     pub fn new(owner:VideoOwner,profile:Profile,profile_idc:u8,constraints:u8,level:u8,source:S)->Result<Self>{
+   |            ^^^
+...
+29 |     fn live(&mut self,owner:VideoOwner,received:Instant)->Result<()>{
+   |        ^^^^
+...
+36 |     fn format(&self,parameters:&ResolvedParameters<'_>)->Result<()>{
+   |        ^^^^^^
+
+warning: function `unavailable` is never used
+  --> platform\broker\src\stream_video_session.rs:10:4
+   |
+10 | fn unavailable()->PlatformError{PlatformError::new(ErrorCode::RuntimeUnavailable,"The native receive session is unavailable or requi...
+   |    ^^^^^^^^^^^
+
+warning: struct `SharedAuthority` is never constructed
+  --> platform\broker\src\stream_video_session.rs:11:12
+   |
+11 | pub struct SharedAuthority<S:NativeVideoAuthority>{source:Arc<Mutex<S>>}
+   |            ^^^^^^^^^^^^^^^
+
+warning: struct `WindowsReceiveConfiguration` is never constructed
+  --> platform\broker\src\stream_video_session.rs:18:12
+   |
+18 | pub struct WindowsReceiveConfiguration{
+   |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: struct `WindowsReceiveSession` is never constructed
+  --> platform\broker\src\stream_video_session.rs:22:12
+   |
+22 | pub struct WindowsReceiveSession<S:NativeVideoAuthority>{
+   |            ^^^^^^^^^^^^^^^^^^^^^
+
+warning: multiple associated items are never used
+  --> platform\broker\src\stream_video_session.rs:27:12
+   |
+26 | impl<S:NativeVideoAuthority> WindowsReceiveSession<S>{
+   | ----------------------------------------------------- associated items in this implementation
+27 |     pub fn open(configuration:WindowsReceiveConfiguration,source:S,deadline:Instant)->Result<Self>{
+   |            ^^^^
+...
+48 |     fn live(&mut self)->Result<()>{
+   |        ^^^^
+...
+55 |     pub fn push_authenticated(&mut self,bytes:&[u8],receipt:DecoderReceipt)->Result<()>{
+   |            ^^^^^^^^^^^^^^^^^^
+...
+58 |     pub fn tick(&mut self)->Result<()>{
+   |            ^^^^
+...
+61 |     pub fn take_unpresented(&mut self)->Result<Option<UnpresentedVideoFrame>>{
+   |            ^^^^^^^^^^^^^^^^
+...
+64 |     pub fn state(&self)->ReceiveState{
+   |            ^^^^^
+...
+67 |     pub fn close_until(&mut self,deadline:Instant)->Result<()>{
+   |            ^^^^^^^^^^^
+
+warning: methods `push` and `take` are never used
+  --> platform\broker\src\stream_video_registry.rs:12:8
+   |
+11 | trait ReceiveOwner{
+   |       ------------ methods in this trait
+12 |     fn push(&mut self,bytes:&[u8],receipt:DecoderReceipt)->Result<()>;
+   |        ^^^^
+13 |     fn tick(&mut self)->Result<()>;
+14 |     fn take(&mut self)->Result<Option<UnpresentedVideoFrame>>;
+   |        ^^^^
+
+warning: struct `DocumentAuthority` is never constructed
+  --> platform\broker\src\stream_video_registry.rs:35:8
+   |
+35 | struct DocumentAuthority<S:NativeVideoAuthority>{document:Weak<DocumentState>,source:S}
+   |        ^^^^^^^^^^^^^^^^^
+
+warning: methods `open`, `push_authenticated`, and `take_unpresented` are never used
+  --> platform\broker\src\stream_video_registry.rs:51:12
+   |
+50 | impl ReceiveRegistry{
+   | -------------------- methods in this implementation
+51 |     pub fn open(&mut self,document:&ReceiveDocument,configuration:WindowsReceiveConfiguration,source:impl NativeVideoAuthority,deadl...
+   |            ^^^^
+...
+67 |     pub fn push_authenticated(&mut self,document:&ReceiveDocument,owner:VideoOwner,bytes:&[u8],receipt:DecoderReceipt)->Result<()>{s...
+   |            ^^^^^^^^^^^^^^^^^^
+68 |     pub fn tick(&mut self,document:&ReceiveDocument,owner:VideoOwner)->Result<()>{self.exact(document,owner)?.session.tick()}
+69 |     pub fn take_unpresented(&mut self,document:&ReceiveDocument,owner:VideoOwner)->Result<Option<UnpresentedVideoFrame>>{
+   |            ^^^^^^^^^^^^^^^^
+
+warning: trait `NativeSrtpReceiver` is never used
+ --> platform\broker\src\stream_video_ingress.rs:9:11
+  |
+9 | pub trait NativeSrtpReceiver{
+  |           ^^^^^^^^^^^^^^^^^^
+
+warning: struct `SrtpReceiverEngine` is never constructed
+  --> platform\broker\src\stream_video_ingress.rs:23:12
+   |
+23 | pub struct SrtpReceiverEngine {
+   |            ^^^^^^^^^^^^^^^^^^
+
+warning: associated function `new` is never used
+  --> platform\broker\src\stream_video_ingress.rs:29:12
+   |
+28 | impl SrtpReceiverEngine {
+   | ----------------------- associated function in this implementation
+29 |     pub fn new(owner: VideoOwner, session: omniplay_streaming::native_srtp::NativeSrtpSession) -> Self {
+   |            ^^^
+
+warning: struct `VideoIngress` is never constructed
+  --> platform\broker\src\stream_video_ingress.rs:68:12
+   |
+68 | pub struct VideoIngress<T:NativeSrtpReceiver>{owner:VideoOwner,transport:T,closed:bool,retired:bool,video_retired:bool}
+   |            ^^^^^^^^^^^^
+
+warning: associated items `new`, `receive`, `retire_until`, and `transport_retired` are never used
+   --> platform\broker\src\stream_video_ingress.rs:70:12
+    |
+ 69 | impl<T:NativeSrtpReceiver> VideoIngress<T>{
+    | ------------------------------------------ associated items in this implementation
+ 70 |     pub fn new(owner:VideoOwner,transport:T)->Result<Self>{
+    |            ^^^
+...
+ 76 |     pub fn receive(&mut self,registry:&mut ReceiveRegistry,document:&ReceiveDocument,datagram:&[u8],receipt:DecoderReceipt)->Result...
+    |            ^^^^^^^
+...
+ 91 |     pub fn retire_until(&mut self,registry:&mut ReceiveRegistry,document:&ReceiveDocument,deadline:Instant)->Result<()>{
+    |            ^^^^^^^^^^^^
+...
+100 |     pub fn transport_retired(&self)->bool{self.retired}
+    |            ^^^^^^^^^^^^^^^^^
+
+warning: function `denied` is never used
+   --> platform\broker\src\stream_video_ingress.rs:102:4
+    |
+102 | fn denied()->PlatformError{PlatformError::new(ErrorCode::PermissionDenied,"The authenticated native video ingress is unavailable or...
+    |    ^^^^^^
+
+warning: struct `UdpVideoIngress` is never constructed
+   --> platform\broker\src\stream_video_ingress.rs:110:12
+    |
+110 | pub struct UdpVideoIngress<T:NativeSrtpReceiver,C:NativeDatagramReceipt>{socket:Option<UdpSocket>,peer:SocketAddr,ingress:VideoIngr...
+    |            ^^^^^^^^^^^^^^^
+
+warning: associated function `from_windows_selected_socket` is never used
+   --> platform\broker\src\stream_video_ingress.rs:115:12
+    |
+111 | impl<T:NativeSrtpReceiver> UdpVideoIngress<T,crate::stream_video_winsock::SelectedWinsockDatagrams>{
+    | --------------------------------------------------------------------------------------------------- associated function in this implementation
+...
+115 |     pub fn from_windows_selected_socket(socket:UdpSocket,expected_peer:SocketAddr,index:u32,owner:VideoOwner,transport:&mut Option<...
+    |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: associated items `owner`, `from_selected_socket`, `poll`, and `retire_until` are never used
+   --> platform\broker\src\stream_video_ingress.rs:130:12
+    |
+129 | impl<T:NativeSrtpReceiver,C:NativeDatagramReceipt> UdpVideoIngress<T,C>{
+    | ----------------------------------------------------------------------- associated items in this implementation
+130 |     pub fn owner(&self)->VideoOwner{self.ingress.owner}
+    |            ^^^^^
+131 |     pub fn from_selected_socket(socket:UdpSocket,expected_peer:SocketAddr,owner:VideoOwner,transport:&mut Option<T>,clock:C)->Resul...
+    |            ^^^^^^^^^^^^^^^^^^^^
+...
+143 |     pub fn poll(&mut self,registry:&mut ReceiveRegistry,document:&ReceiveDocument,deadline:Instant)->Result<usize>{
+    |            ^^^^
+...
+160 |     pub fn retire_until(&mut self,registry:&mut ReceiveRegistry,document:&ReceiveDocument,deadline:Instant)->Result<()>{
+    |            ^^^^^^^^^^^^
+
+warning: method `attach` is never used
+   --> platform\broker\src\stream_video_ingress.rs:180:12
+    |
+178 | impl TransportSlot{
+    | ------------------ method in this implementation
+179 |     pub fn occupied(&self)->bool{self.entry.is_some()}
+180 |     pub fn attach<T:NativeSrtpReceiver+'static,C:NativeDatagramReceipt+'static>(&mut self,transport:&mut Option<UdpVideoIngress<T,C...
+    |            ^^^^^^
+
+warning: `omniplay-broker` (bin "omniplay-broker") generated 76 warnings
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 15.85s

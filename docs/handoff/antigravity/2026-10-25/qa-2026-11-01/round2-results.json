@@ -1,0 +1,54 @@
+[
+  {
+    "name": "rust-recovery-tests",
+    "command": [
+      "cmd.exe",
+      "/d",
+      "/c",
+      "E:\\V10\\work\\vlikeon-flash-qa-20261101-b7db0d9\\round2-6a67d64\\rust-recovery-tests.cmd"
+    ],
+    "exit_code": 101,
+    "timed_out": false,
+    "seconds": 34.67,
+    "log": "E:\\V10\\work\\vlikeon-flash-qa-20261101-b7db0d9\\round2-6a67d64\\evidence\\rust-recovery-tests.log"
+  },
+  {
+    "name": "rust-callers-check",
+    "command": [
+      "cmd.exe",
+      "/d",
+      "/c",
+      "E:\\V10\\work\\vlikeon-flash-qa-20261101-b7db0d9\\round2-6a67d64\\rust-callers-check.cmd"
+    ],
+    "exit_code": 101,
+    "timed_out": false,
+    "seconds": 15.94,
+    "log": "E:\\V10\\work\\vlikeon-flash-qa-20261101-b7db0d9\\round2-6a67d64\\evidence\\rust-callers-check.log"
+  },
+  {
+    "name": "media-input-contract",
+    "command": [
+      "C:\\Users\\lyzag\\AppData\\Local\\Programs\\Python\\Python312\\python.exe",
+      "qa/native-lifecycle/media_input_qualification.py",
+      "--suite",
+      "all",
+      "--output",
+      "E:\\V10\\work\\vlikeon-flash-qa-20261101-b7db0d9\\round2-6a67d64\\evidence\\media-input-contract"
+    ],
+    "exit_code": 1,
+    "timed_out": false,
+    "seconds": 0.19,
+    "log": "E:\\V10\\work\\vlikeon-flash-qa-20261101-b7db0d9\\round2-6a67d64\\evidence\\media-input-contract.log"
+  },
+  {
+    "name": "harness-regressions",
+    "command": [
+      "C:\\Users\\lyzag\\AppData\\Local\\Programs\\Python\\Python312\\python.exe",
+      "qa/native-lifecycle/test_media_input_qualification.py"
+    ],
+    "exit_code": 0,
+    "timed_out": false,
+    "seconds": 0.38,
+    "log": "E:\\V10\\work\\vlikeon-flash-qa-20261101-b7db0d9\\round2-6a67d64\\evidence\\harness-regressions.log"
+  }
+]

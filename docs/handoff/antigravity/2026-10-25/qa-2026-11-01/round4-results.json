@@ -1,0 +1,15 @@
+[
+  {
+    "name": "rust-cue-m3u-test",
+    "command": [
+      "cmd.exe",
+      "/d",
+      "/c",
+      "E:\\V10\\work\\vlikeon-flash-qa-20261101-b7db0d9\\round4-f64e9d2\\rust-cue-m3u-test.cmd"
+    ],
+    "exit_code": 101,
+    "timed_out": false,
+    "seconds": 37.94,
+    "log": "E:\\V10\\work\\vlikeon-flash-qa-20261101-b7db0d9\\round4-f64e9d2\\evidence\\rust-cue-m3u-test.log"
+  }
+]
