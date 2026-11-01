@@ -8,7 +8,8 @@ impl Drop for Directory{fn drop(&mut self){let _=fs::remove_dir_all(&self.0);}}
 struct Fixture{database:Database,_directory:Directory,game:GameManifest}
 impl Fixture{
     fn new()->Self{let base=std::env::temp_dir().join(format!("vlikeon-backup-fixture-{}",Uuid::new_v4()));fs::create_dir(&base).unwrap();let source=base.join("selected.nes");fs::write(&source,[19;64]).unwrap();let database=Database::open(&base.join("profile")).unwrap();let game=Library::new(&database).import(File::open(source).unwrap(),"Fixture".into(),GameSystem::Nes).unwrap();Self{database,_directory:Directory(base),game}}
-    fn save(&mut self,payload:&[u8])->SaveMetadata{let metadata=SaveMetadata{schema_version:1,id:Uuid::new_v4(),game_id:self.game.id,game_content_hash:self.game.content_hash.clone(),kind:SaveKind::InGame,slot:0,generation:1,parent_id:None,core_id:"fixture".into(),core_version:"1.0.0".parse().unwrap(),state_format_version:"1".into(),platform:"fixture".into(),core_config_hash:ContentHash("a".repeat(64)),payload_hash:digest(payload),payload_bytes:payload.len()as u64,created_at_ms:crate::now_ms(),device_id:self.database.device_id,label:None,conflict:false};SaveStore::new(&mut self.database).commit(metadata,payload,None).unwrap()}
+    fn save(&mut self,payload:&[u8])->SaveMetadata{self.save_in_slot(payload,0,None)}
+    fn save_in_slot(&mut self,payload:&[u8],slot:u16,parent_id:Option<Uuid>)->SaveMetadata{let metadata=SaveMetadata{schema_version:1,id:Uuid::new_v4(),game_id:self.game.id,game_content_hash:self.game.content_hash.clone(),kind:SaveKind::InGame,slot,generation:1,parent_id,core_id:"fixture".into(),core_version:"1.0.0".parse().unwrap(),state_format_version:"1".into(),platform:"fixture".into(),core_config_hash:ContentHash("a".repeat(64)),payload_hash:digest(payload),payload_bytes:payload.len()as u64,created_at_ms:crate::now_ms(),device_id:self.database.device_id,label:None,conflict:false};SaveStore::new(&mut self.database).commit(metadata,payload,parent_id).unwrap()}
     fn archive(&mut self,ids:&[Uuid])->Vec<u8>{let path=self._directory.0.join(format!("{}.opbackup",Uuid::new_v4()));let mut file=OpenOptions::new().read(true).write(true).create_new(true).open(path).unwrap();crate::save_backup::export(&mut self.database,ids,&mut file).unwrap();file.seek(SeekFrom::Start(0)).unwrap();let mut bytes=Vec::new();file.read_to_end(&mut bytes).unwrap();bytes}
 }
 #[test]
@@ -374,14 +375,14 @@ fn storage_cluster_rounding_uses_volume_cluster_size() {
     assert_eq!(crate::storage_accounting::round_to_cluster_bytes(4_097, 4_096), 8_192);
 }
 
-fn make_corrupt_profile(base: &PathBuf) -> (PathBuf, ContentHash, Uuid) {
+fn make_corrupt_profile(base: &PathBuf) -> (PathBuf, ContentHash, PathBuf) {
     let rom_path = base.join("cart.nes");
     let mut rom = vec![0u8; 16 + 16384];
     rom[..4].copy_from_slice(b"NES\x1a");
     rom[4] = 1;
     fs::write(&rom_path, &rom).unwrap();
     let root = base.join("profile");
-    let (hash, save_id) = {
+    let (hash, payload_path) = {
         let mut db = Database::open(&root).unwrap();
         let game = Library::new(&db).import(File::open(&rom_path).unwrap(), "Fault NES".into(), GameSystem::Nes).unwrap();
         let metadata = SaveMetadata {
@@ -392,11 +393,17 @@ fn make_corrupt_profile(base: &PathBuf) -> (PathBuf, ContentHash, Uuid) {
             created_at_ms: crate::now_ms(), device_id: db.device_id, label: None, conflict: false,
         };
         let saved = SaveStore::new(&mut db).commit(metadata, b"sram-bytes", None).unwrap();
-        (game.content_hash, saved.id)
+        let file_id: String = db.connection.query_row(
+            "SELECT file_id FROM save_payload_locations WHERE save_id=?1",
+            [saved.id.to_string()], |row| row.get(0),
+        ).unwrap();
+        let payload_path = root.join("repaired-saves-v1").join(format!("{file_id}.bin"));
+        assert_eq!(fs::read(&payload_path).unwrap(), b"sram-bytes");
+        (game.content_hash, payload_path)
     };
     fs::write(root.join("omniplay.sqlite3"), b"corrupt-sqlite-header").unwrap();
-    let _ = fs::write(root.join("omniplay.sqlite3-wal"), b"stale-wal");
-    (root, hash, save_id)
+    fs::write(root.join("omniplay.sqlite3-wal"), b"stale-wal").unwrap();
+    (root, hash, payload_path)
 }
 
 #[test]
@@ -412,9 +419,10 @@ fn corrupt_database_recovery_resumes_after_every_injected_interruption() {
         let base = std::env::temp_dir().join(format!("vlikeon-fault-{}", Uuid::new_v4()));
         let _guard = Directory(base.clone());
         fs::create_dir_all(&base).unwrap();
-        let (root, hash, _save) = make_corrupt_profile(&base);
+        let (root, hash, orphan_payload) = make_corrupt_profile(&base);
         let interrupted = with_recovery_fault_once(point, || crate::database_recovery::recover(&root).map(|_| ()));
         assert!(interrupted.is_err(), "fault {point:?} must interrupt recovery");
+        assert_eq!(interrupted.unwrap_err().message, "Simulated interruption at recovery journal fault point");
         assert!(root.join(RECOVERY_JOURNAL_FILE).exists(), "journal must persist after {point:?}");
 
         // Restart: startup reconciliation resumes and publishes a healthy database.
@@ -427,6 +435,12 @@ fn corrupt_database_recovery_resumes_after_every_injected_interruption() {
         let games = Library::new(&reopened).list(None, 0, 50).unwrap();
         assert_eq!(games.len(), 1);
         assert_eq!(games[0].content_hash, hash);
+        let counts: (u64, u64) = reopened.connection.query_row(
+            "SELECT (SELECT count(*) FROM saves), (SELECT count(*) FROM save_heads)",
+            [], |row| Ok((row.get(0)?, row.get(1)?)),
+        ).unwrap();
+        assert_eq!(counts, (0, 0), "lost metadata must not be invented");
+        assert_eq!(fs::read(&orphan_payload).unwrap(), b"sram-bytes");
         let qroot = root.join("corrupt-db-quarantine");
         let qdirs: Vec<_> = fs::read_dir(&qroot).unwrap().flatten()
             .filter(|e| e.path().join("quarantine-receipt.json").is_file()).collect();
@@ -436,7 +450,158 @@ fn corrupt_database_recovery_resumes_after_every_injected_interruption() {
         drop(reopened);
         // Idempotent: a second open changes nothing.
         let again = Database::open(&root).unwrap();
-        assert_eq!(Library::new(&again).list(None, 0, 50).unwrap().len(), 1);
+        let again_games = Library::new(&again).list(None, 0, 50).unwrap();
+        assert_eq!(again_games.len(), 1);
+        assert_eq!(again_games[0].id, games[0].id);
+        assert_eq!(again_games[0].content_hash, hash);
+        let again_counts: (u64, u64) = again.connection.query_row(
+            "SELECT (SELECT count(*) FROM saves), (SELECT count(*) FROM save_heads)",
+            [], |row| Ok((row.get(0)?, row.get(1)?)),
+        ).unwrap();
+        assert_eq!(again_counts, (0, 0));
+        assert_eq!(fs::read(&orphan_payload).unwrap(), b"sram-bytes");
+        assert!(!root.join(RECOVERY_JOURNAL_FILE).exists());
+        assert_eq!(fs::read_dir(&qroot).unwrap().count(), 1);
+        assert_eq!(fs::read(qdirs[0].path().join("omniplay.sqlite3")).unwrap(), b"corrupt-sqlite-header");
+        assert_eq!(fs::read(qdirs[0].path().join("omniplay.sqlite3-wal")).unwrap(), b"stale-wal");
+    }
+}
+
+#[test]
+fn salvaged_save_heads_recover_after_every_injected_interruption() {
+    use crate::database_recovery::{DatabaseHealthStatus, RecoveryFaultPoint, with_recovery_fault_once, RECOVERY_JOURNAL_FILE};
+    use omniplay_contracts::SaveOriginKind;
+
+    for point in [
+        RecoveryFaultPoint::AfterInitialJournalWrite,
+        RecoveryFaultPoint::BetweenQuarantineRenames,
+        RecoveryFaultPoint::MidStagingRebuild,
+        RecoveryFaultPoint::BeforePublishRename,
+        RecoveryFaultPoint::AfterPublishRenameBeforeJournalRemove,
+    ] {
+        let mut fixture = Fixture::new();
+        let first_payload = b"first-checkpoint".as_slice();
+        let second_payload = b"second-checkpoint".as_slice();
+        let first = fixture.save_in_slot(first_payload, 3, None);
+        let second = fixture.save_in_slot(second_payload, 3, Some(first.id));
+        assert_eq!(first.generation, 1);
+        assert_eq!(second.generation, 2);
+        assert_eq!(second.parent_id, Some(first.id));
+        assert!(!first.conflict && !second.conflict);
+        // Deliberately select the older generation; latest-generation guessing must fail.
+        SaveStore::new(&mut fixture.database).promote(first.id, Some(second.id)).unwrap();
+
+        let root = fixture.database.root.clone();
+        let game_hash = fixture.game.content_hash.clone();
+        let device_id = fixture.database.device_id;
+        // Hold the temporary-directory guard through both reopens, but close SQLite before quarantine.
+        let Fixture { database, _directory: _guard, game: _ } = fixture;
+        drop(database);
+        assert_eq!(crate::database_recovery::diagnose(&root).unwrap().status, DatabaseHealthStatus::Healthy);
+        {
+            // An isolated foreign-key violation makes diagnosis fail while valid save/head rows
+            // remain readable. Production recovery, including salvage and snapshot writing, runs unchanged.
+            let damaged = rusqlite::Connection::open(root.join("omniplay.sqlite3")).unwrap();
+            damaged.execute_batch("PRAGMA foreign_keys=OFF; PRAGMA wal_checkpoint(TRUNCATE); PRAGMA journal_mode=DELETE;").unwrap();
+            damaged.execute(
+                "INSERT INTO sessions(id,game_id,runtime_id,state,info_json,created_at_ms,updated_at_ms) VALUES(?1,?2,'fixture','stopped','{}',1,1)",
+                rusqlite::params![Uuid::new_v4().to_string(), Uuid::nil().to_string()],
+            ).unwrap();
+        }
+        let health = crate::database_recovery::diagnose(&root).unwrap();
+        assert_eq!(health.status, DatabaseHealthStatus::IntegrityFailed);
+        assert!(health.findings.iter().any(|finding| finding.contains("foreign_key_check violation in table sessions")));
+        let damaged_db_bytes = fs::read(root.join("omniplay.sqlite3")).unwrap();
+
+        let interrupted = with_recovery_fault_once(point, || crate::database_recovery::recover(&root).map(|_| ()));
+        assert!(interrupted.is_err(), "fault {point:?} must interrupt salvage recovery");
+        assert_eq!(interrupted.unwrap_err().message, "Simulated interruption at recovery journal fault point");
+        assert!(root.join(RECOVERY_JOURNAL_FILE).is_file());
+        let quarantine_root = root.join("corrupt-db-quarantine");
+        let quarantine_dirs: Vec<_> = fs::read_dir(&quarantine_root).unwrap()
+            .map(|entry| entry.unwrap().path()).collect();
+        assert_eq!(quarantine_dirs.len(), 1);
+        let quarantine = &quarantine_dirs[0];
+        let quarantine_id = quarantine.file_name().unwrap().to_str().unwrap();
+        let snapshot_bytes = fs::read(quarantine.join("salvaged-snapshot.json")).unwrap();
+        let snapshot: serde_json::Value = serde_json::from_slice(&snapshot_bytes).unwrap();
+        assert_eq!(snapshot["head_save_ids"], serde_json::json!([first.id]));
+        let snapshot_saves = snapshot["saves"].as_array().unwrap();
+        assert_eq!(snapshot_saves.len(), 2, "fault {point:?} must have real salvaged save metadata");
+        for original in [&first, &second] {
+            assert!(snapshot_saves.iter().any(|save| save["metadata"] == serde_json::to_value(original).unwrap()));
+        }
+
+        let expected = [(first.clone(), first_payload), (second.clone(), second_payload)];
+        let verify = |database: &mut Database| {
+            assert_eq!(database.device_id, device_id);
+            let games = Library::new(database).list(None, 0, 50).unwrap();
+            assert_eq!(games.len(), 1);
+            assert_eq!(games[0].content_hash, game_hash);
+            let counts: (u64, u64, u64) = database.connection.query_row(
+                "SELECT (SELECT count(*) FROM saves), (SELECT count(*) FROM save_heads), (SELECT count(*) FROM save_origins)",
+                [], |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+            ).unwrap();
+            assert_eq!(counts, (2, 1, 2));
+            let recovered = SaveStore::new(database).list(games[0].id).unwrap();
+            assert_eq!(recovered.len(), 2);
+            let heads = SaveStore::new(database).heads(games[0].id).unwrap();
+            assert_eq!(heads.len(), 1);
+            let mut seen_originals = std::collections::BTreeSet::new();
+            let mut state = std::collections::BTreeMap::new();
+            for local in recovered {
+                let (_, origin) = crate::save_origins::inspect(&database.connection, local.id).unwrap();
+                assert_eq!(origin.kind, SaveOriginKind::Imported);
+                let imported = origin.imported_from.as_ref().unwrap();
+                let (original, payload) = expected.iter().find(|(save, _)| save.id == imported.id).unwrap();
+                assert!(seen_originals.insert(original.id), "each source generation is restored once");
+                assert_eq!(serde_json::to_value(imported).unwrap(), serde_json::to_value(original).unwrap());
+                assert!(!expected.iter().any(|(save, _)| save.id == local.id));
+                assert_eq!(local.game_id, games[0].id);
+                assert_eq!(local.game_content_hash, game_hash);
+                assert_eq!(local.kind, original.kind);
+                assert_eq!(local.slot, original.slot);
+                assert_eq!(local.generation, original.generation);
+                // Local imports are independent branches; original lineage remains in imported_from.
+                assert_eq!(local.parent_id, None);
+                assert_eq!(local.conflict, original.id != first.id);
+                let mut expected_canonical = local.clone();
+                expected_canonical.conflict = true;
+                assert_eq!(serde_json::to_value(origin.canonical_metadata.as_ref().unwrap()).unwrap(), serde_json::to_value(&expected_canonical).unwrap());
+                assert_eq!(origin.imported_from_hash, Some(omniplay_contracts::save_origin_hash(original).unwrap()));
+                let (_, actual_payload) = SaveStore::new(database).read(local.id, None).unwrap();
+                assert_eq!(actual_payload.as_slice(), *payload);
+                assert_eq!(digest(&actual_payload), original.payload_hash);
+                if original.id == first.id {
+                    assert_eq!(heads[0].id, local.id, "selected older head must survive recovery");
+                    assert_eq!(serde_json::to_value(&heads[0]).unwrap(), serde_json::to_value(&local).unwrap());
+                }
+                let reference: String = database.connection.query_row(
+                    "SELECT value FROM preferences WHERE key=?1", [format!("backup_reference.{}", local.id)], |row| row.get(0),
+                ).unwrap();
+                let reference: serde_json::Value = serde_json::from_str(&reference).unwrap();
+                assert_eq!(reference, serde_json::json!({"original_save_id": original.id, "salvaged_from_quarantine": quarantine_id}));
+                state.insert(local.id, serde_json::json!({"metadata": local, "origin": origin, "reference": reference}));
+            }
+            assert_eq!(seen_originals, std::collections::BTreeSet::from([first.id, second.id]));
+            serde_json::json!({"game_id": games[0].id, "saves": state, "heads": heads})
+        };
+
+        let mut reopened = Database::open(&root).unwrap();
+        let recovered_state = verify(&mut reopened);
+        assert!(!root.join(RECOVERY_JOURNAL_FILE).exists());
+        assert_eq!(crate::database_recovery::diagnose(&root).unwrap().status, DatabaseHealthStatus::Healthy);
+        assert!(quarantine.join("quarantine-receipt.json").is_file());
+        assert_eq!(fs::read(quarantine.join("omniplay.sqlite3")).unwrap(), damaged_db_bytes);
+        assert_eq!(fs::read(quarantine.join("salvaged-snapshot.json")).unwrap(), snapshot_bytes);
+        drop(reopened);
+
+        let mut again = Database::open(&root).unwrap();
+        assert_eq!(verify(&mut again), recovered_state, "reopen must keep the same identities, origins, payloads and head");
+        assert!(!root.join(RECOVERY_JOURNAL_FILE).exists());
+        assert_eq!(fs::read_dir(&quarantine_root).unwrap().count(), 1);
+        assert_eq!(fs::read(quarantine.join("omniplay.sqlite3")).unwrap(), damaged_db_bytes);
+        assert_eq!(fs::read(quarantine.join("salvaged-snapshot.json")).unwrap(), snapshot_bytes);
     }
 }
 

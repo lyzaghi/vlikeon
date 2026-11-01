@@ -91,3 +91,23 @@ Implemented in [`storage_accounting.rs`](file:///e:/V10/OmniPlay/platform/core/s
 - **Windows measurement quality.** The 4 KiB estimate fallback is removed. `StorageAccountingReport` carries `measurement_quality`, `volume_cluster_bytes` (from `GetDiskFreeSpaceW`), unmeasured/unverified counts and warnings; files without identity are never hard-link deduplicated; quota admission fails closed when allocation is unmeasured. The Game Hub panel shows these values.
 - **Mobile profile import.** Dedicated `profile_backup_select_import` on Android/iOS with a symmetric 16 GiB cap (`MAX_PROFILE_ARCHIVE_BYTES`), streaming `OPPF0001` magic precheck, free-space/deadline/cancel checks. ROM (4 GiB) and firmware (128 MiB) limits are unchanged.
 - **Journal interruption fixtures.** `#[cfg(test)]` fault points in `database_recovery.rs` (after journal write, between quarantine renames, mid-rebuild, before/after publish) with tests in `backup_recovery_tests.rs`, plus missing/tampered snapshot and journal cases. Not executed.
+
+## Codex completion of review follow-up (2026-11-01 — SOURCE_READY_UNVERIFIED)
+
+After `600c254`, the remaining authored coverage is added in `platform/core/src/backup_recovery_tests.rs`:
+
+- `salvaged_save_heads_recover_after_every_injected_interruption` creates two parent/child save generations in slot 3 and explicitly selects the older generation as head. A foreign-key violation in an unrelated fixture session makes the profile fail diagnosis while the game, saves and head remain readable. The normal production `recover` path creates the snapshot and checksummed journal; no recovery API or snapshot serializer is replaced for the test.
+- At all five fault points, the fixture requires the injected interruption itself, two complete original metadata records and the selected head in the persisted snapshot. After `Database::open`, it requires both exact payloads through `SaveStore`, original lineage in `SaveOrigin.imported_from`, new independent local save identities, correct kind/slot/generation, the selected older head, and per-save quarantine references. A second open must preserve those identities, origins, metadata and head without duplicates. The quarantined database and saved snapshot must retain their exact bytes across both opens.
+- `corrupt_database_recovery_resumes_after_every_injected_interruption` retains the separate unreadable-database case. It now requires zero save/head rows, the original orphan payload at its original path with unchanged bytes, and unchanged game identity on the second open; the damaged database and WAL remain byte-for-byte in quarantine.
+
+These fixtures have only been authored and reviewed against source signatures, migrations and recovery phases. `git diff --check` is a whitespace check, not compilation or test evidence. No compiler, test, assemble, benchmark or SSH command was run for this follow-up. The existing interruption mechanism returns an error with normal resource unwinding; hard process termination, power loss, real storage failures and device/filesystem qualification remain deferred. The restore-token cleanup and staging-count bounds from `600c254` also remain unverified by execution.
+
+Deferred focused recovery commands (run from the repository root only when execution is resumed):
+
+```powershell
+cargo test -p omniplay-core salvaged_save_heads_recover_after_every_injected_interruption
+cargo test -p omniplay-core corrupt_database_recovery_resumes_after_every_injected_interruption
+cargo test -p omniplay-core interrupted_recovery_fails_closed_on_missing_or_tampered_snapshot_and_journal
+```
+
+The handoff ledger records a source checkpoint, not runtime acceptance. Items 46–49 keep `SOURCE_READY_UNVERIFIED`; accepted evidence for other items is preserved.
