@@ -6,6 +6,7 @@ import android.os.Build;
 import android.os.CombinedVibration;
 import android.os.Handler;
 import android.os.Looper;
+import android.os.SystemClock;
 import android.os.VibrationEffect;
 import android.os.Vibrator;
 import android.os.VibratorManager;
@@ -103,8 +104,12 @@ public final class NativeInputController implements InputManager.InputDeviceList
     private final Handler mMain = new Handler(Looper.getMainLooper());
     private final PortState[] mPorts = new PortState[MAX_PORTS];
 
+    private static final long GAMEPLAY_POLL_LEASE_MS = 1500L;
+
     private View mAttachedView;
     private boolean mActive = false;
+    private boolean mGameplayConsumerActive = false;
+    private long mLastPollUptimeMs = 0L;
     private boolean mListenerRegistered = false;
     private RemotePlayClient mRemotePlayClient;
 
@@ -128,6 +133,8 @@ public final class NativeInputController implements InputManager.InputDeviceList
 
     public synchronized void deactivate() {
         mActive = false;
+        mGameplayConsumerActive = false;
+        mLastPollUptimeMs = 0L;
         unbindViewLocked();
         if (mInputManager != null && mListenerRegistered) {
             mInputManager.unregisterInputDeviceListener(this);
@@ -140,6 +147,34 @@ public final class NativeInputController implements InputManager.InputDeviceList
         if (mRemotePlayClient != null) {
             mRemotePlayClient.stop();
         }
+    }
+
+    public synchronized boolean setGameplayMode(boolean enabled) {
+        if (enabled && mActive) {
+            mGameplayConsumerActive = true;
+            mLastPollUptimeMs = SystemClock.uptimeMillis();
+            return true;
+        }
+        mGameplayConsumerActive = false;
+        mLastPollUptimeMs = 0L;
+        for (int i = 0; i < MAX_PORTS; i++) {
+            stopPortRumbleLocked(i);
+            mPorts[i].resetInputs();
+        }
+        return false;
+    }
+
+    private boolean shouldConsumeControllerEventsLocked() {
+        if (!mActive || mAttachedView == null || !mAttachedView.hasWindowFocus()) {
+            return false;
+        }
+        if (mRemotePlayClient != null) {
+            return true;
+        }
+        if (!mGameplayConsumerActive) {
+            return false;
+        }
+        return (SystemClock.uptimeMillis() - mLastPollUptimeMs) <= GAMEPLAY_POLL_LEASE_MS;
     }
 
     public synchronized void attachRemotePlay(RemotePlayClient.ReportSink sink) {
@@ -314,7 +349,7 @@ public final class NativeInputController implements InputManager.InputDeviceList
 
     @Override
     public synchronized boolean onKey(View v, int keyCode, KeyEvent event) {
-        if (!mActive || event == null) return false;
+        if (event == null || !shouldConsumeControllerEventsLocked()) return false;
         int sources = event.getSource();
         boolean isPad = (sources & InputDevice.SOURCE_GAMEPAD) == InputDevice.SOURCE_GAMEPAD
                 || (sources & InputDevice.SOURCE_JOYSTICK) == InputDevice.SOURCE_JOYSTICK
@@ -374,7 +409,7 @@ public final class NativeInputController implements InputManager.InputDeviceList
 
     @Override
     public synchronized boolean onGenericMotion(View v, MotionEvent event) {
-        if (!mActive || event == null) return false;
+        if (event == null || !shouldConsumeControllerEventsLocked()) return false;
         if ((event.getSource() & InputDevice.SOURCE_JOYSTICK) != InputDevice.SOURCE_JOYSTICK
                 && (event.getSource() & InputDevice.SOURCE_GAMEPAD) != InputDevice.SOURCE_GAMEPAD) {
             return false;
@@ -502,6 +537,9 @@ public final class NativeInputController implements InputManager.InputDeviceList
     }
 
     public synchronized JSONObject pollSnapshot() throws Exception {
+        if (mGameplayConsumerActive && mActive) {
+            mLastPollUptimeMs = SystemClock.uptimeMillis();
+        }
         JSONObject result = new JSONObject();
         boolean focused = mActive && mAttachedView != null && mAttachedView.hasWindowFocus();
         result.put("active", focused);

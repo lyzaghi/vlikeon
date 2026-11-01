@@ -148,9 +148,12 @@ class VkVideo {
   static void cb_set_signal_semaphore(void* handle, VkSemaphore semaphore);
 
 public:
+  static constexpr unsigned kInterfaceVersion = 5;
+
   void configure(SDL_Window* window, unsigned width, unsigned height);
   bool negotiate(retro_hw_render_callback& callback);
   bool negotiated() const { return negotiated_; }
+  bool lost() const noexcept { return device_lost_; }
   bool core_callback_active() const { return release_in_progress_ || reset_in_progress_; }
   bool core_callback_failed() const { return release_failed_ || reset_failed_; }
   unsigned width() const { return width_; }

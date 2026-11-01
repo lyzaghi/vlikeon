@@ -108,13 +108,15 @@ pub fn round_cluster_bytes(logical_bytes: u64) -> u64 {
     }
 }
 
-fn metadata_physical_bytes(
+fn file_physical_bytes(
+    path: &Path,
     metadata: &fs::Metadata,
     seen_inodes: &mut BTreeSet<(u64, u64)>,
     hardlink_deduped: &mut u64,
 ) -> u64 {
     #[cfg(unix)]
     {
+        let _ = path;
         use std::os::unix::fs::MetadataExt;
         let key = (metadata.dev(), metadata.ino());
         if metadata.nlink() > 1 && !seen_inodes.insert(key) {
@@ -124,9 +126,24 @@ fn metadata_physical_bytes(
         seen_inodes.insert(key);
         metadata.blocks().saturating_mul(512)
     }
-    #[cfg(not(unix))]
+    #[cfg(windows)]
     {
-        let _ = (seen_inodes, hardlink_deduped);
+        if let Ok(win) = omniplay_stream_input::windows_file_physical(path) {
+            if win.file_index != 0 {
+                let key = (win.volume_serial, win.file_index);
+                if win.link_count > 1 && !seen_inodes.insert(key) {
+                    *hardlink_deduped = hardlink_deduped.saturating_add(1);
+                    return 0;
+                }
+                seen_inodes.insert(key);
+            }
+            return win.allocation_bytes;
+        }
+        round_cluster_bytes(metadata.len())
+    }
+    #[cfg(not(any(unix, windows)))]
+    {
+        let _ = (path, seen_inodes, hardlink_deduped);
         round_cluster_bytes(metadata.len())
     }
 }
@@ -207,7 +224,7 @@ fn scan_tree_recursive(
         ));
     }
     let mut logical = 0u64;
-    let mut physical = CLUSTER_BYTES;
+    let mut physical = 0u64;
     let mut files = 0u64;
     let mut unknown = 0u64;
     for entry in fs::read_dir(dir).map_err(storage_error)? {
@@ -246,7 +263,7 @@ fn scan_tree_recursive(
             unknown = unknown.saturating_add(sub_u);
         } else if entry_meta.is_file() {
             logical = logical.saturating_add(entry_meta.len());
-            physical = physical.saturating_add(metadata_physical_bytes(&entry_meta, seen_inodes, hardlink_deduped));
+            physical = physical.saturating_add(file_physical_bytes(&path, &entry_meta, seen_inodes, hardlink_deduped));
             files = files.saturating_add(1);
         } else {
             unknown = unknown.saturating_add(1);
@@ -462,17 +479,41 @@ fn collect_retainers(database: &Database, until: Instant) -> Result<ReferenceMap
             map.asset_retainers.entry(sha).or_default().insert(format!("native_work_{phase}:{work_id}"));
         }
     }
+
+    if let Some(staging_raw) = database
+        .connection
+        .query_row(
+            "SELECT substr(value,1,262145) FROM preferences WHERE key=?1",
+            [crate::profile_backup::PROFILE_RESTORE_STAGING_KEY],
+            |r| r.get::<_, String>(0),
+        )
+        .optional()
+        .map_err(storage_error)?
+    {
+        if staging_raw.len() <= 262_144 {
+            if let Ok(staging) = serde_json::from_str::<crate::profile_backup::ProfileRestoreStagingRecord>(&staging_raw) {
+                let tag = format!("profile_restore_staging:{}", staging.archive_hash.0);
+                for hash in staging.asset_hashes {
+                    map.asset_retainers.entry(hash.0).or_default().insert(tag.clone());
+                }
+            }
+        }
+    }
     Ok(map)
 }
 
-/// Returns the set of asset hashes currently retained by active sessions or native-work staging,
-/// so `asset_storage` never collects a blob pinned by staging or an active session.
+/// Returns the set of asset hashes currently retained by active sessions, native-work staging,
+/// or in-progress profile restore staging, so `asset_storage` never collects a pinned blob.
 pub fn transient_asset_retainers(database: &Database) -> Result<BTreeSet<String>> {
     let until = Instant::now() + Duration::from_secs(10);
     let refs = collect_retainers(database, until)?;
     let mut pinned = BTreeSet::new();
     for (hash, tags) in refs.asset_retainers {
-        if tags.iter().any(|t| t.starts_with("active_session:") || t.starts_with("native_work_")) {
+        if tags.iter().any(|t| {
+            t.starts_with("active_session:")
+                || t.starts_with("native_work_")
+                || t.starts_with("profile_restore_staging:")
+        }) {
             pinned.insert(hash);
         }
     }
@@ -506,7 +547,8 @@ pub fn report(database: &Database) -> Result<StorageAccountingReport> {
             if let Ok(meta) = fs::symlink_metadata(&path) {
                 if plain_entry(&meta, false) {
                     ns.logical_bytes = ns.logical_bytes.saturating_add(meta.len());
-                    ns.physical_bytes = ns.physical_bytes.saturating_add(metadata_physical_bytes(
+                    ns.physical_bytes = ns.physical_bytes.saturating_add(file_physical_bytes(
+                        &path,
                         &meta,
                         &mut seen_inodes,
                         &mut hardlink_deduped,
@@ -528,14 +570,14 @@ pub fn report(database: &Database) -> Result<StorageAccountingReport> {
             if !plain_entry(&dir_meta, true) {
                 return Err(PlatformError::new(ErrorCode::StorageFailure, "Assets directory is not an ordinary directory"));
             }
-            ns.physical_bytes = ns.physical_bytes.saturating_add(CLUSTER_BYTES);
             for entry in fs::read_dir(&dir).map_err(storage_error)? {
                 if Instant::now() >= until || visited >= SCAN_ENTRY_LIMIT {
                     return Err(PlatformError::new(ErrorCode::ResourceLimit, "Storage accounting exceeded scan limit"));
                 }
                 visited += 1;
                 let entry = entry.map_err(storage_error)?;
-                let meta = fs::symlink_metadata(entry.path()).map_err(storage_error)?;
+                let entry_path = entry.path();
+                let meta = fs::symlink_metadata(&entry_path).map_err(storage_error)?;
                 if !plain_entry(&meta, false) {
                     ns.retained_unknown_entries += 1;
                     continue;
@@ -544,7 +586,7 @@ pub fn report(database: &Database) -> Result<StorageAccountingReport> {
                     ns.retained_unknown_entries += 1;
                     continue;
                 };
-                let phys = metadata_physical_bytes(&meta, &mut seen_inodes, &mut hardlink_deduped);
+                let phys = file_physical_bytes(&entry_path, &meta, &mut seen_inodes, &mut hardlink_deduped);
                 ns.logical_bytes = ns.logical_bytes.saturating_add(meta.len());
                 ns.physical_bytes = ns.physical_bytes.saturating_add(phys);
                 ns.file_count += 1;
@@ -577,16 +619,16 @@ pub fn report(database: &Database) -> Result<StorageAccountingReport> {
         let dir = database.root.join("repaired-saves-v1");
         if let Ok(dir_meta) = fs::symlink_metadata(&dir) {
             if plain_entry(&dir_meta, true) {
-                ns.physical_bytes = ns.physical_bytes.saturating_add(CLUSTER_BYTES);
                 for entry in fs::read_dir(&dir).map_err(storage_error)? {
                     visited += 1;
                     let entry = entry.map_err(storage_error)?;
-                    let meta = fs::symlink_metadata(entry.path()).map_err(storage_error)?;
+                    let entry_path = entry.path();
+                    let meta = fs::symlink_metadata(&entry_path).map_err(storage_error)?;
                     if !plain_entry(&meta, false) {
                         ns.retained_unknown_entries += 1;
                         continue;
                     }
-                    let phys = metadata_physical_bytes(&meta, &mut seen_inodes, &mut hardlink_deduped);
+                    let phys = file_physical_bytes(&entry_path, &meta, &mut seen_inodes, &mut hardlink_deduped);
                     ns.logical_bytes = ns.logical_bytes.saturating_add(meta.len());
                     ns.physical_bytes = ns.physical_bytes.saturating_add(phys);
                     ns.file_count += 1;
@@ -607,7 +649,6 @@ pub fn report(database: &Database) -> Result<StorageAccountingReport> {
         let dir = database.root.join("saves");
         if let Ok(dir_meta) = fs::symlink_metadata(&dir) {
             if plain_entry(&dir_meta, true) {
-                ns.physical_bytes = ns.physical_bytes.saturating_add(CLUSTER_BYTES);
                 for game_entry in fs::read_dir(&dir).map_err(storage_error)? {
                     visited += 1;
                     let game_entry = game_entry.map_err(storage_error)?;
@@ -616,17 +657,17 @@ pub fn report(database: &Database) -> Result<StorageAccountingReport> {
                         ns.retained_unknown_entries += 1;
                         continue;
                     }
-                    ns.physical_bytes = ns.physical_bytes.saturating_add(CLUSTER_BYTES);
                     let game_name = game_entry.file_name().to_string_lossy().into_owned();
                     for leaf in fs::read_dir(game_entry.path()).map_err(storage_error)? {
                         visited += 1;
                         let leaf = leaf.map_err(storage_error)?;
-                        let leaf_meta = fs::symlink_metadata(leaf.path()).map_err(storage_error)?;
+                        let leaf_path = leaf.path();
+                        let leaf_meta = fs::symlink_metadata(&leaf_path).map_err(storage_error)?;
                         if !plain_entry(&leaf_meta, false) {
                             ns.retained_unknown_entries += 1;
                             continue;
                         }
-                        let phys = metadata_physical_bytes(&leaf_meta, &mut seen_inodes, &mut hardlink_deduped);
+                        let phys = file_physical_bytes(&leaf_path, &leaf_meta, &mut seen_inodes, &mut hardlink_deduped);
                         ns.logical_bytes = ns.logical_bytes.saturating_add(leaf_meta.len());
                         ns.physical_bytes = ns.physical_bytes.saturating_add(phys);
                         ns.file_count += 1;
@@ -648,16 +689,16 @@ pub fn report(database: &Database) -> Result<StorageAccountingReport> {
         let dir = database.root.join("firmware");
         if let Ok(dir_meta) = fs::symlink_metadata(&dir) {
             if plain_entry(&dir_meta, true) {
-                ns.physical_bytes = ns.physical_bytes.saturating_add(CLUSTER_BYTES);
                 for entry in fs::read_dir(&dir).map_err(storage_error)? {
                     visited += 1;
                     let entry = entry.map_err(storage_error)?;
-                    let meta = fs::symlink_metadata(entry.path()).map_err(storage_error)?;
+                    let entry_path = entry.path();
+                    let meta = fs::symlink_metadata(&entry_path).map_err(storage_error)?;
                     if !plain_entry(&meta, false) {
                         ns.retained_unknown_entries += 1;
                         continue;
                     }
-                    let phys = metadata_physical_bytes(&meta, &mut seen_inodes, &mut hardlink_deduped);
+                    let phys = file_physical_bytes(&entry_path, &meta, &mut seen_inodes, &mut hardlink_deduped);
                     ns.logical_bytes = ns.logical_bytes.saturating_add(meta.len());
                     ns.physical_bytes = ns.physical_bytes.saturating_add(phys);
                     ns.file_count += 1;

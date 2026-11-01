@@ -145,6 +145,11 @@ public final class GameHubController implements AutoCloseable {
         mMain.postDelayed(expiry,deadline-now);
         NativeCore.Reply reply=response->{if(finished[0]||!owns(channel))return;finished[0]=true;mMain.removeCallbacks(expiry);channel.expiries.remove(id);channel.requests.remove(id);try{response.put("id",id);}catch(Exception ignored){}send(channel,response);};
         JSONObject command=request.getJSONObject("command");String method=command.optString("method");
+        if("native_input_mode".equals(method)){
+            JSONObject params=command.optJSONObject("params");boolean enabled=params!=null&&params.optBoolean("enabled",false);
+            boolean active=mNativeInput.setGameplayMode(enabled);
+            reply.accept(new JSONObject().put("protocol_major",1).put("protocol_minor",0).put("status","ok").put("result",new JSONObject().put("enabled",active)));return;
+        }
         if("native_input_poll".equals(method)){reply.accept(new JSONObject().put("protocol_major",1).put("protocol_minor",0).put("status","ok").put("result",mNativeInput.pollSnapshot()));return;}
         if("native_input_haptics".equals(method)){
             JSONObject params=command.optJSONObject("params");int port=params==null?-1:params.optInt("port",-1);

@@ -108,3 +108,73 @@ impl TargetInput{
     pub fn observation(&self)->Observation{Observation{state:self.state.into(),reason:self.reason.map(str::to_owned)}}
 }
 impl Drop for TargetInput{fn drop(&mut self){self.release();}}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct WindowsFilePhysical {
+    pub allocation_bytes: u64,
+    pub volume_serial: u64,
+    pub file_index: u64,
+    pub link_count: u32,
+}
+
+pub fn windows_file_physical(path: &std::path::Path) -> std::io::Result<WindowsFilePhysical> {
+    use std::{
+        ffi::c_void,
+        fs::OpenOptions,
+        os::windows::{ffi::OsStrExt, fs::OpenOptionsExt, io::AsRawHandle},
+    };
+    use windows_sys::Win32::Storage::FileSystem::{
+        BY_HANDLE_FILE_INFORMATION, FILE_FLAG_OPEN_REPARSE_POINT, FILE_READ_ATTRIBUTES,
+        FILE_SHARE_DELETE, FILE_SHARE_READ, FILE_SHARE_WRITE, FILE_STANDARD_INFO,
+        FileStandardInfo, GetCompressedFileSizeW, GetFileInformationByHandle,
+        GetFileInformationByHandleEx, INVALID_FILE_SIZE,
+    };
+
+    let file = OpenOptions::new()
+        .access_mode(FILE_READ_ATTRIBUTES)
+        .share_mode(FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE)
+        .custom_flags(FILE_FLAG_OPEN_REPARSE_POINT)
+        .open(path)?;
+    let raw_handle = file.as_raw_handle();
+
+    let mut by_handle = BY_HANDLE_FILE_INFORMATION::default();
+    if unsafe { GetFileInformationByHandle(raw_handle, &mut by_handle) } == 0 {
+        return Err(std::io::Error::last_os_error());
+    }
+    let volume_serial = u64::from(by_handle.dwVolumeSerialNumber);
+    let file_index = (u64::from(by_handle.nFileIndexHigh) << 32) | u64::from(by_handle.nFileIndexLow);
+    let mut link_count = by_handle.nNumberOfLinks;
+
+    let mut std_info = FILE_STANDARD_INFO::default();
+    let allocation_bytes = if unsafe {
+        GetFileInformationByHandleEx(
+            raw_handle,
+            FileStandardInfo,
+            (&mut std_info as *mut FILE_STANDARD_INFO).cast::<c_void>(),
+            size_of::<FILE_STANDARD_INFO>() as u32,
+        )
+    } != 0 && std_info.AllocationSize >= 0
+    {
+        link_count = std_info.NumberOfLinks;
+        std_info.AllocationSize as u64
+    } else {
+        let mut wide: Vec<u16> = path.as_os_str().encode_wide().collect();
+        wide.push(0);
+        let mut high = 0u32;
+        let low = unsafe { GetCompressedFileSizeW(wide.as_ptr(), &mut high) };
+        if low == INVALID_FILE_SIZE {
+            let err = std::io::Error::last_os_error();
+            if err.raw_os_error().unwrap_or(0) != 0 {
+                return Err(err);
+            }
+        }
+        (u64::from(high) << 32) | u64::from(low)
+    };
+
+    Ok(WindowsFilePhysical {
+        allocation_bytes,
+        volume_serial,
+        file_index,
+        link_count,
+    })
+}

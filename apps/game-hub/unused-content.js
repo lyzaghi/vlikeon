@@ -43,3 +43,53 @@ export class UnusedContentPanel{
     finally{this.#busy=false;this.#render();}
   }
 }
+
+export class ProfileStorageQuotaPanel{
+  #bridge;#root;#notify;#report=null;#busy=false;#closed=false;#abort=new AbortController();
+  constructor(bridge,root,notify){
+    this.#bridge=bridge;this.#root=root;this.#notify=notify;root.hidden=true;
+    window.addEventListener('pagehide',()=>{this.#closed=true;this.#abort.abort();},{once:true,signal:this.#abort.signal});
+    document.addEventListener('omniplay_locale_changed',()=>this.#render(),{signal:this.#abort.signal});
+    void bridge.request('hello').then(value=>{if(this.#closed||value.storage_accounting_protocol!==1)return;root.hidden=false;this.#render();}).catch(()=>{});
+  }
+  #render(){
+    if(this.#closed)return;this.#root.replaceChildren();const section=node('section');section.className='panel';
+    section.append(node('h2',text('Hạn mức vật lý & tham chiếu giữ dữ liệu','Physical storage quota & active retainers')),node('p',text('Đo dung lượng cấp phát thực trên đĩa theo từng vùng lưu trữ, loại trùng hard-link và kiểm tra các tham chiếu đang giữ blob (thư viện, phiên chơi, save, firmware, native-work).','Measures actual OS on-disk allocation per namespace, deduplicates hard-links, and inspects active retainers keeping blobs alive (library, sessions, saves, firmware, native-work).')));
+    const action=(label,callback)=>{const button=node('button',label);button.type='button';button.className='button button-secondary';button.disabled=this.#busy;button.addEventListener('click',()=>void this.#run(callback));return button;};
+    section.append(action(text('Kiểm tra dung lượng vật lý','Inspect physical usage'),async()=>{this.#report=await this.#bridge.request('storage_accounting_report',undefined,60000);}));
+    const r=this.#report;
+    if(r){
+      const mib=b=>(Number(b||0)/(1024*1024)).toFixed(1);
+      const summary=node('div');summary.className='save-item';
+      summary.append(
+        node('p',text(`Vật lý trên đĩa: ${mib(r.physical_bytes)} MiB · Logic: ${mib(r.logical_bytes)} MiB · Đã giữ chỗ: ${mib(r.effective_committed_physical_bytes)} / ${mib(r.maximum_physical_bytes)} MiB · Còn trống: ${mib(r.available_physical_bytes)} MiB · Hard-link loại trùng: ${r.hardlink_deduped_files}`,`Physical on disk: ${mib(r.physical_bytes)} MiB · Logical: ${mib(r.logical_bytes)} MiB · Committed: ${mib(r.effective_committed_physical_bytes)} / ${mib(r.maximum_physical_bytes)} MiB · Available: ${mib(r.available_physical_bytes)} MiB · Hard-links deduplicated: ${r.hardlink_deduped_files}`)),
+        node('p',text(`Tham chiếu giữ dữ liệu: ${r.retainer_counts?.library_games??0} game · ${r.retainer_counts?.live_saves??0} save · ${r.retainer_counts?.firmware_assets??0} firmware · ${r.retainer_counts?.active_sessions??0} phiên đang mở · ${r.retainer_counts?.native_work_debts??0} native-work`,`Active retainers: ${r.retainer_counts?.library_games??0} games · ${r.retainer_counts?.live_saves??0} saves · ${r.retainer_counts?.firmware_assets??0} firmware · ${r.retainer_counts?.active_sessions??0} active sessions · ${r.retainer_counts?.native_work_debts??0} native-work`))
+      );
+      if(Array.isArray(r.namespaces)){
+        for(const ns of r.namespaces){
+          summary.append(node('p',`${ns.namespace}: ${mib(ns.physical_bytes)} MiB physical (${ns.file_count} files, ${ns.unreferenced_files} unreferenced)`));
+        }
+      }
+      const quotaWrap=node('div');quotaWrap.className='detail-actions';
+      const quotaInput=node('input');quotaInput.type='number';quotaInput.min='256';quotaInput.max='524288';quotaInput.step='256';
+      quotaInput.value=String(Math.max(256,Math.round(Number(r.maximum_physical_bytes||0)/(1024*1024))));
+      quotaInput.disabled=this.#busy;
+      quotaInput.setAttribute('aria-label',text('Hạn mức vật lý tối đa (MiB, 256–524288)','Maximum physical quota (MiB, 256–524288)'));
+      quotaWrap.append(quotaInput,action(text('Cập nhật hạn mức (MiB)','Update quota (MiB)'),async()=>{
+        const mibVal=Number(quotaInput.value);
+        if(!Number.isFinite(mibVal)||mibVal<256||mibVal>524288)throw new Error(text('Hạn mức phải từ 256 MiB đến 524288 MiB (512 GiB).','Quota must be between 256 MiB and 524288 MiB (512 GiB).'));
+        await this.#bridge.request('storage_quota_set',{maximum_physical_bytes:Math.round(mibVal)*1024*1024},30000);
+        this.#report=await this.#bridge.request('storage_accounting_report',undefined,60000);
+        this.#notify(text('Đã cập nhật hạn mức lưu trữ vật lý.','Updated physical storage quota.'));
+      }));
+      summary.append(quotaWrap);
+      section.append(summary);
+    }
+    this.#root.append(section);
+  }
+  async #run(body){
+    if(this.#busy||this.#closed)return;this.#busy=true;this.#render();
+    try{await body();}catch(error){if(!this.#closed)this.#notify(error?.message||text('Không thể cập nhật báo cáo hạn mức vật lý.','Could not update physical storage report.'),true);}
+    finally{this.#busy=false;this.#render();}
+  }
+}

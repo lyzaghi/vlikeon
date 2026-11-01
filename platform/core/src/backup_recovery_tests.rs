@@ -35,33 +35,97 @@ fn exact_orphan_payload_repairs_a_copy_without_adopting_unknown_metadata(){
 }
 
 #[test]
-fn full_profile_backup_roundtrip_restores_settings_games_firmware_and_saves() {
-    let mut source = Fixture::new();
-    let save = source.save(b"full-profile-save-payload");
-    let archive_path = source._directory.0.join("profile.opprofile");
-    let export_summary = crate::profile_backup::export(&source.database, true, &archive_path).unwrap();
-    assert_eq!(export_summary.game_count, 1);
-    assert_eq!(export_summary.save_count, 1);
-    assert!(export_summary.includes_rom_assets);
+fn full_profile_backup_roundtrip_restores_single_and_multiple_saves_without_trailer_overread() {
+    // 1. Single-save archive (save payload sits at the end of payload section right before 32-byte trailer)
+    let mut single_src = Fixture::new();
+    let single_save = single_src.save(b"single-save-before-trailer");
+    let single_archive_path = single_src._directory.0.join("single.opprofile");
+    let mut single_file = OpenOptions::new()
+        .read(true)
+        .write(true)
+        .create_new(true)
+        .open(&single_archive_path)
+        .unwrap();
+    let single_exported = crate::profile_backup::export(&mut single_src.database, true, &mut single_file).unwrap();
+    assert_eq!(single_exported.games, 1);
+    assert_eq!(single_exported.saves, 1);
+    assert!(single_exported.include_rom_assets);
 
-    let inspected = crate::profile_backup::inspect(&archive_path).unwrap();
-    assert_eq!(inspected.game_count, 1);
-    assert_eq!(inspected.save_count, 1);
+    let single_inspected = crate::profile_backup::inspect(&mut single_file).unwrap();
+    assert_eq!(single_inspected.games, 1);
+    assert_eq!(single_inspected.saves, 1);
+    assert!(single_inspected.include_rom_assets);
+
+    let single_dest_root = single_src._directory.0.join("restored-single");
+    let mut single_dest_db = Database::open(&single_dest_root).unwrap();
+    let single_restored = crate::profile_backup::restore(&mut single_dest_db, &mut single_file).unwrap();
+    assert_eq!(single_restored.games_restored, 1);
+    assert_eq!(single_restored.saves_restored, 1);
+    assert_eq!(single_restored.saves_failed, 0);
+    let derived_single_id =
+        crate::profile_backup::derived_profile_save_id(&single_restored.archive_hash, single_save.id, 0);
+    let (_, single_payload) = SaveStore::new(&mut single_dest_db).read(derived_single_id, None).unwrap();
+    assert_eq!(single_payload, b"single-save-before-trailer");
+
+    // 2. Multi-save archive (first, middle, and final save payloads + local quota preservation)
+    let mut source = Fixture::new();
+    let save_a = source.save(b"save-alpha-payload");
+    let save_b = source.save(b"save-beta-payload-longer");
+    let save_c = source.save(b"save-gamma-final-payload");
+    crate::storage_accounting::set_physical_quota_bytes(
+        &source.database,
+        2 * crate::storage_accounting::MIN_PROFILE_PHYSICAL_QUOTA_BYTES,
+    )
+    .unwrap();
+
+    let archive_path = source._directory.0.join("profile.opprofile");
+    let mut archive_file = OpenOptions::new()
+        .read(true)
+        .write(true)
+        .create_new(true)
+        .open(&archive_path)
+        .unwrap();
+    let export_summary = crate::profile_backup::export(&mut source.database, true, &mut archive_file).unwrap();
+    assert_eq!(export_summary.games, 1);
+    assert_eq!(export_summary.saves, 3);
+    assert!(export_summary.include_rom_assets);
 
     let dest_root = source._directory.0.join("restored-profile");
     let mut dest_db = Database::open(&dest_root).unwrap();
-    let restored = crate::profile_backup::restore(&mut dest_db, &archive_path).unwrap();
+    let local_quota = crate::storage_accounting::MIN_PROFILE_PHYSICAL_QUOTA_BYTES;
+    crate::storage_accounting::set_physical_quota_bytes(&dest_db, local_quota).unwrap();
+
+    let restored = crate::profile_backup::restore(&mut dest_db, &mut archive_file).unwrap();
     assert_eq!(restored.games_restored, 1);
-    assert_eq!(restored.saves_restored, 1);
-    let games = Library::new(&dest_db).list().unwrap();
+    assert_eq!(restored.saves_restored, 3);
+    assert_eq!(restored.saves_failed, 0);
+    // Destination physical quota must NEVER be raised from source archive metadata
+    assert_eq!(
+        crate::storage_accounting::get_physical_quota_bytes(&dest_db).unwrap(),
+        local_quota
+    );
+
+    let games = Library::new(&dest_db).list(None, 0, 50).unwrap();
     assert_eq!(games.len(), 1);
     assert_eq!(games[0].content_hash, source.game.content_hash);
-    let (_, payload) = SaveStore::new(&mut dest_db).read(save.id, None).unwrap();
-    assert_eq!(payload, b"full-profile-save-payload");
+
+    for (orig_id, expected_bytes) in [
+        (save_a.id, b"save-alpha-payload".as_slice()),
+        (save_b.id, b"save-beta-payload-longer".as_slice()),
+        (save_c.id, b"save-gamma-final-payload".as_slice()),
+    ] {
+        let restored_id = crate::profile_backup::derived_profile_save_id(&restored.archive_hash, orig_id, 0);
+        let (_, payload) = SaveStore::new(&mut dest_db).read(restored_id, None).unwrap();
+        assert_eq!(payload, expected_bytes);
+    }
+
+    let retry = crate::profile_backup::restore(&mut dest_db, &mut archive_file).unwrap();
+    assert_eq!(retry.saves_already_present, 3);
+    assert_eq!(retry.saves_restored, 0);
 }
 
 #[test]
-fn corrupt_database_diagnosis_and_quarantine_salvages_verified_rows_and_reconstructs_assets() {
+fn corrupt_database_diagnosis_quarantine_and_interrupted_journal_reconciliation() {
     let base = std::env::temp_dir().join(format!("vlikeon-db-recover-{}", Uuid::new_v4()));
     let _guard = Directory(base.clone());
     fs::create_dir_all(&base).unwrap();
@@ -104,15 +168,25 @@ fn corrupt_database_diagnosis_and_quarantine_salvages_verified_rows_and_reconstr
 
     fs::write(profile_root.join("omniplay.sqlite3"), b"corrupt-sqlite-header").unwrap();
     let health = crate::database_recovery::diagnose(&profile_root).unwrap();
-    assert_eq!(health.state, crate::database_recovery::DatabaseHealthState::HeaderCorrupt);
+    assert_eq!(
+        health.status,
+        crate::database_recovery::DatabaseHealthStatus::HeaderCorrupt
+    );
     assert!(health.recoverable);
 
     let outcome = crate::database_recovery::recover(&profile_root).unwrap();
-    assert!(outcome.quarantine_dir.join("quarantine-receipt.json").is_file());
-    assert_eq!(outcome.orphan_games_reconstructed, 1);
+    let qdir = profile_root
+        .join("corrupt-db-quarantine")
+        .join(&outcome.quarantine_id);
+    assert!(qdir.join("quarantine-receipt.json").is_file());
+    assert!(qdir.join("salvaged-snapshot.json").is_file());
+    assert!(!profile_root
+        .join(crate::database_recovery::RECOVERY_JOURNAL_FILE)
+        .exists());
+    assert!(outcome.salvaged_games + outcome.reconstructed_games >= 1);
 
     let reopened = Database::open(&profile_root).unwrap();
-    let games = Library::new(&reopened).list().unwrap();
+    let games = Library::new(&reopened).list(None, 0, 50).unwrap();
     assert_eq!(games.len(), 1);
     assert_eq!(games[0].content_hash, expected_hash);
 }
@@ -129,43 +203,66 @@ fn library_reconstruct_rebuilds_normalized_cue_and_m3u_disc_sets() {
     fs::create_dir_all(&assets_dir).unwrap();
     let track_bytes = vec![0xAAu8; 2352 * 4];
     let track_hash = digest(&track_bytes);
-    fs::write(assets_dir.join(format!("{}.bin", track_hash.0)), &track_bytes).unwrap();
+    // Content-addressed blobs in `assets/` are stored directly under `<sha256>` with no `.bin` suffix.
+    fs::write(assets_dir.join(&track_hash.0), &track_bytes).unwrap();
 
     let cue_bytes = b"FILE \"disc.bin\" BINARY\n  TRACK 01 MODE2/2352\n    INDEX 01 00:00:00\n";
     let cue_hash = digest(cue_bytes);
-    fs::write(assets_dir.join(format!("{}.bin", cue_hash.0)), cue_bytes).unwrap();
+    fs::write(assets_dir.join(&cue_hash.0), cue_bytes).unwrap();
 
     let preview = crate::library_reconstruct::preview(&db).unwrap();
-    assert!(preview.candidates.iter().any(|c| c.entry_hash == cue_hash));
+    let cand = preview
+        .candidates
+        .iter()
+        .find(|c| c.entry_hash == cue_hash)
+        .expect("CUE candidate should be discovered in assets/");
 
-    let committed = crate::library_reconstruct::reconstruct(
+    let bindings = std::collections::BTreeMap::from([("disc.bin".to_string(), track_hash)]);
+    let manifest = crate::library_reconstruct::reconstruct(
         &db,
-        &[crate::library_reconstruct::ReconstructSelection {
-            candidate_id: cue_hash.0.clone(),
-            title: Some("Rebuilt PS1 Disc".into()),
-            system: Some(GameSystem::Ps1),
-            track_bindings: vec![track_hash],
-        }],
+        &cand.candidate_id,
+        &cand.revision,
+        Some("Rebuilt PS1 Disc".into()),
+        Some(GameSystem::Ps1),
+        Some(bindings),
     )
     .unwrap();
-    assert_eq!(committed.reconstructed.len(), 1);
-    assert_eq!(committed.reconstructed[0].title, "Rebuilt PS1 Disc");
+    assert_eq!(manifest.title, "Rebuilt PS1 Disc");
+    assert_eq!(manifest.system, GameSystem::Ps1);
 }
 
 #[test]
-fn storage_accounting_tracks_active_retainers_and_enforces_physical_quota() {
+fn storage_accounting_tracks_active_retainers_hardlinks_and_enforces_physical_quota() {
     let mut f = Fixture::new();
-    let _save = f.save(b"retained-save");
-    let report = crate::storage_accounting::report(&f.database).unwrap();
-    assert!(report.total_physical_bytes >= report.total_logical_bytes);
-    assert!(report.retainers.library_games >= 1);
-    assert!(report.retainers.live_saves >= 1);
+    let save = f.save(b"retained-save");
+    let live_file_id: String = f
+        .database
+        .connection
+        .query_row(
+            "SELECT file_id FROM save_payload_locations WHERE save_id=?1",
+            [save.id.to_string()],
+            |r| r.get(0),
+        )
+        .unwrap();
+    let repaired_dir = f.database.root.join("repaired-saves-v1");
+    let hardlink_alias = repaired_dir.join(format!("{}-hardlink.bin", Uuid::new_v4()));
+    let _ = fs::hard_link(repaired_dir.join(format!("{live_file_id}.bin")), &hardlink_alias);
 
-    let min_quota = crate::storage_accounting::MIN_PHYSICAL_QUOTA_BYTES;
+    let report = crate::storage_accounting::report(&f.database).unwrap();
+    assert!(report.logical_bytes > 0);
+    assert!(report.retainer_counts.library_games >= 1);
+    assert!(report.retainer_counts.live_saves >= 1);
+    if hardlink_alias.exists() {
+        assert!(report.hardlink_deduped_files >= 1);
+    }
+
+    let min_quota = crate::storage_accounting::MIN_PROFILE_PHYSICAL_QUOTA_BYTES;
     crate::storage_accounting::set_physical_quota_bytes(&f.database, min_quota).unwrap();
     assert_eq!(
         crate::storage_accounting::get_physical_quota_bytes(&f.database).unwrap(),
         min_quota
     );
-    assert!(crate::storage_accounting::enforce_physical_quota(&f.database, min_quota + 1).is_err());
+    assert!(
+        crate::storage_accounting::enforce_physical_quota(&f.database, min_quota + 1, 1).is_err()
+    );
 }

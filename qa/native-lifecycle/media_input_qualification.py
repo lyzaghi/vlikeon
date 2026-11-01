@@ -101,6 +101,98 @@ def verify_item43_audio_contracts() -> dict[str, Any]:
     return {"checks": checks, "live_audio_fault_executed": False}
 
 
+def encode_wire_input_160(
+    *,
+    focused: bool,
+    scancodes: list[int],
+    pads: list[dict[str, Any]],
+    pointer: tuple[bool, bool, int, int],
+    mouse_buttons: int,
+    mouse_delta: tuple[int, int],
+    wheel: tuple[int, int],
+) -> bytes:
+    """Packs the canonical 160-byte presentation input frame matching engines/presentation/src/main.cpp."""
+    frame = bytearray(160)
+    if not focused:
+        return bytes(frame)
+    frame[144] = 1
+    for code in scancodes:
+        if 0 < code < 512:
+            frame[code // 8] |= 1 << (code % 8)
+    for port in range(min(4, len(pads))):
+        pad = pads[port]
+        if not pad.get("connected", False):
+            continue
+        at = 64 + port * 20
+        frame[at] = 1
+        frame[at + 1] = 1 if pad.get("rumble", False) else 0
+        struct.pack_into("<I", frame, at + 4, int(pad["button_mask"]) & 0xFFFFFFFF)
+        axes = pad["axes"]
+        assert len(axes) == 6
+        struct.pack_into("<hhhhhh", frame, at + 8, *axes)
+    in_bounds, pressed, px, py = pointer
+    frame[147] = mouse_buttons & 0x07
+    if in_bounds:
+        frame[145] = 1
+        frame[146] = 1 if pressed else 0
+        struct.pack_into("<hh", frame, 148, px, py)
+    struct.pack_into("<hh", frame, 152, mouse_delta[0], mouse_delta[1])
+    struct.pack_into("<hh", frame, 156, wheel[0], wheel[1])
+    return bytes(frame)
+
+
+def decode_wire_input_160(raw: bytes) -> dict[str, Any]:
+    """Decodes the 160-byte presentation input frame matching engines/native/src/presentation_input.hpp."""
+    if len(raw) != 160:
+        raise ValueError(f"Expected 160-byte presentation input frame, got {len(raw)}")
+    focused = raw[144] != 0
+    if not focused:
+        return {
+            "focused": False,
+            "scancodes": [],
+            "pads": [{"connected": False, "rumble": False, "button_mask": 0, "axes": (0, 0, 0, 0, 0, 0)} for _ in range(4)],
+            "pointer": {"in_bounds": False, "offscreen": 1, "pressed": 0, "x": 0, "y": 0},
+            "mouse": {"buttons": 0, "dx": 0, "dy": 0, "wx": 0, "wy": 0},
+        }
+    scancodes = [
+        code for code in range(1, 512) if (raw[code // 8] & (1 << (code % 8))) != 0
+    ]
+    pads = []
+    for port in range(4):
+        at = 64 + port * 20
+        connected = raw[at] != 0
+        if not connected:
+            pads.append({"connected": False, "rumble": False, "button_mask": 0, "axes": (0, 0, 0, 0, 0, 0)})
+            continue
+        rumble = raw[at + 1] != 0
+        (button_mask,) = struct.unpack_from("<I", raw, at + 4)
+        axes = struct.unpack_from("<hhhhhh", raw, at + 8)
+        pads.append({"connected": True, "rumble": rumble, "button_mask": button_mask, "axes": axes})
+    px, py = struct.unpack_from("<hh", raw, 148)
+    dx, dy = struct.unpack_from("<hh", raw, 152)
+    wx, wy = struct.unpack_from("<hh", raw, 156)
+    in_bounds = raw[145] != 0
+    return {
+        "focused": True,
+        "scancodes": scancodes,
+        "pads": pads,
+        "pointer": {
+            "in_bounds": in_bounds,
+            "offscreen": 0 if in_bounds else 1,
+            "pressed": 1 if raw[146] != 0 else 0,
+            "x": px,
+            "y": py,
+        },
+        "mouse": {
+            "buttons": raw[147],
+            "dx": dx,
+            "dy": dy,
+            "wx": wx,
+            "wy": wy,
+        },
+    }
+
+
 def verify_item44_gamepad_contracts() -> dict[str, Any]:
     raw_hdr = (ROOT / "engines/presentation/src/raw_joystick.hpp").read_text(encoding="utf-8")
     prof_hdr = (ROOT / "engines/native/src/input_profile.hpp").read_text(encoding="utf-8")
@@ -108,20 +200,38 @@ def verify_item44_gamepad_contracts() -> dict[str, Any]:
     pres_src = (ROOT / "engines/presentation/src/main.cpp").read_text(encoding="utf-8")
     input_rs = (ROOT / "platform/contracts/src/input.rs").read_text(encoding="utf-8")
 
-    # Verify 160-byte wire frame layout including mouse delta/buttons & neutral fence
-    frame = bytearray(160)
-    for port in range(4):
-        base = port * 36
-        struct.pack_into("<H", frame, base, 0x0101)
-        struct.pack_into("<hhhh", frame, base + 2, 12000, -12000, 4000, -4000)
-        for btn in range(16):
-            struct.pack_into("<H", frame, base + 10 + btn * 2, 850 if btn in (0, 8, 12) else 0)
-    frame[144] = 0x0F  # connected mask
-    frame[146] = 1     # focused
-    frame[147] = 0x05  # mouse L + M
-    struct.pack_into("<hh", frame, 152, -24, 18)
-    assert len(frame) == 160
-    assert struct.unpack_from("<hh", frame, 152) == (-24, 18)
+    expected_pads = [
+        {"connected": True, "rumble": True, "button_mask": 0x00000305, "axes": (12000, -12000, 4000, -4000, 24000, 8000)},
+        {"connected": True, "rumble": False, "button_mask": 0x00000012, "axes": (-5000, 7500, 0, 0, 0, 32767)},
+        {"connected": False, "rumble": False, "button_mask": 0, "axes": (0, 0, 0, 0, 0, 0)},
+        {"connected": True, "rumble": True, "button_mask": 0x00000C00, "axes": (1024, 2048, -1024, -2048, 16384, 0)},
+    ]
+    wire_active = encode_wire_input_160(
+        focused=True,
+        scancodes=[4, 29, 44, 82],
+        pads=expected_pads,
+        pointer=(True, True, -8192, 16384),
+        mouse_buttons=0x05,
+        mouse_delta=(-24, 18),
+        wheel=(1, -2),
+    )
+    decoded_active = decode_wire_input_160(wire_active)
+    wire_unfocused = bytearray(wire_active)
+    wire_unfocused[144] = 0
+    decoded_unfocused = decode_wire_input_160(bytes(wire_unfocused))
+
+    roundtrip_valid = (
+        len(wire_active) == 160
+        and decoded_active["focused"] is True
+        and decoded_active["scancodes"] == [4, 29, 44, 82]
+        and decoded_active["pads"] == expected_pads
+        and decoded_active["pointer"] == {"in_bounds": True, "offscreen": 0, "pressed": 1, "x": -8192, "y": 16384}
+        and decoded_active["mouse"] == {"buttons": 0x05, "dx": -24, "dy": 18, "wx": 1, "wy": -2}
+        and decoded_unfocused["focused"] is False
+        and decoded_unfocused["scancodes"] == []
+        and all(not p["connected"] and p["button_mask"] == 0 for p in decoded_unfocused["pads"])
+        and decoded_unfocused["mouse"]["buttons"] == 0
+    )
 
     checks = {
         "sdl_raw_joystick_calibration_ui_and_provider": (
@@ -140,7 +250,11 @@ def verify_item44_gamepad_contracts() -> dict[str, Any]:
             and "fence(2)" in pres_src
             and "SDL_RumbleGamepad" in pres_src
         ),
-        "wire_frame_160_byte_layout_valid": True,
+        "wire_frame_160_byte_layout_valid": (
+            roundtrip_valid
+            and "64u+port*20u" in pres_src.replace(" ", "")
+            and "64+port*20" in pin_hdr.replace(" ", "")
+        ),
     }
     if not all(checks.values()):
         failed = [k for k, v in checks.items() if not v]
@@ -159,6 +273,8 @@ def verify_item45_touch_and_mobile_contracts() -> dict[str, Any]:
     ios_ctrl = (ROOT / "apps/ios/OmniPlay/NativeInputController.swift").read_text(encoding="utf-8")
     ios_hub = (ROOT / "apps/ios/OmniPlay/GameHubViewController.swift").read_text(encoding="utf-8")
     ios_bridge = (ROOT / "apps/ios/OmniPlay/HubBridge.swift").read_text(encoding="utf-8")
+    player_js = (ROOT / "apps/game-hub/player.js").read_text(encoding="utf-8")
+    ports_js = (ROOT / "apps/game-hub/gamepad-ports.js").read_text(encoding="utf-8")
 
     checks = {
         "native_touch_overlay_18_controls_and_editor": (
@@ -169,8 +285,10 @@ def verify_item45_touch_and_mobile_contracts() -> dict[str, Any]:
         ),
         "android_native_input_wired_to_game_hub": (
             "class NativeInputController" in android_ctrl
+            and "shouldConsumeControllerEventsLocked" in android_ctrl
             and "mNativeInput.activate" in android_hub
             and "mNativeInput.deactivate" in android_hub
+            and "native_input_mode" in android_hub
             and "native_input_poll" in android_hub
             and "native_input_haptics" in android_hub
         ),
@@ -180,8 +298,15 @@ def verify_item45_touch_and_mobile_contracts() -> dict[str, Any]:
             and "CHHapticEngine" in ios_ctrl
             and "nativeInput.activate()" in ios_hub
             and "nativeInput.deactivate()" in ios_hub
+            and "native_input_mode" in ios_bridge
             and "native_input_poll" in ios_bridge
             and "native_input_haptics" in ios_bridge
+        ),
+        "game_hub_player_consumes_mobile_native_input_and_haptics": (
+            "native_input_mode" in player_js
+            and "native_input_poll" in player_js
+            and "native_input_haptics" in player_js
+            and "setNativeSnapshot" in ports_js
         ),
     }
     if not all(checks.values()):

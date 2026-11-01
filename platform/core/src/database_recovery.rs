@@ -28,6 +28,36 @@ use std::{
 use uuid::Uuid;
 
 const SQLITE_HEADER_MAGIC: &[u8; 16] = b"SQLite format 3\0";
+pub const RECOVERY_JOURNAL_FILE: &str = "database-recovery-journal.json";
+const STAGING_DB_FILE: &str = "omniplay.recovering.sqlite3";
+const SALVAGED_SNAPSHOT_FILE: &str = "salvaged-snapshot.json";
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum RecoveryJournalPhase {
+    Quarantining,
+    Rebuilding,
+    Publishing,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+struct RecoveryJournalPayload {
+    schema_version: u32,
+    quarantine_id: String,
+    started_at_ms: u64,
+    previous_status: DatabaseHealthStatus,
+    phase: RecoveryJournalPhase,
+    salvaged_sha256: ContentHash,
+    quarantined_files: Vec<QuarantinedFileReceipt>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+struct RecoveryJournalEnvelope {
+    payload: RecoveryJournalPayload,
+    journal_sha256: ContentHash,
+}
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -128,6 +158,11 @@ pub fn diagnose(root: &Path) -> Result<DatabaseHealthReport> {
 
     let meta = match fs::symlink_metadata(&db_path) {
         Err(err) if err.kind() == std::io::ErrorKind::NotFound => {
+            let journal_present = fs::symlink_metadata(root.join(RECOVERY_JOURNAL_FILE)).is_ok();
+            let mut findings = vec!["omniplay.sqlite3 is absent".into()];
+            if journal_present {
+                findings.push("incomplete database-recovery-journal.json detected; recovery will resume cleanly".into());
+            }
             return Ok(DatabaseHealthReport {
                 schema_version: 1,
                 status: DatabaseHealthStatus::Missing,
@@ -135,8 +170,12 @@ pub fn diagnose(root: &Path) -> Result<DatabaseHealthReport> {
                 db_bytes: 0,
                 wal_present,
                 shm_present,
-                recoverable: wal_present || root.join("assets").exists() || root.join("saves").exists(),
-                findings: vec!["omniplay.sqlite3 is absent".into()],
+                recoverable: journal_present
+                    || wal_present
+                    || root.join("assets").exists()
+                    || root.join("saves").exists()
+                    || root.join("repaired-saves-v1").exists(),
+                findings,
             });
         }
         Err(err) => return Err(storage_error(err)),
@@ -347,7 +386,7 @@ pub fn diagnose(root: &Path) -> Result<DatabaseHealthReport> {
     })
 }
 
-#[derive(Default)]
+#[derive(Default, Clone, Serialize, Deserialize)]
 struct SalvagedData {
     device_id: Option<Uuid>,
     settings: Option<UserSettings>,
@@ -360,6 +399,7 @@ struct SalvagedData {
     head_save_ids: BTreeSet<Uuid>,
 }
 
+#[derive(Clone, Serialize, Deserialize)]
 struct SalvagedGame {
     manifest: GameManifest,
     favorite: bool,
@@ -371,9 +411,9 @@ struct SalvagedGame {
     core_options: BTreeMap<String, GameCoreOptions>,
 }
 
+#[derive(Clone, Serialize, Deserialize)]
 struct SalvagedSave {
     metadata: SaveMetadata,
-    payload: Vec<u8>,
 }
 
 fn assets_exist_for_manifest(root: &Path, manifest: &GameManifest) -> bool {
@@ -611,7 +651,7 @@ fn salvage_from_damaged(root: &Path) -> SalvagedData {
                 let Ok(mut f) = File::open(path) else { continue };
                 let Ok(payload) = bounded_read(&mut f, meta.payload_bytes) else { continue };
                 if payload.len() as u64 == meta.payload_bytes && digest(&payload) == meta.payload_hash {
-                    out.saves.push(SalvagedSave { metadata: meta, payload });
+                    out.saves.push(SalvagedSave { metadata: meta });
                 }
             }
         }
@@ -619,45 +659,102 @@ fn salvage_from_damaged(root: &Path) -> SalvagedData {
     out
 }
 
-/// Quarantines a corrupted or missing SQLite database into `corrupt-db-quarantine/<id>/`,
-/// initializes a clean schema-15 database, restores verified salvaged rows, and triggers
-/// unambiguous asset/multi-disc metadata reconstruction.
-pub fn recover(root: &Path) -> Result<DatabaseRecoveryOutcome> {
-    let _lease = acquire_recovery_lease(root)?;
-    let health = diagnose(root)?;
-    match health.status {
-        DatabaseHealthStatus::Healthy => {
-            return Err(PlatformError::new(
-                ErrorCode::InvalidState,
-                "Profile database is healthy and does not require corruption recovery",
-            ));
+fn write_atomic_json(directory: &Path, filename: &str, bytes: &[u8]) -> Result<()> {
+    fs::create_dir_all(directory).map_err(storage_error)?;
+    let tmp_path = directory.join(format!(".recovery-tmp-{}", Uuid::new_v4()));
+    {
+        let mut opts = OpenOptions::new();
+        opts.write(true).read(true).create_new(true);
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::OpenOptionsExt;
+            opts.mode(0o600);
         }
-        DatabaseHealthStatus::NewerSchema => {
-            return Err(PlatformError::new(
-                ErrorCode::InvalidState,
-                "Database belongs to a newer application schema and will not be quarantined",
-            ));
-        }
-        DatabaseHealthStatus::Missing
-        | DatabaseHealthStatus::HeaderCorrupt
-        | DatabaseHealthStatus::Unopenable
-        | DatabaseHealthStatus::IntegrityFailed => {}
+        let mut file = opts.open(&tmp_path).map_err(storage_error)?;
+        file.write_all(bytes).map_err(storage_error)?;
+        file.sync_all().map_err(storage_error)?;
     }
+    if let Err(err) = fs::rename(&tmp_path, directory.join(filename)) {
+        let _ = fs::remove_file(&tmp_path);
+        return Err(storage_error(err));
+    }
+    sync_directory(directory)
+}
 
-    // 1. Best-effort read-only salvage before moving any files
-    let salvaged = salvage_from_damaged(root);
+fn write_recovery_journal(root: &Path, payload: &RecoveryJournalPayload) -> Result<()> {
+    let payload_bytes = serde_json::to_vec(payload).map_err(storage_error)?;
+    let envelope = RecoveryJournalEnvelope {
+        payload: payload.clone(),
+        journal_sha256: digest(&payload_bytes),
+    };
+    let raw = serde_json::to_vec_pretty(&envelope).map_err(storage_error)?;
+    write_atomic_json(root, RECOVERY_JOURNAL_FILE, &raw)
+}
 
-    // 2. Quarantine damaged database files without deleting any bytes
-    let quarantine_id = format!("{}-{}", now_ms(), Uuid::new_v4());
-    let quarantine_root = root.join("corrupt-db-quarantine");
-    let quarantine_dir = quarantine_root.join(&quarantine_id);
-    fs::create_dir_all(&quarantine_dir).map_err(storage_error)?;
+fn read_recovery_journal(root: &Path) -> Result<Option<RecoveryJournalPayload>> {
+    let path = root.join(RECOVERY_JOURNAL_FILE);
+    let mut file = match File::open(&path) {
+        Err(err) if err.kind() == std::io::ErrorKind::NotFound => return Ok(None),
+        Err(err) => return Err(storage_error(err)),
+        Ok(f) => f,
+    };
+    let bytes = bounded_read(&mut file, 1024 * 1024)?;
+    let envelope: RecoveryJournalEnvelope = serde_json::from_slice(&bytes).map_err(|_| {
+        PlatformError::new(
+            ErrorCode::CorruptData,
+            "Database recovery journal is unreadable or truncated",
+        )
+    })?;
+    if envelope.payload.schema_version != 1 {
+        return Err(PlatformError::new(
+            ErrorCode::CorruptData,
+            "Database recovery journal uses an unsupported schema version",
+        ));
+    }
+    let canonical = serde_json::to_vec(&envelope.payload).map_err(storage_error)?;
+    if digest(&canonical) != envelope.journal_sha256 {
+        return Err(PlatformError::new(
+            ErrorCode::CorruptData,
+            "Database recovery journal failed its SHA-256 integrity check",
+        ));
+    }
+    Ok(Some(envelope.payload))
+}
 
-    let mut quarantined_files = Vec::new();
+fn quarantine_database_files(
+    root: &Path,
+    quarantine_dir: &Path,
+    already_recorded: &[QuarantinedFileReceipt],
+) -> Result<Vec<QuarantinedFileReceipt>> {
+    fs::create_dir_all(quarantine_dir).map_err(storage_error)?;
+    let mut receipts: BTreeMap<String, QuarantinedFileReceipt> = already_recorded
+        .iter()
+        .map(|r| (r.name.clone(), r.clone()))
+        .collect();
+
     for name in ["omniplay.sqlite3", "omniplay.sqlite3-wal", "omniplay.sqlite3-shm"] {
         let src = root.join(name);
+        let dst = quarantine_dir.join(name);
         match fs::symlink_metadata(&src) {
-            Err(err) if err.kind() == std::io::ErrorKind::NotFound => continue,
+            Err(err) if err.kind() == std::io::ErrorKind::NotFound => {
+                // If an interrupted run already moved this file into quarantine_dir, retain its receipt.
+                if !receipts.contains_key(name) {
+                    if let Ok(dst_meta) = fs::symlink_metadata(&dst) {
+                        if plain_entry(&dst_meta, false) {
+                            let mut f = File::open(&dst).map_err(storage_error)?;
+                            let (sha, len) = hash_file(&mut f, u64::MAX)?;
+                            receipts.insert(
+                                name.into(),
+                                QuarantinedFileReceipt {
+                                    name: name.into(),
+                                    byte_length: len,
+                                    sha256: sha,
+                                },
+                            );
+                        }
+                    }
+                }
+            }
             Err(err) => return Err(storage_error(err)),
             Ok(meta) => {
                 if !plain_entry(&meta, false) {
@@ -669,40 +766,107 @@ pub fn recover(root: &Path) -> Result<DatabaseRecoveryOutcome> {
                 let mut f = File::open(&src).map_err(storage_error)?;
                 let (sha, len) = hash_file(&mut f, u64::MAX)?;
                 drop(f);
-                let dst = quarantine_dir.join(name);
-                fs::rename(&src, &dst).map_err(storage_error)?;
-                quarantined_files.push(QuarantinedFileReceipt {
-                    name: name.into(),
-                    byte_length: len,
-                    sha256: sha,
-                });
+                if dst.exists() {
+                    let mut df = File::open(&dst).map_err(storage_error)?;
+                    let (dsha, dlen) = hash_file(&mut df, u64::MAX)?;
+                    drop(df);
+                    if dsha == sha && dlen == len {
+                        fs::remove_file(&src).map_err(storage_error)?;
+                    } else {
+                        return Err(PlatformError::new(
+                            ErrorCode::Conflict,
+                            "Quarantine destination already contains a conflicting database artifact",
+                        ));
+                    }
+                } else {
+                    fs::rename(&src, &dst).map_err(storage_error)?;
+                }
+                receipts.insert(
+                    name.into(),
+                    QuarantinedFileReceipt {
+                        name: name.into(),
+                        byte_length: len,
+                        sha256: sha,
+                    },
+                );
             }
         }
     }
 
-    let receipt_json = serde_json::to_vec_pretty(&serde_json::json!({
-        "schema_version": 1,
-        "quarantine_id": quarantine_id,
-        "quarantined_at_ms": now_ms(),
-        "diagnosis": health,
-        "files": quarantined_files,
-    }))
-    .map_err(storage_error)?;
+    let ordered: Vec<QuarantinedFileReceipt> = ["omniplay.sqlite3", "omniplay.sqlite3-wal", "omniplay.sqlite3-shm"]
+        .into_iter()
+        .filter_map(|name| receipts.remove(name))
+        .collect();
+    Ok(ordered)
+}
+
+fn cleanup_staging_db_files(root: &Path) {
+    for suffix in ["", "-wal", "-shm"] {
+        let _ = fs::remove_file(root.join(format!("{STAGING_DB_FILE}{suffix}")));
+    }
+}
+
+fn execute_recovery_plan(
+    root: &Path,
+    mut journal: RecoveryJournalPayload,
+    salvaged: SalvagedData,
+    diagnosis_snapshot: Option<&DatabaseHealthReport>,
+) -> Result<DatabaseRecoveryOutcome> {
+    let quarantine_root = root.join("corrupt-db-quarantine");
+    let quarantine_dir = quarantine_root.join(&journal.quarantine_id);
+    fs::create_dir_all(&quarantine_dir).map_err(storage_error)?;
+
+    // If journal is already in Publishing phase and omniplay.sqlite3 has already been renamed into place
+    // and passes diagnosis, just clean up staging artifacts + journal and return the outcome.
+    if journal.phase == RecoveryJournalPhase::Publishing
+        && !root.join(STAGING_DB_FILE).exists()
+        && matches!(diagnose(root), Ok(ref rep) if rep.status == DatabaseHealthStatus::Healthy)
     {
-        let mut receipt_file = OpenOptions::new()
-            .write(true)
-            .create_new(true)
-            .open(quarantine_dir.join("quarantine-receipt.json"))
-            .map_err(storage_error)?;
-        receipt_file.write_all(&receipt_json).map_err(storage_error)?;
-        receipt_file.sync_all().map_err(storage_error)?;
+        cleanup_staging_db_files(root);
+        let _ = fs::remove_file(root.join(RECOVERY_JOURNAL_FILE));
+        sync_directory(root)?;
+        return Ok(DatabaseRecoveryOutcome {
+            schema_version: 1,
+            previous_status: journal.previous_status,
+            quarantine_id: journal.quarantine_id,
+            quarantined_files: journal.quarantined_files,
+            preserved_device_id: salvaged.device_id.is_some(),
+            salvaged_settings: salvaged.settings.is_some(),
+            salvaged_games: salvaged.games.len(),
+            reconstructed_games: 0,
+            salvaged_firmware: salvaged.firmware.len(),
+            salvaged_saves: salvaged.saves.len(),
+            salvaged_suppression_markers: salvaged.removed_saves.len(),
+        });
+    }
+
+    // 1. Finish moving damaged database files into quarantine_dir and write quarantine-receipt.json
+    let quarantined_files =
+        quarantine_database_files(root, &quarantine_dir, &journal.quarantined_files)?;
+    let receipt_path = quarantine_dir.join("quarantine-receipt.json");
+    if !receipt_path.exists() {
+        let receipt_json = serde_json::to_vec_pretty(&serde_json::json!({
+            "schema_version": 1,
+            "quarantine_id": journal.quarantine_id,
+            "quarantined_at_ms": now_ms(),
+            "previous_status": journal.previous_status,
+            "diagnosis": diagnosis_snapshot,
+            "files": quarantined_files,
+        }))
+        .map_err(storage_error)?;
+        write_atomic_json(&quarantine_dir, "quarantine-receipt.json", &receipt_json)?;
     }
     sync_directory(&quarantine_dir)?;
     sync_directory(&quarantine_root)?;
-    sync_directory(root)?;
 
-    // 3. Open fresh schema-15 SQLite database
-    let mut database = Database::open(root)?;
+    journal.quarantined_files = quarantined_files.clone();
+    journal.phase = RecoveryJournalPhase::Rebuilding;
+    write_recovery_journal(root, &journal)?;
+
+    // 2. Build replacement schema-15 database in `omniplay.recovering.sqlite3` so `omniplay.sqlite3`
+    // never exists in a half-populated state if a crash occurs mid-rebuild.
+    cleanup_staging_db_files(root);
+    let mut database = Database::open_staging(root, STAGING_DB_FILE)?;
 
     let mut preserved_device_id = false;
     if let Some(dev_id) = salvaged.device_id {
@@ -781,11 +945,12 @@ pub fn recover(root: &Path) -> Result<DatabaseRecoveryOutcome> {
         }
     }
 
-    // 4. Reconstruct any remaining unambiguous ROMs and multi-file disc sets from `assets/`
+    // 3. Reconstruct any remaining unambiguous ROMs and multi-file disc sets from `assets/`
     let reconstructed = library_reconstruct::reconstruct_unambiguous_all(&database).unwrap_or_default();
     let reconstructed_games = reconstructed.len();
 
-    // 5. Restore salvaged save generations against salvaged or reconstructed games
+    // 4. Restore salvaged save generations against salvaged or reconstructed games
+    let payload_index = index_disk_save_payloads(root);
     let mut salvaged_saves = 0usize;
     let mut restored_for_promotion = Vec::new();
     for ssave in salvaged.saves {
@@ -796,24 +961,39 @@ pub fn recover(root: &Path) -> Result<DatabaseRecoveryOutcome> {
         else {
             continue;
         };
-        let was_head = salvaged.head_save_ids.contains(&ssave.metadata.id);
-        let new_id = if salvaged
+        if salvaged
             .removed_saves
             .iter()
             .any(|(rid, _, _)| rid == &ssave.metadata.id)
         {
             continue;
-        } else {
-            Uuid::new_v4()
+        }
+        let Some(payload_path) =
+            payload_index.get(&(ssave.metadata.payload_hash.0.clone(), ssave.metadata.payload_bytes))
+        else {
+            continue;
         };
+        let Ok(mut pf) = File::open(payload_path) else {
+            continue;
+        };
+        let Ok(payload) = bounded_read(&mut pf, ssave.metadata.payload_bytes) else {
+            continue;
+        };
+        if payload.len() as u64 != ssave.metadata.payload_bytes
+            || digest(&payload) != ssave.metadata.payload_hash
+        {
+            continue;
+        }
+        let was_head = salvaged.head_save_ids.contains(&ssave.metadata.id);
+        let new_id = Uuid::new_v4();
         let reference = serde_json::json!({
-            "salvaged_from_quarantine": quarantine_id,
+            "salvaged_from_quarantine": journal.quarantine_id,
             "original_save_id": ssave.metadata.id,
         })
         .to_string();
         if let Ok(committed) = SaveStore::new(&mut database).restore_backup(
             ssave.metadata,
-            &ssave.payload,
+            &payload,
             game.id,
             new_id,
             &reference,
@@ -840,11 +1020,27 @@ pub fn recover(root: &Path) -> Result<DatabaseRecoveryOutcome> {
     }
 
     let _ = database.record_audit("database.recovered_corrupt", None);
+    // Checkpoint WAL and switch staging DB out of WAL before closing so `omniplay.recovering.sqlite3`
+    // is a single self-contained, flushed SQLite file ready for atomic rename.
+    database
+        .connection
+        .execute_batch("PRAGMA wal_checkpoint(TRUNCATE); PRAGMA journal_mode=DELETE;")
+        .map_err(storage_error)?;
+    drop(database);
+
+    // 5. Publish phase: atomically promote `omniplay.recovering.sqlite3` -> `omniplay.sqlite3`
+    journal.phase = RecoveryJournalPhase::Publishing;
+    write_recovery_journal(root, &journal)?;
+
+    fs::rename(root.join(STAGING_DB_FILE), root.join("omniplay.sqlite3")).map_err(storage_error)?;
+    cleanup_staging_db_files(root);
+    let _ = fs::remove_file(root.join(RECOVERY_JOURNAL_FILE));
+    sync_directory(root)?;
 
     Ok(DatabaseRecoveryOutcome {
         schema_version: 1,
-        previous_status: health.status,
-        quarantine_id,
+        previous_status: journal.previous_status,
+        quarantine_id: journal.quarantine_id,
         quarantined_files,
         preserved_device_id,
         salvaged_settings,
@@ -854,4 +1050,112 @@ pub fn recover(root: &Path) -> Result<DatabaseRecoveryOutcome> {
         salvaged_saves,
         salvaged_suppression_markers,
     })
+}
+
+fn reconcile_incomplete_recovery_locked(root: &Path) -> Result<Option<DatabaseRecoveryOutcome>> {
+    let journal = match read_recovery_journal(root) {
+        Ok(Some(j)) => j,
+        Ok(None) => return Ok(None),
+        Err(err) => {
+            // If `omniplay.sqlite3` is still healthy on disk, quarantine had not started yet;
+            // discard the unreadable journal. Otherwise fail closed so we never overwrite a
+            // quarantined profile with a blank database.
+            if matches!(diagnose(root), Ok(rep) if rep.status == DatabaseHealthStatus::Healthy) {
+                let _ = fs::remove_file(root.join(RECOVERY_JOURNAL_FILE));
+                return Ok(None);
+            }
+            return Err(err);
+        }
+    };
+
+    let snapshot_path = root
+        .join("corrupt-db-quarantine")
+        .join(&journal.quarantine_id)
+        .join(SALVAGED_SNAPSHOT_FILE);
+    let mut snap_file = File::open(&snapshot_path).map_err(|_| {
+        PlatformError::new(
+            ErrorCode::CorruptData,
+            "Incomplete database recovery is missing its salvaged snapshot",
+        )
+    })?;
+    let snap_bytes = bounded_read(&mut snap_file, 64 * 1024 * 1024)?;
+    if digest(&snap_bytes) != journal.salvaged_sha256 {
+        return Err(PlatformError::new(
+            ErrorCode::CorruptData,
+            "Incomplete database recovery salvaged snapshot failed checksum verification",
+        ));
+    }
+    let salvaged: SalvagedData = serde_json::from_slice(&snap_bytes).map_err(|_| {
+        PlatformError::new(
+            ErrorCode::CorruptData,
+            "Incomplete database recovery salvaged snapshot is invalid",
+        )
+    })?;
+
+    let outcome = execute_recovery_plan(root, journal, salvaged, None)?;
+    Ok(Some(outcome))
+}
+
+/// Reconciles any interrupted `database-recovery-journal.json` on startup before `Database::open`
+/// touches `omniplay.sqlite3`, preventing blank-DB creation after a mid-recovery crash.
+pub fn reconcile_incomplete_recovery(root: &Path) -> Result<Option<DatabaseRecoveryOutcome>> {
+    if !root.join(RECOVERY_JOURNAL_FILE).exists() {
+        return Ok(None);
+    }
+    let _lease = acquire_recovery_lease(root)?;
+    reconcile_incomplete_recovery_locked(root)
+}
+
+/// Quarantines a corrupted or missing SQLite database into `corrupt-db-quarantine/<id>/`,
+/// journals salvaged state with SHA-256 verification, builds a clean schema-15 database in
+/// `omniplay.recovering.sqlite3`, and atomically promotes it to `omniplay.sqlite3`.
+pub fn recover(root: &Path) -> Result<DatabaseRecoveryOutcome> {
+    let _lease = acquire_recovery_lease(root)?;
+    if let Some(resumed) = reconcile_incomplete_recovery_locked(root)? {
+        return Ok(resumed);
+    }
+
+    let health = diagnose(root)?;
+    match health.status {
+        DatabaseHealthStatus::Healthy => {
+            return Err(PlatformError::new(
+                ErrorCode::InvalidState,
+                "Profile database is healthy and does not require corruption recovery",
+            ));
+        }
+        DatabaseHealthStatus::NewerSchema => {
+            return Err(PlatformError::new(
+                ErrorCode::InvalidState,
+                "Database belongs to a newer application schema and will not be quarantined",
+            ));
+        }
+        DatabaseHealthStatus::Missing
+        | DatabaseHealthStatus::HeaderCorrupt
+        | DatabaseHealthStatus::Unopenable
+        | DatabaseHealthStatus::IntegrityFailed => {}
+    }
+
+    // 1. Best-effort read-only salvage BEFORE moving any database files
+    let salvaged = salvage_from_damaged(root);
+    let salvaged_bytes = serde_json::to_vec_pretty(&salvaged).map_err(storage_error)?;
+    let salvaged_sha256 = digest(&salvaged_bytes);
+
+    let quarantine_id = format!("{}-{}", now_ms(), Uuid::new_v4());
+    let quarantine_dir = root.join("corrupt-db-quarantine").join(&quarantine_id);
+    write_atomic_json(&quarantine_dir, SALVAGED_SNAPSHOT_FILE, &salvaged_bytes)?;
+
+    // 2. Persist checksummed recovery journal BEFORE moving `omniplay.sqlite3`
+    let journal = RecoveryJournalPayload {
+        schema_version: 1,
+        quarantine_id,
+        started_at_ms: now_ms(),
+        previous_status: health.status,
+        phase: RecoveryJournalPhase::Quarantining,
+        salvaged_sha256,
+        quarantined_files: Vec::new(),
+    };
+    write_recovery_journal(root, &journal)?;
+
+    // 3. Execute quarantine -> staging rebuild -> atomic publish -> journal clearance
+    execute_recovery_plan(root, journal, salvaged, Some(&health))
 }

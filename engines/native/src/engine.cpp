@@ -270,7 +270,7 @@ void Engine::pause_core(){
   if(!api_.pause_guest){core_paused_=true;return;}
 
 #ifndef OMNIPLAY_DEVICE_FREE_ACTOR
-  if(hardware_video_){if(vulkan_video_)vk_video_.check_healthy();else gl_video_.make_current();}
+  if(hardware_video_){if(vulkan_video_){if(vk_video_.lost())throw Failure("runtime_crashed");vk_video_.check_healthy();}else gl_video_.make_current();}
 #endif
  // Retryable before callback entry.
   guest_pause_active_=true;int result=0;
@@ -419,7 +419,7 @@ void Engine::tick(){
   if(previous_frame_!=Clock::time_point{}){const auto elapsed=std::chrono::duration<double,std::milli>(before-previous_frame_).count();intervals_.push_back(elapsed);if(elapsed<=5000)active_time_ms_+=elapsed;if(intervals_.size()>1000){fault_=true;}}
   previous_frame_=before;
 #ifndef OMNIPLAY_DEVICE_FREE_ACTOR
-  if(hardware_video_){if(vulkan_video_)vk_video_.check_healthy();else gl_video_.make_current();}
+  if(hardware_video_){if(vulkan_video_){if(vk_video_.lost())throw Failure("runtime_crashed");vk_video_.check_healthy();}else gl_video_.make_current();}
 #endif
 call_core(api_.run);if(fault_)throw Failure(fault_code_.load());
   if(shutdown_requested_.exchange(false)){close_requested_=true;pause();return;}
@@ -742,7 +742,7 @@ std::vector<std::uint8_t> Engine::save(const std::string& kind){
   if(kind!="in_game"&&kind!="emulator_state")throw Failure("unsupported_capability");
 
 #ifndef OMNIPLAY_DEVICE_FREE_ACTOR
-  if(hardware_video_){if(vulkan_video_)vk_video_.check_healthy();else gl_video_.make_current();}
+  if(hardware_video_){if(vulkan_video_){if(vk_video_.lost())throw Failure("runtime_crashed");vk_video_.check_healthy();}else gl_video_.make_current();}
 #endif
 flush_files();
   if(kind=="in_game"){
@@ -801,7 +801,7 @@ bool Engine::restart_content(){
 void Engine::load(const std::string& kind,const std::vector<std::uint8_t>& payload){
   if(payload.empty()||payload.size()>kMaxSave)throw Failure("incompatible_save");const bool restore_running=running_;pause();
 #ifndef OMNIPLAY_DEVICE_FREE_ACTOR
-  if(hardware_video_){if(vulkan_video_)vk_video_.check_healthy();else gl_video_.make_current();}
+  if(hardware_video_){if(vulkan_video_){if(vk_video_.lost())throw Failure("runtime_crashed");vk_video_.check_healthy();}else gl_video_.make_current();}
 #endif
 
   if(saved_files_.enabled()){

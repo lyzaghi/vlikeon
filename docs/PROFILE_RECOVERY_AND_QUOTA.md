@@ -1,6 +1,6 @@
 # Full-Profile Backup, Corrupt Database Recovery, Disc Reconstruction & Physical Quota
 
-This document records the architecture, envelope contracts, IPC protocols, and fail-closed safety invariants implemented for Items **46–49** across [`omniplay-core`](file:///e:/V10/OmniPlay/platform/core/src/lib.rs), [`omniplay-contracts`](file:///e:/V10/OmniPlay/platform/contracts/src/ipc.rs), [`omniplay-broker`](file:///e:/V10/OmniPlay/platform/broker/src/service.rs), [`omniplay-local-service`](file:///e:/V10/OmniPlay/platform/local-service/src/host.rs), and iOS export delivery ([`HubBridge.swift`](file:///e:/V10/OmniPlay/apps/ios/OmniPlay/HubBridge.swift)).
+This document records the architecture, envelope contracts, IPC protocols, UI surfaces, and fail-closed safety invariants implemented for Items **46–49** across [`omniplay-core`](file:///e:/V10/OmniPlay/platform/core/src/lib.rs), [`omniplay-stream-input`](file:///e:/V10/OmniPlay/platform/stream-input/src/windows.rs), [`omniplay-contracts`](file:///e:/V10/OmniPlay/platform/contracts/src/ipc.rs), [`omniplay-broker`](file:///e:/V10/OmniPlay/platform/broker/src/service.rs), [`omniplay-local-service`](file:///e:/V10/OmniPlay/platform/local-service/src/host.rs), Game Hub Settings UI ([`library-recovery.js`](file:///e:/V10/OmniPlay/apps/game-hub/library-recovery.js), [`unused-content.js`](file:///e:/V10/OmniPlay/apps/game-hub/unused-content.js), [`app.js`](file:///e:/V10/OmniPlay/apps/game-hub/app.js)), Android SAF export delivery ([`NativeDocuments.java`](file:///e:/V10/OmniPlay/apps/android/java/org/chromium/chrome/browser/omniplay/NativeDocuments.java)), and iOS export delivery ([`HubBridge.swift`](file:///e:/V10/OmniPlay/apps/ios/OmniPlay/HubBridge.swift)).
 
 Accepted checkpoint evidence for manual data recovery (**Item 50**, [`MANUAL_DATA_RECOVERY.md`](file:///e:/V10/OmniPlay/docs/MANUAL_DATA_RECOVERY.md)) and save-only `OPBK0001` archives ([`save_backup.rs`](file:///e:/V10/OmniPlay/platform/core/src/save_backup.rs)) remains untouched and backward-compatible.
 
@@ -13,28 +13,36 @@ Implemented in [`profile_backup.rs`](file:///e:/V10/OmniPlay/platform/core/src/p
 ### Envelope Format
 - **Magic:** `OPPF0001` (`[u8; 8]`), written with invalid magic `OPPF0000` during streaming and atomically flipped to `OPPF0001` + `sync_all()` only after every payload and the trailer digest are flushed.
 - **Header (`[u32 LE len][JSON]`):**
-  - Captures `settings`, `physical_quota_bytes`, up to `10,000` games (`manifest`, multi-disc `media`, `favorite`, `playtime_ms`, `last_played_ms`, and per-game `session_json`, `input_json`, `touch_json`, `core_options_json`), `firmware_assets` + `firmware_selections`, up to `20,000` save generations (`metadata`, `origin`, `prior_saves`), `save_heads`, `locally_removed_saves` suppression markers, and the deduplicated `blobs` manifest (`save`, `firmware`, and optional `asset` ROM/disc blobs when `include_rom_assets = true`).
+  - Captures `settings`, `physical_quota_bytes` (informational snapshot of the source profile's configured quota), up to `10,000` games (`manifest`, multi-disc `media`, `favorite`, `playtime_ms`, `last_played_ms`, and per-game `session_json`, `input_json`, `touch_json`, `core_options_json`), `firmware_assets` + `firmware_selections`, up to `20,000` save generations (`metadata`, `origin`, `prior_saves`), `save_heads`, `locally_removed_saves` suppression markers, and the deduplicated `blobs` manifest (`save`, `firmware`, and optional `asset` ROM/disc blobs when `include_rom_assets = true`).
 - **Streamed Payload Records:**
   - Each unique `(kind, sha256)` blob is streamed in 64 KiB chunks (`[u8 kind][32-byte sha256][u64 LE bytes][raw bytes]`), verifying both byte length and SHA-256 against the declared manifest while incrementally hashing the entire archive under domain `b"Vlikeon full profile backup v1\0"`.
   - Before finalizing `OPPF0001`, [`export`](file:///e:/V10/OmniPlay/platform/core/src/profile_backup.rs) re-evaluates the live SQLite mutation fingerprint so concurrent writes cannot produce a torn snapshot.
-- **Pre-Validated Restore:**
+- **Pre-Validated, Lease-Held, Atomic Restore:**
   - [`inspect`](file:///e:/V10/OmniPlay/platform/core/src/profile_backup.rs) and [`restore`](file:///e:/V10/OmniPlay/platform/core/src/profile_backup.rs) validate header invariants, every streamed blob digest, and the 32-byte trailer signature **before** mutating any local file or SQLite row.
-  - Refuses restore when any game session is active (`ErrorCode::Busy`) or when missing blobs exceed [`enforce_physical_quota`](file:///e:/V10/OmniPlay/platform/core/src/storage_accounting.rs) (`ErrorCode::DiskFull`).
-  - Stages missing blobs through crash-safe `PendingFile`, merges settings/quotas/suppression markers/games/firmware, and imports save branches deterministically without overwriting diverging local progress.
+  - Refuses restore when any game session is active (`ErrorCode::Busy`).
+  - Preserves the destination profile's configured local `physical_quota_bytes` (never auto-raising local quota from archive metadata) and enforces [`enforce_physical_quota`](file:///e:/V10/OmniPlay/platform/core/src/storage_accounting.rs) (`ErrorCode::ResourceLimit`) over missing bytes and file counts prior to staging.
+  - Holds [`AssetLease::acquire`](file:///e:/V10/OmniPlay/platform/core/src/asset_storage.rs) across the entire restore lifecycle—from initial staging through SQLite metadata publication—and persists `preferences["profile_restore_staging_v1"]` as an active [`storage_accounting`](file:///e:/V10/OmniPlay/platform/core/src/storage_accounting.rs) retainer so concurrent or post-crash unreferenced-asset sweeps cannot delete newly staged `assets/<sha256>` blobs before `games` rows commit.
+  - Stages missing `assets/<sha256>` and `firmware/` blobs via crash-safe `PendingFile`, unlinking newly staged blobs via `cleanup_failed_restore_staging` if staging fails.
+  - Commits firmware metadata/selections, conservative `settings` merge, `locally_removed_saves`, `games` manifests + favorite/playtime + per-game `session`/`input`/`touch`/`core_options`, and removal of `profile_restore_staging_v1` inside **one** `TransactionBehavior::Immediate` SQLite transaction.
+  - Reads save payloads via [`read_exact_archive_blob`](file:///e:/V10/OmniPlay/platform/core/src/profile_backup.rs) bounded strictly to each descriptor's exact `[payload_base + relative_offset .. + byte_length]` slice (verifying `byte_length <= MAX_SAVE_BYTES` and SHA-256 digest without overreading into subsequent blobs or the 32-byte archive trailer), importing save branches deterministically via `derived_profile_save_id` without overwriting diverging local progress.
 
 ---
 
-## 2. Corrupted SQLite Diagnosis & Quarantine Recovery (Item 47)
+## 2. Corrupted SQLite Diagnosis & Crash-Safe Quarantine Recovery (Item 47)
 
-Implemented in [`database_recovery.rs`](file:///e:/V10/OmniPlay/platform/core/src/database_recovery.rs) and wired pre-open in [`platform/broker/src/main.rs`](file:///e:/V10/OmniPlay/platform/broker/src/main.rs) so even an unopenable `omniplay.sqlite3` can be diagnosed and recovered over the native host channel.
+Implemented in [`database_recovery.rs`](file:///e:/V10/OmniPlay/platform/core/src/database_recovery.rs) and wired both at [`Database::open`](file:///e:/V10/OmniPlay/platform/core/src/database.rs) startup and pre-open in [`platform/broker/src/main.rs`](file:///e:/V10/OmniPlay/platform/broker/src/main.rs) so even an unopenable `omniplay.sqlite3` or an interrupted prior recovery can be reconciled, diagnosed, and recovered.
 
 - **Read-Only Diagnosis (`DatabaseHealthCheck`):**
-  - Classifies `omniplay.sqlite3` into `Missing`, `HeaderCorrupt`, `Unopenable`, `NewerSchema`, `IntegrityFailed`, or `Healthy` using header magic (`"SQLite format 3\0"`), `PRAGMA user_version`, `PRAGMA quick_check(16)`, `PRAGMA foreign_key_check`, and core JSON/identity invariants.
-- **Zero-Loss Quarantine & Salvage (`DatabaseRecoverCorrupt`):**
-  - Acquires `database-recovery.lock`; refuses `Healthy` and `NewerSchema` (fail-closed against downgrading newer schemas).
+  - Reconciles any incomplete recovery journal first, then classifies `omniplay.sqlite3` into `Missing`, `HeaderCorrupt`, `Unopenable`, `NewerSchema`, `IntegrityFailed`, or `Healthy` using header magic (`"SQLite format 3\0"`), `PRAGMA user_version`, `PRAGMA quick_check(16)`, `PRAGMA foreign_key_check`, and core JSON/identity invariants.
+- **Checksummed Multi-Phase Recovery Journal (`DatabaseRecoverCorrupt`):**
+  - Acquires `database-recovery.lock` and refuses `Healthy` and `NewerSchema` (fail-closed against downgrading newer schemas).
   - Performs best-effort read-only salvage of `device_id`, `settings`, `physical_quota_bytes`, `locally_removed_saves`, disk-verified `firmware_assets` + `firmware_selections`, disk-verified `games` + per-game preferences, and disk-verified `saves` + `save_heads`.
-  - Atomically moves `omniplay.sqlite3`, `-wal`, and `-shm` into `corrupt-db-quarantine/<timestamp>-<uuid>/` with `quarantine-receipt.json` recording SHA-256 digests (never deleting user files). On Windows, [`Database::recover_live`](file:///e:/V10/OmniPlay/platform/core/src/database.rs) swaps out the open SQLite connection handle before renaming.
-  - Initializes a clean schema-15 database, restores salvaged rows, runs [`reconstruct_unambiguous_all`](file:///e:/V10/OmniPlay/platform/core/src/library_reconstruct.rs) over orphaned `assets/` blobs, and reattaches salvaged save generations whose `game_content_hash` matches reconstructed games.
+  - Persists `salvaged-snapshot.json` inside `corrupt-db-quarantine/<quarantine_id>/` and advances checksummed `database-recovery-journal.json` (`journal_sha256` over domain `b"Vlikeon db recovery journal v1\0"`) through three explicit phases:
+    1. `Quarantining`: moves `omniplay.sqlite3`, `-wal`, and `-shm` into `corrupt-db-quarantine/<quarantine_id>/` and writes `quarantine-receipt.json` (never deleting user files).
+    2. `Rebuilding`: builds the replacement schema-15 database in isolated staging file `omniplay.recovering.sqlite3` ([`Database::open_staging`](file:///e:/V10/OmniPlay/platform/core/src/database.rs)), applies salvaged rows, runs [`reconstruct_unambiguous_all`](file:///e:/V10/OmniPlay/platform/core/src/library_reconstruct.rs) over orphaned `assets/<sha256>` blobs, reattaches salvaged save generations matching `game_content_hash`, and checkpoints/truncates WAL (`PRAGMA wal_checkpoint(TRUNCATE); PRAGMA journal_mode=DELETE`).
+    3. `Publishing`: atomically renames `omniplay.recovering.sqlite3` to `omniplay.sqlite3` and removes `database-recovery-journal.json`.
+  - [`reconcile_incomplete_recovery`](file:///e:/V10/OmniPlay/platform/core/src/database_recovery.rs) runs automatically on [`Database::open`](file:///e:/V10/OmniPlay/platform/core/src/database.rs) and [`recover`](file:///e:/V10/OmniPlay/platform/core/src/database_recovery.rs) to finish any interrupted `Quarantining` / `Rebuilding` / `Publishing` journal from `salvaged-snapshot.json` instead of silently creating an empty database.
+  - On Windows, [`Database::recover_live`](file:///e:/V10/OmniPlay/platform/core/src/database.rs) swaps out the open SQLite connection handle before renaming, reconciles any incomplete journal on error, and only reopens `self.root` when `Database::diagnose` confirms `DatabaseHealthStatus::Healthy`.
 
 ---
 
@@ -43,7 +51,7 @@ Implemented in [`database_recovery.rs`](file:///e:/V10/OmniPlay/platform/core/sr
 Implemented in [`library_reconstruct.rs`](file:///e:/V10/OmniPlay/platform/core/src/library_reconstruct.rs).
 
 - **Content-Addressed Inspection Under `AssetLease`:**
-  - Scans `<sha256>.bin` blobs in `assets/` not referenced by `games`, verifying full SHA-256 digests and refusing symlinks/reparse points.
+  - Scans 64-hex-character `<sha256>` blobs in `assets/<sha256>` not referenced by `games`, verifying full SHA-256 digests and refusing symlinks/reparse points.
 - **Multi-File `.cue` & Multi-Disc `.m3u` Pairing:**
   - Parses normalized `.cue` sheets (`disc.bin` / `track-NN.bin` / `.wav`) and `.m3u` playlists (`disc-01.<cue|chd|iso|pbp>` .. `disc-08.*`).
   - Cross-references candidate [`GameMedia::identity_hash()`](file:///e:/V10/OmniPlay/platform/contracts/src/library.rs) permutations against surviving `saves` and `locally_removed_saves` (`game_content_hash`) to bind exact track/disc ordering automatically when proven by saved progress.
@@ -55,11 +63,23 @@ Implemented in [`library_reconstruct.rs`](file:///e:/V10/OmniPlay/platform/core/
 
 ## 4. Physical Storage Quota & Data-Retaining Reference Accounting (Item 49)
 
-Implemented in [`storage_accounting.rs`](file:///e:/V10/OmniPlay/platform/core/src/storage_accounting.rs).
+Implemented in [`storage_accounting.rs`](file:///e:/V10/OmniPlay/platform/core/src/storage_accounting.rs) and [`platform/stream-input/src/windows.rs`](file:///e:/V10/OmniPlay/platform/stream-input/src/windows.rs).
 
-- **Physical Block Allocation Scanner:**
-  - Measures true physical disk allocation across all 7 profile namespaces (`database`, `assets`, `repaired_saves`, `legacy_saves`, `firmware`, `native_work`, `corrupt_db_quarantine`) using `MetadataExt::blocks() * 512` with `(dev, ino)` hard-link deduplication on Unix and 4 KiB cluster-aligned physical sizing on Windows, failing closed on symlinks or Windows reparse points (`FILE_ATTRIBUTE_REPARSE_POINT`).
+- **OS-Level Physical Block Allocation Scanner:**
+  - Measures true OS-reported physical file allocation across all 7 profile namespaces (`database`, `assets`, `repaired_saves`, `legacy_saves`, `firmware`, `native_work`, `corrupt_db_quarantine`) without synthetic directory cluster charges, failing closed on symlinks or Windows reparse points (`FILE_ATTRIBUTE_REPARSE_POINT`):
+    - **Unix (Linux/macOS):** `MetadataExt::blocks() * 512` with `(dev, ino)` hard-link deduplication when `nlink > 1`.
+    - **Windows:** [`windows_file_physical`](file:///e:/V10/OmniPlay/platform/stream-input/src/windows.rs) via `GetFileInformationByHandle` + `GetFileInformationByHandleEx(FileStandardInfo)` (`AllocationSize`, with `GetCompressedFileSizeW` fallback) and `(dwVolumeSerialNumber, file_index)` hard-link deduplication when `nNumberOfLinks > 1`.
 - **Active Data-Retaining Reference Graph:**
-  - Tracks every active retainer category (`library_games`, `active_sessions`, `live_saves`, `save_heads`, `save_repair_files`, `save_legacy_payloads`, `save_payload_gc`, `firmware_assets`, `firmware_selections`, and `native_work_storage` including `unmaterialized_reserved_bytes`), and pins transient asset retainers inside [`asset_storage::snapshot`](file:///e:/V10/OmniPlay/platform/core/src/asset_storage.rs) so unreferenced-asset cleanup never sweeps blobs held by an active session or recovery workflow.
+  - Tracks every active retainer category (`library_games`, `active_sessions`, `profile_restore_staging`, `live_saves`, `save_heads`, `save_repair_files`, `save_legacy_payloads`, `save_payload_gc`, `firmware_assets`, `firmware_selections`, and `native_work_storage` including `unmaterialized_reserved_bytes`), and pins transient asset retainers inside [`asset_storage::snapshot`](file:///e:/V10/OmniPlay/platform/core/src/asset_storage.rs) so unreferenced-asset cleanup never sweeps blobs held by an active session or in-progress restore/recovery workflow.
 - **Quota Enforcement (`StorageQuotaSet` / `StorageAccountingReport`):**
-  - Default physical quota `64 GiB` (configurable `256 MiB..=512 GiB` in `preferences["storage.physical_quota_bytes"]`), enforced before ROM/disc imports, firmware imports, save payload commits, full-profile backup restores, and native work reservations.
+  - Default physical quota `64 GiB` (configurable `256 MiB..=512 GiB` in `preferences["storage_physical_quota_bytes_v1"]`), enforced with `ErrorCode::ResourceLimit` before ROM/disc imports, firmware imports, save payload commits, full-profile backup restores, and native work reservations.
+
+---
+
+## 5. Game Hub UI & Mobile Export Wiring
+
+- **Game Hub Settings (`#view-settings`):**
+  - [`ProfileStorageQuotaPanel`](file:///e:/V10/OmniPlay/apps/game-hub/unused-content.js) renders live physical vs. logical storage breakdown across namespaces, active retainer counts/bytes, and physical quota configuration (`storage_accounting_report` / `storage_quota_set`).
+  - [`ProfileBackupAndRecoveryPanel`](file:///e:/V10/OmniPlay/apps/game-hub/library-recovery.js) drives `OPPF0001` export (with optional ROM/disc inclusion), archive inspection & restore (`profile_backup_export` / `profile_backup_inspect` / `profile_backup_restore`), SQLite health check & quarantine recovery (`database_health_check` / `database_recover_corrupt`), and orphaned `assets/<sha256>` metadata/multi-disc preview & commit with explicit track-binding selectors (`library_reconstruct_preview` / `library_reconstruct_commit`), mounted in [`app.js`](file:///e:/V10/OmniPlay/apps/game-hub/app.js).
+- **Mobile Export Delivery:**
+  - Android SAF export completion in [`NativeDocuments.java`](file:///e:/V10/OmniPlay/apps/android/java/org/chromium/chrome/browser/omniplay/NativeDocuments.java) (`finishExport` supporting `save_backup_export`, `profile_backup_export` up to `16 GiB`, and `manual_recovery_export`) and iOS export delivery in [`HubBridge.swift`](file:///e:/V10/OmniPlay/apps/ios/OmniPlay/HubBridge.swift).

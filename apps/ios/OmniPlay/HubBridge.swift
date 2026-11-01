@@ -50,6 +50,7 @@ final class HubBridge: NSObject, WKScriptMessageHandlerWithReply, UIDocumentPick
         let params=command["params"] as? [String:Any] ?? [:]
         switch method {
         case "presentation_fullscreen":guard let enabled=params["enabled"] as? Bool else{reject(request,reply,code:"invalid_request",message:"Fullscreen selection is invalid.");return};setGameFullscreen?(enabled);reply(response(request,result:["enabled":enabled]),nil)
+        case "native_input_mode":let active=nativeInput.setGameplayMode(enabled:(params["enabled"] as? Bool) ?? false);reply(response(request,result:["enabled":active]),nil)
         case "native_input_poll":reply(response(request,result:nativeInput.pollSnapshot()),nil)
         case "native_input_haptics":guard let port=params["port"] as? Int,(0..<NativeInputController.maxPorts).contains(port) else{reject(request,reply,code:"invalid_request",message:"Controller port is invalid.");return};let applied=nativeInput.applyHaptics(port:port,enabled:(params["enabled"] as? Bool) ?? false,weakStrength:(params["weak"] as? Int) ?? 0,strongStrength:(params["strong"] as? Int) ?? 0,durationMs:(params["duration_ms"] as? Int) ?? 0);reply(response(request,result:["applied":applied]),nil)
         case "file_select_import": selectImport(request,reply:reply,firmware:nil)

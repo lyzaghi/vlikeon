@@ -9,10 +9,19 @@ pub const CURRENT_SCHEMA_VERSION:u32=15;
 
 impl Database {
     pub fn open(root: &Path) -> Result<Self> {
+        crate::database_recovery::reconcile_incomplete_recovery(root)?;
+        Self::open_named(root, "omniplay.sqlite3", true)
+    }
+
+    pub(crate) fn open_staging(root: &Path, filename: &str) -> Result<Self> {
+        Self::open_named(root, filename, false)
+    }
+
+    fn open_named(root: &Path, filename: &str, run_startup_maintenance: bool) -> Result<Self> {
         std::fs::create_dir_all(root).map_err(storage_error)?;
         #[cfg(unix)]
         {use std::os::unix::fs::PermissionsExt;std::fs::set_permissions(root,std::fs::Permissions::from_mode(0o700)).map_err(storage_error)?;}
-        let connection = Connection::open(root.join("omniplay.sqlite3")).map_err(storage_error)?;
+        let connection = Connection::open(root.join(filename)).map_err(storage_error)?;
         connection.busy_timeout(std::time::Duration::from_secs(5)).map_err(storage_error)?;
         connection.execute_batch("PRAGMA foreign_keys=ON; PRAGMA journal_mode=WAL; PRAGMA synchronous=FULL; PRAGMA trusted_schema=OFF;").map_err(storage_error)?;
         let version: u32 = connection.query_row("PRAGMA user_version", [], |row| row.get(0)).map_err(storage_error)?;
@@ -48,10 +57,12 @@ impl Database {
             }
         };
         let database=Self { connection, root: root.to_owned(), device_id };
-        // Cleanup is bounded and debt is durable. A busy writer/locked file or
-        // cleanup failure does not make a readable profile fail to open.
-        let _=crate::save_maintenance::cleanup(&database,32);
-        let _=crate::native_work_storage::collect_removed(&database,32);
+        if run_startup_maintenance {
+            // Cleanup is bounded and debt is durable. A busy writer/locked file or
+            // cleanup failure does not make a readable profile fail to open.
+            let _=crate::save_maintenance::cleanup(&database,32);
+            let _=crate::native_work_storage::collect_removed(&database,32);
+        }
         Ok(database)
     }
 
@@ -108,9 +119,15 @@ impl Database {
                 Ok(outcome)
             }
             Err(error)=>{
-                if let Ok(reopened)=Self::open(&self.root){
-                    self.connection=reopened.connection;
-                    self.device_id=reopened.device_id;
+                let _ = crate::database_recovery::reconcile_incomplete_recovery(&self.root);
+                if matches!(
+                    Self::diagnose(&self.root),
+                    Ok(report) if report.status == crate::database_recovery::DatabaseHealthStatus::Healthy
+                ) {
+                    if let Ok(reopened) = Self::open(&self.root) {
+                        self.connection = reopened.connection;
+                        self.device_id = reopened.device_id;
+                    }
                 }
                 Err(error)
             }

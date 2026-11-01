@@ -88,7 +88,8 @@ public final class NativeDocuments implements AutoCloseable {
     public boolean finishExport(JSONObject request,JSONObject response,NativeCore.Reply reply) {
         JSONObject command=request.optJSONObject("command");if(command==null)return false;
         String method=command.optString("method");
-        if(!("save_export".equals(method)||"save_export_upload_commit".equals(method)||"diagnostics_export".equals(method)||"performance_run_export".equals(method))||!"ok".equals(response.optString("status")))return false;
+        if(!("save_export".equals(method)||"save_backup_export".equals(method)||"profile_backup_export".equals(method)||"manual_recovery_export".equals(method)||"save_export_upload_commit".equals(method)||"diagnostics_export".equals(method)||"performance_run_export".equals(method))||!"ok".equals(response.optString("status")))return false;
+        final long maxExportBytes="profile_backup_export".equals(method)?(16L*1024*1024*1024):(300L*1024*1024);
         JSONObject params=command.optJSONObject("params");Export export=params==null?null:mExports.remove(params.optString("destination_grant_id"));
         if(export==null){reply.accept(fail(request,"permission_denied","The native export selection expired."));return true;}
         if(!alive(request)||mSelecting||mCopying){cleanup(export.file);reply.accept(fail(request,"busy","Finish the current document selection, then export again."));return true;}
@@ -109,7 +110,7 @@ public final class NativeDocuments implements AutoCloseable {
                     try(ParcelFileDescriptor descriptor=resolver.openFileDescriptor(uri,"wt",cancellation)){
                         if(descriptor==null)throw new IllegalStateException();
                         try(FileInputStream input=new FileInputStream(export.file);FileOutputStream output=new ParcelFileDescriptor.AutoCloseOutputStream(descriptor)){
-                            copy(input,output,300L*1024*1024,request,null);output.flush();
+                            copy(input,output,maxExportBytes,request,null);output.flush();
                         }
                     }
                     complete=true;

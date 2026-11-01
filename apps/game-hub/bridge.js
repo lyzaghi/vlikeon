@@ -37,6 +37,11 @@ export class PlatformBridge extends EventTarget {
   #android = false;
   #web = false;
 
+  get mobileNativeInput() {
+    this.connect();
+    return this.#android || this.#mobile;
+  }
+
   connect() {
     if(webContext){if(!this.#web){this.#web=true;webEvents.addEventListener('closed',()=>this.dispatchEvent(new Event('host_disconnected')));}return;}
     if(globalThis.webkit?.messageHandlers?.omniplay?.postMessage){this.#mobile=true;return;}

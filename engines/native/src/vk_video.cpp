@@ -288,7 +288,7 @@ bool VkVideo::negotiate(retro_hw_render_callback& callback) {
   callback_ = callback;
   interface_ = {
       RETRO_HW_RENDER_INTERFACE_VULKAN,
-      5u,
+      kInterfaceVersion,
       this,
       instance_,
       gpu_,

@@ -13,7 +13,7 @@ use crate::{
     save_origins,
     saves::SaveStore,
     storage_accounting,
-    util::{bounded_read, digest, hash_file, storage_error, PendingFile},
+    util::{digest, hash_file, storage_error, PendingFile},
     Database,
 };
 use omniplay_contracts::{
@@ -21,7 +21,7 @@ use omniplay_contracts::{
     GameTouchProfile, PlatformError, Result, SaveMetadata, SessionConfig, UserSettings,
     MAX_ROM_BYTES, MAX_SAVE_BYTES,
 };
-use rusqlite::{params, OptionalExtension};
+use rusqlite::{params, OptionalExtension, Transaction, TransactionBehavior};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::{
@@ -133,6 +133,17 @@ pub struct ProfileBackupSummary {
     pub total_payload_bytes: u64,
 }
 
+pub const PROFILE_RESTORE_STAGING_KEY: &str = "profile_restore_staging_v1";
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct ProfileRestoreStagingRecord {
+    pub schema_version: u32,
+    pub archive_hash: ContentHash,
+    pub started_at_ms: u64,
+    pub asset_hashes: Vec<ContentHash>,
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct ProfileBackupRestored {
@@ -144,6 +155,7 @@ pub struct ProfileBackupRestored {
     pub saves_restored: usize,
     pub saves_already_present: usize,
     pub saves_skipped: usize,
+    pub saves_failed: usize,
     pub suppression_markers_merged: usize,
 }
 
@@ -842,7 +854,7 @@ pub fn inspect<R: Read + Seek>(source: &mut R) -> Result<ProfileBackupSummary> {
     })
 }
 
-fn derived_profile_save_id(archive_hash: &ContentHash, source_id: Uuid, attempt: u32) -> Uuid {
+pub(crate) fn derived_profile_save_id(archive_hash: &ContentHash, source_id: Uuid, attempt: u32) -> Uuid {
     let mut hasher = Sha256::new();
     hasher.update(b"Vlikeon profile backup branch v1\0");
     hasher.update(archive_hash.0.as_bytes());
@@ -877,6 +889,54 @@ fn choose_restored_save_id(database: &Database, archive_hash: &ContentHash, sour
     ))
 }
 
+fn read_exact_archive_blob<R: Read + Seek>(
+    source: &mut R,
+    payload_base: u64,
+    desc: &PayloadBlobDescriptor,
+    expected_bytes: u64,
+    expected_hash: &ContentHash,
+    until: Instant,
+) -> Result<Vec<u8>> {
+    if expected_bytes > MAX_SAVE_BYTES {
+        return Err(PlatformError::new(
+            ErrorCode::ResourceLimit,
+            "Archive save payload exceeds maximum allowed size",
+        ));
+    }
+    if desc.byte_length != expected_bytes || &desc.content_hash != expected_hash {
+        return Err(corrupt("Archive save descriptor does not match canonical save metadata"));
+    }
+    let start_offset = payload_base
+        .checked_add(desc.relative_offset)
+        .ok_or_else(|| corrupt("Archive save payload offset overflow"))?;
+    source
+        .seek(SeekFrom::Start(start_offset))
+        .map_err(storage_error)?;
+
+    let total_len = usize::try_from(expected_bytes)
+        .map_err(|_| PlatformError::new(ErrorCode::ResourceLimit, "Archive save payload exceeds addressable memory"))?;
+    let mut payload = Vec::with_capacity(total_len.min(1024 * 1024));
+    let mut remaining = total_len;
+    let mut buffer = [0u8; 65536];
+    while remaining > 0 {
+        check_deadline(until)?;
+        let want = remaining.min(buffer.len());
+        source.read_exact(&mut buffer[..want]).map_err(|e| {
+            if e.kind() == std::io::ErrorKind::UnexpectedEof {
+                corrupt("Archive save payload truncated before declared byte_length")
+            } else {
+                storage_error(e)
+            }
+        })?;
+        payload.extend_from_slice(&buffer[..want]);
+        remaining -= want;
+    }
+    if payload.len() != total_len || digest(&payload) != *expected_hash {
+        return Err(corrupt("Archive save payload changed during restore"));
+    }
+    Ok(payload)
+}
+
 fn copy_verified_blob_from_archive<R: Read + Seek>(
     source: &mut R,
     payload_base: u64,
@@ -894,8 +954,11 @@ fn copy_verified_blob_from_archive<R: Read + Seek>(
         return Err(corrupt("Existing local content blob failed integrity verification"));
     }
 
+    let start_offset = payload_base
+        .checked_add(desc.relative_offset)
+        .ok_or_else(|| corrupt("Archive blob offset overflow"))?;
     source
-        .seek(SeekFrom::Start(payload_base + desc.relative_offset))
+        .seek(SeekFrom::Start(start_offset))
         .map_err(storage_error)?;
     let mut pending = PendingFile::create(target_dir)?;
     let mut hasher = Sha256::new();
@@ -916,11 +979,26 @@ fn copy_verified_blob_from_archive<R: Read + Seek>(
     Ok(true)
 }
 
-/// Verifies an entire `OPPF0001` archive before mutating state, checks physical quota admission,
-/// and restores blobs, settings, firmware, games, preferences, suppression markers, and save branches.
+fn cleanup_failed_restore_staging(database: &Database, staged_paths: &[PathBuf]) {
+    for path in staged_paths {
+        let _ = fs::remove_file(path);
+    }
+    let _ = database
+        .connection
+        .execute("DELETE FROM preferences WHERE key=?1", [PROFILE_RESTORE_STAGING_KEY]);
+}
+
+/// Verifies an entire `OPPF0001` archive before mutating state, checks physical quota admission
+/// strictly against the local profile quota (never raising local quota before restore succeeds),
+/// holds `AssetLease` across blob staging through manifest publication, commits metadata atomically,
+/// and restores save branches from exact bounded payload slices.
 pub fn restore<R: Read + Seek>(database: &mut Database, source: &mut R) -> Result<ProfileBackupRestored> {
     let until = Instant::now() + Duration::from_secs(90);
     require_no_active_sessions(database)?;
+
+    // Hold AssetLease across the entire restore lifecycle so asset_storage cleanup cannot
+    // reclaim newly staged ROM/disc blobs before Library manifests are durably committed.
+    let _asset_lease = AssetLease::acquire(database)?;
 
     // 1. Full structural + payload + trailer verification BEFORE any local write
     let (manifest, payload_base, archive_hash) = verify_archive_stream(source, until)?;
@@ -931,12 +1009,17 @@ pub fn restore<R: Read + Seek>(database: &mut Database, source: &mut R) -> Resul
         .map(|d| (d.content_hash.0.clone(), d))
         .collect();
 
-    // Calculate net new bytes needed for physical quota admission
+    // Calculate net new bytes needed for physical quota admission against current local quota.
+    // Archive metadata must never raise the destination device's physical_quota_bytes.
     let mut missing_bytes = 0u64;
     let mut missing_files = 0u32;
+    let mut staged_asset_hashes = Vec::new();
     for desc in &manifest.blobs {
         let already_on_disk = match desc.kind.as_str() {
-            "asset" => database.root.join("assets").join(&desc.content_hash.0).exists(),
+            "asset" => {
+                staged_asset_hashes.push(desc.content_hash.clone());
+                database.root.join("assets").join(&desc.content_hash.0).exists()
+            }
             "firmware" => database
                 .root
                 .join("firmware")
@@ -949,53 +1032,114 @@ pub fn restore<R: Read + Seek>(database: &mut Database, source: &mut R) -> Resul
             missing_files = missing_files.saturating_add(1);
         }
     }
-    if let Some(archived_quota) = manifest.physical_quota_bytes {
-        let current_quota = storage_accounting::get_physical_quota_bytes(database)?;
-        if archived_quota > current_quota {
-            storage_accounting::set_physical_quota_bytes(database, archived_quota)?;
-        }
-    }
     storage_accounting::enforce_physical_quota(database, missing_bytes, missing_files)?;
 
-    // 2. Restore ROM/disc blobs (`assets/<hash>`) under `AssetLease`
-    {
-        let _asset_lease = AssetLease::acquire(database)?;
+    // Persist durable staging retainer in preferences so crash/restart before manifest commit
+    // still retains staged blobs in storage_accounting until reconciled or cleaned up.
+    if !staged_asset_hashes.is_empty() {
+        let staging_record = ProfileRestoreStagingRecord {
+            archive_hash: archive_hash.clone(),
+            started_at_ms: now_ms(),
+            asset_hashes: staged_asset_hashes,
+        };
+        let staging_json = serde_json::to_string(&staging_record).map_err(storage_error)?;
+        database
+            .connection
+            .execute(
+                "INSERT INTO preferences(key,value) VALUES(?1,?2) ON CONFLICT(key) DO UPDATE SET value=excluded.value",
+                params![PROFILE_RESTORE_STAGING_KEY, staging_json],
+            )
+            .map_err(storage_error)?;
+    }
+
+    let mut newly_staged_paths: Vec<PathBuf> = Vec::new();
+    let mut wrote_firmware_blobs: BTreeSet<String> = BTreeSet::new();
+
+    // 2. Stage ROM/disc (`assets/<hash>`) and firmware (`firmware/<hash>.bin`) blobs
+    let stage_result: Result<()> = (|| {
         let assets_dir = database.root.join("assets");
         for desc in manifest.blobs.iter().filter(|d| d.kind == "asset") {
             let target = assets_dir.join(&desc.content_hash.0);
-            copy_verified_blob_from_archive(source, payload_base, desc, &assets_dir, &target, until)?;
+            if copy_verified_blob_from_archive(source, payload_base, desc, &assets_dir, &target, until)? {
+                newly_staged_paths.push(target);
+            }
         }
-    }
-
-    // 3. Restore firmware blobs (`firmware/<hash>.bin`), rows, and non-conflicting selections
-    let mut firmware_restored = 0usize;
-    {
         let fw_dir = database.root.join("firmware");
         for fw in &manifest.firmware_assets {
             let desc = blob_lookup
                 .get(&fw.content_hash.0)
                 .ok_or_else(|| corrupt("Firmware descriptor missing"))?;
             let target = fw_dir.join(format!("{}.bin", fw.content_hash.0));
-            let wrote_new =
-                copy_verified_blob_from_archive(source, payload_base, desc, &fw_dir, &target, until)?;
-            let changed = database
-                .connection
+            if copy_verified_blob_from_archive(source, payload_base, desc, &fw_dir, &target, until)? {
+                newly_staged_paths.push(target);
+                wrote_firmware_blobs.insert(fw.content_hash.0.clone());
+            }
+        }
+        Ok(())
+    })();
+
+    if let Err(err) = stage_result {
+        cleanup_failed_restore_staging(database, &newly_staged_paths);
+        return Err(err);
+    }
+
+    // 3–6. Commit firmware rows/selections, conservative settings, suppression markers,
+    // library manifests, per-game preferences, and staging-marker clearance in ONE transaction.
+    let current_settings = match database.settings() {
+        Ok(s) => s,
+        Err(err) => {
+            cleanup_failed_restore_staging(database, &newly_staged_paths);
+            return Err(err);
+        }
+    };
+    let mut merged_settings = manifest.settings.clone();
+    if !current_settings.cloud_sync_opt_in {
+        merged_settings.cloud_sync_opt_in = false;
+    }
+    if let Err(err) = merged_settings.validate() {
+        cleanup_failed_restore_staging(database, &newly_staged_paths);
+        return Err(err);
+    }
+    let merged_settings_json = match serde_json::to_string(&merged_settings).map_err(storage_error) {
+        Ok(j) => j,
+        Err(err) => {
+            cleanup_failed_restore_staging(database, &newly_staged_paths);
+            return Err(err);
+        }
+    };
+
+    let mut firmware_restored = 0usize;
+    let mut suppression_markers_merged = 0usize;
+    let mut games_restored = 0usize;
+    let mut games_skipped_missing_assets = 0usize;
+
+    let metadata_commit: Result<()> = (|| {
+        let tx = Transaction::new_unchecked(&database.connection, TransactionBehavior::Immediate)
+            .map_err(storage_error)?;
+
+        for fw in &manifest.firmware_assets {
+            let changed = tx
                 .execute(
                     "INSERT OR IGNORE INTO firmware_assets(content_hash, byte_length, created_at_ms) VALUES(?1,?2,?3)",
                     params![fw.content_hash.0, fw.byte_length, fw.created_at_ms],
                 )
                 .map_err(storage_error)?;
-            if wrote_new || changed > 0 {
+            if wrote_firmware_blobs.contains(&fw.content_hash.0) || changed > 0 {
                 firmware_restored += 1;
             }
         }
+
         for sel in &manifest.firmware_selections {
-            let sys_key = serde_json::to_value(sel.system)
+            let Ok(allowed_sizes) = crate::firmware::role_sizes(sel.system, &sel.role) else {
+                continue;
+            };
+            let Some(sys_key) = serde_json::to_value(sel.system)
                 .ok()
                 .and_then(|v| v.as_str().map(str::to_owned))
-                .unwrap_or_default();
-            let exists: bool = database
-                .connection
+            else {
+                continue;
+            };
+            let exists: bool = tx
                 .query_row(
                     "SELECT EXISTS(SELECT 1 FROM firmware_selections WHERE system=?1 AND role=?2)",
                     params![sys_key, sel.role],
@@ -1003,83 +1147,132 @@ pub fn restore<R: Read + Seek>(database: &mut Database, source: &mut R) -> Resul
                 )
                 .map_err(storage_error)?;
             if !exists {
-                let _ = crate::firmware::FirmwareVault::new(database).select(
-                    sel.system,
-                    &sel.role,
-                    &sel.content_hash,
-                );
+                let bytes: Option<u64> = tx
+                    .query_row(
+                        "SELECT byte_length FROM firmware_assets WHERE content_hash=?1",
+                        [&sel.content_hash.0],
+                        |r| r.get(0),
+                    )
+                    .optional()
+                    .map_err(storage_error)?;
+                if bytes.is_some_and(|v| allowed_sizes.contains(&v)) {
+                    tx.execute(
+                        "INSERT INTO firmware_selections(system,role,content_hash) VALUES(?1,?2,?3) ON CONFLICT(system,role) DO UPDATE SET content_hash=excluded.content_hash",
+                        params![sys_key, sel.role, sel.content_hash.0],
+                    )
+                    .map_err(storage_error)?;
+                }
             }
         }
-    }
 
-    // 4. Restore global settings conservatively (preserve local cloud_sync_opt_in if false)
-    let current_settings = database.settings()?;
-    let mut merged_settings = manifest.settings.clone();
-    if !current_settings.cloud_sync_opt_in {
-        merged_settings.cloud_sync_opt_in = false;
-    }
-    database.set_settings(&merged_settings)?;
+        tx.execute(
+            "INSERT INTO preferences(key,value) VALUES('settings',?1) ON CONFLICT(key) DO UPDATE SET value=excluded.value",
+            [&merged_settings_json],
+        )
+        .map_err(storage_error)?;
 
-    // 5. Merge `locally_removed_saves` suppression markers (never deleting existing markers)
-    let mut suppression_markers_merged = 0usize;
-    for marker in &manifest.locally_removed_saves {
-        let changed = database
-            .connection
-            .execute(
-                "INSERT OR IGNORE INTO locally_removed_saves(save_id, game_content_hash, removed_at_ms) VALUES(?1,?2,?3)",
-                params![
-                    marker.save_id.to_string(),
-                    marker.game_content_hash.0,
-                    marker.removed_at_ms
-                ],
-            )
-            .map_err(storage_error)?;
-        if changed > 0 {
-            suppression_markers_merged += 1;
+        for marker in &manifest.locally_removed_saves {
+            let changed = tx
+                .execute(
+                    "INSERT OR IGNORE INTO locally_removed_saves(save_id, game_content_hash, removed_at_ms) VALUES(?1,?2,?3)",
+                    params![
+                        marker.save_id.to_string(),
+                        marker.game_content_hash.0,
+                        marker.removed_at_ms
+                    ],
+                )
+                .map_err(storage_error)?;
+            if changed > 0 {
+                suppression_markers_merged += 1;
+            }
         }
-    }
 
-    // 6. Restore library games & per-game preferences
-    let mut games_restored = 0usize;
-    let mut games_skipped_missing_assets = 0usize;
-    for entry in &manifest.games {
-        check_deadline(until)?;
-        if !matches!(entry.manifest.system, GameSystem::Pc | GameSystem::Web) {
-            let assets_present = if let Some(media) = &entry.manifest.media {
-                media.assets.iter().all(|a| {
+        for entry in &manifest.games {
+            check_deadline(until)?;
+            if !matches!(entry.manifest.system, GameSystem::Pc | GameSystem::Web) {
+                let assets_present = if let Some(media) = &entry.manifest.media {
+                    media.assets.iter().all(|a| {
+                        database
+                            .root
+                            .join("assets")
+                            .join(&a.content_hash.0)
+                            .metadata()
+                            .is_ok_and(|m| m.is_file() && m.len() == a.byte_length)
+                    })
+                } else {
                     database
                         .root
                         .join("assets")
-                        .join(&a.content_hash.0)
+                        .join(&entry.manifest.content_hash.0)
                         .metadata()
-                        .is_ok_and(|m| m.is_file() && m.len() == a.byte_length)
-                })
+                        .is_ok_and(|m| m.is_file() && m.len() == entry.manifest.byte_length)
+                };
+                if !assets_present {
+                    games_skipped_missing_assets += 1;
+                    continue;
+                }
             } else {
-                database
-                    .root
-                    .join("assets")
-                    .join(&entry.manifest.content_hash.0)
-                    .metadata()
-                    .is_ok_and(|m| m.is_file() && m.len() == entry.manifest.byte_length)
-            };
-            if !assets_present {
                 games_skipped_missing_assets += 1;
                 continue;
             }
-        } else {
-            // Installed PC paths are device-specific and cannot be imported blindly across hosts
-            games_skipped_missing_assets += 1;
-            continue;
-        }
 
-        let existed_before = Library::new(database).by_hash(&entry.manifest.content_hash)?.is_some();
-        let local_game = Library::new(database).insert_manifest(entry.manifest.clone())?;
-        if !existed_before {
-            games_restored += 1;
-        }
-        database
-            .connection
-            .execute(
+            entry.manifest.validate()?;
+            let existing_json: Option<String> = tx
+                .query_row(
+                    "SELECT manifest_json FROM games WHERE content_hash=?1",
+                    [&entry.manifest.content_hash.0],
+                    |r| r.get(0),
+                )
+                .optional()
+                .map_err(storage_error)?;
+
+            let local_game = if let Some(raw_existing) = existing_json {
+                let mut existing: GameManifest = serde_json::from_str(&raw_existing)
+                    .map_err(|_| corrupt("Existing library manifest is corrupt"))?;
+                if existing.system != entry.manifest.system {
+                    return Err(PlatformError::new(
+                        ErrorCode::Conflict,
+                        "The same content is already registered for another system",
+                    ));
+                }
+                if existing.media.is_none() && entry.manifest.media.is_some() {
+                    existing.media = entry.manifest.media.clone();
+                    existing.validate()?;
+                    tx.execute(
+                        "UPDATE games SET manifest_json=?1 WHERE id=?2",
+                        params![
+                            serde_json::to_string(&existing).map_err(storage_error)?,
+                            existing.id.to_string()
+                        ],
+                    )
+                    .map_err(storage_error)?;
+                }
+                existing
+            } else {
+                let inserted = entry.manifest.clone();
+                tx.execute(
+                    "INSERT INTO games(id,content_hash,title,search_title,system,manifest_json,created_at_ms) VALUES(?1,?2,?3,?4,?5,?6,?7)",
+                    params![
+                        inserted.id.to_string(),
+                        inserted.content_hash.0,
+                        inserted.title,
+                        inserted.title.to_lowercase(),
+                        serde_json::to_string(&inserted.system).map_err(storage_error)?,
+                        serde_json::to_string(&inserted).map_err(storage_error)?,
+                        inserted.created_at_ms
+                    ],
+                )
+                .map_err(storage_error)?;
+                tx.execute(
+                    "INSERT INTO audit(event,entity_id,created_at_ms) VALUES('library.import',?1,?2)",
+                    params![inserted.id.to_string(), now_ms()],
+                )
+                .map_err(storage_error)?;
+                games_restored += 1;
+                inserted
+            };
+
+            tx.execute(
                 "UPDATE games SET favorite = CASE WHEN favorite=1 THEN 1 ELSE ?1 END, playtime_ms = MAX(playtime_ms, ?2), last_played_at_ms = CASE WHEN last_played_at_ms IS NULL THEN ?3 WHEN ?3 IS NULL THEN last_played_at_ms ELSE MAX(last_played_at_ms, ?3) END WHERE id=?4",
                 params![
                     entry.favorite,
@@ -1090,64 +1283,90 @@ pub fn restore<R: Read + Seek>(database: &mut Database, source: &mut R) -> Resul
             )
             .map_err(storage_error)?;
 
-        if let Some(cfg) = &entry.session_config {
-            let has_local: bool = database
-                .connection
-                .query_row(
-                    "SELECT EXISTS(SELECT 1 FROM preferences WHERE key=?1)",
-                    [format!("session.{}", local_game.id)],
-                    |r| r.get(0),
-                )
-                .map_err(storage_error)?;
-            if !has_local {
-                crate::assistance::set_session_preferences(database, local_game.id, cfg)?;
+            if let Some(cfg) = &entry.session_config {
+                cfg.validate()?;
+                let key = format!("session.{}", local_game.id);
+                let has_local: bool = tx
+                    .query_row("SELECT EXISTS(SELECT 1 FROM preferences WHERE key=?1)", [&key], |r| r.get(0))
+                    .map_err(storage_error)?;
+                if !has_local {
+                    let raw = serde_json::to_string(cfg).map_err(storage_error)?;
+                    tx.execute("INSERT INTO preferences(key,value) VALUES(?1,?2)", params![key, raw])
+                        .map_err(storage_error)?;
+                }
+            }
+            if let Some(inp) = &entry.input_profile {
+                inp.validate()?;
+                let raw = serde_json::to_string(inp).map_err(storage_error)?;
+                if raw.len() <= 16384 {
+                    let key = format!("input.{}", local_game.id);
+                    let has_local: bool = tx
+                        .query_row("SELECT EXISTS(SELECT 1 FROM preferences WHERE key=?1)", [&key], |r| r.get(0))
+                        .map_err(storage_error)?;
+                    if !has_local {
+                        tx.execute("INSERT INTO preferences(key,value) VALUES(?1,?2)", params![key, raw])
+                            .map_err(storage_error)?;
+                    }
+                }
+            }
+            if let Some(tch) = &entry.touch_profile {
+                tch.validate()?;
+                let raw = serde_json::to_string(tch).map_err(storage_error)?;
+                if raw.len() <= 8192 {
+                    let key = format!("touch.{}", local_game.id);
+                    let has_local: bool = tx
+                        .query_row("SELECT EXISTS(SELECT 1 FROM preferences WHERE key=?1)", [&key], |r| r.get(0))
+                        .map_err(storage_error)?;
+                    if !has_local {
+                        tx.execute("INSERT INTO preferences(key,value) VALUES(?1,?2)", params![key, raw])
+                            .map_err(storage_error)?;
+                    }
+                }
+            }
+            for (rt, opts) in &entry.core_options {
+                if !omniplay_contracts::core_option_identifier(rt) || opts.values.is_empty() {
+                    continue;
+                }
+                opts.validate()?;
+                let raw = serde_json::to_string(opts).map_err(storage_error)?;
+                if raw.len() <= omniplay_contracts::MAX_CORE_OPTION_PROFILE_BYTES {
+                    let key = format!("core_options.{}.{rt}", local_game.id);
+                    let has_local: bool = tx
+                        .query_row("SELECT EXISTS(SELECT 1 FROM preferences WHERE key=?1)", [&key], |r| r.get(0))
+                        .map_err(storage_error)?;
+                    if !has_local {
+                        let per_game: u64 = tx
+                            .query_row(
+                                "SELECT count(*) FROM preferences WHERE key GLOB ?1",
+                                [format!("core_options.{}.*", local_game.id)],
+                                |r| r.get(0),
+                            )
+                            .map_err(storage_error)?;
+                        if per_game < 32 {
+                            tx.execute("INSERT INTO preferences(key,value) VALUES(?1,?2)", params![key, raw])
+                                .map_err(storage_error)?;
+                        }
+                    }
+                }
             }
         }
-        if let Some(inp) = &entry.input_profile {
-            let has_local: bool = database
-                .connection
-                .query_row(
-                    "SELECT EXISTS(SELECT 1 FROM preferences WHERE key=?1)",
-                    [format!("input.{}", local_game.id)],
-                    |r| r.get(0),
-                )
-                .map_err(storage_error)?;
-            if !has_local {
-                crate::input::store(database, local_game.id, inp.clone())?;
-            }
-        }
-        if let Some(tch) = &entry.touch_profile {
-            let has_local: bool = database
-                .connection
-                .query_row(
-                    "SELECT EXISTS(SELECT 1 FROM preferences WHERE key=?1)",
-                    [format!("touch.{}", local_game.id)],
-                    |r| r.get(0),
-                )
-                .map_err(storage_error)?;
-            if !has_local {
-                crate::input::store_touch(database, local_game.id, tch.clone())?;
-            }
-        }
-        for (rt, opts) in &entry.core_options {
-            let has_local: bool = database
-                .connection
-                .query_row(
-                    "SELECT EXISTS(SELECT 1 FROM preferences WHERE key=?1)",
-                    [format!("core_options.{}.{rt}", local_game.id)],
-                    |r| r.get(0),
-                )
-                .map_err(storage_error)?;
-            if !has_local {
-                crate::core_options::store(database, local_game.id, rt, opts.clone())?;
-            }
-        }
+
+        // Manifests are now registered in `games`; clear the temporary staging retainer atomically.
+        tx.execute("DELETE FROM preferences WHERE key=?1", [PROFILE_RESTORE_STAGING_KEY])
+            .map_err(storage_error)?;
+        tx.commit().map_err(storage_error)
+    })();
+
+    if let Err(err) = metadata_commit {
+        cleanup_failed_restore_staging(database, &newly_staged_paths);
+        return Err(err);
     }
 
-    // 7. Restore save generations & promote archived heads when no local head exists yet
+    // 7. Restore save generations from exact bounded payload slices & promote archived heads when no local head exists yet
     let mut saves_restored = 0usize;
     let mut saves_already_present = 0usize;
     let mut saves_skipped = 0usize;
+    let mut saves_failed = 0usize;
 
     for entry in &manifest.saves {
         check_deadline(until)?;
@@ -1184,13 +1403,14 @@ pub fn restore<R: Read + Seek>(database: &mut Database, source: &mut R) -> Resul
             saves_skipped += 1;
             continue;
         };
-        source
-            .seek(SeekFrom::Start(payload_base + desc.relative_offset))
-            .map_err(storage_error)?;
-        let payload = bounded_read(source, original.payload_bytes)?;
-        if payload.len() as u64 != original.payload_bytes || digest(&payload) != original.payload_hash {
-            return Err(corrupt("Archive save payload changed during restore"));
-        }
+        let payload = read_exact_archive_blob(
+            source,
+            payload_base,
+            desc,
+            original.payload_bytes,
+            &original.payload_hash,
+            until,
+        )?;
 
         match SaveStore::new(database).restore_backup(
             original.clone(),
@@ -1217,12 +1437,17 @@ pub fn restore<R: Read + Seek>(database: &mut Database, source: &mut R) -> Resul
                 }
             }
             Err(_) => {
-                saves_skipped += 1;
+                saves_failed += 1;
             }
         }
     }
 
-    let _ = database.record_audit("profile.backup_restore", None);
+    let audit_event = if saves_failed > 0 {
+        "profile.backup_restore_partial"
+    } else {
+        "profile.backup_restore"
+    };
+    let _ = database.record_audit(audit_event, None);
 
     Ok(ProfileBackupRestored {
         archive_hash,
@@ -1233,6 +1458,7 @@ pub fn restore<R: Read + Seek>(database: &mut Database, source: &mut R) -> Resul
         saves_restored,
         saves_already_present,
         saves_skipped,
+        saves_failed,
         suppression_markers_merged,
     })
 }

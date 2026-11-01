@@ -42,6 +42,7 @@ export class GamePlayer extends EventTarget{
   #pauseRevision=0;
   #restoring=false;
   #portableFiles=null;
+  #nativeInputActive=false;#nativePollInFlight=false;#nativePollRevision=0;
   constructor(bridge,navigation){super();this.#bridge=bridge;this.#navigation=navigation;window.addEventListener('blur',()=>{this.#keys.clear();this.#analogKeys.clear();this.#touch?.clear();this.#pauseFromEvent();});document.addEventListener('visibilitychange',()=>{if(document.hidden)this.#pauseFromEvent();});window.addEventListener('beforeunload',event=>{if(this.#runtime&&this.#dirty){event.preventDefault();event.returnValue='';}});window.omniplayLifecycle=Object.freeze({suspend:()=>this.suspend()});}
   async suspend(){if(!this.#runtime)return;if(this.#restoring){await this.pause();throw new Error('Progress restoration is still in progress.');}if(this.#preparation){this.#preparation.abort();await this.#runtime.stop();return;}await this.pause();const deadline=performance.now()+10000;while(this.#saving&&performance.now()<deadline)await new Promise(resolve=>setTimeout(resolve,50));if(this.#saving)throw new Error('A save is still being committed.');if(hasInGame(this.#info))await this.save('in_game');if(this.#info?.saveStateBytes)await this.save('emulator_state');}
 
@@ -102,7 +103,7 @@ export class GamePlayer extends EventTarget{
       }
       this.#configHash=await sha256(new TextEncoder().encode(JSON.stringify({core:this.#core.id,wasm:this.#core.wasm_sha256,options:coreOptions,...(firmware?{firmware:firmware.identity}:{}),...(systemAssets?{system_assets:systemAssets.identity}:{}),...(coreThreadPolicy(this.#core)?{thread_pool:coreThreadPolicy(this.#core),pthread_worker:this.#core.pthread_worker_sha256}:{}),...(savedFiles?{saved_files:savedFiles}:{}),...(this.#portableFiles?{portable_files:this.#portableFiles}:{})})));
       this.#runtime.addEventListener('metrics',event=>{if(this.#status)this.#status.textContent=`p95 ${event.detail.frameTimeP95Ms.toFixed(1)} ms · ${event.detail.droppedFrames} dropped`;});
-      this.#runtime.addEventListener('runtime_error',event=>{this.#haptics.stop();this.#keys.clear();this.#analogKeys.clear();this.#touch?.suspend();this.#pointer?.clear();this.#navigation.setGameplayActive(false);clearInterval(this.#heartbeatTimer);void this.#reportState('failed').catch(()=>{});this.#status.textContent=`${text('error')}: ${event.detail.message}`;this.#status.setAttribute('role','alert');});
+      this.#runtime.addEventListener('runtime_error',event=>{this.#setMobileGameplayInput(false);this.#haptics.stop();this.#keys.clear();this.#analogKeys.clear();this.#touch?.suspend();this.#pointer?.clear();this.#navigation.setGameplayActive(false);clearInterval(this.#heartbeatTimer);void this.#reportState('failed').catch(()=>{});this.#status.textContent=`${text('error')}: ${event.detail.message}`;this.#status.setAttribute('role','alert');});
       const extension=media.extension;
       this.#runtime.addEventListener('runtime_storage_warning',event=>this.dispatchEvent(new CustomEvent('warning',{detail:event.detail.message})));
       this.#info=await runtime.prepare({moduleUrl:moduleUrl.href,wasmBinary:wasm,rom,firmware,systemAssets,savedFiles,portableFiles:this.#portableFiles,resultProtocol:libretroResultProtocol(this.#core),threadPolicy:coreThreadPolicy(this.#core),minimumSystemRamBytes:coreMemoryFloor(this.#core),fileBackedContentRequired:this.#core.file_backed_content_required===true,hardwareVideo:hardwareVideoPolicy(this.#core),options:coreOptions,optionPolicy,discControlEnabled,expectedDiscCount:media.media.format==='m3u'?media.media.disc_entries.length:null,nativeMedia:this.#mediaSource,media:media.staged&&!this.#mediaSource?{media:media.media,system:media.system,total:media.total,content_hash:media.content_hash}:null,loadMedia:writer=>streamGameMedia(this.#bridge,game,media,writer,{signal:preparation.signal,onProgress:value=>{if(this.#status)this.#status.textContent=`${text('loading')} ${Math.floor(value.copied_bytes/value.total_bytes*100)}% · ${value.asset_index}/${value.asset_count}`;}}),signal:preparation.signal,canvas:this.#dialog.querySelector('canvas'),volume:settings.audio_volume,latencyFrames:settings.latency_frames,preset:settings.preset,extension,hapticsEnabled:this.#inputProfile.haptics_enabled&&this.#core.capabilities?.includes('haptics'),pointerEnabled:game.system==='nds'&&this.#core.capabilities?.includes('touch_controls')});check();
@@ -122,7 +123,7 @@ export class GamePlayer extends EventTarget{
       if(restored&&latest?.id===restored.id)for(const head of candidates)this.#heads.set(head.kind,head);
       const session=await this.#bridge.request('web_session_begin',{game_id:game.id,runtime_id:this.#core.id});
       if(preparation.signal.aborted)await this.#bridge.request('web_session_heartbeat',{session_id:session.id,state:'stopped'},15000).catch(()=>{});check();this.#observedSession=session;
-      await runtime.start();check();this.#navigation.setGameplayActive(true);this.#pauseButton.disabled=false;this.#pauseButton.textContent=text('pause');this.#dialog.querySelector('canvas').focus();
+      await runtime.start();check();this.#navigation.setGameplayActive(true);this.#setMobileGameplayInput(true);this.#pauseButton.disabled=false;this.#pauseButton.textContent=text('pause');this.#dialog.querySelector('canvas').focus();
       await this.#reportState('running');
       check();
       this.#heartbeatTimer=setInterval(()=>void this.#heartbeat(),5000);
@@ -136,7 +137,7 @@ export class GamePlayer extends EventTarget{
       if(this.#runtime!==runtime)throw error;
       await this.#mediaSource?.close();this.#mediaSource=null;
       clearInterval(this.#heartbeatTimer);if(this.#observedSession)await this.#reportState('failed').catch(()=>{});this.#observedSession=null;
-      this.#haptics.stop();this.#touch?.suspend();this.#pointer?.clear();await this.#runtime?.stop();await this.#releaseBrowserGuard();this.#runtime=null;this.#navigation.setGameplayActive(false);this.#status.textContent=error.code==='cancelled'?(currentLocale()==='vi'?'Đã dừng mở game.':'Game opening cancelled.'):error.message;this.#status.setAttribute('role','alert');this.#pauseButton.disabled=true;throw error;
+      this.#setMobileGameplayInput(false);this.#haptics.stop();this.#touch?.suspend();this.#pointer?.clear();await this.#runtime?.stop();await this.#releaseBrowserGuard();this.#runtime=null;this.#navigation.setGameplayActive(false);this.#status.textContent=error.code==='cancelled'?(currentLocale()==='vi'?'Đã dừng mở game.':'Game opening cancelled.'):error.message;this.#status.setAttribute('role','alert');this.#pauseButton.disabled=true;throw error;
     }finally{if(this.#preparation===preparation)this.#preparation=null;this.#renderDiscs();}
   }
 
@@ -194,7 +195,7 @@ export class GamePlayer extends EventTarget{
     if(this.#exporting||this.#changingDisc||this.#restoring||this.#saving||this.#exiting||this.#preparation||!this.#runtime)throw new Error(currentLocale()==='vi'?'Chờ thao tác hiện tại kết thúc.':'Wait for the current operation to finish.');
     const save=this.#heads.get('emulator_state');if(!save)throw new Error(text('noSnapshot'));
     const runtime=this.#runtime,resume=runtime.state==='running';this.#restoring=true;
-    try{await this.pause();const revision=this.#pauseRevision;await this.#loadSave(save);if(resume&&revision===this.#pauseRevision&&this.#runtime===runtime&&runtime.state==='paused'&&document.visibilityState==='visible'&&document.hasFocus()){await runtime.resume();await this.#reportState('running');this.#navigation.setGameplayActive(true);this.#pauseButton.textContent=text('pause');}}
+    try{await this.pause();const revision=this.#pauseRevision;await this.#loadSave(save);if(resume&&revision===this.#pauseRevision&&this.#runtime===runtime&&runtime.state==='paused'&&document.visibilityState==='visible'&&document.hasFocus()){await runtime.resume();await this.#reportState('running');this.#navigation.setGameplayActive(true);this.#setMobileGameplayInput(true);this.#pauseButton.textContent=text('pause');}}
     finally{this.#restoring=false;this.#renderDiscs();}
   }
   #validateDisc(value){if(!value||typeof value.supported!=='boolean'||!Number.isInteger(value.count)||value.count<0||value.count>8||!Number.isInteger(value.index)||value.index<0||typeof value.ejected!=='boolean'||value.supported&&(value.count<1||value.index>=value.count)||!value.supported&&(value.count!==0||value.index!==0||value.ejected))throw new Error('The emulator returned invalid disc information.');return value;}
@@ -211,7 +212,7 @@ export class GamePlayer extends EventTarget{
       await this.pause();const pauseRevision=this.#pauseRevision,until=performance.now()+30000;while(this.#saving&&performance.now()<until)await new Promise(resolve=>setTimeout(resolve,40));if(this.#saving)throw new Error('Wait for the current save to finish.');
       if(hasInGame(this.#info))await this.save('in_game',true);
       this.#discState=this.#validateDisc(await runtime.selectDisc(index));this.#dirty=true;this.#status.textContent=currentLocale()==='vi'?'Đã đưa đĩa đã chọn vào.':'The selected disc is inserted.';
-      if(resume&&pauseRevision===this.#pauseRevision&&document.visibilityState==='visible'&&document.hasFocus()&&this.#runtime===runtime){await runtime.resume();await this.#reportState('running');this.#navigation.setGameplayActive(true);this.#pauseButton.textContent=text('pause');}
+      if(resume&&pauseRevision===this.#pauseRevision&&document.visibilityState==='visible'&&document.hasFocus()&&this.#runtime===runtime){await runtime.resume();await this.#reportState('running');this.#navigation.setGameplayActive(true);this.#setMobileGameplayInput(true);this.#pauseButton.textContent=text('pause');}
     }catch(error){if(runtime===this.#runtime&&runtime.state==='paused')await this.#refreshDiscs().catch(()=>{});throw error;}finally{this.#changingDisc=false;this.#renderDiscs();}
   }
   async exportCurrent(kind){
@@ -232,10 +233,10 @@ export class GamePlayer extends EventTarget{
   async pause(){
     this.#pauseRevision++;
     if(this.#pauseTask)return this.#pauseTask;
-    const operation=(async()=>{this.#haptics.stop();this.#keys.clear();this.#analogKeys.clear();this.#touch?.suspend();this.#pointer?.clear();if(this.#runtime?.state!=='running')return;await this.#benchmark?.cancel('Playback paused.');await this.#runtime.pause();this.#navigation.setGameplayActive(false);if(this.#pauseButton)this.#pauseButton.textContent=text('resume');await this.#reportState('paused');})();this.#pauseTask=operation;
+    const operation=(async()=>{this.#setMobileGameplayInput(false);this.#haptics.stop();this.#keys.clear();this.#analogKeys.clear();this.#touch?.suspend();this.#pointer?.clear();if(this.#runtime?.state!=='running')return;await this.#benchmark?.cancel('Playback paused.');await this.#runtime.pause();this.#navigation.setGameplayActive(false);if(this.#pauseButton)this.#pauseButton.textContent=text('resume');await this.#reportState('paused');})();this.#pauseTask=operation;
     try{return await operation;}finally{if(this.#pauseTask===operation)this.#pauseTask=null;}
   }
-  async togglePause(){if(this.#restoring)throw new Error(currentLocale()==='vi'?'Chờ khôi phục tiến trình kết thúc.':'Wait for progress restoration to finish.');if(this.#changingDisc)throw new Error(currentLocale()==='vi'?'Chờ thao tác đổi đĩa kết thúc.':'Wait for the disc change to finish.');if(this.#exporting)throw new Error(currentLocale()==='vi'?'Chờ thao tác xuất kết thúc.':'Wait for the live export to finish.');if(!this.#runtime)return;if(this.#runtime.state==='running')await this.pause();else if(this.#runtime.state==='paused'){if(this.#browserGuard)await this.#bridge.request('browser_game_guard_acquire',{id:this.#browserGuard},10000);await this.#runtime.resume();await this.#reportState('running');this.#navigation.setGameplayActive(true);this.#pauseButton.textContent=text('pause');this.#dialog.querySelector('canvas').focus();}}
+  async togglePause(){if(this.#restoring)throw new Error(currentLocale()==='vi'?'Chờ khôi phục tiến trình kết thúc.':'Wait for progress restoration to finish.');if(this.#changingDisc)throw new Error(currentLocale()==='vi'?'Chờ thao tác đổi đĩa kết thúc.':'Wait for the disc change to finish.');if(this.#exporting)throw new Error(currentLocale()==='vi'?'Chờ thao tác xuất kết thúc.':'Wait for the live export to finish.');if(!this.#runtime)return;if(this.#runtime.state==='running')await this.pause();else if(this.#runtime.state==='paused'){if(this.#browserGuard)await this.#bridge.request('browser_game_guard_acquire',{id:this.#browserGuard},10000);await this.#runtime.resume();await this.#reportState('running');this.#navigation.setGameplayActive(true);this.#setMobileGameplayInput(true);this.#pauseButton.textContent=text('pause');this.#dialog.querySelector('canvas').focus();}}
 
   async #reportState(state){if(this.#observedSession)await this.#bridge.request('web_session_heartbeat',{session_id:this.#observedSession.id,state},15000);}
   #pauseFromEvent(){void this.pause().catch(error=>{if(this.#status){this.#status.textContent=error.message;this.#status.setAttribute('role','alert');}});}
@@ -255,7 +256,7 @@ export class GamePlayer extends EventTarget{
     if(this.#heartbeatInFlight||!this.#observedSession||!['running','paused'].includes(this.#runtime?.state))return;
     this.#heartbeatInFlight=true;
     try{if(this.#browserGuard)await this.#bridge.request('browser_game_guard_acquire',{id:this.#browserGuard},10000);await this.#reportState(this.#runtime.state);}
-    catch(error){clearInterval(this.#heartbeatTimer);this.#haptics.stop();this.#touch?.suspend();this.#pointer?.clear();await this.#runtime?.pause().catch(()=>{});this.#navigation.setGameplayActive(false);this.#keys.clear();this.#analogKeys.clear();this.#status.textContent=error.message;this.#status.setAttribute('role','alert');if(this.#pauseButton)this.#pauseButton.textContent=text('resume');}
+    catch(error){clearInterval(this.#heartbeatTimer);this.#setMobileGameplayInput(false);this.#haptics.stop();this.#touch?.suspend();this.#pointer?.clear();await this.#runtime?.pause().catch(()=>{});this.#navigation.setGameplayActive(false);this.#keys.clear();this.#analogKeys.clear();this.#status.textContent=error.message;this.#status.setAttribute('role','alert');if(this.#pauseButton)this.#pauseButton.textContent=text('resume');}
     finally{this.#heartbeatInFlight=false;}
   }
 
@@ -268,18 +269,47 @@ export class GamePlayer extends EventTarget{
     try{
       try{await this.pause();}catch(error){this.#status.textContent=error.message;}
       if(this.#runtime&&hasInGame(this.#info)){try{await this.save('in_game');}catch(error){if(!confirm(`${error.message}\n\n${text('closeWithoutSave')}`))return;}}
-      clearInterval(this.#autoSave);clearInterval(this.#heartbeatTimer);cancelAnimationFrame(this.#frame);this.#haptics.stop();this.#touch?.dispose();this.#touch=null;this.#pointer?.dispose();this.#pointer=null;await this.#runtime?.stop();await this.#mediaSource?.close();this.#mediaSource=null;await this.#releaseBrowserGuard();await this.#reportState('stopped').catch(()=>{});if(this.#nativeFullscreen){await this.#bridge.request('presentation_fullscreen',{enabled:false}).catch(()=>{});this.#nativeFullscreen=false;}this.#observedSession=null;this.#runtime=null;this.#navigation.setGameplayActive(false);this.#dirty=false;this.#dialog?.close();this.#dialog?.remove();this.#dialog=null;this.dispatchEvent(new Event('closed'));
+      clearInterval(this.#autoSave);clearInterval(this.#heartbeatTimer);cancelAnimationFrame(this.#frame);this.#setMobileGameplayInput(false);this.#haptics.stop();this.#touch?.dispose();this.#touch=null;this.#pointer?.dispose();this.#pointer=null;await this.#runtime?.stop();await this.#mediaSource?.close();this.#mediaSource=null;await this.#releaseBrowserGuard();await this.#reportState('stopped').catch(()=>{});if(this.#nativeFullscreen){await this.#bridge.request('presentation_fullscreen',{enabled:false}).catch(()=>{});this.#nativeFullscreen=false;}this.#observedSession=null;this.#runtime=null;this.#navigation.setGameplayActive(false);this.#dirty=false;this.#dialog?.close();this.#dialog?.remove();this.#dialog=null;this.dispatchEvent(new Event('closed'));
     }finally{this.#exiting=false;}
+  }
+
+  #setMobileGameplayInput(enabled){
+    this.#nativePollRevision++;
+    if(!this.#bridge.mobileNativeInput)return;
+    if(!enabled){
+      this.#nativeInputActive=false;
+      this.#ports.clearNativeSnapshot();
+      void this.#bridge.request('native_input_mode',{enabled:false},5000).catch(()=>{});
+      return;
+    }
+    this.#nativeInputActive=true;
+    void this.#bridge.request('native_input_mode',{enabled:true},5000).catch(()=>{});
+    this.#requestMobileInputPoll();
+  }
+
+  #requestMobileInputPoll(){
+    if(!this.#bridge.mobileNativeInput||!this.#nativeInputActive||this.#nativePollInFlight||this.#runtime?.state!=='running'||document.hidden||!document.hasFocus()||this.#pauseTask)return;
+    const rev=this.#nativePollRevision;
+    this.#nativePollInFlight=true;
+    void this.#bridge.request('native_input_poll',undefined,2000).then(snapshot=>{
+      if(rev!==this.#nativePollRevision||!this.#nativeInputActive||this.#runtime?.state!=='running')return;
+      this.#ports.setNativeSnapshot(snapshot,(port,enabled,weak,strong,duration_ms)=>this.#bridge.request('native_input_haptics',{port,enabled,weak,strong,duration_ms},2000).catch(()=>{}));
+    }).catch(()=>{
+      if(rev===this.#nativePollRevision)this.#ports.clearNativeSnapshot();
+    }).finally(()=>{
+      this.#nativePollInFlight=false;
+    });
   }
 
   #pollInput(){
     if(!this.#runtime)return;
     if(this.#runtime.state==='running'){
       if(document.hidden||!document.hasFocus()||this.#pauseTask){
-        this.#haptics.stop();this.#keys.clear();this.#analogKeys.clear();this.#touch?.clear();this.#pointer?.clear();
+        this.#setMobileGameplayInput(false);this.#haptics.stop();this.#keys.clear();this.#analogKeys.clear();this.#touch?.clear();this.#pointer?.clear();
         this.#runtime.input(Array.from({length:4},()=>Array(16).fill(0)),Array.from({length:4},()=>Array(4).fill(0)));
         this.#pauseFromEvent();this.#frame=requestAnimationFrame(()=>this.#pollInput());return;
       }
+      this.#requestMobileInputPoll();
       const pads=this.#ports.update();
       const touch=this.#touch.snapshot(),{ports,analogPorts}=gameInput(pads,this.#inputProfile,this.#keys,touch.buttons,this.#analogKeys,['n64','psp'].includes(this.#game.system),touch.sticks);
       const pause=Boolean(pads[0]?.mapping==='standard'&&pads[0]?.buttons[16]?.pressed);if(pause&&!this.#lastPauseButton)this.#pauseFromEvent();this.#lastPauseButton=pause;

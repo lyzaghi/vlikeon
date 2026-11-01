@@ -33,6 +33,7 @@ final class NativeInputController: NSObject {
 
     private var slots: [PortSlot] = (0..<NativeInputController.maxPorts).map { _ in PortSlot() }
     private var active = false
+    private var gameplayConsumerActive = false
     private var observersInstalled = false
     private var remotePlayBridge: RemotePlayBridge?
 
@@ -54,10 +55,24 @@ final class NativeInputController: NSObject {
 
     func deactivate() {
         active = false
+        gameplayConsumerActive = false
         for slot in slots {
             slot.stopRumble()
         }
         remotePlayBridge?.stop()
+    }
+
+    func setGameplayMode(enabled: Bool) -> Bool {
+        if enabled && active {
+            gameplayConsumerActive = true
+            reconcileControllers()
+            return true
+        }
+        gameplayConsumerActive = false
+        for slot in slots {
+            slot.stopRumble()
+        }
+        return false
     }
 
     func attachRemotePlay(handler: @escaping RemotePlayBridge.ReportHandler) {
