@@ -605,7 +605,11 @@ impl LocalHost {
             Command::ProfileBackupInspect{grant_id}=>{let file=self.permissions.take(self.owner,grant_id,FileAccess::ProfileBackupRead)?;encode(self.profile_restores.inspect_and_stage(self.owner,file,300_000)?)},
             Command::ProfileBackupCancel{restore_token}=>Ok(json!({"cancelled":self.profile_restores.cancel(self.owner,restore_token)?})),
             Command::ProfileBackupRestore{grant_id,restore_token,expected_archive_hash}=>{
-                if self.sessions.list().iter().any(|s|!s.state.is_terminal()){return Err(PlatformError::new(ErrorCode::Busy,"Stop active games before restoring a full profile backup"));}
+                if self.sessions.list().iter().any(|s|!s.state.is_terminal()){
+                    // Release the staged descriptor so a refused restore cannot occupy a pending slot.
+                    if let Some(token)=restore_token{let _=self.profile_restores.cancel(self.owner,token);}
+                    return Err(PlatformError::new(ErrorCode::Busy,"Stop active games before restoring a full profile backup").recover("Stop active games, then inspect the archive again"));
+                }
                 match (grant_id,restore_token){
                     (None,Some(token))=>{
                         let expected=expected_archive_hash.ok_or_else(||PlatformError::new(ErrorCode::InvalidRequest,"expected_archive_hash is required when confirming a staged profile restore"))?;

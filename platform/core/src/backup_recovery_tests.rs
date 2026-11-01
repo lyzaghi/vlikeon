@@ -418,18 +418,21 @@ fn corrupt_database_recovery_resumes_after_every_injected_interruption() {
         assert!(root.join(RECOVERY_JOURNAL_FILE).exists(), "journal must persist after {point:?}");
 
         // Restart: startup reconciliation resumes and publishes a healthy database.
+        // The whole SQLite file is unreadable, so only data recoverable from content-addressed
+        // assets can return: the game is reconstructed from `assets/`. Save rows and heads lived
+        // only in the destroyed metadata DB and are NOT expected to survive; the damaged files must
+        // instead be preserved byte-for-byte in quarantine.
         let reopened = Database::open(&root).unwrap();
         assert!(!root.join(RECOVERY_JOURNAL_FILE).exists());
         let games = Library::new(&reopened).list(None, 0, 50).unwrap();
         assert_eq!(games.len(), 1);
         assert_eq!(games[0].content_hash, hash);
-        let saves: i64 = reopened.connection.query_row("SELECT count(*) FROM saves", [], |r| r.get(0)).unwrap();
-        assert_eq!(saves, 1);
-        let heads: i64 = reopened.connection.query_row("SELECT count(*) FROM save_heads", [], |r| r.get(0)).unwrap();
-        assert_eq!(heads, 1);
         let qroot = root.join("corrupt-db-quarantine");
-        let receipts = fs::read_dir(&qroot).unwrap().flatten().filter(|e| e.path().join("quarantine-receipt.json").is_file()).count();
-        assert_eq!(receipts, 1);
+        let qdirs: Vec<_> = fs::read_dir(&qroot).unwrap().flatten()
+            .filter(|e| e.path().join("quarantine-receipt.json").is_file()).collect();
+        assert_eq!(qdirs.len(), 1);
+        assert_eq!(fs::read(qdirs[0].path().join("omniplay.sqlite3")).unwrap(), b"corrupt-sqlite-header");
+        assert_eq!(fs::read(qdirs[0].path().join("omniplay.sqlite3-wal")).unwrap(), b"stale-wal");
         drop(reopened);
         // Idempotent: a second open changes nothing.
         let again = Database::open(&root).unwrap();
@@ -467,4 +470,22 @@ fn interrupted_recovery_fails_closed_on_missing_or_tampered_snapshot_and_journal
     let text = fs::read_to_string(&jpath).unwrap().replace("\"journal_sha256\"", "\"journal_sha256\": \"") ;
     fs::write(&jpath, text).unwrap();
     assert!(Database::open(&root3).is_err());
+}
+
+#[test]
+fn staging_meta_with_inflated_counts_fails_closed_without_allocating() {
+    use omniplay_contracts::ErrorCode;
+    let base = std::env::temp_dir().join(format!("vlikeon-inflated-{}", Uuid::new_v4()));
+    let _guard = Directory(base.clone());
+    let db = Database::open(&base.join("profile")).unwrap();
+    let archive = ContentHash("c".repeat(64));
+    let hashes: Vec<ContentHash> = (0..3u32).map(|i| digest(format!("h-{i}").as_bytes())).collect();
+    crate::profile_backup::persist_restore_staging_retainers(&db, &archive, &hashes).unwrap();
+    let key = format!("{}{}:meta", crate::profile_backup::PROFILE_RESTORE_STAGING_PREFIX, archive.0);
+    let meta = format!(
+        "{{\"schema_version\":1,\"archive_hash\":\"{}\",\"started_at_ms\":1,\"chunk_count\":1,\"total_hashes\":4294967295,\"asset_hashes\":[]}}",
+        archive.0
+    );
+    db.connection.execute("UPDATE preferences SET value=?1 WHERE key=?2", rusqlite::params![meta, key]).unwrap();
+    assert_eq!(crate::profile_backup::read_restore_staging_retainers(&db).err().unwrap().code, ErrorCode::CorruptData);
 }

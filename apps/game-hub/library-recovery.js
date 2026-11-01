@@ -192,8 +192,11 @@ export class ProfileBackupAndRecoveryPanel{
       }
       const shortHash=summary.archive_hash.slice(0,12);
       if(!window.confirm(text(`Khôi phục gói sao lưu đã xác minh (${shortHash}…) gồm ${summary.games} game và ${summary.saves} bản lưu vào hồ sơ hiện tại?`,`Restore verified backup archive (${shortHash}…) with ${summary.games} games and ${summary.saves} saves into the current profile?`)))return;
-      const confirmedToken=restoreToken;restoreToken=null;
+      const confirmedToken=restoreToken;
+      // Keep the token tracked until the restore reply arrives so any error (Busy, mismatch,
+      // timeout) releases the staged archive instead of leaving it pending.
       const restored=await this.#bridge.request('profile_backup_restore',{restore_token:confirmedToken,expected_archive_hash:summary.archive_hash},120000);
+      restoreToken=null;
       if(this.#closed)return;
       this.#lastRestore=restored;
       if(this.#onProfileChanged)await this.#onProfileChanged();

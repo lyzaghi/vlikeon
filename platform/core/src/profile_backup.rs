@@ -1335,6 +1335,15 @@ pub fn read_restore_staging_retainers(database: &Database) -> Result<BTreeMap<St
         if chunk_map.len() != meta.chunk_count as usize {
             return Err(corrupt_staging());
         }
+        // `total_hashes` is untrusted durable data: bound it before any allocation and require it
+        // to be consistent with the chunk count (every chunk is non-empty and ≤ the per-chunk cap).
+        let max_total = meta.chunk_count as usize * MAX_STAGING_HASHES_PER_CHUNK;
+        if meta.total_hashes == 0
+            || meta.total_hashes as usize > max_total
+            || (meta.total_hashes as usize) < meta.chunk_count as usize
+        {
+            return Err(corrupt_staging());
+        }
         let mut combined = Vec::with_capacity(meta.total_hashes as usize);
         for expected_idx in 0..meta.chunk_count {
             let Some(hashes) = chunk_map.get(&expected_idx) else {

@@ -361,8 +361,12 @@ impl Broker {
             Command::ProfileBackupInspect{grant_id}=>{let file=self.permissions.take(self.client_id,grant_id,FileAccess::ProfileBackupRead)?;encode(self.profile_restores.inspect_and_stage(self.client_id,file,180_000)?)},
             Command::ProfileBackupCancel{restore_token}=>Ok(json!({"cancelled":self.profile_restores.cancel(self.client_id,restore_token)?})),
             Command::ProfileBackupRestore{grant_id,restore_token,expected_archive_hash}=>{
-                if self.installed.list(&self.database)?.iter().any(|s|s.running)||self.sessions.list().iter().any(|s|!s.state.is_terminal()){
-                    return Err(PlatformError::new(ErrorCode::Busy,"Exit active games before restoring a full profile backup"));
+                let busy=match self.installed.list(&self.database){Ok(list)=>list.iter().any(|s|s.running),Err(error)=>{if let Some(token)=restore_token{let _=self.profile_restores.cancel(self.client_id,token);}return Err(error);}}
+                    ||self.sessions.list().iter().any(|s|!s.state.is_terminal());
+                if busy{
+                    // Release the staged descriptor so a refused restore cannot occupy a pending slot.
+                    if let Some(token)=restore_token{let _=self.profile_restores.cancel(self.client_id,token);}
+                    return Err(PlatformError::new(ErrorCode::Busy,"Exit active games before restoring a full profile backup").recover("Stop active games, then inspect the archive again"));
                 }
                 match (grant_id,restore_token) {
                     (None,Some(token))=>{
