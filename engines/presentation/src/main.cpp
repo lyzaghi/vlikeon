@@ -150,7 +150,7 @@ public:
         else if(event.type==SDL_EVENT_GAMEPAD_REMOVED){const bool owned=std::any_of(pads_.begin(),pads_.end(),[&](auto* pad){return pad&&SDL_GetGamepadID(pad)==event.gdevice.which;});update_pads();if(owned)fence(2);}
         else if(event.type==SDL_EVENT_GAMEPAD_ADDED||event.type==SDL_EVENT_JOYSTICK_ADDED)update_pads();
         else if(event.type==SDL_EVENT_JOYSTICK_REMOVED){const bool owned=raw_joysticks_.remove_device(event.jdevice.which);update_pads();if(owned)fence(2);}
-        else if((event.type==SDL_EVENT_WINDOW_RESIZED||event.type==SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED)&&event.window.windowID==SDL_GetWindowID(window_)){touch_overlay_.clear_contacts();finger_down_=false;}
+        else if((event.type==SDL_EVENT_WINDOW_RESIZED||event.type==SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED||event.type==SDL_EVENT_WINDOW_DISPLAY_SCALE_CHANGED)&&event.window.windowID==SDL_GetWindowID(window_)){touch_overlay_.clear_contacts();finger_down_=false;}
         else if(event.type==SDL_EVENT_KEY_DOWN&&!event.key.repeat&&event.key.windowID==SDL_GetWindowID(window_)){
           if(touch_overlay_.handle_key(event.key.scancode,event.key.mod)){finger_down_=false;draw_frame();}
           else if(raw_joysticks_.handle_key(event.key.scancode)){draw_frame();}

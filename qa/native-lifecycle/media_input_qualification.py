@@ -20,6 +20,11 @@ from typing import Any
 ROOT = Path(__file__).resolve().parents[2]
 
 
+def compact(source: str) -> str:
+    """Normalize formatting for source-presence checks, never hardware qualification."""
+    return "".join(source.split())
+
+
 def sha256_file(path: Path) -> str:
     h = hashlib.sha256()
     with path.open("rb") as handle:
@@ -36,25 +41,38 @@ def verify_item42_video_contracts() -> dict[str, Any]:
     eng_src = (ROOT / "engines/native/src/engine.cpp").read_text(encoding="utf-8")
     pres_src = (ROOT / "engines/presentation/src/main.cpp").read_text(encoding="utf-8")
     reg_src = (ROOT / "platform/native-runtime/src/registry.rs").read_text(encoding="utf-8")
+    gl_code, vk_code = compact(gl_src), compact(vk_src)
+    reg_code = compact(reg_src)
 
     checks = {
         "opengl_and_gles3_backends_present": (
-            "ApiFlavor::OpenGlCore33" in gl_hdr
-            and "ApiFlavor::OpenGlEs30" in gl_hdr
-            and "SDL_GL_CONTEXT_PROFILE_ES" in gl_src
+            "bool es_profile_" in gl_hdr
+            and "SDL_GL_CONTEXT_PROFILE_MASK,es_profile?SDL_GL_CONTEXT_PROFILE_ES:SDL_GL_CONTEXT_PROFILE_CORE" in gl_code
+            and "SDL_GL_CONTEXT_MAJOR_VERSION,3" in gl_code
+            and "SDL_GL_CONTEXT_MINOR_VERSION,es_profile?0:3" in gl_code
+            and "RETRO_HW_CONTEXT_OPENGLES3" in gl_src
+            and "RETRO_HW_CONTEXT_OPENGL_CORE" in gl_src
         ),
         "gl_robustness_context_loss_detection": (
-            "KHR_robustness" in gl_src and "context_lost_" in gl_hdr
+            "GL_KHR_robustness" in gl_src
+            and "PFNGLGETGRAPHICSRESETSTATUSPROC" in gl_hdr
+            and "gl_.reset_status=load<decltype(gl_.reset_status)>(reset)" in gl_code
+            and 'gl_.reset_status()!=GL_NO_ERROR)throwFailure("runtime_crashed")' in gl_code
         ),
         "vulkan_backend_and_libretro_v5_interface": (
-            "RETRO_HW_RENDER_INTERFACE_VULKAN" in vk_hdr
-            and "kInterfaceVersion = 5" in vk_hdr
+            "RetroHwRenderInterfaceVulkan" in vk_hdr
+            and "kInterfaceVersion=5" in compact(vk_hdr)
+            and "RETRO_HW_RENDER_INTERFACE_VULKAN,kInterfaceVersion" in vk_code
             and "VK_ERROR_DEVICE_LOST" in vk_src
             and "VK_ERROR_OUT_OF_DATE_KHR" in vk_src
         ),
         "resize_fullscreen_dpi_handling": (
-            "SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED" in eng_src
-            and "SDL_EVENT_WINDOW_DISPLAY_SCALE_CHANGED" in eng_src
+            all(event in source for source in (eng_src, pres_src) for event in (
+                "SDL_EVENT_WINDOW_RESIZED", "SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED", "SDL_EVENT_WINDOW_DISPLAY_SCALE_CHANGED",
+            ))
+            and all("touch_overlay_.clear_contacts();finger_down_=false;" in compact(source) for source in (eng_src, pres_src))
+            and "SDL_GetWindowSizeInPixels" in gl_src
+            and "SDL_GetWindowSizeInPixels" in vk_src
             and "SDL_SetWindowFullscreen" in pres_src
         ),
         "render_device_lost_recovery_and_retirement": (
@@ -65,13 +83,12 @@ def verify_item42_video_contracts() -> dict[str, Any]:
         "registry_approved_gpu_bounds": (
             "VideoBackend::OpenGlEs" in reg_src
             and "VideoBackend::Vulkan" in reg_src
-            and "16_777_216" in reg_src
+            and "(16..=4096).contains(&package.gpu_max_width)" in reg_code
+            and "(16..=4096).contains(&package.gpu_max_height)" in reg_code
+            and "u64::from(package.gpu_max_width)*u64::from(package.gpu_max_height)>16*1024*1024" in reg_code
         ),
     }
-    if not all(checks.values()):
-        failed = [k for k, v in checks.items() if not v]
-        raise AssertionError(f"Item 42 contract checks failed: {failed}")
-    return {"checks": checks, "live_gpu_executed": False}
+    return {"checks": checks, "passed": all(checks.values()), "live_gpu_executed": False}
 
 
 def verify_item43_audio_contracts() -> dict[str, Any]:
@@ -82,7 +99,10 @@ def verify_item43_audio_contracts() -> dict[str, Any]:
 
     checks = {
         "bounded_audio_ring_non_blocking_producer": (
-            "AudioRing" in ring_hdr and "overruns" in ring_hdr.lower() or "dropped" in ring_hdr.lower() or "underrun" in eng_src.lower()
+            "class AudioRing" in ring_hdr
+            and "capacity=65536" in compact(ring_hdr)
+            and "capacity-queued" in compact(ring_hdr)
+            and "std::atomic<std::uint64_t>" in compact(ring_hdr)
         ),
         "device_switch_and_loss_recovery": (
             "SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK" in eng_src
@@ -92,13 +112,13 @@ def verify_item43_audio_contracts() -> dict[str, Any]:
             "SDL_ClearAudioStream" in eng_src and "SDL_ClearAudioStream" in pres_src
         ),
         "wedged_consumer_bounded_wire_queue": (
-            "kAudioBytes" in wire_hdr or "kAudioFrames" in wire_hdr or "131072" in pres_src or "128 * 1024" in pres_src or "audio" in wire_hdr.lower()
+            "kMaxAudioFrames=8192" in compact(wire_hdr)
+            and "limit=std::min<std::size_t>(128u*1024u,audio_rate_)" in compact(pres_src)
+            and "if(bytes>limit)return;" in compact(pres_src)
+            and "queued)>limit-bytes)check(SDL_ClearAudioStream(audio_))" in compact(pres_src)
         ),
     }
-    if not all(checks.values()):
-        failed = [k for k, v in checks.items() if not v]
-        raise AssertionError(f"Item 43 contract checks failed: {failed}")
-    return {"checks": checks, "live_audio_fault_executed": False}
+    return {"checks": checks, "passed": all(checks.values()), "live_audio_fault_executed": False}
 
 
 def encode_wire_input_160(
@@ -256,10 +276,7 @@ def verify_item44_gamepad_contracts() -> dict[str, Any]:
             and "64+port*20" in pin_hdr.replace(" ", "")
         ),
     }
-    if not all(checks.values()):
-        failed = [k for k, v in checks.items() if not v]
-        raise AssertionError(f"Item 44 contract checks failed: {failed}")
-    return {"checks": checks, "live_controller_executed": False}
+    return {"checks": checks, "passed": all(checks.values()), "live_controller_executed": False}
 
 
 def verify_item45_touch_and_mobile_contracts() -> dict[str, Any]:
@@ -279,9 +296,10 @@ def verify_item45_touch_and_mobile_contracts() -> dict[str, Any]:
     checks = {
         "native_touch_overlay_18_controls_and_editor": (
             "class NativeTouchOverlay" in touch_hdr
-            and "kMaxContacts = 10" in touch_hdr
-            and "toggle_edit_mode" in touch_hdr
-            and "on_geometry_changed" in touch_hdr
+            and "std::array<TouchControlSpec,18>controls_" in compact(touch_hdr)
+            and "std::array<Contact,10>contacts_" in compact(touch_hdr)
+            and "edit_mode_=!edit_mode_" in compact(touch_hdr)
+            and "voidclear_contacts()" in compact(touch_hdr)
         ),
         "android_native_input_wired_to_game_hub": (
             "class NativeInputController" in android_ctrl
@@ -309,10 +327,7 @@ def verify_item45_touch_and_mobile_contracts() -> dict[str, Any]:
             and "setNativeSnapshot" in ports_js
         ),
     }
-    if not all(checks.values()):
-        failed = [k for k, v in checks.items() if not v]
-        raise AssertionError(f"Item 45 contract checks failed: {failed}")
-    return {"checks": checks, "live_touch_device_executed": False}
+    return {"checks": checks, "passed": all(checks.values()), "live_touch_device_executed": False}
 
 
 def run_live_worker_smoke(worker: Path, core: Path) -> dict[str, Any]:
@@ -326,6 +341,7 @@ def run_live_worker_smoke(worker: Path, core: Path) -> dict[str, Any]:
     try:
         assert proc.stdin is not None
         proc.stdin.close()
+        proc.stdin = None  # communicate must not flush the pipe we deliberately closed.
         _, stderr = proc.communicate(timeout=10)
         return {
             "executed": True,
@@ -351,6 +367,8 @@ def main() -> int:
     parser.add_argument("--core", type=Path, help="Optional built fixture/libretro core")
     parser.add_argument("--output", type=Path, required=True, help="Fresh output directory for evidence.json")
     args = parser.parse_args()
+    if bool(args.worker) != bool(args.core):
+        parser.error("--worker and --core must be supplied together")
 
     out_dir = args.output.resolve()
     if out_dir.exists():
@@ -359,29 +377,49 @@ def main() -> int:
 
     evidence: dict[str, Any] = {
         "schema_version": 1,
+        "verification_level": "source_contract_and_synthetic_protocol",
         "timestamp_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
         "suite": args.suite,
         "items": {},
         "live_worker": {"executed": False},
     }
 
-    if args.suite in ("contract", "video", "all"):
-        evidence["items"]["item_42_video"] = verify_item42_video_contracts()
-    if args.suite in ("contract", "audio", "all"):
-        evidence["items"]["item_43_audio"] = verify_item43_audio_contracts()
-    if args.suite in ("contract", "gamepad", "all"):
-        evidence["items"]["item_44_gamepad"] = verify_item44_gamepad_contracts()
-    if args.suite in ("contract", "touch", "all"):
-        evidence["items"]["item_45_touch"] = verify_item45_touch_and_mobile_contracts()
+    failures = []
+    for suite, item, verify in (
+        ("video", "item_42_video", verify_item42_video_contracts),
+        ("audio", "item_43_audio", verify_item43_audio_contracts),
+        ("gamepad", "item_44_gamepad", verify_item44_gamepad_contracts),
+        ("touch", "item_45_touch", verify_item45_touch_and_mobile_contracts),
+    ):
+        if args.suite not in ("contract", "all", suite):
+            continue
+        try:
+            result = verify()
+            result["failed_checks"] = [name for name, passed in result["checks"].items() if not passed]
+        except Exception as error:
+            # Preserve evidence for this suite and continue the independent suites.
+            result = {"passed": False, "error_type": type(error).__name__, "error": str(error)}
+        evidence["items"][item] = result
+        if not result["passed"]:
+            failures.append(item)
 
     if args.worker and args.core:
-        evidence["live_worker"] = run_live_worker_smoke(args.worker.resolve(), args.core.resolve())
+        try:
+            evidence["live_worker"] = run_live_worker_smoke(args.worker.resolve(), args.core.resolve())
+            if evidence["live_worker"]["exit_code"] != 0:
+                failures.append("live_worker")
+        except Exception as error:
+            evidence["live_worker"] = {"attempted": True, "executed": None, "error_type": type(error).__name__, "error": str(error)}
+            failures.append("live_worker")
 
+    evidence["failed_items"] = failures
+    evidence["passed"] = not failures
     (out_dir / "evidence.json").write_text(
         json.dumps(evidence, indent=2, ensure_ascii=False) + "\n",
         encoding="utf-8",
     )
-    return 0
+    print(json.dumps({"passed": not failures, "failed_items": failures, "evidence": str(out_dir / "evidence.json")}))
+    return 1 if failures else 0
 
 
 if __name__ == "__main__":

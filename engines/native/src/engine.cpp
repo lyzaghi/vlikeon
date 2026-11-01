@@ -374,7 +374,7 @@ void Engine::poll(){
   SDL_Event event;while(SDL_PollEvent(&event)){
   if(event.type==SDL_EVENT_QUIT||(event.type==SDL_EVENT_WINDOW_CLOSE_REQUESTED&&window_&&event.window.windowID==SDL_GetWindowID(window_))){close_requested_=true;pause();}
   else if((event.type==SDL_EVENT_WINDOW_FOCUS_LOST||event.type==SDL_EVENT_WINDOW_MINIMIZED||event.type==SDL_EVENT_WINDOW_HIDDEN)&&window_&&event.window.windowID==SDL_GetWindowID(window_))pause();
-  else if((event.type==SDL_EVENT_WINDOW_RESIZED||event.type==SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED)&&window_&&event.window.windowID==SDL_GetWindowID(window_)){touch_overlay_.clear_contacts();finger_down_=false;}
+  else if((event.type==SDL_EVENT_WINDOW_RESIZED||event.type==SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED||event.type==SDL_EVENT_WINDOW_DISPLAY_SCALE_CHANGED)&&window_&&event.window.windowID==SDL_GetWindowID(window_)){touch_overlay_.clear_contacts();finger_down_=false;}
   else if((event.type==SDL_EVENT_RENDER_DEVICE_LOST||event.type==SDL_EVENT_RENDER_DEVICE_RESET||event.type==SDL_EVENT_RENDER_TARGETS_RESET)&&window_&&event.render.windowID==SDL_GetWindowID(window_)){fault_=true;throw Failure("runtime_unavailable");}
   else if(event.type==SDL_EVENT_GAMEPAD_ADDED)pad_added(event.gdevice.which);
   else if(event.type==SDL_EVENT_GAMEPAD_REMOVED)pad_removed(event.gdevice.which);

@@ -149,11 +149,11 @@ impl<S:SoftwareTimestampSource> WinsockDatagrams<S>{
             if only==0&&unsafe{setsockopt(native,IPPROTO_IP,IP_PKTINFO,(&enabled as *const i32).cast(),size_of::<i32>()as i32)}==SOCKET_ERROR{return Err(denied());}
         }
         let mut recv:LPFN_WSARECVMSG=None;let mut bytes=0u32;let mut id=WSAID_WSARECVMSG;
-        let result=unsafe{WSAIoctl(native,SIO_GET_EXTENSION_FUNCTION_POINTER,(&mut id as *mut _).cast(),size_of_val(&id)as u32,
-            (&mut recv as *mut _).cast(),size_of::<LPFN_WSARECVMSG>()as u32,&mut bytes,std::ptr::null_mut(),None)};
+        let result=unsafe{WSAIoctl(native,SIO_GET_EXTENSION_FUNCTION_POINTER,std::ptr::from_mut(&mut id).cast(),size_of_val(&id)as u32,
+            std::ptr::from_mut(&mut recv).cast(),size_of::<LPFN_WSARECVMSG>()as u32,&mut bytes,std::ptr::null_mut(),None)};
         if result==SOCKET_ERROR||recv.is_none()||bytes as usize!=size_of::<LPFN_WSARECVMSG>(){return Err(denied());}
         let mut config:TIMESTAMPING_CONFIG=unsafe{zeroed()};config.Flags=TIMESTAMPING_FLAG_RX;
-        let result=unsafe{WSAIoctl(native,SIO_TIMESTAMPING,(&mut config as *mut _).cast(),size_of::<TIMESTAMPING_CONFIG>()as u32,
+        let result=unsafe{WSAIoctl(native,SIO_TIMESTAMPING,std::ptr::from_mut(&mut config).cast(),size_of::<TIMESTAMPING_CONFIG>()as u32,
             std::ptr::null_mut(),0,&mut bytes,std::ptr::null_mut(),None)};
         if result==SOCKET_ERROR{return Err(denied());}
         source.require_current(socket)?;

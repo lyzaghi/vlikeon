@@ -3,6 +3,7 @@
 //! responsibilities of the native pairing controller; this is not a relay API.
 use crate::{decode,document_hash,key,validate_audience,verify,verify_grant,invalid,unauthorized,
     SignedDocument,Invite,ClientHello,INVITE_DOMAIN,HELLO_DOMAIN,native_credentials::NativePairKey};
+use omniplay_contracts::Result;
 use base64::{Engine,engine::general_purpose::URL_SAFE_NO_PAD};
 use ring::{agreement,hkdf,rand::SystemRandom};
 use sha2::{Digest,Sha256};

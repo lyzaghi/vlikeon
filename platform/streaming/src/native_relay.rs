@@ -1,7 +1,7 @@
 //! Bounded native HTTP transport for paired operations and admitted client join. Product
 //! generation/session authority must be checked by its native caller. Creating
 //! this client or authoring this source does not deploy or contact a relay.
-use crate::{validate_audience,verify_grant,verify_grant_for_retirement,verify_request,RelayEnvelope,RelayOperation,RelayRequest,
+use crate::{validate_audience,verify_grant,verify_grant_for_retirement,verify_request,RelayEnvelope,RelayOperation,RelayRequest,SignedDocument,
     native_credentials::{NativeSigningIdentity,SigningDomain}};
 use omniplay_contracts::{ErrorCode,PlatformError,Result};
 use reqwest::{blocking::Client,redirect::Policy,header};
