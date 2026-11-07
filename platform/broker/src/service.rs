@@ -358,12 +358,13 @@ impl Broker {
                 let grant_id = self.permissions.grant_selected_file(self.client_id, &path, FileAccess::ProfileBackupRead, 180_000)?;
                 Ok(json!({"grant_id": grant_id, "byte_length": meta.len()}))
             }
-            Command::ProfileBackupExport{include_rom_assets,destination_grant_id}=>{if self.installed.list(&self.database)?.iter().any(|s|s.running){return Err(PlatformError::new(ErrorCode::Busy,"Exit installed games before exporting a full profile backup"));}let mut file=self.permissions.take(self.client_id,destination_grant_id,FileAccess::ExportWrite)?;encode(omniplay_core::profile_backup::export(&mut self.database,include_rom_assets,&mut file)?)},
+            Command::ProfileBackupExport{include_rom_assets,destination_grant_id}=>{if self.installed.list(&self.database)?.iter().any(|s|s.running)||self.sessions.list().iter().any(|s|!s.state.is_terminal())||self.web_sessions.list().iter().any(|s|!s.state.is_terminal()){return Err(PlatformError::new(ErrorCode::Busy,"Exit active games before exporting a full profile backup"));}let mut file=self.permissions.take(self.client_id,destination_grant_id,FileAccess::ExportWrite)?;encode(omniplay_core::profile_backup::export(&mut self.database,include_rom_assets,&mut file)?)},
             Command::ProfileBackupInspect{grant_id}=>{let file=self.permissions.take(self.client_id,grant_id,FileAccess::ProfileBackupRead)?;encode(self.profile_restores.inspect_and_stage(self.client_id,file,180_000)?)},
             Command::ProfileBackupCancel{restore_token}=>Ok(json!({"cancelled":self.profile_restores.cancel(self.client_id,restore_token)?})),
             Command::ProfileBackupRestore{grant_id,restore_token,expected_archive_hash}=>{
                 let busy=match self.installed.list(&self.database){Ok(list)=>list.iter().any(|s|s.running),Err(error)=>{if let Some(token)=restore_token{let _=self.profile_restores.cancel(self.client_id,token);}return Err(error);}}
-                    ||self.sessions.list().iter().any(|s|!s.state.is_terminal());
+                    ||self.sessions.list().iter().any(|s|!s.state.is_terminal())
+                    ||self.web_sessions.list().iter().any(|s|!s.state.is_terminal());
                 if busy{
                     // Release the staged descriptor so a refused restore cannot occupy a pending slot.
                     if let Some(token)=restore_token{let _=self.profile_restores.cancel(self.client_id,token);}
@@ -371,7 +372,10 @@ impl Broker {
                 }
                 match (grant_id,restore_token) {
                     (None,Some(token))=>{
-                        let expected=expected_archive_hash.ok_or_else(||PlatformError::new(ErrorCode::InvalidRequest,"expected_archive_hash is required when confirming a staged profile restore"))?;
+                        let Some(expected)=expected_archive_hash else{
+                            let _=self.profile_restores.cancel(self.client_id,token);
+                            return Err(PlatformError::new(ErrorCode::InvalidRequest,"expected_archive_hash is required when confirming a staged profile restore"));
+                        };
                         let mut file=self.profile_restores.take_for_restore(self.client_id,token,&expected)?;
                         encode(omniplay_core::profile_backup::restore_verified(&mut self.database,&mut file,Some(&expected))?)
                     }
@@ -379,11 +383,14 @@ impl Broker {
                         let mut file=self.permissions.take(self.client_id,gid,FileAccess::ProfileBackupRead)?;
                         encode(omniplay_core::profile_backup::restore_verified(&mut self.database,&mut file,expected_archive_hash.as_ref())?)
                     }
-                    _=>Err(PlatformError::new(ErrorCode::InvalidRequest,"Provide either restore_token or grant_id, not both")),
+                    (_,maybe_token)=>{
+                        if let Some(token)=maybe_token{let _=self.profile_restores.cancel(self.client_id,token);}
+                        Err(PlatformError::new(ErrorCode::InvalidRequest,"Provide either restore_token or grant_id, not both"))
+                    }
                 }
             },
             Command::DatabaseHealthCheck=>encode(omniplay_core::Database::diagnose(&self.database.root)?),
-            Command::DatabaseRecoverCorrupt=>{if self.installed.list(&self.database).is_ok_and(|list|list.iter().any(|s|s.running))||self.sessions.list().iter().any(|s|!s.state.is_terminal()){return Err(PlatformError::new(ErrorCode::Busy,"Stop active games before recovering the profile database"));}encode(self.database.recover_live()?)},
+            Command::DatabaseRecoverCorrupt=>{if self.installed.list(&self.database).is_ok_and(|list|list.iter().any(|s|s.running))||self.sessions.list().iter().any(|s|!s.state.is_terminal())||self.web_sessions.list().iter().any(|s|!s.state.is_terminal()){return Err(PlatformError::new(ErrorCode::Busy,"Stop active games before recovering the profile database"));}encode(self.database.recover_live()?)},
             Command::LibraryReconstructPreview=>encode(omniplay_core::library_reconstruct::preview(&self.database)?),
             Command::LibraryReconstructCommit{candidate_id,revision,title,system,track_bindings}=>encode(omniplay_core::library_reconstruct::reconstruct(&self.database,&candidate_id,&revision,title,system,track_bindings)?),
             Command::StorageAccountingReport=>encode(omniplay_core::storage_accounting::report(&self.database)?),
@@ -598,3 +605,121 @@ impl Broker {
 }
 
 fn encode(value: impl serde::Serialize) -> Result<Value> { serde_json::to_value(value).map_err(|_|PlatformError::new(ErrorCode::Internal,"Response could not be encoded")) }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use omniplay_core::sessions::RuntimeAdapter;
+    use std::fs::{self, File};
+
+    struct NoopRuntimeFactory;
+    impl RuntimeFactory for NoopRuntimeFactory {
+        fn list(&self) -> Vec<RuntimeManifest> {
+            Vec::new()
+        }
+        fn option_policy(&self, _runtime_id: &str) -> Result<CoreOptionPolicy> {
+            Err(PlatformError::new(ErrorCode::NotFound, "No native runtime in test"))
+        }
+        fn create(&self, _runtime_id: &str) -> Result<Box<dyn RuntimeAdapter>> {
+            Err(PlatformError::new(ErrorCode::NotFound, "No native runtime in test"))
+        }
+    }
+
+    fn send(broker: &mut Broker, command: Command) -> Result<Value> {
+        let req = Request {
+            protocol_major: PROTOCOL_MAJOR,
+            protocol_minor: PROTOCOL_MINOR,
+            id: Uuid::new_v4(),
+            profile_id: broker.profile_id,
+            deadline_ms: omniplay_core::now_ms() + 15_000,
+            command,
+        };
+        let raw = serde_json::to_vec(&req).unwrap();
+        match broker.handle(req, &raw).outcome {
+            ResponseOutcome::Ok { result } => Ok(result),
+            ResponseOutcome::Error { error } => Err(error),
+        }
+    }
+
+    #[test]
+    fn desktop_broker_ipc_profile_backup_busy_token_release_and_recovery_commands() {
+        let base = std::env::temp_dir().join(format!("vlikeon-broker-ipc-{}", Uuid::new_v4()));
+        fs::create_dir_all(&base).unwrap();
+        let profile_id = Uuid::new_v4();
+        let db = Database::open(&base.join("profile")).unwrap();
+        let mut broker = Broker::new(db, Box::new(NoopRuntimeFactory), profile_id).unwrap();
+
+        let rom_path = base.join("game.nes");
+        let mut nes_rom = vec![0u8; 16 + 16384];
+        nes_rom[..4].copy_from_slice(b"NES\x1a");
+        nes_rom[4] = 1;
+        fs::write(&rom_path, &nes_rom).unwrap();
+        let game = Library::new(&broker.database)
+            .import(File::open(&rom_path).unwrap(), "Broker NES".into(), GameSystem::Nes)
+            .unwrap();
+
+        let archive_path = base.join("broker.opprofile");
+        let export_grant = broker
+            .permissions
+            .grant_selected_file(broker.client_id, &archive_path, FileAccess::ExportWrite, 60_000)
+            .unwrap();
+        send(
+            &mut broker,
+            Command::ProfileBackupExport {
+                include_rom_assets: true,
+                destination_grant_id: export_grant,
+            },
+        )
+        .unwrap();
+
+        // Start an active web session and verify both ProfileBackupExport and ProfileBackupRestore
+        // reject with Busy AND release staged restore tokens across 5 consecutive attempts.
+        let begin_val = send(
+            &mut broker,
+            Command::WebSessionBegin {
+                game_id: game.id,
+                runtime_id: "fceumm-web".into(),
+            },
+        )
+        .unwrap();
+        let session_id: Uuid = serde_json::from_value(begin_val["id"].clone()).unwrap();
+
+        for _ in 0..5 {
+            let read_grant = broker
+                .permissions
+                .grant_selected_file(broker.client_id, &archive_path, FileAccess::ProfileBackupRead, 60_000)
+                .unwrap();
+            let summary = send(&mut broker, Command::ProfileBackupInspect { grant_id: read_grant }).unwrap();
+            let token: Uuid = serde_json::from_value(summary["restore_token"].clone()).unwrap();
+            let hash: ContentHash = serde_json::from_value(summary["archive_hash"].clone()).unwrap();
+
+            let restore_busy = send(
+                &mut broker,
+                Command::ProfileBackupRestore {
+                    grant_id: None,
+                    restore_token: Some(token),
+                    expected_archive_hash: Some(hash),
+                },
+            )
+            .unwrap_err();
+            assert_eq!(restore_busy.code, ErrorCode::Busy);
+        }
+
+        send(
+            &mut broker,
+            Command::WebSessionHeartbeat {
+                session_id,
+                state: SessionState::Stopped,
+            },
+        )
+        .unwrap();
+
+        let health = send(&mut broker, Command::DatabaseHealthCheck).unwrap();
+        assert_eq!(health["status"], "healthy");
+
+        send(&mut broker, Command::StorageAccountingReport).unwrap();
+
+        broker.close();
+        let _ = fs::remove_dir_all(&base);
+    }
+}

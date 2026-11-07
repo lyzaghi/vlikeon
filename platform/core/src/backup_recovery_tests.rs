@@ -696,3 +696,444 @@ fn staging_meta_with_inflated_counts_fails_closed_without_allocating() {
     db.connection.execute("UPDATE preferences SET value=?1 WHERE key=?2", rusqlite::params![meta, key]).unwrap();
     assert_eq!(crate::profile_backup::read_restore_staging_retainers(&db).err().unwrap().code, ErrorCode::CorruptData);
 }
+
+#[test]
+fn subprocess_hard_crash_recovery_worker() {
+    let Ok(profile_dir) = std::env::var("OMNIPLAY_TEST_RECOVERY_HARD_CRASH_DIR") else {
+        return;
+    };
+    let _ = crate::database_recovery::recover(std::path::Path::new(&profile_dir));
+}
+
+#[test]
+fn corrupt_database_recovery_survives_abrupt_subprocess_kill_and_os_storage_lock() {
+    use crate::database_recovery::{DatabaseHealthStatus, RecoveryFaultPoint, RECOVERY_JOURNAL_FILE, STAGING_DB_FILE};
+    use omniplay_contracts::ErrorCode;
+
+    // 1. Real OS process abrupt exit (`std::process::exit(99)` with zero stack unwinding or Drop cleanup)
+    // across all 5 recovery journal fault points, preserving salvaged save generations and selected head.
+    let current_exe = std::env::current_exe().unwrap();
+    for point in [
+        RecoveryFaultPoint::AfterInitialJournalWrite,
+        RecoveryFaultPoint::BetweenQuarantineRenames,
+        RecoveryFaultPoint::MidStagingRebuild,
+        RecoveryFaultPoint::BeforePublishRename,
+        RecoveryFaultPoint::AfterPublishRenameBeforeJournalRemove,
+    ] {
+        let mut fixture = Fixture::new();
+        let first = fixture.save_in_slot(b"hard-crash-gen1", 2, None);
+        let second = fixture.save_in_slot(b"hard-crash-gen2", 2, Some(first.id));
+        SaveStore::new(&mut fixture.database).promote(first.id, Some(second.id)).unwrap();
+        let root = fixture.database.root.clone();
+        let game_hash = fixture.game.content_hash.clone();
+        let Fixture { database, _directory: _guard, game: _ } = fixture;
+        drop(database);
+
+        {
+            let damaged = rusqlite::Connection::open(root.join("omniplay.sqlite3")).unwrap();
+            damaged.execute_batch("PRAGMA foreign_keys=OFF; PRAGMA wal_checkpoint(TRUNCATE); PRAGMA journal_mode=DELETE;").unwrap();
+            damaged.execute(
+                "INSERT INTO sessions(id,game_id,runtime_id,state,info_json,created_at_ms,updated_at_ms) VALUES(?1,?2,'fixture','stopped','{}',1,1)",
+                rusqlite::params![Uuid::new_v4().to_string(), Uuid::nil().to_string()],
+            ).unwrap();
+        }
+        assert_eq!(crate::database_recovery::diagnose(&root).unwrap().status, DatabaseHealthStatus::IntegrityFailed);
+
+        let output = std::process::Command::new(&current_exe)
+            .arg("--exact")
+            .arg("backup_recovery_tests::subprocess_hard_crash_recovery_worker")
+            .arg("--nocapture")
+            .env("OMNIPLAY_TEST_RECOVERY_HARD_CRASH_DIR", &root)
+            .env("OMNIPLAY_TEST_RECOVERY_HARD_CRASH_POINT", format!("{point:?}"))
+            .output()
+            .unwrap();
+        assert_eq!(
+            output.status.code(),
+            Some(99),
+            "Child process must terminate abruptly with exit code 99 at {point:?}"
+        );
+        assert!(
+            root.join(RECOVERY_JOURNAL_FILE).is_file(),
+            "Recovery journal must exist on disk after abrupt process death at {point:?}"
+        );
+
+        let mut reopened = Database::open(&root).unwrap();
+        assert!(!root.join(RECOVERY_JOURNAL_FILE).exists());
+        assert_eq!(crate::database_recovery::diagnose(&root).unwrap().status, DatabaseHealthStatus::Healthy);
+        let games = Library::new(&reopened).list(None, 0, 50).unwrap();
+        assert_eq!(games.len(), 1);
+        assert_eq!(games[0].content_hash, game_hash);
+        let saves = SaveStore::new(&mut reopened).list(games[0].id).unwrap();
+        assert_eq!(saves.len(), 2);
+        let heads = SaveStore::new(&mut reopened).heads(games[0].id).unwrap();
+        assert_eq!(heads.len(), 1);
+        let (_, head_payload) = SaveStore::new(&mut reopened).read(heads[0].id, None).unwrap();
+        assert_eq!(head_payload, b"hard-crash-gen1");
+    }
+
+    // 2. Real OS storage fault (exclusive sharing-violation lock on staging DB during recovery)
+    #[cfg(windows)]
+    {
+        use std::os::windows::fs::OpenOptionsExt;
+        let base = std::env::temp_dir().join(format!("vlikeon-oslock-{}", Uuid::new_v4()));
+        let _guard = Directory(base.clone());
+        fs::create_dir_all(&base).unwrap();
+        let (root, expected_hash, _) = make_corrupt_profile(&base);
+        let locked_staging = OpenOptions::new()
+            .read(true)
+            .write(true)
+            .create(true)
+            .truncate(true)
+            .share_mode(0)
+            .open(root.join(STAGING_DB_FILE))
+            .unwrap();
+        let err = crate::database_recovery::recover(&root).unwrap_err();
+        assert_eq!(err.code, ErrorCode::StorageFailure);
+        assert!(root.join(RECOVERY_JOURNAL_FILE).is_file());
+        drop(locked_staging);
+
+        let reopened = Database::open(&root).unwrap();
+        assert!(!root.join(RECOVERY_JOURNAL_FILE).exists());
+        let games = Library::new(&reopened).list(None, 0, 50).unwrap();
+        assert_eq!(games.len(), 1);
+        assert_eq!(games[0].content_hash, expected_hash);
+    }
+}
+
+#[test]
+fn library_reconstruct_chd_iso_pbp_multi_disc_and_ambiguous_bindings() {
+    use omniplay_contracts::{ContentFormat, CueEncoding, ErrorCode};
+    use std::{collections::BTreeMap, sync::atomic::AtomicBool};
+
+    let base = std::env::temp_dir().join(format!("vlikeon-reconstruct-formats-{}", Uuid::new_v4()));
+    let _guard = Directory(base.clone());
+    fs::create_dir_all(&base).unwrap();
+
+    let make_chd = |tag: u8| -> Vec<u8> {
+        let mut buf = vec![tag; 4096];
+        buf[..8].copy_from_slice(b"MComprHD");
+        buf
+    };
+    let make_pbp = |tag: u8| -> Vec<u8> {
+        let mut buf = vec![tag; 4096];
+        buf[..4].copy_from_slice(b"\0PBP");
+        buf
+    };
+    let make_iso = |sys_id: &[u8], vol_id: &[u8], tag: u8| -> Vec<u8> {
+        let mut buf = vec![tag; 0x8060 + 2048];
+        buf[0x8000] = 0x01;
+        buf[0x8001..0x8006].copy_from_slice(b"CD001");
+        buf[0x8006] = 0x01;
+        buf[0x8008..0x8028].fill(b' ');
+        buf[0x8008..0x8008 + sys_id.len()].copy_from_slice(sys_id);
+        buf[0x8028..0x8048].fill(b' ');
+        buf[0x8028..0x8028 + vol_id.len()].copy_from_slice(vol_id);
+        buf
+    };
+
+    // 1. Standalone CHD (PS1), ISO (PS1 & PSP), and PBP (PSP) imported via public import_bundle
+    for (label, filename, system, expected_format, bytes) in [
+        ("chd-ps1", "disc.chd", GameSystem::Ps1, ContentFormat::Chd, make_chd(0x11)),
+        ("iso-ps1", "disc.iso", GameSystem::Ps1, ContentFormat::Iso, make_iso(b"PLAYSTATION", b"PS1_ISO_VOL", 0x22)),
+        ("iso-psp", "umd.iso", GameSystem::Psp, ContentFormat::Iso, make_iso(b"PSP GAME", b"PSP_ISO_VOL", 0x33)),
+        ("pbp-psp", "eboot.pbp", GameSystem::Psp, ContentFormat::Pbp, make_pbp(0x44)),
+    ] {
+        let case_root = base.join(label);
+        let selected = case_root.join("selected");
+        fs::create_dir_all(&selected).unwrap();
+        fs::write(selected.join(filename), &bytes).unwrap();
+
+        let imported_db = Database::open(&case_root.join("imported")).unwrap();
+        let original = crate::media_import::import_bundle(
+            &imported_db,
+            crate::media_import::DiscScope::selected(&selected).unwrap(),
+            filename,
+            format!("Original {label}"),
+            system,
+            CueEncoding::Utf8,
+            &AtomicBool::new(false),
+            |_| {},
+        )
+        .unwrap();
+
+        let db = Database::open(&case_root.join("recovered")).unwrap();
+        let assets_dir = db.root.join("assets");
+        fs::create_dir_all(&assets_dir).unwrap();
+        for asset in &original.media.as_ref().unwrap().assets {
+            let b = fs::read(imported_db.root.join("assets").join(&asset.content_hash.0)).unwrap();
+            fs::write(assets_dir.join(&asset.content_hash.0), b).unwrap();
+        }
+
+        let preview = crate::library_reconstruct::preview(&db).unwrap();
+        assert_eq!(preview.candidates.len(), 1, "{label} must yield 1 candidate");
+        let cand = &preview.candidates[0];
+        assert_eq!(cand.format, expected_format);
+        assert_eq!(cand.suggested_system, Some(system));
+        assert!(!cand.needs_track_binding);
+
+        let rebuilt = crate::library_reconstruct::reconstruct(
+            &db,
+            &cand.candidate_id,
+            &cand.revision,
+            Some(format!("Rebuilt {label}")),
+            None,
+            None,
+        )
+        .unwrap();
+        assert_eq!(rebuilt.content_hash, original.content_hash);
+        assert_eq!(rebuilt.system, system);
+        assert_eq!(
+            serde_json::to_value(&rebuilt.media).unwrap(),
+            serde_json::to_value(&original.media).unwrap()
+        );
+    }
+
+    // 2. Two-disc CHD M3U & two-disc ISO M3U: ambiguous without save hash, explicit bindings, and save-hash auto-resolution
+    for (ext, disc1_bytes, disc2_bytes) in [
+        ("chd", make_chd(0x51), make_chd(0x52)),
+        ("iso", make_iso(b"PLAYSTATION", b"DISC1", 0x61), make_iso(b"PLAYSTATION", b"DISC2", 0x62)),
+    ] {
+        let case_root = base.join(format!("m3u-{ext}"));
+        let selected = case_root.join("selected");
+        fs::create_dir_all(&selected).unwrap();
+        let d1_name = format!("Alpha.{ext}");
+        let d2_name = format!("Beta.{ext}");
+        fs::write(selected.join(&d1_name), &disc1_bytes).unwrap();
+        fs::write(selected.join(&d2_name), &disc2_bytes).unwrap();
+        fs::write(selected.join("Set.m3u"), format!("{d1_name}\n{d2_name}\n")).unwrap();
+
+        let imported_db = Database::open(&case_root.join("imported")).unwrap();
+        let original = crate::media_import::import_bundle(
+            &imported_db,
+            crate::media_import::DiscScope::selected(&selected).unwrap(),
+            "Set.m3u",
+            format!("Multi {ext}"),
+            GameSystem::Ps1,
+            CueEncoding::Utf8,
+            &AtomicBool::new(false),
+            |_| {},
+        )
+        .unwrap();
+        let orig_media = original.media.as_ref().unwrap();
+
+        // 2a. Without save hash: M3U candidate is ambiguous (needs_track_binding == true)
+        let db_ambig = Database::open(&case_root.join("recovered-ambig")).unwrap();
+        let assets_ambig = db_ambig.root.join("assets");
+        fs::create_dir_all(&assets_ambig).unwrap();
+        let mut explicit_bindings = BTreeMap::new();
+        for asset in &orig_media.assets {
+            let b = fs::read(imported_db.root.join("assets").join(&asset.content_hash.0)).unwrap();
+            fs::write(assets_ambig.join(&asset.content_hash.0), b).unwrap();
+            if asset.name != "game.m3u" {
+                explicit_bindings.insert(asset.name.clone(), asset.content_hash.clone());
+            }
+        }
+        let preview_ambig = crate::library_reconstruct::preview(&db_ambig).unwrap();
+        let m3u_cand = preview_ambig
+            .candidates
+            .iter()
+            .find(|c| c.format == ContentFormat::M3u)
+            .unwrap();
+        assert!(m3u_cand.needs_track_binding, "2-disc {ext} M3U without saves must require track binding");
+        assert_eq!(
+            crate::library_reconstruct::reconstruct(
+                &db_ambig,
+                &m3u_cand.candidate_id,
+                &m3u_cand.revision,
+                None,
+                None,
+                None,
+            )
+            .unwrap_err()
+            .code,
+            ErrorCode::InvalidRequest
+        );
+        // Supplying explicit bindings reconstructs exact identity
+        let rebuilt_explicit = crate::library_reconstruct::reconstruct(
+            &db_ambig,
+            &m3u_cand.candidate_id,
+            &m3u_cand.revision,
+            Some(format!("Rebuilt {ext} M3U")),
+            Some(GameSystem::Ps1),
+            Some(explicit_bindings),
+        )
+        .unwrap();
+        assert_eq!(rebuilt_explicit.content_hash, original.content_hash);
+        assert_eq!(
+            serde_json::to_value(&rebuilt_explicit.media).unwrap(),
+            serde_json::to_value(&original.media).unwrap()
+        );
+
+        // 2b. With surviving save hash in `locally_removed_saves`: preview auto-disambiguates disc order!
+        let db_saved = Database::open(&case_root.join("recovered-saved")).unwrap();
+        let assets_saved = db_saved.root.join("assets");
+        fs::create_dir_all(&assets_saved).unwrap();
+        for asset in &orig_media.assets {
+            let b = fs::read(imported_db.root.join("assets").join(&asset.content_hash.0)).unwrap();
+            fs::write(assets_saved.join(&asset.content_hash.0), b).unwrap();
+        }
+        db_saved
+            .connection
+            .execute(
+                "INSERT INTO locally_removed_saves(save_id, game_content_hash, removed_at_ms) VALUES(?1, ?2, 1)",
+                rusqlite::params![Uuid::new_v4().to_string(), original.content_hash.0],
+            )
+            .unwrap();
+        let preview_saved = crate::library_reconstruct::preview(&db_saved).unwrap();
+        assert_eq!(preview_saved.candidates.len(), 1, "claimed discs must not appear as separate standalone games");
+        let resolved_cand = &preview_saved.candidates[0];
+        assert!(!resolved_cand.needs_track_binding);
+        assert_eq!(resolved_cand.matched_save_content_hash, Some(original.content_hash.clone()));
+        let rebuilt_auto = crate::library_reconstruct::reconstruct(
+            &db_saved,
+            &resolved_cand.candidate_id,
+            &resolved_cand.revision,
+            Some(format!("Auto {ext} M3U")),
+            None,
+            None,
+        )
+        .unwrap();
+        assert_eq!(rebuilt_auto.content_hash, original.content_hash);
+    }
+
+    // 3. Multiple standalone CUE+BIN disc sets coexisting in `assets/`
+    let multi_root = base.join("two-cue-sets");
+    let mut imported_manifests = Vec::new();
+    let db_multi = Database::open(&multi_root.join("recovered")).unwrap();
+    let assets_multi = db_multi.root.join("assets");
+    fs::create_dir_all(&assets_multi).unwrap();
+
+    for (idx, tag) in [(1, 0x71u8), (2, 0x72u8)] {
+        let sel = multi_root.join(format!("sel-{idx}"));
+        fs::create_dir_all(&sel).unwrap();
+        fs::write(sel.join(format!("Game{idx}.bin")), vec![tag; 2352 * 4]).unwrap();
+        fs::write(
+            sel.join(format!("Game{idx}.cue")),
+            format!("TITLE \"Cue Set {idx}\"\nFILE \"Game{idx}.bin\" BINARY\n  TRACK 01 MODE2/2352\n    INDEX 01 00:00:00\n"),
+        )
+        .unwrap();
+        let imp_db = Database::open(&multi_root.join(format!("imp-{idx}"))).unwrap();
+        let manifest = crate::media_import::import_bundle(
+            &imp_db,
+            crate::media_import::DiscScope::selected(&sel).unwrap(),
+            &format!("Game{idx}.cue"),
+            format!("Cue Set {idx}"),
+            GameSystem::Ps1,
+            CueEncoding::Utf8,
+            &AtomicBool::new(false),
+            |_| {},
+        )
+        .unwrap();
+        for asset in &manifest.media.as_ref().unwrap().assets {
+            let b = fs::read(imp_db.root.join("assets").join(&asset.content_hash.0)).unwrap();
+            fs::write(assets_multi.join(&asset.content_hash.0), b).unwrap();
+        }
+        imported_manifests.push(manifest);
+    }
+
+    // Without save hashes, both CUE candidates in `assets/` are ambiguous
+    let preview_both = crate::library_reconstruct::preview(&db_multi).unwrap();
+    assert_eq!(preview_both.candidates.len(), 2);
+    assert!(preview_both.candidates.iter().all(|c| c.needs_track_binding));
+    assert!(crate::library_reconstruct::reconstruct_unambiguous_all(&db_multi).unwrap().is_empty());
+
+    // Record a surviving save hash for Set 1: Set 1 auto-resolves, and once reconstructed, Set 2 becomes unambiguous too!
+    db_multi
+        .connection
+        .execute(
+            "INSERT INTO locally_removed_saves(save_id, game_content_hash, removed_at_ms) VALUES(?1, ?2, 1)",
+            rusqlite::params![Uuid::new_v4().to_string(), imported_manifests[0].content_hash.0],
+        )
+        .unwrap();
+    let preview_with_save = crate::library_reconstruct::preview(&db_multi).unwrap();
+    let cand1 = preview_with_save
+        .candidates
+        .iter()
+        .find(|c| c.matched_save_content_hash == Some(imported_manifests[0].content_hash.clone()))
+        .unwrap();
+    assert!(!cand1.needs_track_binding);
+    let rebuilt1 = crate::library_reconstruct::reconstruct(&db_multi, &cand1.candidate_id, &cand1.revision, None, None, None).unwrap();
+    assert_eq!(rebuilt1.content_hash, imported_manifests[0].content_hash);
+
+    // Now only Set 2 remains unindexed in `assets/`, so it is unambiguous!
+    let preview_remaining = crate::library_reconstruct::preview(&db_multi).unwrap();
+    assert_eq!(preview_remaining.candidates.len(), 1);
+    assert!(!preview_remaining.candidates[0].needs_track_binding);
+    let rebuilt2 = crate::library_reconstruct::reconstruct(
+        &db_multi,
+        &preview_remaining.candidates[0].candidate_id,
+        &preview_remaining.candidates[0].revision,
+        None,
+        None,
+        None,
+    )
+    .unwrap();
+    assert_eq!(rebuilt2.content_hash, imported_manifests[1].content_hash);
+}
+
+#[test]
+fn storage_accounting_measures_windows_sparse_and_compressed_files_accurately() {
+    let f = Fixture::new();
+    let assets_dir = f.database.root.join("assets");
+    fs::create_dir_all(&assets_dir).unwrap();
+
+    // Create a 1 MiB sparse file and a 256 KiB NTFS-compressed file in assets/
+    let sparse_bytes = vec![0u8; 1024 * 1024];
+    let sparse_hash = digest(&sparse_bytes);
+    let sparse_path = assets_dir.join(&sparse_hash.0);
+    fs::write(&sparse_path, &sparse_bytes).unwrap();
+
+    let comp_bytes = vec![b'Z'; 256 * 1024];
+    let comp_hash = digest(&comp_bytes);
+    let comp_path = assets_dir.join(&comp_hash.0);
+    fs::write(&comp_path, &comp_bytes).unwrap();
+
+    #[cfg(windows)]
+    {
+        let _ = std::process::Command::new("fsutil")
+            .args(["sparse", "setflag"])
+            .arg(&sparse_path)
+            .arg("1")
+            .output();
+        let _ = std::process::Command::new("fsutil")
+            .args(["sparse", "setrange"])
+            .arg(&sparse_path)
+            .args(["0", "1048576"])
+            .output();
+        let _ = std::process::Command::new("compact")
+            .arg("/c")
+            .arg(&comp_path)
+            .output();
+
+        let sparse_phys = omniplay_stream_input::windows_file_physical(&sparse_path).unwrap();
+        let comp_phys = omniplay_stream_input::windows_file_physical(&comp_path).unwrap();
+        assert!(
+            sparse_phys.allocation_bytes < sparse_bytes.len() as u64,
+            "NTFS sparse file physical allocation ({}) must be less than logical size ({})",
+            sparse_phys.allocation_bytes,
+            sparse_bytes.len()
+        );
+        assert!(
+            comp_phys.allocation_bytes < comp_bytes.len() as u64,
+            "NTFS compressed file physical allocation ({}) must be less than logical size ({})",
+            comp_phys.allocation_bytes,
+            comp_bytes.len()
+        );
+    }
+
+    let report = crate::storage_accounting::report(&f.database).unwrap();
+    assert_eq!(
+        report.measurement_quality,
+        crate::storage_accounting::StorageMeasurementQuality::ExactOsAllocation
+    );
+    assert!(report.volume_cluster_bytes >= 512);
+    let assets_ns = report.namespaces.iter().find(|n| n.namespace == "assets").unwrap();
+    assert!(assets_ns.logical_bytes >= (1024 * 1024 + 256 * 1024));
+    #[cfg(windows)]
+    assert!(
+        assets_ns.physical_bytes < assets_ns.logical_bytes,
+        "assets namespace physical bytes ({}) must reflect sparse/compressed savings vs logical bytes ({})",
+        assets_ns.physical_bytes,
+        assets_ns.logical_bytes
+    );
+}

@@ -512,6 +512,22 @@ fn try_build_media_from_bindings(
         let blob = blobs.get(&hash.0).ok_or_else(|| {
             PlatformError::new(ErrorCode::NotFound, "Referenced track or disc blob is missing from assets")
         })?;
+        let ext = role_name.rsplit_once('.').map(|(_, e)| e).unwrap_or("");
+        let role_kind_matches = match ext {
+            "cue" => matches!(blob.kind, BlobKind::Cue { .. }),
+            "chd" => matches!(blob.kind, BlobKind::SingleGame { format: ContentFormat::Chd, .. }),
+            "iso" => matches!(blob.kind, BlobKind::SingleGame { format: ContentFormat::Iso, .. }),
+            "pbp" => matches!(blob.kind, BlobKind::SingleGame { format: ContentFormat::Pbp, .. }),
+            "bin" => matches!(blob.kind, BlobKind::BinaryOrRaw { .. }),
+            "wav" => matches!(blob.kind, BlobKind::WaveTrack),
+            _ => false,
+        };
+        if !role_kind_matches {
+            return Err(PlatformError::new(
+                ErrorCode::ContentMismatch,
+                "Bound asset blob kind does not match its disc or track role",
+            ));
+        }
         total = total
             .checked_add(blob.bytes)
             .filter(|v| *v <= MAX_ROM_BYTES)
@@ -638,17 +654,17 @@ fn build_preview_unlocked(database: &Database) -> Result<ReconstructionPreview> 
                     ambiguous = true;
                 }
             }
-        } else if !all_cue && single_disc_images.len() == disc_names.len() && disc_names.len() <= 4 {
+        } else if !all_cue && single_disc_images.len() >= disc_names.len() && single_disc_images.len() <= 6 && disc_names.len() <= 4 {
             for d in disc_names {
                 required_tracks.push(d.clone());
             }
-            if disc_names.len() == 1 {
+            if disc_names.len() == 1 && single_disc_images.len() == 1 {
                 resolved.insert(disc_names[0].clone(), single_disc_images[0].hash.clone());
                 total_known = total_known.saturating_add(single_disc_images[0].bytes);
             } else {
                 let mut matched = false;
                 if !save_hashes.is_empty() {
-                    for perm in permutations(single_disc_images.len()) {
+                    for perm in k_permutations(single_disc_images.len(), disc_names.len()) {
                         let mut trial = BTreeMap::new();
                         for (i, dname) in disc_names.iter().enumerate() {
                             trial.insert(dname.clone(), single_disc_images[perm[i]].hash.clone());
@@ -747,9 +763,9 @@ fn build_preview_unlocked(database: &Database) -> Result<ReconstructionPreview> 
                 resolved.insert((*w_name).clone(), free_wavs[0].hash.clone());
                 total_known = total_known.saturating_add(free_wavs[0].bytes);
             }
-        } else if !save_hashes.is_empty() && needed_wavs.is_empty() && free_bins.len() == needed_bins.len() && needed_bins.len() <= 4 {
+        } else if !save_hashes.is_empty() && needed_wavs.is_empty() && free_bins.len() >= needed_bins.len() && free_bins.len() <= 6 && needed_bins.len() <= 4 {
             let mut matched = false;
-            for perm in permutations(free_bins.len()) {
+            for perm in k_permutations(free_bins.len(), needed_bins.len()) {
                 let mut trial = BTreeMap::new();
                 for (i, b_name) in needed_bins.iter().enumerate() {
                     trial.insert((*b_name).clone(), free_bins[perm[i]].hash.clone());
@@ -891,27 +907,35 @@ fn build_preview_unlocked(database: &Database) -> Result<ReconstructionPreview> 
 }
 
 fn permutations(n: usize) -> Vec<Vec<usize>> {
-    if n == 0 {
+    k_permutations(n, n)
+}
+
+fn k_permutations(n: usize, k: usize) -> Vec<Vec<usize>> {
+    if k == 0 {
         return vec![Vec::new()];
     }
-    let mut current: Vec<usize> = (0..n).collect();
+    if k > n {
+        return Vec::new();
+    }
     let mut out = Vec::new();
-    fn generate(k: usize, arr: &mut [usize], out: &mut Vec<Vec<usize>>) {
-        if k == 1 {
-            out.push(arr.to_vec());
+    let mut cur = Vec::with_capacity(k);
+    let mut used = vec![false; n];
+    fn backtrack(n: usize, k: usize, cur: &mut Vec<usize>, used: &mut [bool], out: &mut Vec<Vec<usize>>) {
+        if cur.len() == k {
+            out.push(cur.clone());
             return;
         }
-        generate(k - 1, arr, out);
-        for i in 0..k - 1 {
-            if k % 2 == 0 {
-                arr.swap(i, k - 1);
-            } else {
-                arr.swap(0, k - 1);
+        for i in 0..n {
+            if !used[i] {
+                used[i] = true;
+                cur.push(i);
+                backtrack(n, k, cur, used, out);
+                cur.pop();
+                used[i] = false;
             }
-            generate(k - 1, arr, out);
         }
     }
-    generate(n, &mut current, &mut out);
+    backtrack(n, k, &mut cur, &mut used, &mut out);
     out
 }
 

@@ -65,6 +65,14 @@ pub(crate) fn with_recovery_fault_once<T>(
 
 #[cfg(test)]
 fn check_recovery_fault(point: RecoveryFaultPoint) -> Result<()> {
+    if std::env::var("OMNIPLAY_TEST_RECOVERY_HARD_CRASH_POINT")
+        .ok()
+        .is_some_and(|wanted| wanted == format!("{point:?}"))
+    {
+        let _ = std::io::stdout().flush();
+        let _ = std::io::stderr().flush();
+        std::process::exit(99);
+    }
     let triggered = RECOVERY_FAULT_ONCE.with(|slot| {
         if slot.get() == Some(point) {
             slot.set(None);

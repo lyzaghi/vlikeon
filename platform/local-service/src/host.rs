@@ -612,7 +612,10 @@ impl LocalHost {
                 }
                 match (grant_id,restore_token){
                     (None,Some(token))=>{
-                        let expected=expected_archive_hash.ok_or_else(||PlatformError::new(ErrorCode::InvalidRequest,"expected_archive_hash is required when confirming a staged profile restore"))?;
+                        let Some(expected)=expected_archive_hash else{
+                            let _=self.profile_restores.cancel(self.owner,token);
+                            return Err(PlatformError::new(ErrorCode::InvalidRequest,"expected_archive_hash is required when confirming a staged profile restore"));
+                        };
                         let mut file=self.profile_restores.take_for_restore(self.owner,token,&expected)?;
                         encode(omniplay_core::profile_backup::restore_verified(&mut self.database,&mut file,Some(&expected))?)
                     }
@@ -620,7 +623,10 @@ impl LocalHost {
                         let mut file=self.permissions.take(self.owner,gid,FileAccess::ProfileBackupRead)?;
                         encode(omniplay_core::profile_backup::restore_verified(&mut self.database,&mut file,expected_archive_hash.as_ref())?)
                     }
-                    _=>Err(PlatformError::new(ErrorCode::InvalidRequest,"Provide either restore_token or grant_id, not both")),
+                    (_,maybe_token)=>{
+                        if let Some(token)=maybe_token{let _=self.profile_restores.cancel(self.owner,token);}
+                        Err(PlatformError::new(ErrorCode::InvalidRequest,"Provide either restore_token or grant_id, not both"))
+                    }
                 }
             },
             Command::DatabaseHealthCheck=>encode(omniplay_core::Database::diagnose(&self.database.root)?),
@@ -709,3 +715,219 @@ impl LocalHost {
 }
 impl Drop for LocalHost{fn drop(&mut self){self.close();}}
 fn encode(value:impl serde::Serialize)->Result<Value>{serde_json::to_value(value).map_err(|_|PlatformError::new(ErrorCode::Internal,"Local response could not be encoded"))}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs::{self, OpenOptions};
+    use std::io::{Read, Seek, SeekFrom, Write};
+
+    fn send(host: &mut LocalHost, command: Command) -> Result<Value> {
+        let req = Request {
+            protocol_major: PROTOCOL_MAJOR,
+            protocol_minor: PROTOCOL_MINOR,
+            id: Uuid::new_v4(),
+            profile_id: host.profile_id,
+            deadline_ms: omniplay_core::now_ms() + 15_000,
+            command,
+        };
+        let raw = serde_json::to_vec(&req).unwrap();
+        match host.handle(req, &raw).outcome {
+            ResponseOutcome::Ok { result } => Ok(result),
+            ResponseOutcome::Error { error } => Err(error),
+        }
+    }
+
+    #[test]
+    fn ipc_profile_backup_export_inspect_restore_cancel_busy_token_cleanup_and_owner_isolation() {
+        let base = std::env::temp_dir().join(format!("vlikeon-local-host-ipc-{}", Uuid::new_v4()));
+        fs::create_dir_all(&base).unwrap();
+        let src_profile_id = Uuid::new_v4();
+        let mut src_host = LocalHost::open(&base.join("src-profile"), src_profile_id).unwrap();
+
+        let rom_path = base.join("sample.nes");
+        let mut nes_rom = vec![0u8; 16 + 16384];
+        nes_rom[..4].copy_from_slice(b"NES\x1a");
+        nes_rom[4] = 1;
+        fs::write(&rom_path, &nes_rom).unwrap();
+
+        let game = Library::new(&src_host.database)
+            .import(File::open(&rom_path).unwrap(), "IPC NES".into(), GameSystem::Nes)
+            .unwrap();
+        let save_meta = SaveMetadata {
+            schema_version: 1,
+            id: Uuid::new_v4(),
+            game_id: game.id,
+            game_content_hash: game.content_hash.clone(),
+            kind: SaveKind::InGame,
+            slot: 0,
+            generation: 1,
+            parent_id: None,
+            core_id: "fceumm-web".into(),
+            core_version: "1.0.0".parse().unwrap(),
+            state_format_version: "1".into(),
+            platform: "web".into(),
+            core_config_hash: ContentHash("a".repeat(64)),
+            payload_hash: omniplay_core::util::digest(b"ipc-save-payload"),
+            payload_bytes: 16,
+            created_at_ms: omniplay_core::now_ms(),
+            device_id: src_host.database.device_id,
+            label: None,
+            conflict: false,
+        };
+        SaveStore::new(&mut src_host.database)
+            .commit(save_meta, b"ipc-save-payload", None)
+            .unwrap();
+
+        // 1. Export full profile backup via native export picker grant + IPC Command::ProfileBackupExport
+        let archive_path = base.join("exported.opprofile");
+        let export_grant: Uuid = serde_json::from_value(
+            src_host.selected_export(&archive_path).unwrap()["grant_id"].clone(),
+        )
+        .unwrap();
+        let export_val = send(
+            &mut src_host,
+            Command::ProfileBackupExport {
+                include_rom_assets: true,
+                destination_grant_id: export_grant,
+            },
+        )
+        .unwrap();
+        assert_eq!(export_val["games"], 1);
+        assert_eq!(export_val["saves"], 1);
+
+        // 2. Destination host: verify Busy releases restore_token across 5 consecutive attempts (never hits 4-token cap)
+        let dst_profile_id = Uuid::new_v4();
+        let mut dst_host = LocalHost::open(&base.join("dst-profile"), dst_profile_id).unwrap();
+        let active_game = Library::new(&dst_host.database)
+            .import(File::open(&rom_path).unwrap(), "Active NES".into(), GameSystem::Nes)
+            .unwrap();
+        let begin_val = send(
+            &mut dst_host,
+            Command::WebSessionBegin {
+                game_id: active_game.id,
+                runtime_id: "fceumm-web".into(),
+            },
+        )
+        .unwrap();
+        let session_id: Uuid = serde_json::from_value(begin_val["id"].clone()).unwrap();
+
+        for _ in 0..5 {
+            let pick = dst_host.selected_profile_backup(&archive_path).unwrap();
+            let gid: Uuid = serde_json::from_value(pick["grant_id"].clone()).unwrap();
+            let summary = send(&mut dst_host, Command::ProfileBackupInspect { grant_id: gid }).unwrap();
+            let token: Uuid = serde_json::from_value(summary["restore_token"].clone()).unwrap();
+            let hash: ContentHash = serde_json::from_value(summary["archive_hash"].clone()).unwrap();
+
+            let restore_busy = send(
+                &mut dst_host,
+                Command::ProfileBackupRestore {
+                    grant_id: None,
+                    restore_token: Some(token),
+                    expected_archive_hash: Some(hash.clone()),
+                },
+            )
+            .unwrap_err();
+            assert_eq!(restore_busy.code, ErrorCode::Busy);
+        }
+
+        // Stop the active web session
+        send(
+            &mut dst_host,
+            Command::WebSessionHeartbeat {
+                session_id,
+                state: SessionState::Stopped,
+            },
+        )
+        .unwrap();
+
+        // 3. Owner isolation: detach() rotates owner and revokes staged tokens from previous document owner
+        let pick_detach = dst_host.selected_profile_backup(&archive_path).unwrap();
+        let gid_detach: Uuid = serde_json::from_value(pick_detach["grant_id"].clone()).unwrap();
+        let summary_detach = send(&mut dst_host, Command::ProfileBackupInspect { grant_id: gid_detach }).unwrap();
+        let token_detach: Uuid = serde_json::from_value(summary_detach["restore_token"].clone()).unwrap();
+        let hash_detach: ContentHash = serde_json::from_value(summary_detach["archive_hash"].clone()).unwrap();
+        dst_host.detach();
+        let restore_after_detach = send(
+            &mut dst_host,
+            Command::ProfileBackupRestore {
+                grant_id: None,
+                restore_token: Some(token_detach),
+                expected_archive_hash: Some(hash_detach),
+            },
+        )
+        .unwrap_err();
+        assert_eq!(restore_after_detach.code, ErrorCode::PermissionExpired);
+
+        // 4. Cancel and valid Restore into clean destination host
+        let clean_profile_id = Uuid::new_v4();
+        let mut clean_host = LocalHost::open(&base.join("clean-profile"), clean_profile_id).unwrap();
+        let pick_cancel = clean_host.selected_profile_backup(&archive_path).unwrap();
+        let gid_cancel: Uuid = serde_json::from_value(pick_cancel["grant_id"].clone()).unwrap();
+        let summary_cancel = send(&mut clean_host, Command::ProfileBackupInspect { grant_id: gid_cancel }).unwrap();
+        let token_cancel: Uuid = serde_json::from_value(summary_cancel["restore_token"].clone()).unwrap();
+        let cancel_val = send(
+            &mut clean_host,
+            Command::ProfileBackupCancel {
+                restore_token: token_cancel,
+            },
+        )
+        .unwrap();
+        assert_eq!(cancel_val["cancelled"], true);
+
+        let pick_ok = clean_host.selected_profile_backup(&archive_path).unwrap();
+        let gid_ok: Uuid = serde_json::from_value(pick_ok["grant_id"].clone()).unwrap();
+        let summary_ok = send(&mut clean_host, Command::ProfileBackupInspect { grant_id: gid_ok }).unwrap();
+        let token_ok: Uuid = serde_json::from_value(summary_ok["restore_token"].clone()).unwrap();
+        let hash_ok: ContentHash = serde_json::from_value(summary_ok["archive_hash"].clone()).unwrap();
+        let restored_val = send(
+            &mut clean_host,
+            Command::ProfileBackupRestore {
+                grant_id: None,
+                restore_token: Some(token_ok),
+                expected_archive_hash: Some(hash_ok),
+            },
+        )
+        .unwrap();
+        assert_eq!(restored_val["games_restored"], 1);
+        assert_eq!(restored_val["saves_restored"], 1);
+
+        // 5. Post-inspect archive mutation fails closed over IPC
+        let pick_mut = clean_host.selected_profile_backup(&archive_path).unwrap();
+        let gid_mut: Uuid = serde_json::from_value(pick_mut["grant_id"].clone()).unwrap();
+        let summary_mut = send(&mut clean_host, Command::ProfileBackupInspect { grant_id: gid_mut }).unwrap();
+        let token_mut: Uuid = serde_json::from_value(summary_mut["restore_token"].clone()).unwrap();
+        let hash_mut: ContentHash = serde_json::from_value(summary_mut["archive_hash"].clone()).unwrap();
+        {
+            let mut f = OpenOptions::new().read(true).write(true).open(&archive_path).unwrap();
+            f.seek(SeekFrom::Start(96)).unwrap();
+            let mut b = [0u8; 1];
+            f.read_exact(&mut b).unwrap();
+            f.seek(SeekFrom::Start(96)).unwrap();
+            f.write_all(&[b[0] ^ 0xFF]).unwrap();
+        }
+        assert!(send(
+            &mut clean_host,
+            Command::ProfileBackupRestore {
+                grant_id: None,
+                restore_token: Some(token_mut),
+                expected_archive_hash: Some(hash_mut),
+            },
+        )
+        .is_err());
+
+        // 6. DatabaseHealthCheck, LibraryReconstructPreview, and StorageAccountingReport over IPC
+        let health_val = send(&mut clean_host, Command::DatabaseHealthCheck).unwrap();
+        assert_eq!(health_val["status"], "healthy");
+
+        send(&mut clean_host, Command::LibraryReconstructPreview).unwrap();
+
+        let acct_val = send(&mut clean_host, Command::StorageAccountingReport).unwrap();
+        assert!(acct_val["logical_bytes"].as_u64().unwrap() > 0);
+
+        drop(clean_host);
+        drop(dst_host);
+        drop(src_host);
+        let _ = fs::remove_dir_all(&base);
+    }
+}
