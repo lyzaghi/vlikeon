@@ -23,7 +23,12 @@
 using VkFlags = std::uint32_t;
 using VkBool32 = std::uint32_t;
 using VkDeviceSize = std::uint64_t;
+#if defined(__LP64__) || defined(_WIN64) || (defined(__x86_64__) && !defined(__ILP32__)) || defined(_M_X64) || defined(__ia64) || defined(_M_IA64) || defined(__aarch64__) || defined(__powerpc64__) || (defined(__riscv) && __riscv_xlen == 64)
+#define VK_DEFINE_NON_DISPATCHABLE_HANDLE(object) using object = struct object##_T*;
+#else
 #define VK_DEFINE_NON_DISPATCHABLE_HANDLE(object) using object = std::uint64_t;
+#endif
+using VkDevice = struct VkDevice_T*;
 using VkQueue = struct VkQueue_T*;
 using VkCommandBuffer = struct VkCommandBuffer_T*;
 VK_DEFINE_NON_DISPATCHABLE_HANDLE(VkSemaphore)
@@ -32,6 +37,7 @@ VK_DEFINE_NON_DISPATCHABLE_HANDLE(VkImage)
 VK_DEFINE_NON_DISPATCHABLE_HANDLE(VkImageView)
 VK_DEFINE_NON_DISPATCHABLE_HANDLE(VkCommandPool)
 VK_DEFINE_NON_DISPATCHABLE_HANDLE(VkSwapchainKHR)
+#undef VK_DEFINE_NON_DISPATCHABLE_HANDLE
 
 enum VkResult : int {
   VK_SUCCESS = 0,

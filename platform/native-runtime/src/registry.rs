@@ -248,3 +248,92 @@ pub(crate) fn approved_file(root:&Path,path:&str,inventory:Option<&PackageManife
     if approved.is_some_and(|f|f.sha256!=hash||f.bytes!=bytes)||expected.is_some_and(|f|f.sha256!=hash||f.bytes!=bytes){return Err(unavailable("An installed native runtime file failed its integrity check"));}
     use std::io::{Seek,SeekFrom};file.seek(SeekFrom::Start(0)).map_err(storage_error)?;Ok(file)
 }
+
+#[cfg(all(test,windows))]
+mod tests {
+    use super::*;
+    use serde_json::{Value,json};
+
+    fn sample_brokered_catalog()->Value{
+        let worker_sha="016ec973a6b5cf0939c5e660df78843e13dff6bc227093d6fb03f48b9a91a52e";
+        let core_sha="34973015d2e93b849cb9eecb32da330628cd1fe8cd88e6b3fca17c54bbc76785";
+        let helper_sha="1d63fdbb489a06aa8a0fb7ba91d29f9b8f87cb647d4b0d31d8e65f353280f5c9";
+        json!({
+            "schema_version":1,
+            "runtimes":[{
+                "manifest":{
+                    "schema_version":1,
+                    "id":"fceumm-native",
+                    "version":"0.0.0+ac0d00a7fc01",
+                    "kind":"native_emulator",
+                    "systems":["nes"],
+                    "capabilities":["pause","save_ram","save_state","keyboard_mouse","gamepad","haptics"],
+                    "platform":"windows-x86_64",
+                    "executable_sha256":worker_sha,
+                    "state_format_version":"fceumm-ac0d00a7fc01166f-opns1-native64",
+                    "source_revision":"ac0d00a7fc01166f84c7bac01d1084ebfd2b865e",
+                    "license_expression":"GPL-2.0-or-later",
+                    "distribution_approved":false,
+                    "security_revoked":false
+                },
+                "worker":"native-runtimes/fceumm-native/omniplay-native-worker.exe",
+                "core_library":"native-runtimes/fceumm-native/fceumm_libretro.dll",
+                "expected_library_name":"FCEUmm",
+                "expected_library_version":"(SVN)",
+                "in_game_format_version":"fceumm-memory-envelope-v1-native64",
+                "maximum_rom_bytes":16777216,
+                "memory_limit_mb":512,
+                "files":[
+                    {"path":"native-runtimes/fceumm-native/fceumm_libretro.dll","sha256":core_sha,"bytes":4039168},
+                    {"path":"native-runtimes/fceumm-native/omniplay-native-worker.exe","sha256":worker_sha,"bytes":687104},
+                    {"path":"native-runtimes/fceumm-native/omniplay-presentation-host.exe","sha256":helper_sha,"bytes":3068416}
+                ],
+                "minimum_system_ram_bytes":0,
+                "reset_after_ram_load":false,
+                "video_backend":"software",
+                "gpu_max_width":0,
+                "gpu_max_height":0,
+                "prepare_completion":false,
+                "pause_barrier":false,
+                "pause_barrier_protocol":0,
+                "core_options":{},
+                "content_formats":["raw_rom"],
+                "firmware_requirements":[],
+                "presentation":{
+                    "protocol":2,
+                    "executable":"native-runtimes/fceumm-native/omniplay-presentation-host.exe",
+                    "maximum_width":4096,
+                    "maximum_height":4096,
+                    "memory_limit_mb":512
+                }
+            }]
+        })
+    }
+
+    #[test]
+    fn parse_catalog_admits_brokered_rgba_windows_package_and_rejects_invalid_presentation_policy(){
+        let valid=sample_brokered_catalog();
+        let runtimes=parse_catalog(&serde_json::to_vec(&valid).unwrap()).expect("admit valid brokered_rgba catalog");
+        assert_eq!(runtimes.len(),1);
+        let presentation=runtimes[0].presentation.as_ref().expect("presentation spec");
+        assert_eq!(presentation.protocol,2);
+        assert_eq!(presentation.executable,"native-runtimes/fceumm-native/omniplay-presentation-host.exe");
+
+        // Reject when presentation memory budget cannot cover 4096x4096x16 + 128 MiB
+        let mut underbudget=sample_brokered_catalog();
+        underbudget["runtimes"][0]["presentation"]["memory_limit_mb"]=json!(256);
+        assert!(parse_catalog(&serde_json::to_vec(&underbudget).unwrap()).is_err());
+
+        // Reject when presentation executable collides with worker executable
+        let mut colliding=sample_brokered_catalog();
+        colliding["runtimes"][0]["presentation"]["executable"]=json!("native-runtimes/fceumm-native/omniplay-native-worker.exe");
+        assert!(parse_catalog(&serde_json::to_vec(&colliding).unwrap()).is_err());
+
+        // Reject when presentation is attached to a non-software video backend
+        let mut gpu_mismatch=sample_brokered_catalog();
+        gpu_mismatch["runtimes"][0]["video_backend"]=json!("opengl_core");
+        gpu_mismatch["runtimes"][0]["gpu_max_width"]=json!(640);
+        gpu_mismatch["runtimes"][0]["gpu_max_height"]=json!(480);
+        assert!(parse_catalog(&serde_json::to_vec(&gpu_mismatch).unwrap()).is_err());
+    }
+}

@@ -210,12 +210,33 @@ pub fn enforce_profile_write_quota(profile_root: &Path) -> Result<SubtreeUsage> 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use uuid::Uuid;
+    use std::{
+        sync::atomic::{AtomicU64, Ordering},
+        time::{SystemTime, UNIX_EPOCH},
+    };
+
+    fn unique_id() -> String {
+        static SEQ: AtomicU64 = AtomicU64::new(1);
+        let seq = SEQ.fetch_add(1, Ordering::Relaxed) as u128;
+        let nanos = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let nonce = nanos ^ ((std::process::id() as u128) << 64) ^ (seq << 96);
+        format!(
+            "{:08x}-{:04x}-4{:03x}-8{:03x}-{:012x}",
+            (nonce >> 96) as u32,
+            ((nonce >> 80) & 0xffff) as u16,
+            ((nonce >> 68) & 0x0fff) as u16,
+            ((nonce >> 56) & 0x0fff) as u16,
+            nonce & 0xffff_ffff_ffff
+        )
+    }
 
     #[test]
     fn enforces_readonly_vs_legacy_core_and_helper_write_quotas() {
-        let root = std::env::temp_dir().join(format!("omniplay-win-quota-{}", Uuid::new_v4()));
-        let work = root.join("native-work").join(Uuid::new_v4().to_string());
+        let root = std::env::temp_dir().join(format!("omniplay-win-quota-{}", unique_id()));
+        let work = root.join("native-work").join(unique_id());
         fs::create_dir_all(work.join("scratch")).unwrap();
         fs::create_dir_all(work.join("save")).unwrap();
         fs::create_dir_all(work.join("presentation-tmp")).unwrap();

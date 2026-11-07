@@ -169,8 +169,8 @@ struct InputProfile {
         }
       }
       const auto keys=[&](const Json& values,auto& destination){for(std::size_t index=0;index<destination.size();++index){const auto& entry=values[index];if(entry.is_null()){destination[index]=SDL_SCANCODE_UNKNOWN;continue;}if(!entry.is_string())return false;const auto name=entry.get<std::string>();if(name.size()>16)return false;const auto code=scan(name);if(code==SDL_SCANCODE_UNKNOWN||!used.insert(code).second)return false;destination[index]=code;}return true;};
-      if(!keys(value.at("keyboard"),next.keyboard)||!keys(value.at("analog_keyboard"),next.analog))return false;std::set<unsigned> buttons;
-      for(unsigned index=0;index<16;++index){const auto& raw=value.at("button_sources")[index];if(!raw.is_number_integer()||raw<0||raw>15)return false;const auto source=raw.get<unsigned>();if(!buttons.insert(source).second)return false;next.buttons[index]=source;}
+      if(!keys(value.at("keyboard"),next.keyboard)||!keys(value.at("analog_keyboard"),next.analog))return false;std::set<unsigned> seen_buttons;
+      for(unsigned index=0;index<16;++index){const auto& raw=value.at("button_sources")[index];if(!raw.is_number_integer()||raw<0||raw>15)return false;const auto source=raw.get<unsigned>();if(!seen_buttons.insert(source).second)return false;next.buttons[index]=source;}
       *this=next;return true;
     }catch(...){return false;}
   }
