@@ -1,5 +1,11 @@
 # Public status — 2026-11-07
 
+The desktop source migration to Windows Stable Chromium 158.0.8127.18 has passed
+authenticated patch rehearsal and source advisory checks. Full browser compilation
+and runtime qualification remain open. Android tracks its own reviewed revision.
+See [migration status](CHROMIUM_158_MIGRATION.md).
+
+
 Vlikeon Browser is the public identity of the source project called OmniPlay
 internally: a Chromium-first gaming browser by Vlike. Internal identifiers and
 wire formats retain `omniplay`; their migration is not complete.
