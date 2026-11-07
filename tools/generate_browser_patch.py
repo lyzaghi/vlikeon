@@ -17,7 +17,7 @@ from source_patch import apply_exact
 
 ROOT=Path(__file__).resolve().parents[1]
 SNAPSHOTS=ROOT/"browser/upstream-snapshots"
-SNAPSHOT_REVISION="0e66b94549a8bd85f03fbdf189b752d6e7b63c32"
+SNAPSHOT_REVISION="6449d9f9a6a906edff724b7b220199b3fde4615c"
 
 def replace_once(text,old,new,label):
     if text.count(old)!=1:
@@ -80,7 +80,7 @@ def main():
     allow_path="chrome/browser/extensions/component_extensions_allowlist/allowlist.cc"
     allow=(SNAPSHOTS/allow_path).read_text(encoding="utf-8")
     allow=replace_once(allow,"      extension_misc::kPdfExtensionId,\n",f'      extension_misc::kPdfExtensionId,\n#if BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC) || BUILDFLAG(IS_LINUX)\n      "{identity["extension_id"]}",\n#endif\n',"component identity")
-    allow=replace_once(allow,"    case IDR_READING_MODE_GDOCS_HELPER_MANIFEST:\n",'    case IDR_READING_MODE_GDOCS_HELPER_MANIFEST:\n#if BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC) || BUILDFLAG(IS_LINUX)\n    case IDR_OMNIPLAY_MANIFEST:\n#endif\n',"component manifest")
+    allow=replace_once(allow,"    case IDR_WEBSTORE_MANIFEST:\n",'    case IDR_WEBSTORE_MANIFEST:\n#if BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC) || BUILDFLAG(IS_LINUX)\n    case IDR_OMNIPLAY_MANIFEST:\n#endif\n',"component manifest")
     changes[allow_path]=allow
     grd_path="chrome/browser/resources/component_extension_resources.grd"
     grd=(SNAPSHOTS/grd_path).read_text(encoding="utf-8")

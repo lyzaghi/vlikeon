@@ -6,10 +6,10 @@ import hashlib
 
 PINS={
     'chrome/browser/extensions/api/desktop_capture/desktop_capture_api.cc':'fe672eb9a07c499fa81fa909d1de4b562e43e56e',
-    'chrome/browser/extensions/api/desktop_capture/desktop_capture_base.cc':'bb268f83a895a17a93a074470ce53a7c619a9156',
+    'chrome/browser/extensions/api/desktop_capture/desktop_capture_base.cc':'eeda40174892deb448c505b4b6951f29f7c44f5e',
     'chrome/browser/extensions/api/desktop_capture/desktop_capture_base.h':'4ac6604b073dfc869e0ea7c0111c9efacb5c0b49',
-    'chrome/browser/media/webrtc/desktop_media_picker.h':'75d83fb788daefad989626423514d817ad5ad832',
-    'chrome/browser/ui/views/desktop_capture/desktop_media_picker_views.cc':'fb98e1125a03a47eab126be7f385e4d755130714',
+    'chrome/browser/media/webrtc/desktop_media_picker.h':'8d2f2275b20c51de8439187a631d637c00a79fd1',
+    'chrome/browser/ui/views/desktop_capture/desktop_media_picker_views.cc':'148d42eef075a0f97eba4b0116746142adb5ee74',
     'chrome/common/extensions/api/desktop_capture.json':'975b51070f28e8b28a2aec1d75e3c3830b1365a5',
 }
 
@@ -91,7 +91,7 @@ def author(snapshots):
     edit(base,'    const std::u16string& target_name) {','''    const std::u16string& target_name,
     std::optional<blink::mojom::WindowAudioPreference> window_audio_preference,
     bool omniplay_strict_window_audio) {''')
-    edit(base,'  DCHECK(!picker_controller_);','  DCHECK(!picker_controller_);\n  omniplay_strict_window_audio_ = omniplay_strict_window_audio;')
+    edit(base,'  CHECK(!picker_controller_, base::NotFatalUntil::M161);','  CHECK(!picker_controller_, base::NotFatalUntil::M161);\n  omniplay_strict_window_audio_ = omniplay_strict_window_audio;')
     edit(base,'  picker_params.exclude_system_audio = exclude_system_audio;','''  picker_params.exclude_system_audio = exclude_system_audio;
   if (window_audio_preference) {
     picker_params.window_audio_preference = *window_audio_preference;

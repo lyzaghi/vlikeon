@@ -83,7 +83,8 @@ def test_security_advisories_and_cves():
     from unittest.mock import patch
     from tools import audit_security_advisories as auditor
 
-    stable = {"version": "155.0.8059.85", "revision": "0e66b94549a8bd85f03fbdf189b752d6e7b63c32"}
+    pin = json.loads((WORKSPACE_ROOT / "browser/upstream.lock.json").read_bytes())
+    stable = {"version": pin["version"], "revision": pin["revision"]}
     result = {"vulnerabilities": {"list": []}}
     revision = "a" * 40
     with tempfile.TemporaryDirectory() as tmp, patch.object(auditor, "fetch_chromium_stable", return_value=stable):
@@ -108,7 +109,7 @@ def test_security_advisories_and_cves():
             assert report["inspected_packages"] > 0
             assert report["advisory_database"]["revision"] == revision
 
-            newer = {"version": "158.0.8127.18", "revision": "b" * 40}
+            newer = {"version": "999.0.0.1", "revision": "b" * 40}
             with patch.object(auditor, "fetch_chromium_stable", return_value=newer):
                 report = auditor.audit_dependencies(**args)
                 assert report["status"] == "OUTDATED" and report["chromium_freshness"]["status"] == "BEHIND_STABLE"

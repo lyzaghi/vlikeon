@@ -23,6 +23,7 @@ REQUIRED_FILES = [
     "SECURITY.md",
     "tools/audit_security_advisories.py",
     "browser/upstream.lock.json",
+    "browser/android-upstream.lock.json",
     "browser/patches/series.json",
     "docs/handoff/antigravity/2026-10-25/WORK_ITEMS.csv",
     "qa/mobile/android_qualification.py",

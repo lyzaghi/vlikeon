@@ -19,7 +19,7 @@ def replace(text,old,new):
 
 def main():
     parser=argparse.ArgumentParser(description=__doc__);parser.add_argument('--without-cores',action='store_true');args=parser.parse_args()
-    revision=json.loads((ROOT/'browser/upstream.lock.json').read_text(encoding='utf-8'))['revision']
+    revision=json.loads((ROOT/'browser/android-upstream.lock.json').read_text(encoding='utf-8'))['revision']
     inventory=json.loads((UPSTREAM/'inventory.json').read_text(encoding='utf-8'))
     if inventory['revision']!=revision:raise ValueError('Android source snapshots belong to another Chromium revision')
     sources,cores=collect(args.without_cores)

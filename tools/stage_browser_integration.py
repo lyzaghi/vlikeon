@@ -14,7 +14,8 @@ arguments=parser.parse_args()
 CHECKOUT=ROOT/"browser/chromium"
 STAGED=ROOT/("out/browser-android-integration" if arguments.android else "out/browser-integration")
 SNAPSHOTS=ROOT/("browser/android-snapshots" if arguments.android else "browser/upstream-snapshots")
-LOCK=json.loads((ROOT/"browser/upstream.lock.json").read_text(encoding="utf-8"))
+LOCK_PATH=ROOT/("browser/android-upstream.lock.json" if arguments.android else "browser/upstream.lock.json")
+LOCK=json.loads(LOCK_PATH.read_text(encoding="utf-8"))
 receipt_path=ROOT/("browser/android-integration-receipt.json" if arguments.android else "browser/integration-receipt.json")
 receipt=json.loads(receipt_path.read_text(encoding="utf-8")) if receipt_path.is_file() else {}
 published={}
@@ -51,6 +52,6 @@ expected={path.relative_to(resources).as_posix() for path in resources.rglob('*'
 prepare(CHECKOUT/relative_resources,expected)
 shutil.copytree(resources,CHECKOUT/relative_resources,dirs_exist_ok=True)
 LOCK["checkout_state"]="sparse_integration_authored"
-(ROOT/"browser/upstream.lock.json").write_text(json.dumps(LOCK,indent=2)+"\n",encoding="utf-8")
+LOCK_PATH.write_text(json.dumps(LOCK,indent=2)+"\n",encoding="utf-8")
 receipt_path.write_text(json.dumps(published,indent=2)+"\n",encoding="utf-8")
 print("Applied authored OmniPlay integration source to pinned Chromium checkout.")
