@@ -34,7 +34,7 @@ def source_inventory():
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--cmake', required=True, type=Path)
-    parser.add_argument('--generator', required=True, choices=['Visual Studio 17 2022', 'Visual Studio 18 2026'])
+    parser.add_argument('--generator', required=True, choices=['Visual Studio 17 2022', 'Visual Studio 18 2026', 'Ninja'])
     parser.add_argument('--architecture', required=True, choices=['x64', 'ARM64'])
     parser.add_argument('--sdk-version', required=True)
     parser.add_argument('--parallel', type=int, default=2)
@@ -62,7 +62,8 @@ def main():
         if digest(destination) != before[relative]:
             raise ValueError('Video source changed during snapshot creation')
     configure = [str(args.cmake), '-S', str(snapshot), '-B', str(output / 'build'),
-                 '-G', args.generator, '-A', args.architecture,
+                 '-G', args.generator,
+                 *(['-DCMAKE_BUILD_TYPE=Release'] if args.generator == 'Ninja' else ['-A', args.architecture]),
                  '-DCMAKE_SYSTEM_VERSION=' + args.sdk_version,
                  '-DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded',
                  '-DFETCHCONTENT_FULLY_DISCONNECTED=ON']
@@ -70,7 +71,7 @@ def main():
              '--target', 'omniplay-video-worker', '--parallel', str(args.parallel)]
     subprocess.run(configure, cwd=ROOT, check=True)
     subprocess.run(build, cwd=ROOT, check=True)
-    binary = output / 'build/Release/omniplay-video-worker.exe'
+    binary = output / ('build/omniplay-video-worker.exe' if args.generator == 'Ninja' else 'build/Release/omniplay-video-worker.exe')
     target = 'windows-x64' if args.architecture == 'x64' else 'windows-arm64'
     artifact = admit_video_artifact(binary, target)
     staged = output / 'package' / ENTRY

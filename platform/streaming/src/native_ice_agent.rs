@@ -336,3 +336,87 @@ impl Drop for IceAgent {
         self.retire();
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use ring::hmac;
+
+    fn build_signed_binding_response(tx_id: &[u8; 12], password: &str) -> Vec<u8> {
+        let msg_len_before_integrity = 24u16; // 4-byte attr header + 20-byte HMAC-SHA1
+        let mut packet = Vec::with_capacity(20 + 24);
+        packet.extend_from_slice(&BINDING_RESPONSE.to_be_bytes());
+        packet.extend_from_slice(&msg_len_before_integrity.to_be_bytes());
+        packet.extend_from_slice(&STUN_MAGIC_COOKIE.to_be_bytes());
+        packet.extend_from_slice(tx_id);
+
+        let s_key = hmac::Key::new(hmac::HMAC_SHA1_FOR_LEGACY_USE_ONLY, password.as_bytes());
+        let mac = hmac::sign(&s_key, &packet);
+        packet.extend_from_slice(&ATTR_MESSAGE_INTEGRITY.to_be_bytes());
+        packet.extend_from_slice(&20u16.to_be_bytes());
+        packet.extend_from_slice(mac.as_ref());
+        packet
+    }
+
+    #[test]
+    fn ice_candidate_priority_stun_integrity_nomination_and_consent_expiry() {
+        crate::native_ice::validate_turn_uri("turns:turn.omniplay.vlikeon.internal:5349?transport=udp").unwrap();
+        assert!(crate::native_ice::validate_turn_uri("http://bad.example.com").is_err());
+
+        let sock_a = UdpSocket::bind("127.0.0.1:0").unwrap();
+        let sock_b = UdpSocket::bind("127.0.0.1:0").unwrap();
+        let addr_a = sock_a.local_addr().unwrap();
+        let addr_b = sock_b.local_addr().unwrap();
+        sock_a.set_nonblocking(true).unwrap();
+
+        let now = Instant::now();
+        let mut agent = IceAgent {
+            local_candidates: vec![IceCandidate::new_host(addr_a)],
+            remote_candidates: Vec::new(),
+            pairs: Vec::new(),
+            nominated_pair: None,
+            socket: Some(sock_a),
+            ice_username: Zeroizing::new("1700000000:peerA".to_string()),
+            ice_password: Zeroizing::new("secret-ice-password-20B!".to_string()),
+            last_consent_check: now,
+            consent_valid_until: now + Duration::from_secs(30),
+            retired: false,
+        };
+
+        let host_cand = IceCandidate::new_host(addr_b);
+        let relay_cand = IceCandidate::new_relayed("127.0.0.1:59999".parse().unwrap());
+        assert!(host_cand.priority > relay_cand.priority);
+
+        agent.add_remote_candidate(relay_cand);
+        agent.add_remote_candidate(host_cand);
+        assert_eq!(agent.pairs.len(), 2);
+        // Host pair must sort ahead of Relayed pair
+        assert_eq!(agent.pairs[0].remote.candidate_type, CandidateType::Host);
+
+        let tx_id = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
+        let req = agent.build_binding_request(tx_id, true).unwrap();
+        assert_eq!(&req[0..2], &BINDING_REQUEST.to_be_bytes());
+        assert_eq!(&req[4..8], &STUN_MAGIC_COOKIE.to_be_bytes());
+        assert_eq!(&req[8..20], &tx_id);
+
+        // Wrong password in STUN Binding Response must be rejected
+        let bad_resp = build_signed_binding_response(&tx_id, "wrong-ice-password");
+        assert!(agent.handle_binding_response(&bad_resp, &tx_id, 0).is_err());
+        assert!(!agent.is_nominated());
+
+        // Valid STUN Binding Response nominates pair 0
+        let good_resp = build_signed_binding_response(&tx_id, "secret-ice-password-20B!");
+        agent.handle_binding_response(&good_resp, &tx_id, 0).unwrap();
+        assert!(agent.is_nominated());
+        assert_eq!(agent.nominated_peer().unwrap(), addr_b);
+        agent.check_consent().unwrap();
+
+        let (_selected_sock, peer) = agent.take_selected_socket().unwrap();
+        assert_eq!(peer, addr_b);
+
+        // Expire consent freshness and verify check_consent retires the agent
+        agent.consent_valid_until = Instant::now() - Duration::from_secs(1);
+        assert!(agent.check_consent().is_err());
+        assert!(agent.retired);
+    }
+}

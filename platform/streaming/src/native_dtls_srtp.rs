@@ -167,3 +167,60 @@ impl Drop for DtlsSrtpExporter {
         self.retire();
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn dtls_srtp_fingerprint_verification_and_rfc5764_exporter() {
+        let cert_der = b"vlikeon-dtls-peer-certificate-der-fixture";
+        let fp = CertificateFingerprint::from_certificate_der(cert_der);
+        let hex_colon = fp.to_hex_string();
+        assert!(fp.verify_matches(&hex_colon));
+        assert!(fp.verify_matches(&hex_colon.to_lowercase()));
+        assert!(!fp.verify_matches("00:11:22:33"));
+
+        let master_secret = [0x5Au8; 48];
+        let client_random = [0x11u8; 32];
+        let server_random = [0x22u8; 32];
+
+        // Mismatched fingerprint is denied
+        assert!(DtlsSrtpExporter::new(
+            DtlsRole::Client,
+            &master_secret,
+            client_random,
+            server_random,
+            cert_der,
+            "00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00"
+        )
+        .is_err());
+
+        let mut client_exp = DtlsSrtpExporter::new(
+            DtlsRole::Client,
+            &master_secret,
+            client_random,
+            server_random,
+            cert_der,
+            &hex_colon,
+        )
+        .unwrap();
+        let server_exp = DtlsSrtpExporter::new(
+            DtlsRole::Server,
+            &master_secret,
+            client_random,
+            server_random,
+            cert_der,
+            &hex_colon,
+        )
+        .unwrap();
+
+        let srtp_client = client_exp.export_srtp_keys(0xABCD_1234).unwrap();
+        let srtp_server = server_exp.export_srtp_keys(0xABCD_1234).unwrap();
+        assert!(!srtp_client.is_retired());
+        assert!(!srtp_server.is_retired());
+
+        client_exp.retire();
+        assert!(client_exp.export_srtp_keys(0xABCD_1234).is_err());
+    }
+}

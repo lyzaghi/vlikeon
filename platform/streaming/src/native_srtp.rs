@@ -313,3 +313,119 @@ impl Drop for NativeSrtpSession {
         self.retire();
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use ring::hmac;
+
+    fn protect_test_srtp_packet(
+        master_key: &[u8; 16],
+        master_salt: &[u8; 14],
+        ssrc: u32,
+        full_seq: u64,
+        pt: u8,
+        payload: &[u8],
+    ) -> Vec<u8> {
+        let mut header = [0u8; 12];
+        header[0] = 0x80; // RTP v2
+        header[1] = pt;
+        header[2..4].copy_from_slice(&(full_seq as u16).to_be_bytes());
+        header[4..8].copy_from_slice(&90_000u32.to_be_bytes());
+        header[8..12].copy_from_slice(&ssrc.to_be_bytes());
+
+        let master_prf = hmac::Key::new(hmac::HMAC_SHA256, master_key);
+        let mut auth_kdf_input = Vec::with_capacity(21);
+        auth_kdf_input.extend_from_slice(master_salt);
+        auth_kdf_input.extend_from_slice(&[0x01, 0, 0, 0, 0, 0, 0]);
+        let session_auth_key = hmac::sign(&master_prf, &auth_kdf_input);
+
+        let mut enc_kdf_input = Vec::with_capacity(21);
+        enc_kdf_input.extend_from_slice(master_salt);
+        enc_kdf_input.extend_from_slice(&[0x00, 0, 0, 0, 0, 0, 0]);
+        let session_enc_key = hmac::sign(&master_prf, &enc_kdf_input);
+
+        let mut iv = [0u8; 14];
+        iv.copy_from_slice(master_salt);
+        for (i, b) in ssrc.to_be_bytes().into_iter().enumerate() {
+            iv[4 + i] ^= b;
+        }
+        let seq_bytes = full_seq.to_be_bytes();
+        for i in 0..6 {
+            iv[8 + i] ^= seq_bytes[2 + i];
+        }
+
+        let stream_prf = hmac::Key::new(hmac::HMAC_SHA256, session_enc_key.as_ref());
+        let mut ciphertext = payload.to_vec();
+        for (block_idx, chunk) in ciphertext.chunks_mut(32).enumerate() {
+            let mut counter_in = [0u8; 16];
+            counter_in[..14].copy_from_slice(&iv);
+            counter_in[14..16].copy_from_slice(&(block_idx as u16).to_be_bytes());
+            let ks = hmac::sign(&stream_prf, &counter_in);
+            for (b, k) in chunk.iter_mut().zip(ks.as_ref().iter()) {
+                *b ^= *k;
+            }
+        }
+
+        let mut datagram = Vec::with_capacity(12 + ciphertext.len() + 10);
+        datagram.extend_from_slice(&header);
+        datagram.extend_from_slice(&ciphertext);
+
+        let roc = (full_seq >> 16) as u32;
+        let s_key = hmac::Key::new(hmac::HMAC_SHA1_FOR_LEGACY_USE_ONLY, session_auth_key.as_ref());
+        let mut auth_ctx = hmac::Context::with_key(&s_key);
+        auth_ctx.update(&datagram);
+        auth_ctx.update(&roc.to_be_bytes());
+        let tag = auth_ctx.sign();
+        datagram.extend_from_slice(&tag.as_ref()[..10]);
+        datagram
+    }
+
+    #[test]
+    fn rfc7983_demux_replay_window_and_srtp_unprotect_roundtrip() {
+        assert_eq!(classify_datagram(&[]), DemuxPacketType::Unknown);
+        assert_eq!(classify_datagram(&[0x00, 0x01]), DemuxPacketType::Stun);
+        assert_eq!(classify_datagram(&[0x16, 0xFE]), DemuxPacketType::Dtls);
+        assert_eq!(classify_datagram(&[0x80, 96]), DemuxPacketType::Srtp);
+        assert_eq!(classify_datagram(&[0x80, 200]), DemuxPacketType::Srtcp);
+        assert_eq!(classify_datagram(&[0xFF, 0x00]), DemuxPacketType::Unknown);
+
+        let key = [0x42u8; 16];
+        let salt = [0x24u8; 14];
+        let ssrc = 0x1122_3344;
+        let keys = SrtpKeys::new(&key, &salt, ssrc).unwrap();
+        let mut session = NativeSrtpSession::new(keys, ssrc);
+
+        let pkt100 = protect_test_srtp_packet(&key, &salt, ssrc, 100, 96, b"hello-srtp-frame-100");
+        let dec100 = session.unprotect(&pkt100).unwrap();
+        assert_eq!(&dec100[12..], b"hello-srtp-frame-100");
+
+        // Exact replay must be rejected
+        assert!(session.unprotect(&pkt100).is_err());
+
+        // Tampered ciphertext must be rejected BEFORE updating the replay window
+        let pkt101 = protect_test_srtp_packet(&key, &salt, ssrc, 101, 96, b"hello-srtp-frame-101");
+        let mut tampered101 = pkt101.clone();
+        tampered101[14] ^= 0xFF;
+        assert!(session.unprotect(&tampered101).is_err());
+
+        // Because authentication failed first, valid packet 101 is still accepted!
+        let dec101 = session.unprotect(&pkt101).unwrap();
+        assert_eq!(&dec101[12..], b"hello-srtp-frame-101");
+
+        // Out-of-order late arrival within 128-packet window (seq 99) succeeds once
+        let pkt99 = protect_test_srtp_packet(&key, &salt, ssrc, 99, 96, b"late-srtp-frame-99");
+        assert!(session.unprotect(&pkt99).is_ok());
+        assert!(session.unprotect(&pkt99).is_err());
+
+        // Wrong SSRC rejected
+        let wrong_ssrc = protect_test_srtp_packet(&key, &salt, 0x9999_9999, 102, 96, b"wrong-ssrc");
+        assert!(session.unprotect(&wrong_ssrc).is_err());
+
+        // Retire wipes keys and refuses subsequent packets
+        session.retire();
+        assert!(session.is_retired());
+        let pkt103 = protect_test_srtp_packet(&key, &salt, ssrc, 103, 96, b"after-retire");
+        assert!(session.unprotect(&pkt103).is_err());
+    }
+}

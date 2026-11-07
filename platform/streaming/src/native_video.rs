@@ -121,3 +121,110 @@ impl FrameMailbox{
     /// the owning service must separately retain unresolved backend cleanup.
     pub fn close(&self)->Result<()>{let mut state=self.state.lock().map_err(|_|unauthorized())?;state.closed=true;state.frames.clear();Ok(())}
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn encoder_selection_and_two_frame_raw_mailbox_backpressure() {
+        let h264_id = CodecIdentity {
+            codec: Codec::H264,
+            profile: "main".into(),
+            level: 42,
+            packetization: 1,
+        };
+        let hevc_id = CodecIdentity {
+            codec: Codec::Hevc,
+            profile: "main".into(),
+            level: 120,
+            packetization: 1,
+        };
+        let local = vec![
+            EncoderCapability {
+                identity: h264_id.clone(),
+                input: PixelFormat::Nv12,
+                max_width: 1920,
+                max_height: 1080,
+                max_fps: 60,
+                max_bitrate_bps: 20_000_000,
+                hardware: false,
+                realtime: true,
+            },
+            EncoderCapability {
+                identity: hevc_id.clone(),
+                input: PixelFormat::Nv12,
+                max_width: 1920,
+                max_height: 1080,
+                max_fps: 60,
+                max_bitrate_bps: 20_000_000,
+                hardware: true,
+                realtime: true,
+            },
+        ];
+        let receiver = vec![h264_id.clone(), hevc_id.clone()];
+        let profile = Profile {
+            width: 1280,
+            height: 720,
+            fps: 60,
+            bitrate_bps: 8_000_000,
+        };
+
+        // Auto preserves backend order when hardware is not required
+        let auto_sel = select_encoder(&local, &receiver, profile, None, true, false).unwrap();
+        assert_eq!(auto_sel.identity.codec, Codec::H264);
+
+        // Hardware required skips software H.264 and selects hardware HEVC
+        let hw_sel = select_encoder(&local, &receiver, profile, None, true, true).unwrap();
+        assert_eq!(hw_sel.identity.codec, Codec::Hevc);
+
+        // Hardware required with preferred H.264 and allow_fallback=false fails
+        assert!(select_encoder(&local, &receiver, profile, Some(Codec::H264), false, true).is_err());
+
+        // FrameMailbox 2-frame capacity and oldest eviction under backpressure
+        let binding = Binding {
+            capture: Uuid::new_v4(),
+            session: Uuid::new_v4(),
+            generation: 1,
+        };
+        let mailbox = FrameMailbox::new(binding, profile, PixelFormat::Nv12, Duration::from_secs(60)).unwrap();
+        let nv12_bytes = (1280 * (720 + 360)) as usize;
+        for seq in 1..=3 {
+            mailbox
+                .push(Frame {
+                    binding,
+                    sequence: seq,
+                    timestamp_us: seq * 16_666,
+                    width: 1280,
+                    height: 720,
+                    format: PixelFormat::Nv12,
+                    colour: ColourEncoding::Bt709LimitedCentered,
+                    stride: 1280,
+                    bytes: vec![seq as u8; nv12_bytes],
+                })
+                .unwrap();
+        }
+        // Non-monotonic sequence rejected
+        assert!(mailbox
+            .push(Frame {
+                binding,
+                sequence: 3,
+                timestamp_us: 4 * 16_666,
+                width: 1280,
+                height: 720,
+                format: PixelFormat::Nv12,
+                colour: ColourEncoding::Bt709LimitedCentered,
+                stride: 1280,
+                bytes: vec![0; nv12_bytes],
+            })
+            .is_err());
+
+        // Consumer receives the newest frame (sequence 3) and older frames are discarded
+        let latest = mailbox.take_latest().unwrap().unwrap();
+        assert_eq!(latest.sequence, 3);
+        assert!(mailbox.take_latest().unwrap().is_none());
+
+        mailbox.close().unwrap();
+        assert!(mailbox.take_latest().is_err());
+    }
+}

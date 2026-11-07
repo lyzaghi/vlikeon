@@ -202,3 +202,140 @@ pub fn advance(database:&Database,lease:&CredentialLease,profile:Uuid,address:Cr
     let updated=journal::observe_cleanup(database,lease,profile,expected_revision,address,observation)?;
     Ok(StepOutcome::Committed{revision:updated.revision()})
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::stream_credential_writer::NativeCredentialWriter;
+    use omniplay_streaming::native_credentials::{validate_secret_envelope, SECRET_RECORD_BYTES};
+    use std::collections::HashMap;
+    use std::sync::Mutex;
+    use zeroize::Zeroizing;
+
+    #[derive(Default)]
+    struct MemorySecretStore {
+        records: Mutex<HashMap<String, Vec<u8>>>,
+    }
+
+    impl PairingSecretStore for MemorySecretStore {
+        fn read(&self, address: &CredentialAddress) -> Result<Option<Zeroizing<Vec<u8>>>> {
+            let key = address.account()?;
+            let map = self.records.lock().unwrap();
+            if let Some(bytes) = map.get(&key) {
+                validate_secret_envelope(address, bytes)?;
+                Ok(Some(Zeroizing::new(bytes.clone())))
+            } else {
+                Ok(None)
+            }
+        }
+        fn write(&self, address: &CredentialAddress, record: &[u8]) -> Result<()> {
+            validate_secret_envelope(address, record)?;
+            assert_eq!(record.len(), SECRET_RECORD_BYTES);
+            let key = address.account()?;
+            let mut map = self.records.lock().unwrap();
+            if map.contains_key(&key) {
+                return Err(PlatformError::new(ErrorCode::Conflict, "Duplicate generation"));
+            }
+            map.insert(key, record.to_vec());
+            Ok(())
+        }
+        fn remove(&self, address: &CredentialAddress) -> Result<()> {
+            let key = address.account()?;
+            self.records.lock().unwrap().remove(&key);
+            Ok(())
+        }
+    }
+
+    struct TestRecoveryOwner {
+        profile: Uuid,
+        device: Uuid,
+    }
+
+    impl NativeRecoveryOwner for TestRecoveryOwner {
+        fn check_exclusive(&mut self, profile: Uuid, device: Uuid) -> Result<()> {
+            if self.profile == profile && self.device == device {
+                Ok(())
+            } else {
+                Err(conflict())
+            }
+        }
+        fn retire_writer(&mut self, _record: &Record, _deadline: Instant) -> Result<Retirement> {
+            Ok(Retirement::Confirmed)
+        }
+        fn retire_local(&mut self, _record: &Record, _deadline: Instant) -> Result<Retirement> {
+            Ok(Retirement::Confirmed)
+        }
+        fn revoke_relay(&mut self, _record: &Record, _deadline: Instant) -> Result<Retirement> {
+            Ok(Retirement::Confirmed)
+        }
+    }
+
+    #[test]
+    fn credential_lease_exclusion_writer_lifecycle_and_stepwise_recovery() {
+        let base = std::env::temp_dir().join(format!("vlikeon-cred-test-{}", Uuid::new_v4()));
+        std::fs::create_dir_all(&base).unwrap();
+        let db = Database::open(&base.join("profile")).unwrap();
+        let profile_id = Uuid::new_v4();
+        let store = MemorySecretStore::default();
+
+        // 1. Verify Windows/POSIX CredentialLease nonblocking exclusion returns Busy on contention
+        {
+            let _lease1 = CredentialLease::acquire(&db, profile_id).unwrap();
+            let Err(err) = CredentialLease::acquire(&db, profile_id) else {
+                panic!("Expected Busy on concurrent CredentialLease::acquire");
+            };
+            assert_eq!(err.code, ErrorCode::Busy);
+        }
+
+        // 2. Prepare identity (Reserved -> Writing -> MaterialReady) and activate after local consent
+        let (addr, rev_active) = {
+            let mut writer = NativeCredentialWriter::open(&db, profile_id, &store).unwrap();
+            let dl = Instant::now() + Duration::from_secs(15);
+            let cand = writer.prepare_identity(0, dl).unwrap();
+            assert_eq!(cand.revision(), 3);
+            let rev = writer
+                .activate_identity_after_local_consent(cand.address(), cand.revision(), crate::now_ms(), dl)
+                .unwrap();
+            assert_eq!(rev, 4);
+            (cand.address(), rev)
+        };
+
+        // 3. Revoke active identity and run stepwise recovery (RetireLocalSessions -> RemoveMaterial -> FinalizeRetirement)
+        let lease = CredentialLease::acquire(&db, profile_id).unwrap();
+        let dl = Instant::now() + Duration::from_secs(15);
+        let mut owner = TestRecoveryOwner {
+            profile: profile_id,
+            device: db.device_id,
+        };
+
+        // Active record returns RevalidationRequired before explicit revocation
+        assert!(matches!(
+            advance(&db, &lease, profile_id, addr, rev_active, &store, &mut owner, crate::now_ms(), dl).unwrap(),
+            StepOutcome::RevalidationRequired
+        ));
+
+        let revoked = revoke_active(&db, &lease, profile_id, addr, rev_active, dl).unwrap();
+        let mut rev = revoked.revision();
+
+        // Step 1: RetireLocalSessions
+        match advance(&db, &lease, profile_id, addr, rev, &store, &mut owner, crate::now_ms(), dl).unwrap() {
+            StepOutcome::Committed { revision } => rev = revision,
+            _ => panic!("Expected RetireLocalSessions commit"),
+        }
+        // Step 2: RemoveMaterial (deletes from vault, verifies absence, and transitions to Retired when no pair debt remains)
+        match advance(&db, &lease, profile_id, addr, rev, &store, &mut owner, crate::now_ms(), dl).unwrap() {
+            StepOutcome::Committed { revision } => rev = revision,
+            _ => panic!("Expected RemoveMaterial commit"),
+        }
+        assert!(store.read(&addr).unwrap().is_none());
+        // Step 3: AlreadyRetired
+        assert!(matches!(
+            advance(&db, &lease, profile_id, addr, rev, &store, &mut owner, crate::now_ms(), dl).unwrap(),
+            StepOutcome::AlreadyRetired
+        ));
+
+        drop(lease);
+        drop(db);
+        let _ = std::fs::remove_dir_all(&base);
+    }
+}

@@ -146,3 +146,57 @@ impl OwnedGameProcess{
         Ok(process)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs;
+    use std::time::{Duration, Instant};
+
+    #[test]
+    fn windows_job_object_tracks_launcher_and_admits_member_handles() {
+        let current_exe = std::env::current_exe().unwrap();
+        let parent_dir = current_exe.parent().unwrap();
+        let temp_dir = std::env::temp_dir().join(format!("vlikeon-job-test-{}", uuid::Uuid::new_v4()));
+        fs::create_dir_all(&temp_dir).unwrap();
+
+        // Copy the harmless vlikeon-decode-type-fixture.exe (or current_exe) into temp_dir as a standalone executable
+        let fixture_src = Path::new(r"E:\V10\OmniPlay\out\stream-video\x64\build\vlikeon-decode-type-fixture.exe");
+        let launcher_exe = temp_dir.join("game_launcher.exe");
+        if fixture_src.is_file() {
+            fs::copy(fixture_src, &launcher_exe).unwrap();
+        } else {
+            let _ = parent_dir;
+            fs::copy(&current_exe, &launcher_exe).unwrap();
+        }
+
+        let owned = OwnedGameProcess::launch(&launcher_exe, &temp_dir).unwrap();
+
+        // Calling admit_selected on our own test runner process (which is outside the game's unnamed job)
+        // must fail with PermissionDenied!
+        let current_proc = unsafe { BorrowedHandle::borrow_raw(GetCurrentProcess()) };
+        let foreign_err = owned.admit_selected(current_proc).unwrap_err();
+        assert_eq!(foreign_err.code, ErrorCode::PermissionDenied);
+
+        // Wait for the launched process in the job to finish and verify poll_exit accounting
+        let deadline = Instant::now() + Duration::from_secs(10);
+        let mut exit_result = None;
+        while Instant::now() < deadline {
+            if let Some(res) = owned.poll_exit().unwrap() {
+                exit_result = Some(res);
+                break;
+            }
+            std::thread::sleep(Duration::from_millis(20));
+        }
+        assert!(exit_result.is_some(), "Job process must complete within deadline");
+        if fixture_src.is_file() {
+            assert_eq!(exit_result.unwrap(), Some(true));
+        }
+
+        // Once the process has exited, root_handle() refuses to admit a dead process handle
+        assert!(owned.root_handle().is_err());
+
+        drop(owned);
+        let _ = fs::remove_dir_all(&temp_dir);
+    }
+}

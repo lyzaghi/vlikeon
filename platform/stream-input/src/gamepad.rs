@@ -216,3 +216,136 @@ impl<P:Provider> Gamepads<P>{
     }
 }
 impl<P:Provider> Drop for Gamepads<P>{fn drop(&mut self){let _=self.retire();}}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::cell::RefCell;
+    use std::rc::Rc;
+
+    #[derive(Default)]
+    struct MockLog {
+        reports: Vec<(u8, Report)>,
+        fail_detach: bool,
+    }
+
+    struct MockDevice {
+        slot: u8,
+        id: Uuid,
+    }
+
+    struct MockProvider {
+        log: Rc<RefCell<MockLog>>,
+    }
+
+    impl Provider for MockProvider {
+        type Device = MockDevice;
+        fn create(&mut self, slot: u8, _owner: &Owner) -> Result<Self::Device> {
+            Ok(MockDevice {
+                slot,
+                id: Uuid::new_v4(),
+            })
+        }
+        fn write(&mut self, device: &mut Self::Device, report: &Report) -> Result<()> {
+            self.log.borrow_mut().reports.push((device.slot, *report));
+            Ok(())
+        }
+        fn detach(&mut self, _device: &mut Self::Device) -> Result<()> {
+            if self.log.borrow().fail_detach {
+                Err(unavailable())
+            } else {
+                Ok(())
+            }
+        }
+        fn cleanup_identity(&self, device: &Self::Device) -> Option<Uuid> {
+            Some(device.id)
+        }
+    }
+
+    #[test]
+    fn virtual_gamepad_four_slot_ownership_release_fence_and_cleanup_debt() {
+        let log = Rc::new(RefCell::new(MockLog::default()));
+        let mut pads = Gamepads::new(MockProvider { log: log.clone() });
+
+        let target = TargetBinding {
+            process_id: 4242,
+            creation_time: 100_000,
+            window: 0xABCD,
+        };
+        let owner1 = Owner {
+            grant: Uuid::new_v4(),
+            game: Uuid::new_v4(),
+            pair: Uuid::new_v4(),
+            session: Uuid::new_v4(),
+            capture: Uuid::new_v4(),
+            epoch: 1,
+            target,
+        };
+        let host_ok = HostObservation {
+            target: Some(target),
+            foreground: true,
+            local_override: false,
+            document_alive: true,
+            capture_alive: true,
+            pair_authorized: true,
+        };
+
+        // Without system_visible_gamepad_consent, authorize is denied
+        assert!(pads
+            .authorize(owner1, &[0, 2], Duration::from_secs(60), &host_ok, false)
+            .is_err());
+
+        // Prepare and activate slots 0 and 2
+        pads.prepare(owner1, &[0, 2], Duration::from_secs(60), &host_ok, true)
+            .unwrap();
+        assert_eq!(pads.state(), State::Preparing);
+        assert_eq!(pads.cleanup_identities().unwrap().len(), 2);
+        pads.activate(&owner1, &host_ok).unwrap();
+        assert_eq!(pads.state(), State::Active);
+
+        // Initial activation writes neutral default reports to both slots
+        assert_eq!(log.borrow().reports.len(), 2);
+        assert_eq!(log.borrow().reports[0], (0, Report::default()));
+        assert_eq!(log.borrow().reports[1], (2, Report::default()));
+        log.borrow_mut().reports.clear();
+
+        // Apply frame sequence 10 only to slot 0; omitted slot 2 must receive neutral report
+        let pad0 = RemotePad {
+            axes: [1.0, -1.0, 0.0, 0.0, 0.5, 1.0],
+            buttons: 0b0000_0000_0000_0011,
+        };
+        pads.apply(&owner1, 10, &[(0, pad0.clone())], &host_ok).unwrap();
+        assert_eq!(log.borrow().reports.len(), 2);
+        assert_eq!(log.borrow().reports[0].0, 0);
+        assert_eq!(log.borrow().reports[0].1.sticks[0], 32767);
+        assert_eq!(log.borrow().reports[0].1.sticks[1], -32767);
+        assert_eq!(log.borrow().reports[0].1.buttons, 3);
+        assert_eq!(log.borrow().reports[1], (2, Report::default()));
+
+        // Reliable release fence at sequence 11 zeroes both slots and blocks stale sequence <= 11
+        pads.release(&owner1, 11, &host_ok).unwrap();
+        assert!(pads.apply(&owner1, 11, &[(0, pad0)], &host_ok).is_err());
+
+        // Simulate detach failure on focus loss -> retains CleanupRequired until retry succeeds
+        log.borrow_mut().fail_detach = true;
+        let host_unfocused = HostObservation {
+            foreground: false,
+            ..host_ok
+        };
+        assert!(pads.tick(&host_unfocused).is_err());
+        assert_eq!(pads.state(), State::CleanupRequired);
+        assert_eq!(pads.reserved_slots(), vec![0, 2]);
+
+        // Re-authorizing while CleanupRequired is refused
+        let owner2 = Owner { epoch: 2, ..owner1 };
+        assert!(pads
+            .authorize(owner2, &[0], Duration::from_secs(60), &host_ok, true)
+            .is_err());
+
+        // Once detach succeeds, tick transitions to Idle and frees slots
+        log.borrow_mut().fail_detach = false;
+        pads.tick(&host_unfocused).unwrap();
+        assert_eq!(pads.state(), State::Idle);
+        assert!(pads.reserved_slots().is_empty());
+    }
+}
