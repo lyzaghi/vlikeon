@@ -24,9 +24,11 @@ Dependency components and submodules are continuously monitored against:
 
 ---
 
-## 3. Chromium Security Freshness
+## 3. Chromium Security Freshness & Automated Lockfile Verification
 
-OmniPlay's browser runtime integrates with Chromium:
-- **Baseline Milestone**: Chromium 128+
-- **Security Floor**: Requires active V8 memory sandbox and site isolation.
+OmniPlay's browser runtime integrates with Chromium and enforces automated lockfile and advisory verification via [`tools/audit_security_advisories.py`](../tools/audit_security_advisories.py) and [`security/advisory-database.json`](../security/advisory-database.json):
+- **Dataset Versioning**: `dataset_version = "2026-11-08.1"`, `dataset_date = "2026-11-08"` (`vlikeon-rustsec-and-chromium-advisory-db`).
+- **RustSec Lockfile Scan**: Parses all 327 `[[package]]` entries from `Cargo.lock` via `tomllib` and evaluates each crate's exact version against RustSec affected ranges.
+- **Chromium Security Baseline**: Compares the pinned Chromium version and commit revision in `browser/upstream.lock.json` (`155.0.8059.85` / `0e66b94549a8bd85f03fbdf189b752d6e7b63c32`) against the minimum baseline (`155.0.8059.85`) and historical CVE fix milestones.
+- **Fail-Closed Gate**: When `Cargo.lock`, `browser/upstream.lock.json`, or `security/advisory-database.json` is missing/unreadable or yields 0 packages, the auditor reports `status: "UNVERIFIED"` and exits with code `1`. When any vulnerable crate or outdated Chromium revision is detected, it reports `status: "VULNERABLE"` and exits with code `1`.
 - **Rollback Policy**: Update state records schema floors; downgrading to an insecure schema or older security epoch is rejected fail-closed.

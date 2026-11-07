@@ -6,20 +6,21 @@ This document provides the consolidated evaluation across all **109 work items**
 
 ## 1. Executive Summary & Ledger Audit (Items 1–109)
 
-| Range | Group(s) | Primary Domain | Status & Evidence (2026-11-07 v2 Run) | Coordinating Owner |
+| Range | Group(s) | Primary Domain | Status & Evidence (2026-11-08 Post-QA Run) | Coordinating Owner |
 |:---:|:---:|:---|:---|:---:|
-| **1–3** | A | Foundations & Architecture | `PRESERVE_ACCEPTED_EVIDENCE` (historical accepted) | Core Team |
-| **4–49** | B, C, D | Desktop Browser & Core Engine | 34 `READY_FOR_CODEX_REVIEW`, 12 `WAITING_PERMISSION_OR_RESOURCE` (Batches `w1`, `w2`, `w3`, `w4a`, `w4b`, `d`) | `antigravity-app` |
-| **50–52** | E | Base Recovery & Fault Core | `PRESERVE_ACCEPTED_EVIDENCE` (historical accepted) | Core Team |
-| **53–60** | E | Capture, Gamepad & SRTP Transport | 5 `READY_FOR_CODEX_REVIEW`, 3 `WAITING_PERMISSION_OR_RESOURCE` (Batch `r-remote-play`, Commit `7027452`) | `antigravity-app` |
+| **1–3** | A | Foundations & Architecture | 3 `PRESERVE_ACCEPTED_EVIDENCE` (historical accepted) | Core Team |
+| **4–49** | A, B, C, D | Desktop Browser & Core Engine | 29 `READY_FOR_CODEX_REVIEW`, 17 `WAITING_PERMISSION_OR_RESOURCE` (Batches `w1`, `w2`, `w3`, `w4a`, `w4b`, `d`, `qa-remediation-20261108`, Commit `07543cf`) | `antigravity-app` |
+| **50–52** | D | Base Recovery & Fault Core | 3 `PRESERVE_ACCEPTED_EVIDENCE` (historical accepted) | Core Team |
+| **53–60** | E | Capture, Gamepad & SRTP Transport | 5 `READY_FOR_CODEX_REVIEW`, 3 `WAITING_PERMISSION_OR_RESOURCE` (Batch `r-remote-play`, Commit `07543cf`) | `antigravity-app` |
 | **61–66** | F | Android Platform & 16K Alignment | 6 `WAITING_PERMISSION_OR_RESOURCE` (local `android_qualification.py` 3/3 PASS; Batch `m-mobile`) | `antigravity-app` |
 | **67–72** | G | iOS / iPadOS Platform & Non-JIT Core | 6 `WAITING_PERMISSION_OR_RESOURCE` (local `ios_qualification.py` 3/3 PASS; Batch `m-mobile`) | `antigravity-app` |
 | **73–76** | H | Web / PWA Runtime & Quota Manager | 3 `READY_FOR_CODEX_REVIEW`, 1 `WAITING_PERMISSION_OR_RESOURCE` (Batch `p-web-pwa`, Commit `e4cfcb0`) | `antigravity-app` |
 | **77–83** | I | Encrypted Sync & Resumable Crypto | 4 `READY_FOR_CODEX_REVIEW`, 3 `WAITING_PERMISSION_OR_RESOURCE` (Batch `s-sync`, Commit `ab73030`) | `antigravity-app` |
 | **84–87** | J | Benchmark Registry & Presentation Timing | 3 `READY_FOR_CODEX_REVIEW`, 1 `WAITING_PERMISSION_OR_RESOURCE` (Batch `b-benchmark`, Commit `ab73030`) | `antigravity-app` |
-| **88–95** | K | Installer, Repair, Update & Maintenance | 5 `READY_FOR_CODEX_REVIEW`, 3 `WAITING_PERMISSION_OR_RESOURCE` (Batch `i-installer-updater`, Commit `ab73030`) | `antigravity-app` |
-| **96–104** | L | Licensing, Provenance, SBOM & Security | 5 `READY_FOR_CODEX_REVIEW`, 4 `WAITING_PERMISSION_OR_RESOURCE` (Batch `l-release-security`, Commit `ab73030`) | `antigravity-app` |
-| **105–109** | M | Fixtures, CI, Intake & Final Evaluation | 4 `READY_FOR_CODEX_REVIEW`, 1 `WAITING_PERMISSION_OR_RESOURCE` (Batches `w2`, `f-final-alignment`, Commit `ab73030`) | `antigravity-app` |
+| **88–95** | K | Installer, Repair, Update & Maintenance | 5 `READY_FOR_CODEX_REVIEW`, 3 `WAITING_PERMISSION_OR_RESOURCE` (Batch `i-installer-updater` + `qa-remediation-20261108`, Commit `07543cf`) | `antigravity-app` |
+| **96–104** | L | Licensing, Provenance, SBOM & Security | 5 `READY_FOR_CODEX_REVIEW`, 4 `WAITING_PERMISSION_OR_RESOURCE` (Batch `l-release-security` + `qa-remediation-20261108`, Commit `07543cf`) | `antigravity-app` |
+| **105–109** | M | Fixtures, CI, Intake & Final Evaluation | 4 `READY_FOR_CODEX_REVIEW`, 1 `WAITING_PERMISSION_OR_RESOURCE` (Batches `w2`, `f-final-alignment`, `qa-remediation-20261108`, Commit `07543cf`) | `antigravity-app` |
+| **Total (1–109)** | **A–M** | **All 109 Ledger Items** | **6 `PRESERVE_ACCEPTED_EVIDENCE`, 58 `READY_FOR_CODEX_REVIEW`, 45 `WAITING_PERMISSION_OR_RESOURCE` (0 `SOURCE_READY_UNVERIFIED`)** | `antigravity-app` |
 
 ---
 
@@ -102,6 +103,22 @@ This document provides the consolidated evaluation across all **109 work items**
   - Hardened `native_srtp.rs` (session key derivation, ROC in HMAC-SHA1-80 tag, replay window update strictly after authentication, HMAC-SHA256 counter-mode keystream) and `native_ice_agent.rs` (`ATTR_MESSAGE_INTEGRITY` HMAC-SHA1 verification).
   - Connected `BenchmarkRegistry::load_from_database` and `InstalledGames::is_registered` in `service.rs` and `host.rs`; removed fabricated flip timing estimates in `apps/web/platform/presentation-timing.js`.
   - Fixed stateful fractional phase across audio chunks in `audio-resampler.js`, true 64 KiB slice streaming SHA-256 in `quota-manager.js`, `-32767..=32767` stick clamping & non-wrapping sequence exhaustion across Web/Android/iOS gamepads, canonical SAF/FileProvider path containment, and real packaging/installer/fixture scripts.
+
+### Batch 12 (2026-11-08 Direct QA Remediation across Items 7, 60, 88, 90, 95, 99, 107, 109, Commit `07543cf`)
+- **Priority 1 — Installer & Uninstaller Process-Fencing Safety (Items 88, 90, 95)**:
+  - Updated `tools/installer/installer_wizard.py` and `tools/installer/uninstaller.py` to raise `ProcessInspectionError` whenever process inspection times out (`subprocess.TimeoutExpired`), is denied permission (`PermissionError`), exits with an error (`CalledProcessError` / `OSError`), or returns empty/unparseable output, halting immediately **before** any directory creation or file deletion.
+  - Enforced active-process halting in `--mode silent` as well as interactive wizard mode.
+  - Verified in `qa/installer_qualification.py` (7/7 PASS) on temporary directories that timeout, permission error, unreadable output, and active process cases leave target `install_dir` and `data_dir` completely untouched.
+- **Priority 2 — Chromium Upgrade Verifier Hardening (Item 7)**:
+  - Updated `tools/verify_chromium_upgrade.py` to remove all fallback to `source/baseline/`, require all 36 integration snapshot/modified files to exist under `source/candidate/` (or `candidate_root`), verify exact SHA-256 digests against `upgrade-review.json` `source_inventory`, and reject escaping/non-ordinary/symlink paths via `prepare_desktop_browser.relative` and `ordinary`.
+  - Recorded `desktop_capture_audio_patch.author` accurately as `ANCHORS_VERIFIED` (`mutates_tree: false`) while only patches `0001-omniplay-game-hub.patch` and `0003-owned-game-capture.patch` that write to `scratch_tree` are recorded as `APPLIED` (`mutates_tree: true`).
+  - Expanded `qa/browser/upgrade_rehearsal_test.py` to 7/7 unit tests covering valid snapshot, valid `upgrade-review` directory, `0`-candidate/`36`-baseline rejection, missing candidate file, wrong SHA-256 hash, escaping path, and drifted anchor.
+- **Priority 3 — Real Lockfile & RustSec/Chromium CVE Auditor (Item 99)**:
+  - Authored versioned security dataset `security/advisory-database.json` (`dataset_version: "2026-11-08.1"`, `dataset_date: "2026-11-08"`) and rewrote `tools/audit_security_advisories.py` to parse all 327 `[[package]]` entries in `Cargo.lock` via `tomllib` and compare against RustSec semver ranges and `browser/upstream.lock.json` (`155.0.8059.85` / `0e66b94549a8bd85f03fbdf189b752d6e7b63c32`).
+  - Enforced fail-closed behavior (`status: "UNVERIFIED"` or `"VULNERABLE"`, exit code `1`) when `Cargo.lock` or `security/advisory-database.json` is missing/empty or when a vulnerable crate or outdated Chromium version is present; verified in `qa/security_license_qualification.py` (6/6 PASS).
+- **Priority 4 — Local Clean-Checkout Verification vs. Remote CI & Ledger Synchronization (Items 107, 109)**:
+  - Verified build and test execution from a fresh detached `git worktree` clean checkout of commit `07543cf50f6f1a73b76b99fa997c6f07f0c1fe9e` (`tools/verify_clean_clone.py`, `qa/installer_qualification.py`, `qa/browser/upgrade_rehearsal_test.py -v`, `qa/security_license_qualification.py`, 6 Node.js ESM suites, and `cargo test --locked --offline -j 2` across `omniplay-updater`, `omniplay-sync`, `omniplay-sync-client`, `omniplay-sync-service`, `omniplay-streaming`, all exiting `0`).
+  - Explicitly distinguished local clean-checkout verification from remote GitHub Actions CI runner execution (`.github/workflows/ci.yml`), which runs only when pushed to a remote repository with CI runners enabled.
 
 ---
 

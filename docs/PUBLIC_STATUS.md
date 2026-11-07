@@ -8,9 +8,9 @@ wire formats retain `omniplay`; their migration is not complete.
 
 Development is active. [`OUTSTANDING_WORK.md`](OUTSTANDING_WORK.md) and
 [`handoff/antigravity/2026-10-25/WORK_ITEMS.csv`](handoff/antigravity/2026-10-25/WORK_ITEMS.csv)
-track the 1–109 project ledger. Under the 2026-11-07 v2 delegation on branch
-`antigravity/complete-20261107`, Antigravity executed local Windows native/Rust/Python/Node.js
-builds and qualification suites across Batches `W1 -> W2 -> W3 -> W4a -> W4b -> R -> D -> M -> P -> S -> B -> I -> L -> F`:
+track the 1–109 project ledger. Under the 2026-11-07 v2 delegation and 2026-11-08 direct QA remediation on branch
+`antigravity/complete-20261107` (source commit `07543cf50f6f1a73b76b99fa997c6f07f0c1fe9e`), Antigravity executed local Windows native/Rust/Python/Node.js
+builds, clean-checkout worktree verification, and qualification suites across Batches `W1 -> W2 -> W3 -> W4a -> W4b -> R -> D -> M -> P -> S -> B -> I -> L -> F -> qa-remediation-20261108`:
 - **6 items** retain `PRESERVE_ACCEPTED_EVIDENCE` (original items `1, 2, 3, 50, 51, 52`).
 - **58 items** are `READY_FOR_CODEX_REVIEW` with build/test execution logs under `E:\V10\work\vlikeon-antigravity-implementation-20261107\`.
 - **45 items** are `WAITING_PERMISSION_OR_RESOURCE` (gated on external Linux/macOS hosts, physical mobile/gamepad/display hardware labs, third-party audits, or production signing/server credentials).
