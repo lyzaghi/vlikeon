@@ -86,6 +86,36 @@ impl NativeWorkJobs {
         #[cfg(not(windows))]{let _=(root,profile_id,work_id);Err(unsupported())}
     }
 
+    pub fn quarantine_legacy_batch(&self,root:&Path,profile_id:Uuid)->Result<omniplay_contracts::NativeWorkQuarantineSummary>{
+        if !enabled(){return Err(unsupported());}
+        if profile_id.is_nil(){return Err(PlatformError::new(ErrorCode::PermissionDenied,"Legacy work quarantine requires an exact profile owner"));}
+        if self.busy(){return Err(PlatformError::new(ErrorCode::Busy,"A native temporary-session recovery is still finishing").recover("Wait for the current recovery operation to finish"));}
+        let candidates={
+            let database=omniplay_core::Database::open(root)?;
+            omniplay_core::native_work_storage::windows_recovery_candidates(&database,profile_id)?
+        };
+        let mut summary=omniplay_contracts::NativeWorkQuarantineSummary{schema_version:1,..Default::default()};
+        for work_id in candidates.iter().take(32){
+            if self.busy(){return Err(PlatformError::new(ErrorCode::Busy,"A native temporary-session recovery is still finishing"));}
+            summary.attempted+=1;
+            match self.quarantine_legacy(root,profile_id,*work_id){
+                Ok(receipt)=>{
+                    if receipt.quarantine_directory.is_empty(){
+                        summary.reclaimed_clean+=1;
+                    }else{
+                        summary.quarantined+=1;
+                        summary.preserved_files=summary.preserved_files.saturating_add(receipt.preserved_files);
+                        summary.preserved_bytes=summary.preserved_bytes.saturating_add(receipt.preserved_bytes);
+                    }
+                }
+                Err(error) if matches!(error.code,ErrorCode::Busy|ErrorCode::PermissionDenied)=>return Err(error),
+                Err(_)=>{summary.skipped_ineligible+=1;}
+            }
+        }
+        summary.more_available=candidates.len()>summary.attempted as usize;
+        Ok(summary)
+    }
+
     pub fn diagnostic(&self)->Result<Option<omniplay_core::diagnostics::NativeRecoveryDiagnostic>>{
         let Some(active)=&self.current else{return Ok(None)};
         // Export never waits on a worker-held snapshot lock and never exposes
@@ -124,5 +154,45 @@ mod tests{
         assert_eq!(encoded["started_at_ms"],10);assert_eq!(encoded["finished_at_ms"],20);
         assert_eq!(busy,Some(ErrorCode::Busy));
         assert_eq!(encoded.as_object().unwrap().len(),5);
+    }
+
+    #[test]
+    fn quarantine_legacy_batch_quarantines_legacy_work_and_redacts_internal_ids(){
+        let profile_id=Uuid::new_v4();
+        let work_id=Uuid::new_v4();
+        let root=std::env::temp_dir().join(format!("omniplay-broker-legacy-quarantine-{work_id}"));
+        std::fs::create_dir_all(&root).unwrap();
+        {
+            let mut db=omniplay_core::Database::open(&root).unwrap();
+            omniplay_core::native_work_storage::reserve(&mut db,profile_id,work_id,8192,2).unwrap();
+        }
+        let work_dir=root.join("native-work").join(work_id.to_string());
+        std::fs::create_dir_all(work_dir.join("save")).unwrap();
+        std::fs::write(work_dir.join("save").join("battery.srm"),b"LEGACY_BATTERY_DATA").unwrap();
+        std::fs::write(work_dir.join("notes.bin"),b"NOTES").unwrap();
+
+        let jobs=NativeWorkJobs::default();
+        let summary=jobs.quarantine_legacy_batch(&root,profile_id).expect("quarantine batch");
+        assert_eq!(summary.schema_version,1);
+        assert_eq!(summary.attempted,1);
+        assert_eq!(summary.quarantined,1);
+        assert_eq!(summary.reclaimed_clean,0);
+        assert_eq!(summary.skipped_ineligible,0);
+        assert_eq!(summary.preserved_files,2);
+        assert_eq!(summary.preserved_bytes,19+5);
+        assert!(!summary.more_available);
+        assert!(!work_dir.exists());
+        assert!(root.join("manual-recovery-staging").join(work_id.to_string()).join("legacy-quarantine-receipt.json").is_file());
+
+        let encoded=serde_json::to_string(&summary).unwrap();
+        assert!(!encoded.contains(&work_id.to_string()));
+        assert!(!encoded.contains(&profile_id.to_string()));
+
+        let db=omniplay_core::Database::open(&root).unwrap();
+        let status=omniplay_core::native_work_storage::status(&db,profile_id).unwrap();
+        assert_eq!(status.works,0);
+        assert_eq!(status.physical_bytes,Some(0));
+        drop(db);
+        let _=std::fs::remove_dir_all(&root);
     }
 }

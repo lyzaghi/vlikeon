@@ -40,3 +40,16 @@ pub struct NativeWorkRecoverySummary {
     pub cancelled:bool,
     pub more_available:bool,
 }
+
+#[derive(Clone,Debug,Default,Serialize,Deserialize,PartialEq,Eq)]
+#[serde(deny_unknown_fields)]
+pub struct NativeWorkQuarantineSummary {
+    pub schema_version:u32,
+    pub attempted:u32,
+    pub quarantined:u32,
+    pub reclaimed_clean:u32,
+    pub skipped_ineligible:u32,
+    pub preserved_files:u32,
+    pub preserved_bytes:u64,
+    pub more_available:bool,
+}

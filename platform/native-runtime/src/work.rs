@@ -248,7 +248,6 @@ pub fn quarantine_unowned_windows_work(profile:&Path,profile_id:Uuid,id:Uuid)->R
     use std::os::windows::fs::OpenOptionsExt;
     if profile_id.is_nil()||id.is_nil(){return Err(storage_error("legacy quarantine identity is invalid"));}
     let _collector=recovery_lease(profile)?;
-    let _creator=creation_guard(profile)?;
     let database=omniplay_core::Database::open(profile)?;
     if omniplay_core::native_work_storage::macos_journal(&database,profile_id,id)?.is_some(){
         return Err(PlatformError::new(ErrorCode::UnsupportedCapability,"macOS native work requires its own recovery path"));
@@ -271,6 +270,9 @@ pub fn quarantine_unowned_windows_work(profile:&Path,profile_id:Uuid,id:Uuid)->R
     if !matches!(reason,RetainedReason::LegacyOwnership|RetainedReason::IncompleteOwnership){
         return Err(storage_error("work is not eligible for legacy/incomplete ownership quarantine"));
     }
+    let _creator=creation_guard(profile)?;
+    let reservation=omniplay_core::native_work_storage::windows_recovery_reservation(&database,profile_id,id)?
+        .ok_or_else(||storage_error("legacy quarantine requires an owned reservation row"))?;
     let quarantine_root=profile.join("manual-recovery-staging");
     if !ordinary(&quarantine_root,true)?{
         fs::create_dir_all(&quarantine_root).map_err(storage_error)?;

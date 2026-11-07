@@ -146,6 +146,7 @@ pub enum Command {
     NativeWorkRecoverStart,
     NativeWorkRecoverStatus {job_id:Uuid},
     NativeWorkRecoverCancel {job_id:Uuid},
+    NativeWorkQuarantineLegacy,
     SaveImport { grant_id: Uuid, game_id: Uuid },
     SaveRepair {grant_id:Uuid,save_id:Uuid},
     SaveCreate { session_id: Uuid, kind: SaveKind, slot: u16, expected_parent_id: Option<Uuid> },

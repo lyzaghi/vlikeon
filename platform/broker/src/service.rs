@@ -123,6 +123,7 @@ impl Broker {
             Command::NativeWorkRecoverStart=>encode(self.native_work_jobs.start(&self.database.root,self.profile_id)?),
             Command::NativeWorkRecoverStatus{job_id}=>encode(self.native_work_jobs.status(job_id)?),
             Command::NativeWorkRecoverCancel{job_id}=>encode(self.native_work_jobs.cancel(job_id)?),
+            Command::NativeWorkQuarantineLegacy=>encode(self.native_work_jobs.quarantine_legacy_batch(&self.database.root,self.profile_id)?),
             Command::StreamCapturePrepare{game_id,pair_id,session_id,host_public_key,grant}=>self.stream_inputs.prepare_capture(&self.database,&mut self.installed,game_id,pair_id,session_id,host_public_key,grant,deadline_ms),
             Command::StreamCaptureSelect{capture_id,session_id,choice_id}=>self.stream_inputs.select_capture(&self.database,&mut self.installed,capture_id,session_id,choice_id,deadline_ms),
             Command::StreamCaptureRelease{capture_id,session_id}=>self.stream_inputs.release_capture(capture_id,session_id),

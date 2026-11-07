@@ -4,7 +4,9 @@ import argparse
 from datetime import datetime, timezone
 import hashlib
 import json
+import os
 from pathlib import Path
+import shutil
 import subprocess
 import sys
 
@@ -60,7 +62,7 @@ WINDOWS_LIFECYCLE_GATES: tuple[tuple[str, str, str], ...] = (
     (
         "fixed_16_slot_ipc_worker_retirement",
         "platform/native-runtime/src/control_workers.rs",
-        "MAX_SLOTS:usize=16",
+        "const LIMIT:usize=16;",
     ),
     (
         "presentation_helper_isolated_job_and_pipes",
@@ -69,28 +71,135 @@ WINDOWS_LIFECYCLE_GATES: tuple[tuple[str, str, str], ...] = (
     ),
 )
 
-ACCEPTANCE_TEST_QUEUE: tuple[dict[str, object], ...] = (
-    {
-        "id": "sandbox_windows_unit_and_storage_suite",
-        "command": ["cargo", "test", "-p", "omniplay-sandbox", "--", "--nocapture"],
-        "covers_items": [8, 10, 11],
-    },
-    {
-        "id": "native_runtime_windows_work_and_ipc_suite",
-        "command": ["cargo", "test", "-p", "omniplay-native-runtime", "--", "--nocapture"],
-        "covers_items": [8, 9, 11],
-    },
-    {
-        "id": "broker_windows_recovery_jobs_suite",
-        "command": ["cargo", "test", "-p", "omniplay-broker", "native_work_jobs::tests", "--", "--nocapture"],
-        "covers_items": [9, 11],
-    },
-    {
-        "id": "native_control_wire_cases",
-        "command": ["python", "qa/native-lifecycle/wire_cases.py"],
-        "covers_items": [10, 11],
-    },
+IGNORED_WINDOWS_ENV_VARS: tuple[str, ...] = (
+    "OMNIPLAY_WINDOWS_STORAGE_PROBE",
+    "OMNIPLAY_WINDOWS_READONLY_STORAGE_PROBE",
+    "OMNIPLAY_WINDOWS_LOADER_PROBE",
+    "OMNIPLAY_WINDOWS_PRESENTATION_FIXTURE",
+    "OMNIPLAY_WINDOWS_DEVICE_FREE_WORKER",
+    "OMNIPLAY_WINDOWS_DEVICE_FREE_CORE",
 )
+
+
+def resolve_cargo() -> str:
+    env_cargo = os.environ.get("CARGO")
+    if env_cargo and Path(env_cargo).is_file():
+        return str(Path(env_cargo).resolve())
+    found = shutil.which("cargo")
+    if found:
+        return found
+    local_rustup = REPO_ROOT.parent / ".rustup-local" / "toolchains" / "stable-x86_64-pc-windows-msvc" / "bin" / "cargo.exe"
+    if local_rustup.is_file():
+        return str(local_rustup)
+    return "cargo"
+
+
+def build_acceptance_queue(
+    cargo_bin: str,
+    python_bin: str,
+    lifecycle_worker: Path,
+    lifecycle_core: Path,
+    lifecycle_void_core: Path,
+    run_root: Path,
+) -> list[dict[str, object]]:
+    queue: list[dict[str, object]] = [
+        {
+            "id": "sandbox_windows_unit_and_storage_suite",
+            "command": [cargo_bin, "test", "--locked", "--offline", "-j", "2", "-p", "omniplay-sandbox", "--", "--nocapture"],
+            "covers_items": [8, 10, 11],
+        },
+        {
+            "id": "native_runtime_windows_work_and_ipc_suite",
+            "command": [cargo_bin, "test", "--locked", "--offline", "-j", "2", "-p", "omniplay-native-runtime", "--", "--nocapture"],
+            "covers_items": [8, 9, 11],
+        },
+        {
+            "id": "broker_windows_recovery_jobs_suite",
+            "command": [cargo_bin, "test", "--locked", "--offline", "-j", "2", "-p", "omniplay-broker", "native_work_jobs::tests", "--", "--nocapture"],
+            "covers_items": [9, 11],
+        },
+    ]
+    if all(os.environ.get(var) for var in (
+        "OMNIPLAY_WINDOWS_STORAGE_PROBE",
+        "OMNIPLAY_WINDOWS_READONLY_STORAGE_PROBE",
+        "OMNIPLAY_WINDOWS_PRESENTATION_FIXTURE",
+        "OMNIPLAY_WINDOWS_DEVICE_FREE_WORKER",
+        "OMNIPLAY_WINDOWS_DEVICE_FREE_CORE",
+    )):
+        queue.append(
+            {
+                "id": "sandbox_windows_ignored_os_probes_suite",
+                "command": [
+                    cargo_bin,
+                    "test",
+                    "--locked",
+                    "--offline",
+                    "-j",
+                    "2",
+                    "-p",
+                    "omniplay-sandbox",
+                    "--",
+                    "--ignored",
+                    "--skip",
+                    "actual_actor_reports_staged_system_dll_initialization",
+                    "--nocapture",
+                ],
+                "covers_items": [8, 10, 11, 105],
+            }
+        )
+    if lifecycle_worker.is_file() and lifecycle_core.is_file():
+        queue.append(
+            {
+                "id": "native_control_wire_cases",
+                "command": [
+                    python_bin,
+                    "qa/native-lifecycle/wire_cases.py",
+                    "--worker",
+                    str(lifecycle_worker.resolve()),
+                    "--core",
+                    str(lifecycle_core.resolve()),
+                    "--output",
+                    str((run_root / "wire-cases").resolve()),
+                ],
+                "covers_items": [10, 11],
+            }
+        )
+        queue.append(
+            {
+                "id": "native_temporary_directory_cases",
+                "command": [
+                    python_bin,
+                    "qa/native-lifecycle/temporary_directory_cases.py",
+                    "--worker",
+                    str(lifecycle_worker.resolve()),
+                    "--core",
+                    str(lifecycle_core.resolve()),
+                    "--output",
+                    str((run_root / "temp-dir-cases").resolve()),
+                ],
+                "covers_items": [8, 11],
+            }
+        )
+    if lifecycle_worker.is_file() and lifecycle_core.is_file() and lifecycle_void_core.is_file():
+        queue.append(
+            {
+                "id": "native_lifecycle_run_cases",
+                "command": [
+                    python_bin,
+                    "qa/native-lifecycle/run_cases.py",
+                    "--worker",
+                    str(lifecycle_worker.resolve()),
+                    "--core",
+                    str(lifecycle_core.resolve()),
+                    "--void-core",
+                    str(lifecycle_void_core.resolve()),
+                    "--output",
+                    str((run_root / "lifecycle-run-cases").resolve()),
+                ],
+                "covers_items": [10, 11],
+            }
+        )
+    return queue
 
 
 def utc_now() -> str:
@@ -148,6 +257,30 @@ def main(argv: list[str] | None = None) -> int:
         help="Optional compiled omniplay-presentation-host.exe to verify PE import isolation.",
     )
     parser.add_argument(
+        "--lifecycle-worker",
+        type=Path,
+        default=REPO_ROOT / "out" / "qualification" / "worker-direct" / "omniplay-native-worker.exe",
+        help="Direct qualification worker binary for wire_cases.py / run_cases.py / temporary_directory_cases.py.",
+    )
+    parser.add_argument(
+        "--lifecycle-core",
+        type=Path,
+        default=REPO_ROOT / "out" / "qualification" / "lifecycle-cores" / "omniplay-lifecycle-fixture.dll",
+        help="Qualification lifecycle fixture core DLL.",
+    )
+    parser.add_argument(
+        "--lifecycle-void-core",
+        type=Path,
+        default=REPO_ROOT / "out" / "qualification" / "lifecycle-cores" / "omniplay-lifecycle-void-fixture.dll",
+        help="Qualification void-only lifecycle fixture core DLL.",
+    )
+    parser.add_argument(
+        "--run-output-dir",
+        type=Path,
+        default=None,
+        help="Fresh directory root for child qualification suite evidence.",
+    )
+    parser.add_argument(
         "--output-receipt",
         type=Path,
         default=None,
@@ -166,9 +299,25 @@ def main(argv: list[str] | None = None) -> int:
             args.helper_binary.resolve() if args.helper_binary else None,
         )
 
+    stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    run_root = (
+        args.run_output_dir.resolve()
+        if args.run_output_dir is not None
+        else (REPO_ROOT / "out" / "qualification" / "lifecycle-runs" / stamp).resolve()
+    )
+    acceptance_queue = build_acceptance_queue(
+        cargo_bin=resolve_cargo(),
+        python_bin=sys.executable,
+        lifecycle_worker=args.lifecycle_worker,
+        lifecycle_core=args.lifecycle_core,
+        lifecycle_void_core=args.lifecycle_void_core,
+        run_root=run_root,
+    )
+
     executed_suites: list[dict[str, object]] = []
     if args.execute:
-        for entry in ACCEPTANCE_TEST_QUEUE:
+        run_root.mkdir(parents=True, exist_ok=True)
+        for entry in acceptance_queue:
             cmd = [str(x) for x in entry["command"]]
             completed = subprocess.run(
                 cmd,
@@ -178,24 +327,27 @@ def main(argv: list[str] | None = None) -> int:
                 text=True,
                 check=False,
             )
+            suite_log = run_root / f"{entry['id']}.log"
+            suite_log.write_text(completed.stdout, encoding="utf-8")
             executed_suites.append(
                 {
                     "id": entry["id"],
                     "command": cmd,
                     "returncode": completed.returncode,
+                    "log_path": str(suite_log),
                     "output_tail": completed.stdout[-4000:],
                 }
             )
 
     receipt: dict[str, object] = {
         "schema_version": 1,
-        "items": [8, 9, 10, 11],
+        "items": [8, 9, 10, 11, 105],
         "generated_at_utc": utc_now(),
         "all_source_gates_passed": all_gates_passed,
         "source_gates": gates,
         "pe_isolation_audit": pe_audit,
         "execution_mode": "executed" if args.execute else "deferred_queue_ready",
-        "acceptance_queue": list(ACCEPTANCE_TEST_QUEUE),
+        "acceptance_queue": acceptance_queue,
         "executed_suites": executed_suites,
     }
 

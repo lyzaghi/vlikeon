@@ -262,6 +262,95 @@ mod tests {
         let profile_usage = enforce_profile_write_quota(&root).unwrap();
         assert_eq!(profile_usage.physical_bytes, 4096 + 8192 + 4096);
 
+        // Readonly mode also rejects any write inside save/ even when scratch/ is clean
+        fs::remove_file(work.join("scratch").join("illegal.tmp")).unwrap();
+        fs::write(work.join("save").join("battery.srm"), b"unauthorized-os-save").unwrap();
+        let save_err = enforce_work_write_quotas(&work, false).unwrap_err();
+        assert_eq!(save_err.code, ErrorCode::ResourceLimit);
+
         let _ = fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn enforces_file_count_depth_and_byte_caps_across_subtrees() {
+        let root = std::env::temp_dir().join(format!("omniplay-win-quota-caps-{}", unique_id()));
+        let work = root.join("native-work").join(unique_id());
+        let helper = work.join("presentation-tmp");
+        fs::create_dir_all(&helper).unwrap();
+
+        for idx in 0..MAX_HELPER_TEMP_FILES {
+            fs::write(helper.join(format!("f-{idx}.tmp")), b"x").unwrap();
+        }
+        let ok_usage = enforce_work_write_quotas(&work, false).unwrap();
+        assert_eq!(ok_usage.helper_temp.file_count, MAX_HELPER_TEMP_FILES);
+        assert_eq!(
+            ok_usage.helper_temp.physical_bytes,
+            u64::from(MAX_HELPER_TEMP_FILES) * CLUSTER_ROUND_BYTES
+        );
+
+        // 65th file in presentation-tmp exceeds MAX_HELPER_TEMP_FILES (64)
+        fs::write(helper.join("overflow.tmp"), b"x").unwrap();
+        let count_err = enforce_work_write_quotas(&work, false).unwrap_err();
+        assert_eq!(count_err.code, ErrorCode::ResourceLimit);
+        let _ = fs::remove_dir_all(&helper);
+
+        // Exceeding MAX_SUBTREE_DEPTH (16) fails closed with ResourceLimit
+        let mut deep = work.join("cache");
+        fs::create_dir_all(&deep).unwrap();
+        for level in 0..=MAX_SUBTREE_DEPTH {
+            deep = deep.join(format!("d{level}"));
+            fs::create_dir(&deep).unwrap();
+        }
+        let depth_err = enforce_work_write_quotas(&work, false).unwrap_err();
+        assert_eq!(depth_err.code, ErrorCode::ResourceLimit);
+        let _ = fs::remove_dir_all(work.join("cache"));
+
+        // Direct measure_subtree byte cap check
+        let bounded = work.join("bounded");
+        fs::create_dir_all(&bounded).unwrap();
+        fs::write(bounded.join("big.bin"), vec![0u8; 8193]).unwrap();
+        let byte_err = measure_subtree(&bounded, "bounded_test", 8192, 16).unwrap_err();
+        assert_eq!(byte_err.code, ErrorCode::ResourceLimit);
+
+        let _ = fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn rejects_reparse_points_and_sums_profile_native_work_plus_retirement() {
+        let root = std::env::temp_dir().join(format!("omniplay-win-quota-reparse-{}", unique_id()));
+        let work = root.join("native-work").join(unique_id());
+        let retirement = root.join("native-retirement");
+        let outside = std::env::temp_dir().join(format!("omniplay-win-quota-outside-{}", unique_id()));
+        fs::create_dir_all(work.join("scratch")).unwrap();
+        fs::create_dir_all(&retirement).unwrap();
+        fs::create_dir_all(&outside).unwrap();
+        fs::write(outside.join("secret.bin"), b"outside").unwrap();
+
+        // Sum physical bytes across native-work and native-retirement
+        fs::write(work.join("scratch").join("ok.bin"), vec![7u8; 100]).unwrap();
+        fs::write(retirement.join("receipt.json"), b"{}").unwrap();
+        let combined = enforce_profile_write_quota(&root).unwrap();
+        assert_eq!(combined.physical_bytes, 4096 + 4096);
+        assert_eq!(combined.file_count, 2);
+
+        // Create a Windows directory junction inside scratch and verify StorageFailure rejection
+        let junction = work.join("scratch").join("linked-dir");
+        let status = std::process::Command::new("cmd.exe")
+            .args(["/c", "mklink", "/J"])
+            .arg(&junction)
+            .arg(&outside)
+            .output()
+            .unwrap();
+        assert!(status.status.success(), "mklink /J must succeed on Windows NTFS");
+
+        let reparse_err = enforce_work_write_quotas(&work, true).unwrap_err();
+        assert_eq!(reparse_err.code, ErrorCode::StorageFailure);
+        let profile_reparse_err = enforce_profile_write_quota(&root).unwrap_err();
+        assert_eq!(profile_reparse_err.code, ErrorCode::StorageFailure);
+
+        // Remove junction directory link itself before deleting outside target
+        let _ = fs::remove_dir(&junction);
+        let _ = fs::remove_dir_all(&root);
+        let _ = fs::remove_dir_all(&outside);
     }
 }

@@ -20,30 +20,30 @@ from pathlib import Path
 FIXTURES = {
     "storage": {
         "env_var": "OMNIPLAY_WINDOWS_STORAGE_PROBE",
-        "source": "qa/windows/storage-probe.cpp",
+        "sources": ["qa/windows/storage-probe.cpp"],
         "output": "out/qualification/windows-storage/storage-probe.exe",
-        "flags": ["/nologo", "/std:c++20", "/EHsc", "/W4", "/WX", "/MT", "/O2", "/guard:cf", "/DUNICODE", "/D_UNICODE"],
-        "libs": ["advapi32.lib", "userenv.lib", "ole32.lib"],
+        "flags": ["/nologo", "/std:c++20", "/EHsc", "/W4", "/WX", "/utf-8", "/permissive-", "/GS", "/MT", "/O2", "/guard:cf", "/DUNICODE", "/D_UNICODE", "/D_WIN32_WINNT=0x0A00", "/DWINVER=0x0A00"],
+        "libs": ["advapi32.lib", "userenv.lib", "windowsapp.lib"],
     },
     "storage_readonly": {
         "env_var": "OMNIPLAY_WINDOWS_READONLY_STORAGE_PROBE",
-        "source": "qa/windows/storage-probe.cpp",
+        "sources": ["qa/windows/storage-probe.cpp"],
         "output": "out/qualification/windows-storage/storage-probe-readonly.exe",
-        "flags": ["/nologo", "/std:c++20", "/EHsc", "/W4", "/WX", "/MT", "/O2", "/guard:cf", "/DUNICODE", "/D_UNICODE", "/DOMNIPLAY_EXPECT_SCRATCH_DENIED"],
-        "libs": ["advapi32.lib", "userenv.lib", "ole32.lib"],
+        "flags": ["/nologo", "/std:c++20", "/EHsc", "/W4", "/WX", "/utf-8", "/permissive-", "/GS", "/MT", "/O2", "/guard:cf", "/DUNICODE", "/D_UNICODE", "/D_WIN32_WINNT=0x0A00", "/DWINVER=0x0A00", "/DOMNIPLAY_EXPECT_SCRATCH_DENIED"],
+        "libs": ["advapi32.lib", "userenv.lib", "windowsapp.lib"],
     },
     "loader_diagnostic": {
         "env_var": "OMNIPLAY_WINDOWS_LOADER_PROBE",
-        "source": "qa/windows/loader-probe.cpp",
+        "sources": ["qa/windows/loader-probe.cpp"],
         "output": "out/qualification/windows-storage/loader-probe.exe",
-        "flags": ["/nologo", "/std:c++20", "/EHsc", "/W4", "/WX", "/MT", "/O2", "/guard:cf", "/DUNICODE", "/D_UNICODE"],
+        "flags": ["/nologo", "/std:c++20", "/EHsc", "/W4", "/WX", "/utf-8", "/permissive-", "/GS", "/MT", "/O2", "/guard:cf", "/DUNICODE", "/D_UNICODE"],
         "libs": ["kernel32.lib"],
     },
     "presentation_fixture": {
         "env_var": "OMNIPLAY_WINDOWS_PRESENTATION_FIXTURE",
-        "source": "qa/windows/presentation-fixture.cpp",
+        "sources": ["qa/windows/presentation-fixture.cpp", "engines/presentation/src/wire.cpp"],
         "output": "out/qualification/windows-presentation/omniplay-presentation-fixture.exe",
-        "flags": ["/nologo", "/std:c++20", "/EHsc", "/W4", "/WX", "/MT", "/O2", "/guard:cf", "/DUNICODE", "/D_UNICODE", "/Iengines/native/presentation/src"],
+        "flags": ["/nologo", "/std:c++20", "/EHsc", "/W4", "/WX", "/utf-8", "/permissive-", "/GS", "/MT", "/O2", "/guard:cf", "/DUNICODE", "/D_UNICODE", "/DNOMINMAX", "/DWIN32_LEAN_AND_MEAN", "/D_CRT_SECURE_NO_WARNINGS", "/Iengines/presentation/src"],
         "libs": ["kernel32.lib"],
     },
 }
@@ -52,29 +52,35 @@ def compile_fixtures(msvc_available: bool = False):
     print("[+] Preparing Windows Sandbox Fixtures...")
     for spec in FIXTURES.values():
         Path(spec["output"]).parent.mkdir(parents=True, exist_ok=True)
-        src_path = Path(spec["source"])
-        if not src_path.is_file():
-            raise FileNotFoundError(f"Missing fixture source file: {src_path}")
+        for src in spec["sources"]:
+            src_path = Path(src)
+            if not src_path.is_file():
+                raise FileNotFoundError(f"Missing fixture source file: {src_path}")
 
     if not msvc_available:
         print("    [Deferred] MSVC compiler 'cl.exe' deferred; printing build commands:")
         for name, spec in FIXTURES.items():
             print(f"\n# Compile {name}:")
+            obj_dir = Path(spec["output"]).parent / "obj" / name
             flags_str = " ".join(spec["flags"])
+            sources_str = " ".join(spec["sources"])
             libs_str = " ".join(spec["libs"])
-            cmd = f"cl {flags_str} {spec['source']} /Fe:{spec['output']} /link /DYNAMICBASE /HIGHENTROPYVA /NXCOMPAT /GUARD:CF {libs_str}"
+            cmd = f"cl {flags_str} {sources_str} /Fo:{obj_dir.as_posix()}/ /Fe:{spec['output']} /link /DYNAMICBASE /HIGHENTROPYVA /NXCOMPAT /GUARD:CF {libs_str}"
             print(f"  {cmd}")
             print(f"  $env:{spec['env_var']} = (Resolve-Path '{spec['output']}').Path")
         print("\n# Device-free worker & core environment variables:")
-        print("  $env:OMNIPLAY_WINDOWS_DEVICE_FREE_WORKER = (Resolve-Path 'out/qualification/windows-presentation/omniplay-native-worker.exe').Path")
-        print("  $env:OMNIPLAY_WINDOWS_DEVICE_FREE_CORE = (Resolve-Path 'out/qualification/windows-presentation/omniplay-lifecycle-fixture.dll').Path")
+        print("  $env:OMNIPLAY_WINDOWS_DEVICE_FREE_WORKER = (Resolve-Path 'out/qualification/worker-device-free/omniplay-native-worker.exe').Path")
+        print("  $env:OMNIPLAY_WINDOWS_DEVICE_FREE_CORE = (Resolve-Path 'out/qualification/lifecycle-cores/omniplay-lifecycle-fixture.dll').Path")
     else:
         print("[+] MSVC cl.exe detected; compiling fixtures...")
         for name, spec in FIXTURES.items():
+            obj_dir = Path(spec["output"]).parent / "obj" / name
+            obj_dir.mkdir(parents=True, exist_ok=True)
             cmd = [
                 "cl",
                 *spec["flags"],
-                spec["source"],
+                *spec["sources"],
+                f"/Fo:{obj_dir.as_posix()}/",
                 f"/Fe:{spec['output']}",
                 "/link",
                 "/DYNAMICBASE",

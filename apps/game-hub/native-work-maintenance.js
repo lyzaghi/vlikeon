@@ -10,7 +10,19 @@ function storageStatus(value){
     value.reserved_works+value.staged_works+value.retiring_works!==value.works||
     !integer(value.reserved_bytes,32*1024**3)||!integer(value.reserved_files,4096)||
     value.maximum_works!==64||value.maximum_bytes!==32*1024**3||value.maximum_files!==4096||
-    value.physical_bytes!==null||typeof value.recovery_running!=='boolean')throw new Error('invalid_native_storage_status');
+    value.physical_bytes!==null&&!integer(value.physical_bytes,512*1024**3)||
+    typeof value.recovery_running!=='boolean')throw new Error('invalid_native_storage_status');
+  return value;
+}
+
+function quarantineSummary(value){
+  const keys=['schema_version','attempted','quarantined','reclaimed_clean','skipped_ineligible','preserved_files','preserved_bytes','more_available'];
+  if(!value||typeof value!=='object'||Array.isArray(value)||Object.keys(value).length!==keys.length||
+    keys.some(key=>!Object.hasOwn(value,key))||value.schema_version!==1||
+    !integer(value.attempted,32)||!integer(value.quarantined,32)||!integer(value.reclaimed_clean,32)||
+    !integer(value.skipped_ineligible,32)||value.quarantined+value.reclaimed_clean+value.skipped_ineligible!==value.attempted||
+    !integer(value.preserved_files,32*256)||!integer(value.preserved_bytes,32*256*1024**2)||
+    typeof value.more_available!=='boolean')throw new Error('invalid_native_quarantine_status');
   return value;
 }
 
@@ -37,9 +49,9 @@ function jobStatus(value,expected=null){
 
 export class NativeWorkMaintenancePanel {
   #bridge;#root;#notify;#available=false;#active=false;#generation=0;#status=null;#job=null;
-  #starting=false;#polling=false;#refreshing=false;#cancelling=false;#stopRequested=false;#timer=null;#failure=false;
+  #starting=false;#polling=false;#refreshing=false;#cancelling=false;#quarantining=false;#quarantineResult=null;#stopRequested=false;#timer=null;#failure=false;
   #cancelFailed=false;
-  #heading;#description;#storage;#progress;#start;#stop;#refresh;
+  #heading;#description;#storage;#progress;#start;#stop;#quarantine;#refresh;
 
   constructor(bridge,root,notify){
     this.#bridge=bridge;this.#root=root;this.#notify=notify;
@@ -48,12 +60,13 @@ export class NativeWorkMaintenancePanel {
     this.#storage=node('p','muted small');this.#progress=node('p','muted small');
     this.#progress.setAttribute('role','status');this.#progress.setAttribute('aria-live','polite');
     const actions=node('div','detail-actions');
-    this.#start=node('button','button button-secondary');this.#stop=node('button','button button-quiet');this.#refresh=node('button','button button-quiet');
-    for(const button of[this.#start,this.#stop,this.#refresh])button.type='button';
+    this.#start=node('button','button button-secondary');this.#stop=node('button','button button-quiet');this.#quarantine=node('button','button button-quiet');this.#refresh=node('button','button button-quiet');
+    for(const button of[this.#start,this.#stop,this.#quarantine,this.#refresh])button.type='button';
     this.#start.addEventListener('click',()=>void this.#begin());
     this.#stop.addEventListener('click',()=>{this.#stopRequested=true;this.#cancelFailed=false;this.#render();void this.#cancel();});
+    this.#quarantine.addEventListener('click',()=>void this.#quarantineLegacy());
     this.#refresh.addEventListener('click',()=>void this.refresh());
-    actions.append(this.#start,this.#stop,this.#refresh);section.append(this.#heading,this.#description,this.#storage,this.#progress,actions);root.replaceChildren(section);
+    actions.append(this.#start,this.#stop,this.#quarantine,this.#refresh);section.append(this.#heading,this.#description,this.#storage,this.#progress,actions);root.replaceChildren(section);
     document.addEventListener('omniplay_locale_changed',()=>this.#render());
     document.addEventListener('visibilitychange',()=>{if(document.hidden)this.#clearTimer();else this.#schedule();});
     window.addEventListener('pagehide',()=>{this.#stopRequested=true;this.#clearTimer();void this.#cancel();});
@@ -68,7 +81,7 @@ export class NativeWorkMaintenancePanel {
   setActive(value){this.#active=value===true;if(!this.#active)this.#clearTimer();else this.#schedule();}
   disconnect(){
     this.#generation++;this.#available=false;this.#root.hidden=true;this.#clearTimer();
-    this.#status=null;this.#job=null;this.#starting=false;this.#polling=false;this.#refreshing=false;this.#cancelling=false;this.#stopRequested=false;this.#cancelFailed=false;this.#failure=false;this.#render();
+    this.#status=null;this.#job=null;this.#starting=false;this.#polling=false;this.#refreshing=false;this.#cancelling=false;this.#quarantining=false;this.#quarantineResult=null;this.#stopRequested=false;this.#cancelFailed=false;this.#failure=false;this.#render();
   }
   #running(){return this.#job&&['running','stopping'].includes(this.#job.state);}
   #clearTimer(){clearTimeout(this.#timer);this.#timer=null;}
@@ -88,8 +101,8 @@ export class NativeWorkMaintenancePanel {
   }
 
   async #begin(){
-    if(!this.#available||this.#starting||this.#running()||this.#refreshing||this.#status?.recovery_running)return;
-    const generation=this.#generation;this.#starting=true;this.#stopRequested=false;this.#cancelFailed=false;this.#failure=false;this.#job=null;this.#render();
+    if(!this.#available||this.#starting||this.#running()||this.#refreshing||this.#quarantining||this.#status?.recovery_running)return;
+    const generation=this.#generation;this.#starting=true;this.#quarantineResult=null;this.#stopRequested=false;this.#cancelFailed=false;this.#failure=false;this.#job=null;this.#render();
     try{
       const result=await this.#bridge.request('native_work_recover_start',undefined,15000);
       if(generation!==this.#generation)return;
@@ -97,6 +110,18 @@ export class NativeWorkMaintenancePanel {
       if(this.#stopRequested)await this.#cancel();else this.#schedule();
     }catch(error){if(generation===this.#generation){this.#failure=true;this.#notify(error?.code==='busy'?text('Một lượt kiểm tra khác vẫn đang kết thúc. Hãy thử lại sau.','Another recovery operation is still finishing. Try again later.'):text('Chưa bắt đầu được lượt kiểm tra. Hãy làm mới trước khi thử lại.','Recovery could not start. Refresh before retrying.'),true);}}
     finally{if(generation===this.#generation){this.#starting=false;this.#render();this.#schedule();}}
+  }
+
+  async #quarantineLegacy(){
+    if(!this.#available||this.#starting||this.#running()||this.#refreshing||this.#quarantining||this.#status?.recovery_running)return;
+    const generation=this.#generation;this.#quarantining=true;this.#failure=false;this.#render();
+    try{
+      const result=await this.#bridge.request('native_work_quarantine_legacy',undefined,30000);
+      if(generation!==this.#generation)return;
+      this.#quarantineResult=quarantineSummary(result);
+      await this.refresh();
+    }catch(error){if(generation===this.#generation){this.#failure=true;this.#notify(error?.code==='busy'?text('Một lượt kiểm tra khác vẫn đang kết thúc. Hãy thử lại sau.','Another recovery operation is still finishing. Try again later.'):text('Chưa cách ly được mục cũ. Dữ liệu vẫn được giữ nguyên.','Legacy entries could not be quarantined. Data remains retained.'),true);}}
+    finally{if(generation===this.#generation){this.#quarantining=false;this.#render();this.#schedule();}}
   }
 
   async #cancel(){
@@ -123,9 +148,9 @@ export class NativeWorkMaintenancePanel {
     this.#root.hidden=!this.#available;
     this.#heading.textContent=text('Dữ liệu tạm của phiên chơi','Temporary game-session data');
     this.#description.textContent=text('Kiểm tra và thu hồi dữ liệu tạm của các phiên đã kết thúc. Dữ liệu chưa xác minh được được giữ lại để khôi phục.','Inspect and recover temporary data from ended sessions. Unconfirmed data stays retained for recovery.');
-    this.#storage.textContent=this.#status?text(`${this.#status.works} phiên đang giữ · ${(this.#status.reserved_bytes/1024**2).toFixed(1)} MiB dung lượng dự trù. Đây chưa phải số đo dung lượng đĩa thực tế.`,`${this.#status.works} retained sessions · ${(this.#status.reserved_bytes/1024**2).toFixed(1)} MiB reserved. This is not a measurement of actual disk allocation.`):text('Chưa đọc trạng thái dữ liệu tạm.','Temporary-session status has not been read.');
+    this.#storage.textContent=this.#status?(this.#status.physical_bytes!==null?text(`${this.#status.works} phiên đang giữ · ${(this.#status.reserved_bytes/1024**2).toFixed(1)} MiB dung lượng dự trù · ${(this.#status.physical_bytes/1024**2).toFixed(1)} MiB trên đĩa.`,`${this.#status.works} retained sessions · ${(this.#status.reserved_bytes/1024**2).toFixed(1)} MiB reserved · ${(this.#status.physical_bytes/1024**2).toFixed(1)} MiB on disk.`):text(`${this.#status.works} phiên đang giữ · ${(this.#status.reserved_bytes/1024**2).toFixed(1)} MiB dung lượng dự trù. Đây chưa phải số đo dung lượng đĩa thực tế.`,`${this.#status.works} retained sessions · ${(this.#status.reserved_bytes/1024**2).toFixed(1)} MiB reserved. This is not a measurement of actual disk allocation.`)):text('Chưa đọc trạng thái dữ liệu tạm.','Temporary-session status has not been read.');
     const summary=this.#job?.summary;
-    let message=this.#starting?text('Đang bắt đầu lượt kiểm tra…','Starting recovery…'):summary?text(`Đã kiểm tra ${summary.attempted} mục · thu hồi ${summary.recovered} · giữ lại ${summary.retained}.`,`Checked ${summary.attempted} entries · recovered ${summary.recovered} · retained ${summary.retained}.`):text('Chưa có lượt kiểm tra trong tab này.','No recovery operation has run in this tab.');
+    let message=this.#starting?text('Đang bắt đầu lượt kiểm tra…','Starting recovery…'):this.#quarantining?text('Đang cách ly mục cũ sang thư mục phục hồi…','Quarantining legacy entries for recovery…'):summary?text(`Đã kiểm tra ${summary.attempted} mục · thu hồi ${summary.recovered} · giữ lại ${summary.retained}.`,`Checked ${summary.attempted} entries · recovered ${summary.recovered} · retained ${summary.retained}.`):text('Chưa có lượt kiểm tra trong tab này.','No recovery operation has run in this tab.');
     if(this.#running())message+=' '+text('Đang xử lý.','Working.');
     else if(this.#status?.recovery_running)message+=' '+text('Một lượt kiểm tra khác đang kết thúc.','Another recovery operation is finishing.');
     if(this.#stopRequested&&(this.#starting||this.#running()))message+=' '+text('Đã yêu cầu dừng sau thao tác hiện tại.','Stop requested after the current operation.');
@@ -134,9 +159,14 @@ export class NativeWorkMaintenancePanel {
     if(summary?.unknown_entries)message+=' '+text(`${summary.unknown_entries} mục chưa nhận diện được vẫn được giữ lại.`,`${summary.unknown_entries} unrecognized entries remain retained.`);
     const retention=summary?.retention;
     if(retention?.locked)message+=' '+text(`${retention.locked} mục đang bị khóa bởi thao tác khác; đóng phiên chơi hoặc chờ thao tác đó kết thúc rồi thử lại.`,`${retention.locked} entries are locked by another operation; close the game or wait for that operation to finish before retrying.`);
-    if(retention?.legacy_ownership||retention?.incomplete_ownership){
+    const legacyEligible=(retention?.legacy_ownership??0)+(retention?.incomplete_ownership??0);
+    if(legacyEligible){
       const legacy=retention.legacy_ownership,incomplete=retention.incomplete_ownership;
       message+=' '+text(`${legacy} mục cũ và ${incomplete} mục thiếu xác nhận sở hữu chưa đủ bằng chứng để thu hồi. Giữ bản sao lưu hồ sơ khi cần hỗ trợ phục hồi; chạy lại không tự bổ sung bằng chứng còn thiếu.`,`${legacy} legacy entries and ${incomplete} entries with incomplete ownership lack the evidence required for recovery. Keep a profile backup when seeking recovery support; rerunning does not supply the missing evidence.`);
+    }
+    if(this.#quarantineResult){
+      const q=this.#quarantineResult;
+      message+=' '+text(`Đã cách ly ${q.quarantined} mục (${q.preserved_files} tệp, ${(q.preserved_bytes/1024).toFixed(1)} KiB) sang thư mục phục hồi và thu hồi ${q.reclaimed_clean} mục trống.`,`Quarantined ${q.quarantined} entries (${q.preserved_files} files, ${(q.preserved_bytes/1024).toFixed(1)} KiB) to recovery staging and reclaimed ${q.reclaimed_clean} empty entries.`);
     }
     if(retention?.other_platform)message+=' '+text(`${retention.other_platform} mục cần công cụ phục hồi của hệ điều hành tương ứng.`,`${retention.other_platform} entries require recovery on their corresponding operating system.`);
     if(retention?.unconfirmed)message+=' '+text(`${retention.unconfirmed} mục chưa thể xác minh; dữ liệu vẫn được giữ lại.`,`${retention.unconfirmed} entries could not be confirmed; their data remains retained.`);
@@ -144,9 +174,12 @@ export class NativeWorkMaintenancePanel {
     if(summary?.more_available&&!this.#running())message+=' '+text('Còn mục chưa kiểm tra; bạn có thể chạy tiếp một lượt.','More entries remain; you can run another pass.');
     if(this.#progress.textContent!==message)this.#progress.textContent=message;
     this.#start.textContent=summary?.more_available?text('Tiếp tục kiểm tra','Continue inspection'):text('Kiểm tra và thu hồi','Inspect and recover');
-    this.#start.disabled=!this.#available||this.#starting||Boolean(this.#running())||this.#refreshing||!this.#status||this.#status.recovery_running;
+    this.#start.disabled=!this.#available||this.#starting||Boolean(this.#running())||this.#refreshing||this.#quarantining||!this.#status||this.#status.recovery_running;
     this.#stop.textContent=this.#cancelFailed?text('Thử yêu cầu dừng lại','Retry stop request'):text('Dừng sau thao tác hiện tại','Stop after current operation');
     this.#stop.disabled=!this.#available||!this.#starting&&!this.#running()||this.#cancelling||this.#stopRequested&&!this.#cancelFailed;
-    this.#refresh.textContent=text('Làm mới','Refresh');this.#refresh.disabled=!this.#available||this.#refreshing;
+    this.#quarantine.textContent=text('Cách ly mục cũ','Quarantine legacy entries');
+    this.#quarantine.hidden=!legacyEligible&&!this.#quarantining;
+    this.#quarantine.disabled=!this.#available||!legacyEligible||this.#starting||Boolean(this.#running())||this.#refreshing||this.#quarantining||!this.#status||this.#status.recovery_running;
+    this.#refresh.textContent=text('Làm mới','Refresh');this.#refresh.disabled=!this.#available||this.#refreshing||this.#quarantining;
   }
 }
