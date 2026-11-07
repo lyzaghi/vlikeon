@@ -21,54 +21,55 @@ import source_patch  # noqa: E402
 
 LOCK_PATH = REPO_ROOT / "browser" / "upstream.lock.json"
 SERIES_PATH = REPO_ROOT / "browser" / "patches" / "series.json"
+GAME_HUB_PATCH_PATH = REPO_ROOT / "browser" / "patches" / "0001-omniplay-game-hub.patch"
 OWNED_CAPTURE_PATCH_PATH = REPO_ROOT / "browser" / "patches" / "0003-owned-game-capture.patch"
 SNAPSHOT_ROOT = REPO_ROOT / "browser" / "upstream-snapshots"
 
 SECURITY_INVARIANTS: tuple[tuple[str, str, str], ...] = (
     (
-        "webui_game_hub_host",
-        "chrome/common/webui_url_constants.h",
-        'inline constexpr char kChromeUIGameHubHost[] = "game-hub";',
+        "component_loader_off_the_record_guard",
+        "chrome/browser/extensions/component_loader.cc",
+        "if (!skip_session_components && !profile_->IsOffTheRecord()) {",
     ),
     (
         "component_extension_allowlist",
-        "chrome/browser/extensions/component_loader.cc",
-        "AddOmniPlayGameHubExtension",
+        "chrome/browser/extensions/component_extensions_allowlist/allowlist.cc",
+        "case IDR_OMNIPLAY_MANIFEST:",
     ),
     (
         "isolated_linux_user_data_dir",
         "chrome/common/chrome_paths_linux.cc",
-        '"omniplay"',
+        'std::string data_dir_basename = "omniplay";',
     ),
     (
         "isolated_mac_product_dir",
         "chrome/common/chrome_paths_mac.mm",
-        '"OmniPlay"',
+        'product_dir_name = "OmniPlay";',
     ),
     (
         "isolated_windows_install_dir",
-        "chrome/installer/util/util_constants.cc",
-        'L"OmniPlay"',
+        "chrome/install_static/chromium_install_modes.h",
+        'inline constexpr wchar_t kProductPathName[] = L"OmniPlay";',
     ),
     (
-        "private_api_off_the_record_rejection",
-        "chrome/browser/extensions/api/omniplay_private/omniplay_private_api.cc",
-        "browser_context()->IsOffTheRecord()",
+        "isolated_windows_native_messaging_registry",
+        "chrome/browser/extensions/api/messaging/launch_context_win.cc",
+        'L"SOFTWARE\\\\OmniPlay\\\\NativeMessagingHosts"',
     ),
     (
-        "private_api_component_id_enforcement",
-        "chrome/browser/extensions/api/omniplay_private/omniplay_private_api.cc",
-        "extension()->id() != omniplay::kGameHubExtensionId",
+        "strict_window_audio_policy_enforcement",
+        "chrome/browser/extensions/api/desktop_capture/desktop_capture_api.cc",
+        "const bool strict_window_audio = params->options &&",
     ),
     (
         "owned_game_pid_and_creation_time_verification",
-        "chrome/browser/media/webrtc/omniplay_owned_game_registry.cc",
-        "VerifyOwnedProcess",
+        "chrome/browser/extensions/api/desktop_capture/desktop_capture_base.cc",
+        "WaitForSingleObject(process.get(), 0) != WAIT_TIMEOUT",
     ),
     (
-        "native_capture_picker_bypass_restricted_to_game_hub",
-        "chrome/browser/extensions/api/desktop_capture/desktop_capture_base.cc",
-        "extension()->id() == omniplay::kGameHubExtensionId",
+        "owned_game_capture_schema_contract",
+        "chrome/common/extensions/api/desktop_capture.json",
+        '"omniplayOwnedCaptureProtocol": {',
     ),
 )
 
@@ -88,12 +89,13 @@ def sha256_file(path: Path) -> str:
 def copy_candidate_inputs(candidate_source: Path, scratch_tree: Path, review_manifest: dict[str, object] | None) -> list[str]:
     copied: list[str] = []
     if review_manifest is not None:
-        for entry in review_manifest.get("files", []):
+        entries = review_manifest.get("integration_sources") or review_manifest.get("files") or []
+        for entry in entries:
             if not isinstance(entry, dict):
                 continue
             rel = str(entry["path"])
-            cand_rel = entry.get("candidate_Copy")
-            baseline_rel = entry.get("baseline_copy")
+            cand_rel = entry.get("candidate_Copy") or f"source/candidate/{rel}"
+            baseline_rel = entry.get("baseline_copy") or f"source/baseline/{rel}"
             source_file = None
             if isinstance(cand_rel, str):
                 candidate_path = candidate_source / cand_rel
@@ -127,37 +129,54 @@ def rehearse_upgrade_on_tree(candidate_source: Path, review_manifest: dict[str, 
         scratch_tree.mkdir(parents=True, exist_ok=True)
         copied_files = copy_candidate_inputs(candidate_source, scratch_tree, review_manifest)
 
+        sources: dict[str, str] = {}
+        for rel in copied_files:
+            target_file = scratch_tree / rel
+            if target_file.is_file():
+                sources[rel] = target_file.read_text(encoding="utf-8")
+
         stage_results: list[dict[str, object]] = []
 
-        # Stage 1: Core anchor series (0001 + 0002 + overlays)
-        generate_browser_patch.apply_series(scratch_tree)
-        stage_results.append(
-            {
-                "stage": "generate_browser_patch.apply_series",
-                "status": "APPLIED",
-            }
-        )
+        try:
+            # Stage 1: Verify pinned desktop capture audio anchors against candidate tree
+            touched_audio = desktop_capture_audio_patch.author(scratch_tree)
+            stage_results.append(
+                {
+                    "stage": "desktop_capture_audio_patch.author",
+                    "status": "APPLIED",
+                    "touched_files": sorted(touched_audio.keys()),
+                }
+            )
 
-        # Stage 2: Owned-game capture patch (0003)
-        patch_text = OWNED_CAPTURE_PATCH_PATH.read_text(encoding="utf-8")
-        touched_0003 = source_patch.apply_exact(scratch_tree, patch_text)
-        stage_results.append(
-            {
-                "stage": "0003-owned-game-capture.patch",
-                "status": "APPLIED",
-                "touched_files": touched_0003,
-            }
-        )
+            # Stage 2: Apply 0001-omniplay-game-hub.patch with zero fuzz
+            patch_0001_text = GAME_HUB_PATCH_PATH.read_text(encoding="utf-8")
+            touched_0001 = source_patch.apply_exact(sources, patch_0001_text)
+            sources.update(touched_0001)
+            for rel, updated in touched_0001.items():
+                (scratch_tree / rel).write_text(updated, encoding="utf-8", newline="\n")
+            stage_results.append(
+                {
+                    "stage": "0001-omniplay-game-hub.patch",
+                    "status": "APPLIED",
+                    "touched_files": sorted(touched_0001.keys()),
+                }
+            )
 
-        # Stage 3: Desktop capture audio & WebUI plumbing patch
-        touched_audio = desktop_capture_audio_patch.apply_to_tree(scratch_tree)
-        stage_results.append(
-            {
-                "stage": "desktop_capture_audio_patch.apply_to_tree",
-                "status": "APPLIED",
-                "touched_files": touched_audio,
-            }
-        )
+            # Stage 3: Apply 0003-owned-game-capture.patch on top of Stage 2 with zero fuzz
+            patch_0003_text = OWNED_CAPTURE_PATCH_PATH.read_text(encoding="utf-8")
+            touched_0003 = source_patch.apply_exact(sources, patch_0003_text)
+            sources.update(touched_0003)
+            for rel, updated in touched_0003.items():
+                (scratch_tree / rel).write_text(updated, encoding="utf-8", newline="\n")
+            stage_results.append(
+                {
+                    "stage": "0003-owned-game-capture.patch",
+                    "status": "APPLIED",
+                    "touched_files": sorted(touched_0003.keys()),
+                }
+            )
+        except (ValueError, SystemExit) as exc:
+            raise RuntimeError(f"Chromium upgrade patch rehearsal failed: {exc}") from exc
 
         # Stage 4: Verify all security invariants
         invariant_checks: list[dict[str, object]] = []
@@ -216,10 +235,10 @@ def verify_upgrade(
         "schema_version": 1,
         "item_id": 7,
         "generated_at_utc": utc_now(),
-        "baseline_release_tag": lock_data.get("release_tag"),
+        "baseline_release_tag": lock_data.get("version") or lock_data.get("release_tag"),
         "baseline_revision": lock_data.get("revision"),
         "candidate_source": str(source_root.resolve()),
-        "series_count": len(series_data.get("series", [])),
+        "series_count": len(series_data.get("patches", series_data.get("series", []))),
         "rehearsal": rehearsal,
         "verified": bool(rehearsal["all_security_invariants_passed"]),
     }

@@ -29,12 +29,14 @@ class UpgradeRehearsalTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             candidate_dir = Path(tmp) / "candidate"
             shutil.copytree(REPO_ROOT / "browser" / "upstream-snapshots", candidate_dir)
-            target = candidate_dir / "chrome" / "common" / "webui_url_constants.h"
-            drifted = target.read_text(encoding="utf-8").replace(
-                'inline constexpr char kChromeUIVersionURL[] = "chrome://version/";',
-                'inline constexpr char kChromeUIVersionURL[] = "chrome://version-drifted/";',
+            target = candidate_dir / "chrome" / "browser" / "extensions" / "component_loader.cc"
+            original = target.read_text(encoding="utf-8")
+            drifted = original.replace(
+                "  if (should_disable_background_extensions) {\n    return;\n  }\n",
+                "  if (should_disable_background_extensions) {\n    return; // drifted\n  }\n",
             )
-            target.write_text(drifted, encoding="utf-8")
+            self.assertNotEqual(original, drifted)
+            target.write_text(drifted, encoding="utf-8", newline="\n")
             with self.assertRaises(RuntimeError):
                 verify_chromium_upgrade.verify_upgrade(candidate_root=candidate_dir)
 
