@@ -10,6 +10,10 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: vlikeon-qa-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   qualification:
     name: Qualification Suites & Clean Clone Verification
@@ -140,3 +144,35 @@ jobs:
           path: |
             ${{ runner.temp }}/vlikeon-remote-play.json
             ${{ runner.temp }}/vlikeon-remote-play.browser.log
+
+  security-audit:
+    name: Official RustSec and Chromium Freshness
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Verify Official Advisory Sources
+        shell: bash
+        run: |
+          cd "$RUNNER_TEMP"
+          curl --fail --location --retry 2 \
+            'https://github.com/rustsec/rustsec/releases/download/cargo-audit/v0.22.2/cargo-audit-x86_64-unknown-linux-gnu-v0.22.2.tgz' \
+            --output cargo-audit.tgz
+          echo 'ab28a1bdb54db4d5d8ad5981cf1f959410370b3d28250dbd35f6a44248620e39  cargo-audit.tgz' | sha256sum --check
+          tar -xzf cargo-audit.tgz
+          git clone --depth 1 https://github.com/RustSec/advisory-db.git rustsec-db
+          advisory_revision="$(git -C rustsec-db rev-parse HEAD)"
+          audit_executable="$(find "$RUNNER_TEMP" -type f -name cargo-audit -print -quit)"
+          cd "$GITHUB_WORKSPACE"
+          python3 tools/audit_security_advisories.py --advisory-db "$RUNNER_TEMP/rustsec-db" \
+            --advisory-revision "$advisory_revision" --cargo-audit "$audit_executable" \
+            --output "$RUNNER_TEMP/vlikeon-official-security.json"
+
+      - name: Upload Official Security Evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: official-security-audit
+          path: ${{ runner.temp }}/vlikeon-official-security.json
