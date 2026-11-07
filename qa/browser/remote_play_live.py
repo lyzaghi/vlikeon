@@ -83,7 +83,7 @@ def run(browser: Path, output: Path, turn_url: str | None) -> dict:
         finally:
             server.shutdown()
             server_thread.join()
-    if turn_url and report.get("passed") and not report.get("relay"):
+    if turn_url and report.get("passed") and (not report.get("relay") or not report.get("fallback")):
         report = {"passed": False, "error": "Required relay evidence is missing"}
     output.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
     return report

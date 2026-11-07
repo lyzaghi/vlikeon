@@ -20,6 +20,8 @@ globalThis.RTCPeerConnection = class extends PeerConnection {
 class FixtureSignal extends EventTarget {
   closed = false;
   messages = [];
+  withheldCandidates = 0;
+  withholdDirect = false;
   constructor(role, relay) {
     super();
     this.pair = { role, input_allowed: true };
@@ -30,6 +32,22 @@ class FixtureSignal extends EventTarget {
   }
   async send(session_id, value) {
     this.messages.push(value);
+    if (this.withholdDirect) {
+      if (value.type === "candidate" && value.candidate && !value.candidate.candidate.includes(" typ relay ")) {
+        this.withheldCandidates++;
+        return;
+      }
+      if (value.description) {
+        const lines = value.description.sdp.split("\r\n").filter(line => {
+          if (line.startsWith("a=candidate:") && !line.includes(" typ relay ")) {
+            this.withheldCandidates++;
+            return false;
+          }
+          return true;
+        });
+        value = { ...value, description: { ...value.description, sdp: lines.join("\r\n") } };
+      }
+    }
     this.peer.dispatchEvent(new CustomEvent("signal", { detail: { session_id, value } }));
   }
   async close() { this.closed = true; }
@@ -54,14 +72,15 @@ async function selectedRoute(pc) {
     remote: stats.get(pair.remoteCandidateId)?.candidateType,
   };
 }
-async function qualify(relay) {
+async function qualify(relay, relayOnly = Boolean(relay)) {
   failure = undefined;
   peerConnections.length = 0;
   const clientSignal = new FixtureSignal("client", relay);
   const hostSignal = new FixtureSignal("host", relay);
   clientSignal.peer = hostSignal;
   hostSignal.peer = clientSignal;
-  const options = { relayOnly: Boolean(relay) };
+  clientSignal.withholdDirect = hostSignal.withholdDirect = Boolean(relay) && !relayOnly;
+  const options = { relayOnly };
   const client = new RemoteSession(clientSignal, options);
   const host = new RemoteSession(hostSignal, options);
   for (const session of [client, host]) {
@@ -105,6 +124,8 @@ async function qualify(relay) {
       peerConnections.length === 2 && peerConnections.every(pc => pc.connectionState === "connected") && decodedFrames > 0
     ));
     const route = await selectedRoute(peerConnections[0]);
+    const withheldCandidates = clientSignal.withheldCandidates + hostSignal.withheldCandidates;
+    if (relay && !relayOnly) assert(withheldCandidates > 0, "Fallback fixture did not withhold any direct candidates");
     assert(route && route.local === (relay ? "relay" : "host"), "Unexpected WebRTC candidate route " + JSON.stringify(route));
 
     host.armInput(true);
@@ -127,7 +148,7 @@ async function qualify(relay) {
     track.stop();
     track.dispatchEvent(new Event("ended")); // Simulates the browser reporting loss of its capture source.
     await until("capture failure closes both sessions", () => !client.active && !host.active);
-    return { route, decodedFrames, restartGeneration: restartOffer.generation, inputRevoked: true, captureEndClosedPeers: true };
+    return { route, decodedFrames, withheldCandidates, restartGeneration: restartOffer.generation, inputRevoked: true, captureEndClosedPeers: true };
   } finally {
     clearInterval(timer);
     await Promise.allSettled([client.stop(), host.stop()]);
@@ -138,7 +159,8 @@ async function qualify(relay) {
 try {
   const direct = await qualify(null);
   const relay = configuration.turn ? await qualify(configuration.turn) : null;
-  await fetch("/result", { method: "POST", body: JSON.stringify({ passed: true, direct, relay }) });
+  const fallback = configuration.turn ? await qualify(configuration.turn, false) : null;
+  await fetch("/result", { method: "POST", body: JSON.stringify({ passed: true, direct, relay, fallback }) });
 } catch (error) {
   await fetch("/result", { method: "POST", body: JSON.stringify({ passed: false, error: error.message, stack: error.stack }) });
 }
