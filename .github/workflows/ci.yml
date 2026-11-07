@@ -47,6 +47,9 @@ jobs:
       - name: Run iOS Qualification Suite
         run: python qa/mobile/ios_qualification.py
 
+      - name: Verify Reproducible Development Web Assembly
+        run: python tools/assemble_web.py --without-cores --check-receipt
+
       - name: Run Web/PWA Qualification Suite
         run: python qa/web_pwa_qualification.py
 
@@ -61,9 +64,6 @@ jobs:
 
       - name: Run Security, Licensing & Release Qualification Suite
         run: python qa/security_license_qualification.py
-
-      - name: Verify Reproducible Development Web Assembly
-        run: python tools/assemble_web.py --without-cores --check-receipt
 
       - name: Run Chromium Patch Rehearsal Regression
         run: python qa/browser/upgrade_rehearsal_test.py -v
