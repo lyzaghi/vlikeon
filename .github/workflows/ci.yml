@@ -71,6 +71,10 @@ jobs:
       - name: Run Browser Module Regression
         run: node --experimental-vm-modules --test qa/browser/*.test.mjs
 
+      - name: Install Linux Keyring Build Dependencies
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y libdbus-1-dev pkg-config
+
       - name: Run Rust Regression
         run: cargo test --locked -p omniplay-streaming -p omniplay-updater -p omniplay-sync -p omniplay-sync-client -p omniplay-sync-service
 

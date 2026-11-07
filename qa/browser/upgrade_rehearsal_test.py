@@ -22,7 +22,7 @@ def git_blob_id(raw: bytes) -> str:
 
 
 def _build_valid_upgrade_review_dir(root_dir: Path, revision: str, raw_version: bytes) -> Path:
-    review_dir = root_dir / "upgrade-review"
+    review_dir = root_dir.resolve() / "upgrade-review"
     review_dir.mkdir(parents=True, exist_ok=True)
     snap_root = REPO_ROOT / "browser" / "upstream-snapshots"
 
@@ -80,7 +80,7 @@ class UpgradeRehearsalTest(unittest.TestCase):
     def setUpClass(cls):
         tmp = tempfile.TemporaryDirectory()
         cls.addClassCleanup(tmp.cleanup)
-        cls.checkout = Path(tmp.name) / "upstream"
+        cls.checkout = Path(tmp.name).resolve() / "upstream"
         shutil.copytree(verify_chromium_upgrade.SNAPSHOT_ROOT, cls.checkout)
         cls.raw_version = b"MAJOR=999\nMINOR=0\nBUILD=0\nPATCH=1\n"
         (cls.checkout / "chrome" / "VERSION").write_bytes(cls.raw_version)
@@ -145,7 +145,7 @@ class UpgradeRehearsalTest(unittest.TestCase):
 
     def test_rehearsal_rejects_missing_candidate_file_in_candidate_root(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
-            candidate_dir = Path(tmp) / "candidate"
+            candidate_dir = Path(tmp).resolve() / "candidate"
             shutil.copytree(REPO_ROOT / "browser" / "upstream-snapshots", candidate_dir)
             (candidate_dir / "chrome" / "common" / "chrome_paths_linux.cc").unlink()
             with self.assertRaises(RuntimeError) as ctx:
@@ -236,7 +236,7 @@ class UpgradeRehearsalTest(unittest.TestCase):
 
     def test_rehearsal_rejects_drifted_upstream_anchor(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
-            candidate_dir = Path(tmp) / "candidate"
+            candidate_dir = Path(tmp).resolve() / "candidate"
             shutil.copytree(REPO_ROOT / "browser" / "upstream-snapshots", candidate_dir)
             target = candidate_dir / "chrome" / "browser" / "extensions" / "component_loader.cc"
             original = target.read_text(encoding="utf-8")
