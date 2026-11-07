@@ -154,6 +154,16 @@ disabled. Changed code still requires anchor/policy migration; unchanged code
 still requires the candidate desktop build and acceptance matrix. Candidate
 selection does not grant release approval or imply security-update freshness.
 
+Verify the generated bundle with `tools/verify_chromium_upgrade.py` using
+`--upgrade-review-dir`, `--candidate-checkout` and
+`--expected-candidate-revision`. Select the full revision independently from
+the bundle. Keep its Git objects local. The verifier checks the candidate VERSION,
+ordinary file paths, byte lengths, SHA-256 and the exact bytes of each selected
+Git blob before applying the patches in a scratch tree. With no candidate bundle
+the receipt records a source fixture rehearsal. A successful rehearsal still
+requires a separate Chromium build and runtime qualification before switching
+the active pin.
+
 Source completion requires the three target recipes, live-document/profile
 boundary, current complete overlay and an upgradeable minimal patch queue.
 Verified completion additionally requires actual desktop builds, first-run and
