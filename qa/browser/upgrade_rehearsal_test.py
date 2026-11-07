@@ -177,6 +177,27 @@ class UpgradeRehearsalTest(unittest.TestCase):
                 self.verify_review(review_dir)
             self.assertIn("invalid or escaping path", str(ctx.exception).lower())
 
+    def test_migrated_patch_queue_uses_an_explicit_previous_baseline(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            review = self.build_review(Path(tmp))
+            lock = json.loads(verify_chromium_upgrade.LOCK_PATH.read_bytes())
+            lock.update(version="1.0.0.0", revision="1" * 40)
+            baseline = review / "previous-baseline.json"
+            baseline.write_text(json.dumps(lock), encoding="utf-8")
+            manifest_path = review / "upgrade-review.json"
+            manifest = json.loads(manifest_path.read_bytes())
+            manifest["baseline_revision"] = lock["revision"]
+            manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+            with self.assertRaisesRegex(RuntimeError, "baseline revision"):
+                self.verify_review(review)
+            receipt = verify_chromium_upgrade.verify_upgrade(
+                upgrade_review_dir=review, candidate_checkout=self.checkout,
+                expected_candidate_revision=self.revision, baseline_lock_path=baseline,
+            )
+            self.assertTrue(receipt["verified"])
+            self.assertEqual(receipt["baseline_revision"], lock["revision"])
+            self.assertEqual(receipt["candidate_revision"], self.revision)
+
     def test_review_rejects_untrusted_identity_and_missing_length(self):
         with tempfile.TemporaryDirectory() as tmp:
             review = self.build_review(Path(tmp))

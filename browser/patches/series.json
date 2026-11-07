@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "upstream_revision": "0e66b94549a8bd85f03fbdf189b752d6e7b63c32",
+  "upstream_revision": "6449d9f9a6a906edff724b7b220199b3fde4615c",
   "patches": [
     {
       "file": "0001-omniplay-game-hub.patch",

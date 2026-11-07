@@ -398,8 +398,9 @@ def verify_upgrade(
     output_receipt: Path | None = None,
     candidate_checkout: Path | None = None,
     expected_candidate_revision: str | None = None,
+    baseline_lock_path: Path | None = None,
 ) -> dict[str, object]:
-    lock_data = json.loads(LOCK_PATH.read_text(encoding="utf-8"))
+    lock_data = json.loads((baseline_lock_path or LOCK_PATH).read_text(encoding="utf-8"))
     series_data = json.loads(SERIES_PATH.read_text(encoding="utf-8"))
 
     review_manifest = None
@@ -469,6 +470,7 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument("--candidate-checkout", type=Path, help="Local Chromium Git objects for the independently selected candidate.")
     parser.add_argument("--expected-candidate-revision", help="Full Chromium commit ID selected independently of the review bundle.")
+    parser.add_argument("--baseline-lock", type=Path, help="Previously reviewed baseline lock when testing a migrated patch queue.")
     args = parser.parse_args(argv)
 
     receipt = verify_upgrade(
@@ -477,6 +479,7 @@ def main(argv: list[str] | None = None) -> int:
         output_receipt=args.output_receipt,
         candidate_checkout=args.candidate_checkout,
         expected_candidate_revision=args.expected_candidate_revision,
+        baseline_lock_path=args.baseline_lock,
     )
     print(json.dumps(receipt, indent=2, sort_keys=True))
     return 0 if receipt["verified"] else 1

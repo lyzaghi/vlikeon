@@ -7,7 +7,7 @@ import subprocess
 import urllib.request
 
 ROOT=Path(__file__).resolve().parents[1]
-REV=json.loads((ROOT/'browser/upstream.lock.json').read_text(encoding='utf-8'))['revision']
+REV=json.loads((ROOT/'browser/android-upstream.lock.json').read_text(encoding='utf-8'))['revision']
 FILES=[
  'chrome/android/BUILD.gn',
  'chrome/android/chrome_java_sources.gni',

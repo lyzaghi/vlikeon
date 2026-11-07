@@ -2,7 +2,7 @@ name: OmniPlay Continuous Integration
 
 on:
   push:
-    branches: [main, 'codex/qa-*']
+    branches: [main, 'codex/qa-*', 'codex/chromium-158-*']
   pull_request:
     branches: [ main ]
   workflow_dispatch:

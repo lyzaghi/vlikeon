@@ -12,6 +12,7 @@ Validates:
 """
 
 import os
+import json
 import struct
 import sys
 import unittest
@@ -19,6 +20,16 @@ import xml.etree.ElementTree as ET
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
+
+
+class TestAndroidPin(unittest.TestCase):
+    def test_android_sources_and_patch_queue_keep_their_own_revision(self):
+        lock = json.loads((ROOT / "browser/android-upstream.lock.json").read_bytes())
+        inventory = json.loads((ROOT / "browser/android-snapshots/inventory.json").read_bytes())
+        series = json.loads((ROOT / "browser/patches/android-series.json").read_bytes())
+        self.assertEqual(lock["platform"], "Android")
+        self.assertEqual(lock["revision"], inventory["revision"])
+        self.assertEqual(lock["revision"], series["upstream_revision"])
 
 
 class TestAndroid16kAlignment(unittest.TestCase):

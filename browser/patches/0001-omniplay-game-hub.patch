@@ -51,7 +51,7 @@
 +    const std::u16string& target_name,
 +    std::optional<blink::mojom::WindowAudioPreference> window_audio_preference,
 +    bool omniplay_strict_window_audio) {
-   DCHECK(!picker_controller_);
+   CHECK(!picker_controller_, base::NotFatalUntil::M161);
 +  omniplay_strict_window_audio_ = omniplay_strict_window_audio;
  
    if (!render_frame_host->IsActive()) {
@@ -142,7 +142,7 @@
  class DesktopCaptureCancelChooseDesktopMediaFunctionBase
 --- a/chrome/browser/media/webrtc/desktop_media_picker.h
 +++ b/chrome/browser/media/webrtc/desktop_media_picker.h
-@@ -92,6 +92,9 @@
+@@ -90,6 +90,9 @@
      // Mutually exclusive with |force_audio_checkboxes_to_default_checked|.
      blink::mojom::WindowAudioPreference window_audio_preference =
          blink::mojom::WindowAudioPreference::kExclude;
@@ -205,7 +205,7 @@
                     "description": "True if \"audio\" is included in parameter sources, and the end user does not uncheck the \"Share audio\" checkbox. Otherwise false, and in this case, one should not ask for audio stream through getUserMedia call."
 --- a/chrome/browser/extensions/component_loader.cc
 +++ b/chrome/browser/extensions/component_loader.cc
-@@ -750,6 +750,14 @@
+@@ -782,6 +782,14 @@
      return;
    }
  
@@ -222,9 +222,9 @@
      Add(IDR_ECHO_MANIFEST,
 --- a/chrome/browser/extensions/component_extensions_allowlist/allowlist.cc
 +++ b/chrome/browser/extensions/component_extensions_allowlist/allowlist.cc
-@@ -40,6 +40,9 @@
-       extension_misc::kGlicExtensionId,
-       extension_misc::kInAppPaymentsSupportAppId,
+@@ -48,6 +48,9 @@
+       extension_misc::kNewTabPageExtensionId,
+ #endif  // BUILDFLAG(ENABLE_WEBUI_NTP)
        extension_misc::kPdfExtensionId,
 +#if BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC) || BUILDFLAG(IS_LINUX)
 +      "knanejoacaeomhkfeciafoclmmnogdpg",
@@ -232,16 +232,16 @@
  #if BUILDFLAG(IS_CHROMEOS)
        extension_misc::kAssessmentAssistantExtensionId,
        extension_misc::kAccessibilityCommonExtensionId,
-@@ -99,6 +102,9 @@
+@@ -109,6 +112,9 @@
      case IDR_NETWORK_SPEECH_SYNTHESIS_MANIFEST:
      case IDR_NETWORK_SPEECH_SYNTHESIS_MANIFEST_MV3:
-     case IDR_READING_MODE_GDOCS_HELPER_MANIFEST:
+     case IDR_WEBSTORE_MANIFEST:
 +#if BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC) || BUILDFLAG(IS_LINUX)
 +    case IDR_OMNIPLAY_MANIFEST:
 +#endif
-     case IDR_WEBSTORE_MANIFEST:
  
  #if BUILDFLAG(IS_CHROMEOS)
+     // Separate ChromeOS list, as it is quite large.
 --- a/chrome/browser/resources/component_extension_resources.grd
 +++ b/chrome/browser/resources/component_extension_resources.grd
 @@ -12,6 +12,100 @@
@@ -389,7 +389,7 @@
  
 --- a/chrome/common/chrome_paths.cc
 +++ b/chrome/common/chrome_paths.cc
-@@ -460,7 +460,7 @@
+@@ -466,7 +466,7 @@
            "/Library/Google/ChromeForTesting/NativeMessagingHosts"));
  #else
        cur = base::FilePath(FILE_PATH_LITERAL(
@@ -398,7 +398,7 @@
  #endif
  #else  // BUILDFLAG(IS_MAC)
  #if BUILDFLAG(GOOGLE_CHROME_BRANDING)
-@@ -471,7 +471,7 @@
+@@ -477,7 +477,7 @@
            "/etc/opt/chrome_for_testing/native-messaging-hosts"));
  #else
        cur = base::FilePath(
@@ -443,7 +443,7 @@
                                                          // GUID.
 --- a/chrome/browser/extensions/api/messaging/launch_context_win.cc
 +++ b/chrome/browser/extensions/api/messaging/launch_context_win.cc
-@@ -62,6 +62,13 @@
+@@ -63,6 +63,13 @@
                                const std::wstring& host_name,
                                std::wstring* result) {
  #if BUILDFLAG(CHROMIUM_BRANDING)
