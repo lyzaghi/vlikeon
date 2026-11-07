@@ -38,6 +38,10 @@ By installing or using this software, you agree that:
 ================================================================================
 """
 
+class ProcessInspectionError(RuntimeError):
+    """Raised when the installer cannot reliably query running system processes."""
+
+
 class InstallerWizard:
     def __init__(self, install_dir: Optional[str] = None, data_dir: Optional[str] = None, silent: bool = False):
         self.os_type = platform.system().lower()
@@ -68,39 +72,88 @@ class InstallerWizard:
             return Path(xdg_config) / "omniplay"
 
     def check_running_processes(self) -> List[str]:
-        running = []
-        process_names = ["omniplay", "omniplay-launcher", "omniplay-host", "OmniPlay"]
+        import csv
+        import io
+
+        running: List[str] = []
+        process_names = ("omniplay", "omniplay-launcher", "omniplay-host", "vlikeon")
         if self.os_type == "windows":
             try:
                 out = subprocess.check_output(
                     ["tasklist", "/FO", "CSV", "/NH"],
                     text=True,
                     stdin=subprocess.DEVNULL,
-                    stderr=subprocess.DEVNULL,
+                    stderr=subprocess.PIPE,
                     timeout=5,
                 )
-                for line in out.splitlines():
-                    parts = line.split('","')
-                    if parts:
-                        name = parts[0].strip('"').lower()
-                        if any(p.lower() in name for p in process_names):
-                            running.append(name)
-            except Exception:
-                pass
+            except subprocess.TimeoutExpired as exc:
+                raise ProcessInspectionError("Process query timed out while executing tasklist") from exc
+            except PermissionError as exc:
+                raise ProcessInspectionError(f"Permission denied while querying running processes: {exc}") from exc
+            except subprocess.CalledProcessError as exc:
+                stderr_msg = (exc.stderr or "").strip()
+                raise ProcessInspectionError(
+                    f"tasklist exited with status {exc.returncode}: {stderr_msg or 'unknown error'}"
+                ) from exc
+            except OSError as exc:
+                raise ProcessInspectionError(f"Failed to invoke tasklist for process fencing: {exc}") from exc
+
+            if not isinstance(out, str) or not out.strip():
+                raise ProcessInspectionError("tasklist returned empty or unreadable process table output")
+
+            parsed_rows = 0
+            for raw_line in out.splitlines():
+                line = raw_line.strip()
+                if not line:
+                    continue
+                if line.upper().startswith(("ERROR:", "INFO:")):
+                    raise ProcessInspectionError(f"tasklist did not return a valid CSV process table: {line}")
+                try:
+                    row = next(csv.reader(io.StringIO(line)))
+                except Exception as exc:
+                    raise ProcessInspectionError(f"Unreadable CSV row from tasklist: {line!r}") from exc
+                if len(row) < 2 or not row[0].strip() or not row[1].strip().isdigit():
+                    raise ProcessInspectionError(f"Malformed CSV process entry from tasklist: {line!r}")
+                parsed_rows += 1
+                name = row[0].strip().lower()
+                if any(p in name for p in process_names):
+                    running.append(name)
+
+            if parsed_rows == 0:
+                raise ProcessInspectionError("tasklist output contained zero valid process records")
         else:
             try:
                 out = subprocess.check_output(
                     ["pgrep", "-l", "omniplay"],
                     text=True,
                     stdin=subprocess.DEVNULL,
-                    stderr=subprocess.DEVNULL,
+                    stderr=subprocess.PIPE,
                     timeout=5,
                 )
-                for line in out.splitlines():
-                    if line.strip():
-                        running.append(line.strip())
-            except Exception:
-                pass
+                if not isinstance(out, str) or not out.strip():
+                    raise ProcessInspectionError("pgrep exited 0 but returned empty or unreadable output")
+                for raw_line in out.splitlines():
+                    line = raw_line.strip()
+                    if not line:
+                        continue
+                    parts = line.split(maxsplit=1)
+                    if not parts or not parts[0].isdigit():
+                        raise ProcessInspectionError(f"Malformed pgrep output line: {line!r}")
+                    running.append(line)
+            except subprocess.TimeoutExpired as exc:
+                raise ProcessInspectionError("Process query timed out while executing pgrep") from exc
+            except PermissionError as exc:
+                raise ProcessInspectionError(f"Permission denied while querying running processes: {exc}") from exc
+            except subprocess.CalledProcessError as exc:
+                stderr_msg = (exc.stderr or "").strip()
+                # pgrep exit code 1 with empty stderr indicates no matching processes found
+                if exc.returncode == 1 and not stderr_msg:
+                    return []
+                raise ProcessInspectionError(
+                    f"pgrep failed with status {exc.returncode}: {stderr_msg or 'process inspection failed'}"
+                ) from exc
+            except OSError as exc:
+                raise ProcessInspectionError(f"Failed to invoke pgrep for process fencing: {exc}") from exc
         return running
 
     def run(self, accept_eula: bool = False) -> bool:
@@ -108,13 +161,18 @@ class InstallerWizard:
         print("       OmniPlay Installer - Vlikeon Platform      ")
         print("==================================================")
 
-        # Step 1: Active process check
-        running = self.check_running_processes()
+        # Step 1: Active process check (fail closed on inspection error or active session in any mode)
+        try:
+            running = self.check_running_processes()
+        except ProcessInspectionError as exc:
+            print(f"[-] Error: Cannot verify running processes ({exc}).")
+            print("[-] Halting installation before any file modifications.")
+            return False
+
         if running:
-            print(f"[!] Warning: Active OmniPlay processes detected: {', '.join(running)}")
-            if not self.silent:
-                print("[!] Please exit all running OmniPlay instances before continuing.")
-                return False
+            print(f"[-] Error: Active OmniPlay/Vlikeon processes detected: {', '.join(running)}")
+            print("[-] Please exit all running instances before installing (applies to both wizard and silent modes).")
+            return False
 
         # Step 2: EULA
         if not accept_eula:

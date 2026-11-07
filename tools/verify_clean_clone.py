@@ -21,6 +21,9 @@ REQUIRED_FILES = [
     "Cargo.toml",
     "Cargo.lock",
     "SECURITY.md",
+    "security/advisory-database.json",
+    "browser/upstream.lock.json",
+    "browser/patches/series.json",
     "docs/handoff/antigravity/2026-10-25/WORK_ITEMS.csv",
     "qa/mobile/android_qualification.py",
     "qa/mobile/ios_qualification.py",
@@ -29,6 +32,7 @@ REQUIRED_FILES = [
     "qa/benchmark_qualification.py",
     "qa/installer_qualification.py",
     "qa/security_license_qualification.py",
+    "qa/browser/upgrade_rehearsal_test.py",
 ]
 
 FORBIDDEN_FILE_PATTERNS = [

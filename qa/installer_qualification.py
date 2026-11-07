@@ -28,8 +28,11 @@ if str(WORKSPACE_ROOT) not in sys.path:
     sys.path.insert(0, str(WORKSPACE_ROOT))
 
 def test_installer_wizard_unattended():
-    print("Running Test 1: Installer Wizard Unattended Flow...")
+    print("Running Test 1: Installer Wizard Unattended & Process Fencing Safety...")
+    import subprocess
+    from unittest import mock
     from tools.installer.installer_wizard import InstallerWizard
+    from tools.installer.uninstaller import Uninstaller
 
     with tempfile.TemporaryDirectory() as tmp:
         install_dir = Path(tmp) / "install"
@@ -41,52 +44,148 @@ def test_installer_wizard_unattended():
             silent=True,
         )
 
-        # Without accept_eula, silent mode must fail
-        assert not wizard.run(accept_eula=False), "Silent install should fail without accept_eula"
+        # 1a. Timeout during process inspection must halt BEFORE creating install_dir or data_dir
+        with mock.patch(
+            "tools.installer.installer_wizard.subprocess.check_output",
+            side_effect=subprocess.TimeoutExpired(cmd="tasklist", timeout=5),
+        ):
+            assert not wizard.run(accept_eula=True), "Installer should halt when process query times out"
+            assert not install_dir.exists(), "install_dir must NOT be created when process query times out"
+            assert not data_dir.exists(), "data_dir must NOT be created when process query times out"
 
-        # With accept_eula, silent mode should succeed
+        # 1b. PermissionError during process inspection must halt BEFORE creating files
+        with mock.patch(
+            "tools.installer.installer_wizard.subprocess.check_output",
+            side_effect=PermissionError("Access is denied"),
+        ):
+            assert not wizard.run(accept_eula=True), "Installer should halt on PermissionError"
+            assert not install_dir.exists(), "install_dir must NOT be created on PermissionError"
+            assert not data_dir.exists(), "data_dir must NOT be created on PermissionError"
+
+        # 1c. Unreadable / malformed output from process query must halt BEFORE creating files
+        with mock.patch(
+            "tools.installer.installer_wizard.subprocess.check_output",
+            return_value="ERROR: Invalid syntax or corrupted output\n",
+        ):
+            assert not wizard.run(accept_eula=True), "Installer should halt on unreadable process output"
+            assert not install_dir.exists(), "install_dir must NOT be created on unreadable output"
+            assert not data_dir.exists(), "data_dir must NOT be created on unreadable output"
+
+        # 1d. Active Vlikeon/OmniPlay process detected in SILENT mode must halt BEFORE creating files
+        active_csv = '"omniplay-broker.exe","4242","Console","1","18,432 K"\n'
+        with mock.patch(
+            "tools.installer.installer_wizard.subprocess.check_output",
+            return_value=active_csv,
+        ):
+            assert not wizard.run(accept_eula=True), "Silent install MUST halt when OmniPlay is running"
+            assert not install_dir.exists(), "install_dir must NOT be created when OmniPlay is running in silent mode"
+            assert not data_dir.exists(), "data_dir must NOT be created when OmniPlay is running in silent mode"
+
+        # 1e. Active Vlikeon/OmniPlay process detected in INTERACTIVE mode must also halt
+        interactive_wizard = InstallerWizard(
+            install_dir=str(install_dir),
+            data_dir=str(data_dir),
+            silent=False,
+        )
+        with mock.patch(
+            "tools.installer.installer_wizard.subprocess.check_output",
+            return_value=active_csv,
+        ):
+            assert not interactive_wizard.run(accept_eula=True), "Interactive install MUST halt when OmniPlay is running"
+            assert not install_dir.exists(), "install_dir must NOT be created when OmniPlay is running in wizard mode"
+
+        # 1f. Without accept_eula, silent mode must fail before writing files
+        assert not wizard.run(accept_eula=False), "Silent install should fail without accept_eula"
+        assert not install_dir.exists(), "install_dir must NOT be created when EULA is rejected"
+
+        # 1g. Clean process table + accept_eula -> silent install succeeds
         success = wizard.run(accept_eula=True)
-        assert success, "Silent install failed with accept_eula"
+        assert success, "Silent install failed with accept_eula and no active processes"
         assert install_dir.exists(), "Target install directory not created"
         assert (install_dir / ".omniplay-install-receipt.json").is_file(), "Install receipt not created"
         assert (install_dir / "LICENSE-EULA.txt").is_file(), "EULA file not staged"
         assert data_dir.exists(), "Target data directory not created"
 
-    print("  PASS: Unattended wizard lifecycle verified.")
+    print("  PASS: Unattended wizard & process-fencing safety verified (timeout, permission, unreadable, active process, clean).")
 
 
 def test_uninstaller_retention_and_fencing():
     print("Running Test 2: Uninstaller Fencing & Data Retention Options...")
+    import subprocess
+    from unittest import mock
     from tools.installer.uninstaller import Uninstaller
 
     with tempfile.TemporaryDirectory() as tmp:
         install_dir = Path(tmp) / "install"
         data_dir = Path(tmp) / "data"
 
-        # Setup mock install and data
+        # Setup mock install with valid receipt and user data
         install_dir.mkdir(parents=True)
         (install_dir / "omniplay-launcher.exe").write_text("binary", encoding="utf-8")
+        (install_dir / ".omniplay-install-receipt.json").write_text('{"schema_version": 1}\n', encoding="utf-8")
         data_dir.mkdir(parents=True)
         (data_dir / "savegame.sav").write_text("game_save_data", encoding="utf-8")
 
-        # Scenario A: Uninstall preserving user data
-        uninst = Uninstaller(
-            keep_user_data=True,
+        uninst_guarded = Uninstaller(
+            keep_user_data=False,
+            force=False,
+            install_dir=str(install_dir),
+            data_dir=str(data_dir),
+        )
+
+        # 2a. Timeout during process inspection must halt BEFORE deleting install_dir or data_dir
+        with mock.patch(
+            "tools.installer.uninstaller.subprocess.check_output",
+            side_effect=subprocess.TimeoutExpired(cmd="tasklist", timeout=5),
+        ):
+            assert not uninst_guarded.run(), "Uninstaller must halt when process query times out"
+            assert (install_dir / "omniplay-launcher.exe").is_file(), "install_dir files must remain intact on timeout"
+            assert (data_dir / "savegame.sav").is_file(), "data_dir files must remain intact on timeout"
+
+        # 2b. PermissionError must halt BEFORE deleting any files (even if force=True!)
+        uninst_force_on_error = Uninstaller(
+            keep_user_data=False,
             force=True,
             install_dir=str(install_dir),
             data_dir=str(data_dir),
         )
-        assert uninst.run(), "Uninstallation failed"
+        with mock.patch(
+            "tools.installer.uninstaller.subprocess.check_output",
+            side_effect=PermissionError("Access is denied"),
+        ):
+            assert not uninst_force_on_error.run(), "Uninstaller must halt on PermissionError"
+            assert (install_dir / "omniplay-launcher.exe").is_file(), "install_dir must remain intact on PermissionError"
+            assert (data_dir / "savegame.sav").is_file(), "data_dir must remain intact on PermissionError"
+
+        # 2c. Active process detected (without force) must halt BEFORE deleting files
+        active_csv = '"omniplay-host.exe","7788","Console","1","22,000 K"\n'
+        with mock.patch(
+            "tools.installer.uninstaller.subprocess.check_output",
+            return_value=active_csv,
+        ):
+            assert not uninst_guarded.run(), "Uninstaller must halt when OmniPlay process is active"
+            assert (install_dir / "omniplay-launcher.exe").is_file(), "install_dir must remain intact when process is active"
+            assert (data_dir / "savegame.sav").is_file(), "data_dir must remain intact when process is active"
+
+        # Scenario A: Clean process table, uninstall preserving user data
+        uninst = Uninstaller(
+            keep_user_data=True,
+            force=False,
+            install_dir=str(install_dir),
+            data_dir=str(data_dir),
+        )
+        assert uninst.run(), "Uninstallation failed when no processes were active"
         assert not install_dir.exists(), "Install directory was not removed"
         assert data_dir.exists(), "User data was incorrectly deleted"
         assert (data_dir / "savegame.sav").exists(), "Save game was incorrectly deleted"
 
-        # Scenario B: Uninstall removing all data
+        # Scenario B: Clean process table, uninstall removing all data
         install_dir.mkdir(parents=True)
         (install_dir / "omniplay-launcher.exe").write_text("binary", encoding="utf-8")
+        (install_dir / ".omniplay-install-receipt.json").write_text('{"schema_version": 1}\n', encoding="utf-8")
         uninst_all = Uninstaller(
             keep_user_data=False,
-            force=True,
+            force=False,
             install_dir=str(install_dir),
             data_dir=str(data_dir),
         )
@@ -94,7 +193,7 @@ def test_uninstaller_retention_and_fencing():
         assert not install_dir.exists(), "Install dir should be removed"
         assert not data_dir.exists(), "User data dir should be removed"
 
-    print("  PASS: Data retention policy (keep vs wipe) strictly verified.")
+    print("  PASS: Uninstaller process fencing and data retention policy (keep vs wipe) strictly verified.")
 
 
 def test_repair_file_corruption():

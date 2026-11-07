@@ -80,16 +80,127 @@ def test_spdx_sbom_generation():
 
 def test_security_advisories_and_cves():
     print("Running Test 4: Security Advisories & CVE Freshness Review...")
-    from tools.audit_security_advisories import audit_dependencies
+    from tools.audit_security_advisories import audit_dependencies, main as audit_main
 
     lock_file = WORKSPACE_ROOT / "Cargo.lock"
-    report = audit_dependencies(lock_file)
-    assert report["status"] == "CLEAN", f"Audit failed: {report['status']}"
-    assert report["inspected_packages"] > 0, "No packages inspected"
-    assert len(report["flagged_vulnerabilities"]) == 0, "Vulnerabilities flagged"
-    assert report["chromium_freshness"]["status"] == "COMPLIANT"
+    advisory_db = WORKSPACE_ROOT / "security" / "advisory-database.json"
+    upstream_lock = WORKSPACE_ROOT / "browser" / "upstream.lock.json"
 
-    print("  PASS: Security advisories and freshness audit verified clean.")
+    # 4a. Clean scan on workspace Cargo.lock + upstream.lock.json + advisory-database.json
+    report = audit_dependencies(
+        lock_file,
+        advisory_db_path=advisory_db,
+        upstream_lock_path=upstream_lock,
+    )
+    assert report["status"] == "CLEAN", f"Audit failed: {report['status']} ({report.get('errors')})"
+    assert report["cargo_lock_present"] is True
+    assert report["inspected_packages"] == 327, f"Expected 327 packages, got {report['inspected_packages']}"
+    assert len(report["flagged_vulnerabilities"]) == 0, "Vulnerabilities flagged on clean lockfile"
+    assert report["advisory_database"]["present"] is True
+    assert report["advisory_database"]["dataset_version"] == "2026-11-08.1"
+    assert report["advisory_database"]["dataset_date"] == "2026-11-08"
+    assert report["chromium_freshness"]["status"] == "COMPLIANT"
+    assert report["chromium_freshness"]["pinned_version"] == "155.0.8059.85"
+
+    with tempfile.TemporaryDirectory() as tmp:
+        tmp_path = Path(tmp)
+        out_json = tmp_path / "out.json"
+
+        # 4b. Missing Cargo.lock MUST fail closed (status="UNVERIFIED", exit code 1)
+        missing_lock = tmp_path / "nonexistent-Cargo.lock"
+        rep_missing = audit_dependencies(
+            missing_lock,
+            advisory_db_path=advisory_db,
+            upstream_lock_path=upstream_lock,
+        )
+        assert rep_missing["status"] == "UNVERIFIED", f"Expected UNVERIFIED on missing Cargo.lock, got {rep_missing['status']}"
+        assert rep_missing["inspected_packages"] == 0
+        rc_missing = audit_main(
+            [
+                "--cargo-lock",
+                str(missing_lock),
+                "--advisory-db",
+                str(advisory_db),
+                "--upstream-lock",
+                str(upstream_lock),
+                "--output",
+                str(out_json),
+            ]
+        )
+        assert rc_missing != 0, "CLI must return non-zero exit code when Cargo.lock is missing"
+
+        # 4c. Missing advisory database MUST fail closed (status="UNVERIFIED", exit code 1)
+        missing_db = tmp_path / "nonexistent-advisory-db.json"
+        rep_no_db = audit_dependencies(
+            lock_file,
+            advisory_db_path=missing_db,
+            upstream_lock_path=upstream_lock,
+        )
+        assert rep_no_db["status"] == "UNVERIFIED"
+        rc_no_db = audit_main(
+            [
+                "--cargo-lock",
+                str(lock_file),
+                "--advisory-db",
+                str(missing_db),
+                "--upstream-lock",
+                str(upstream_lock),
+                "--output",
+                str(out_json),
+            ]
+        )
+        assert rc_no_db != 0, "CLI must return non-zero exit code when advisory DB is missing"
+
+        # 4d. Vulnerable crate version in Cargo.lock MUST be detected (status="VULNERABLE", exit code 1)
+        vuln_lock = tmp_path / "vuln-Cargo.lock"
+        vuln_lock.write_text(
+            'version = 4\n\n[[package]]\nname = "time"\nversion = "0.2.16"\nsource = "registry+https://github.com/rust-lang/crates.io-index"\n',
+            encoding="utf-8",
+        )
+        rep_vuln = audit_dependencies(
+            vuln_lock,
+            advisory_db_path=advisory_db,
+            upstream_lock_path=upstream_lock,
+        )
+        assert rep_vuln["status"] == "VULNERABLE", f"Expected VULNERABLE, got {rep_vuln['status']}"
+        flagged_ids = [v["id"] for v in rep_vuln["flagged_vulnerabilities"]]
+        assert "RUSTSEC-2020-0071" in flagged_ids, f"Expected RUSTSEC-2020-0071 in {flagged_ids}"
+        rc_vuln = audit_main(
+            [
+                "--cargo-lock",
+                str(vuln_lock),
+                "--advisory-db",
+                str(advisory_db),
+                "--upstream-lock",
+                str(upstream_lock),
+                "--output",
+                str(out_json),
+            ]
+        )
+        assert rc_vuln != 0, "CLI must return non-zero exit code when vulnerable crate is detected"
+
+        # 4e. Outdated Chromium version in upstream.lock.json MUST be flagged (status="VULNERABLE", exit code 1)
+        stale_upstream = tmp_path / "stale-upstream.lock.json"
+        stale_upstream.write_text(
+            json.dumps(
+                {
+                    "schema_version": 1,
+                    "version": "115.0.5790.170",
+                    "revision": "0e66b94549a8bd85f03fbdf189b752d6e7b63c32",
+                }
+            ),
+            encoding="utf-8",
+        )
+        rep_stale = audit_dependencies(
+            lock_file,
+            advisory_db_path=advisory_db,
+            upstream_lock_path=stale_upstream,
+        )
+        assert rep_stale["status"] == "VULNERABLE"
+        stale_ids = [v["id"] for v in rep_stale["flagged_vulnerabilities"]]
+        assert "CVE-2023-4863" in stale_ids and "CHROMIUM-BASELINE-STALE" in stale_ids
+
+    print("  PASS: Security advisories and CVE freshness auditor verified (clean, missing lock/DB, vulnerable crate, stale Chromium).")
 
 def test_secret_detection_and_hygiene():
     print("Running Test 5: Secret Detection & Repository Hygiene...")

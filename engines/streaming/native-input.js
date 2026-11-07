@@ -17,7 +17,10 @@ export class NativeInputForwarder extends EventTarget{
       const grant=await this.#bridge.request('stream_input_arm',{game_id:gameId,pair_id:this.#pair.id,session_id,host_public_key:this.#identity.public_key,grant:this.#pair.grant,capture_id:capture.capture_id},120000);
       requireValue(grant.session_id===session_id&&grant.pair_id===this.#pair.id&&grant.game_id===gameId&&grant.keyboard_mouse===true&&grant.gamepad===false,'unauthorized','Native input grant identity is invalid.');
       this.#validate(grant,grant);
-      if(this.#closed||generation!==this.#armGeneration||!this.#session.active||session_id!==this.#session.id){this.#retiring=grant;await this.revoke('context_closed');return;}
+      if(this.#closed||generation!==this.#armGeneration||!this.#session.active||session_id!==this.#session.id){
+        if(['revoked','cleanup_required'].includes(grant.state)){this.#retiring=grant;this.#retired(grant);return;}
+        this.#grant=grant;await this.revoke('context_closed');return;
+      }
       if(['revoked','cleanup_required'].includes(grant.state)){this.#retiring=grant;this.#retired(grant);return;}
       this.#grant=grant;this.#sequence=0;this.#session.armInput(true);this.dispatchEvent(new CustomEvent('status',{detail:grant}));this.#timer=setInterval(()=>void this.#status(),1000);
     }finally{this.#arming=false;}

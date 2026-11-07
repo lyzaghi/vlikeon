@@ -4,6 +4,7 @@ import argparse
 from datetime import datetime, timezone
 import hashlib
 import json
+import os
 from pathlib import Path
 import shutil
 import sys
@@ -16,6 +17,7 @@ if str(REPO_ROOT / "tools") not in sys.path:
 
 import desktop_capture_audio_patch  # noqa: E402
 import generate_browser_patch  # noqa: E402
+from prepare_desktop_browser import ordinary, relative  # noqa: E402
 import source_patch  # noqa: E402
 
 
@@ -86,40 +88,195 @@ def sha256_file(path: Path) -> str:
     return sha256_bytes(path.read_bytes())
 
 
-def copy_candidate_inputs(candidate_source: Path, scratch_tree: Path, review_manifest: dict[str, object] | None) -> list[str]:
+def required_integration_paths() -> list[str]:
+    series_data = json.loads(SERIES_PATH.read_text(encoding="utf-8"))
+    paths: set[str] = set()
+    for item in series_data.get("modified_files", []):
+        relative(str(item))
+        paths.add(str(item))
+    for snap in SNAPSHOT_ROOT.rglob("*"):
+        ordinary(snap, SNAPSHOT_ROOT, False)
+        if snap.is_file():
+            rel = snap.relative_to(SNAPSHOT_ROOT).as_posix()
+            relative(rel)
+            paths.add(rel)
+    if not paths:
+        raise RuntimeError("Chromium integration snapshot inventory is empty")
+    return sorted(paths)
+
+
+def validate_safe_relative_path(raw_path: object, context: str) -> str:
+    try:
+        rel = relative(raw_path).as_posix()
+    except ValueError as exc:
+        raise RuntimeError(f"Invalid or escaping path in {context}: {raw_path!r} ({exc})") from exc
+    return rel
+
+
+def validate_safe_file_within(file_path: Path, root_dir: Path, context: str) -> Path:
+    try:
+        return ordinary(file_path, root_dir, file=True)
+    except ValueError as exc:
+        raise RuntimeError(f"Unsafe or missing file in {context}: {file_path} ({exc})") from exc
+
+
+def copy_candidate_inputs(
+    candidate_source: Path,
+    scratch_tree: Path,
+    review_manifest: dict[str, object] | None,
+) -> list[str]:
+    required_paths = required_integration_paths()
     copied: list[str] = []
+
     if review_manifest is not None:
-        entries = review_manifest.get("integration_sources") or review_manifest.get("files") or []
-        for entry in entries:
-            if not isinstance(entry, dict):
-                continue
-            rel = str(entry["path"])
-            cand_rel = entry.get("candidate_Copy") or f"source/candidate/{rel}"
-            baseline_rel = entry.get("baseline_copy") or f"source/baseline/{rel}"
-            source_file = None
-            if isinstance(cand_rel, str):
-                candidate_path = candidate_source / cand_rel
-                if candidate_path.is_file():
-                    source_file = candidate_path
-            if source_file is None and isinstance(baseline_rel, str):
-                baseline_path = candidate_source / baseline_rel
-                if baseline_path.is_file():
-                    source_file = baseline_path
-            if source_file is not None:
-                dest = scratch_tree / rel
-                dest.parent.mkdir(parents=True, exist_ok=True)
-                shutil.copy2(source_file, dest)
-                copied.append(rel)
+        raw_sources = review_manifest.get("integration_sources")
+        if raw_sources is None:
+            raw_sources = review_manifest.get("files")
+        if not isinstance(raw_sources, list) or not raw_sources:
+            raise RuntimeError("upgrade-review.json is missing a non-empty integration_sources list")
+
+        raw_inventory = review_manifest.get("source_inventory")
+        if not isinstance(raw_inventory, list) or not raw_inventory:
+            raise RuntimeError("upgrade-review.json is missing a non-empty source_inventory list")
+
+        inventory_by_path: dict[str, dict[str, object]] = {}
+        for inv_item in raw_inventory:
+            if not isinstance(inv_item, dict) or "path" not in inv_item:
+                raise RuntimeError("Malformed entry in upgrade-review.json source_inventory")
+            inv_rel = validate_safe_relative_path(inv_item["path"], "source_inventory")
+            if inv_rel in inventory_by_path:
+                raise RuntimeError(f"Duplicate source_inventory entry in upgrade-review.json: {inv_rel}")
+            inventory_by_path[inv_rel] = inv_item
+
+        candidate_root = candidate_source / "source" / "candidate"
+        if not candidate_root.is_dir():
+            raise RuntimeError(f"Candidate source directory is missing: {candidate_root}")
+
+        manifest_paths: dict[str, str] = {}
+        for entry in raw_sources:
+            if not isinstance(entry, dict) or "path" not in entry:
+                raise RuntimeError("Malformed entry in upgrade-review.json integration_sources")
+            rel = validate_safe_relative_path(entry["path"], "integration_sources")
+            if rel in manifest_paths:
+                raise RuntimeError(f"Duplicate integration_sources entry in upgrade-review.json: {rel}")
+
+            cand_rel_raw = entry.get("candidate_copy") or f"source/candidate/{rel}"
+            cand_rel = validate_safe_relative_path(cand_rel_raw, "candidate_copy")
+            if not cand_rel.startswith("source/candidate/"):
+                raise RuntimeError(
+                    f"Candidate input for {rel} must reside under source/candidate/, got {cand_rel!r}"
+                )
+            manifest_paths[rel] = cand_rel
+
+        missing_from_manifest = sorted(set(required_paths) - set(manifest_paths.keys()))
+        if missing_from_manifest:
+            raise RuntimeError(
+                f"upgrade-review.json is missing required integration sources: {', '.join(missing_from_manifest)}"
+            )
+
+        for rel in sorted(manifest_paths.keys()):
+            cand_rel = manifest_paths[rel]
+            inv_entry = inventory_by_path.get(cand_rel)
+            if inv_entry is None:
+                raise RuntimeError(f"Missing candidate source_inventory digest entry for {cand_rel}")
+
+            expected_sha = inv_entry.get("sha256")
+            if not isinstance(expected_sha, str) or len(expected_sha) != 64:
+                raise RuntimeError(f"Invalid SHA-256 digest in source_inventory for {cand_rel}")
+
+            expected_bytes = inv_entry.get("bytes")
+            candidate_file = validate_safe_file_within(
+                candidate_source / cand_rel,
+                candidate_root,
+                f"candidate file {cand_rel}",
+            )
+            raw_bytes = candidate_file.read_bytes()
+            if isinstance(expected_bytes, int) and len(raw_bytes) != expected_bytes:
+                raise RuntimeError(
+                    f"Candidate byte length mismatch for {cand_rel}: expected {expected_bytes}, got {len(raw_bytes)}"
+                )
+            actual_sha = sha256_bytes(raw_bytes)
+            if actual_sha.lower() != expected_sha.lower():
+                raise RuntimeError(
+                    f"Candidate SHA-256 mismatch for {cand_rel}: expected {expected_sha}, got {actual_sha}"
+                )
+
+            dest = scratch_tree / rel
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(candidate_file, dest)
+            copied.append(rel)
+
         return copied
+
+    # Direct candidate_root mode (no fallback to baseline snapshots)
+    if not candidate_source.is_dir():
+        raise RuntimeError(f"Candidate root directory does not exist: {candidate_source}")
+
+    manifest_digests: dict[str, str] = {}
+    optional_manifest = candidate_source / "candidate-manifest.json"
+    if optional_manifest.is_file():
+        manifest_data = json.loads(optional_manifest.read_text(encoding="utf-8"))
+        files_map = manifest_data.get("files")
+        if not isinstance(files_map, dict) or not files_map:
+            raise RuntimeError("candidate-manifest.json must contain a non-empty 'files' mapping")
+        for raw_rel, expected_sha in files_map.items():
+            rel = validate_safe_relative_path(raw_rel, "candidate-manifest.json")
+            if not isinstance(expected_sha, str) or len(expected_sha) != 64:
+                raise RuntimeError(f"Invalid SHA-256 digest in candidate-manifest.json for {rel}")
+            manifest_digests[rel] = expected_sha
+
+    for dirpath, dirnames, filenames in os.walk(candidate_source, followlinks=False):
+        curr_dir = Path(dirpath)
+        for d in dirnames:
+            sub = curr_dir / d
+            if sub.is_symlink() or getattr(sub, "is_junction", lambda: False)():
+                raise RuntimeError(f"Candidate tree cannot contain symlink or junction directory: {sub}")
+        for f in filenames:
+            fp = curr_dir / f
+            if fp.is_symlink():
+                raise RuntimeError(f"Candidate tree cannot contain symlink file: {fp}")
+
+    missing_required: list[str] = []
+    for rel in required_paths:
+        validate_safe_relative_path(rel, "required_integration_paths")
+        candidate_file = candidate_source / rel
+        if not candidate_file.is_file():
+            missing_required.append(rel)
+            continue
+        validate_safe_file_within(candidate_file, candidate_source, f"candidate file {rel}")
+
+    if missing_required:
+        raise RuntimeError(
+            f"Candidate root is missing {len(missing_required)} required file(s): {', '.join(missing_required[:10])}"
+        )
+
+    for rel, expected_sha in sorted(manifest_digests.items()):
+        target_file = validate_safe_file_within(
+            candidate_source / rel,
+            candidate_source,
+            f"manifest file {rel}",
+        )
+        actual_sha = sha256_file(target_file)
+        if actual_sha.lower() != expected_sha.lower():
+            raise RuntimeError(
+                f"Candidate SHA-256 mismatch for {rel}: expected {expected_sha}, got {actual_sha}"
+            )
 
     for file_path in sorted(candidate_source.rglob("*")):
         if not file_path.is_file():
             continue
-        rel = file_path.relative_to(candidate_source).as_posix()
+        if file_path.name == "candidate-manifest.json":
+            continue
+        validate_safe_file_within(file_path, candidate_source, "candidate tree scan")
+        rel = validate_safe_relative_path(
+            file_path.relative_to(candidate_source).as_posix(),
+            "candidate tree file",
+        )
         dest = scratch_tree / rel
         dest.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(file_path, dest)
         copied.append(rel)
+
     return copied
 
 
@@ -138,13 +295,14 @@ def rehearse_upgrade_on_tree(candidate_source: Path, review_manifest: dict[str, 
         stage_results: list[dict[str, object]] = []
 
         try:
-            # Stage 1: Verify pinned desktop capture audio anchors against candidate tree
+            # Stage 1: Verify pinned desktop capture audio anchors against candidate tree (does not write to tree)
             touched_audio = desktop_capture_audio_patch.author(scratch_tree)
             stage_results.append(
                 {
                     "stage": "desktop_capture_audio_patch.author",
-                    "status": "APPLIED",
-                    "touched_files": sorted(touched_audio.keys()),
+                    "status": "ANCHORS_VERIFIED",
+                    "mutates_tree": False,
+                    "verified_files": sorted(touched_audio.keys()),
                 }
             )
 
@@ -158,6 +316,7 @@ def rehearse_upgrade_on_tree(candidate_source: Path, review_manifest: dict[str, 
                 {
                     "stage": "0001-omniplay-game-hub.patch",
                     "status": "APPLIED",
+                    "mutates_tree": True,
                     "touched_files": sorted(touched_0001.keys()),
                 }
             )
@@ -172,6 +331,7 @@ def rehearse_upgrade_on_tree(candidate_source: Path, review_manifest: dict[str, 
                 {
                     "stage": "0003-owned-game-capture.patch",
                     "status": "APPLIED",
+                    "mutates_tree": True,
                     "touched_files": sorted(touched_0003.keys()),
                 }
             )
