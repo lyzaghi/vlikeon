@@ -45,7 +45,9 @@ def previous_output():
             if name!=MARKER and (name not in known or info(path)[1]!=known[name]):raise ValueError('Generated web output has a local edit: '+name)
 
 def main():
-    parser=argparse.ArgumentParser(description=__doc__);parser.add_argument('--without-cores',action='store_true');args=parser.parse_args()
+    parser=argparse.ArgumentParser(description=__doc__);parser.add_argument('--without-cores',action='store_true')
+    parser.add_argument('--check-receipt',action='store_true',help='Require the tracked receipt to match the assembled bundle')
+    args=parser.parse_args()
     sources,cores=collect(args.without_cores,extension=False);payload=dict(sources)
     extra=' '.join(sorted(set(connect_sources().split()+sync_connect_sources())));headers=dict(HEADERS)
     if extra:headers['Content-Security-Policy']=headers['Content-Security-Policy'].replace("connect-src 'self';","connect-src 'self' "+extra+';')
@@ -90,6 +92,12 @@ def main():
         size,digest=info(data);files.append({'path':name,'bytes':size,'sha256':digest})
     (OUTPUT/MARKER).write_bytes(encoded({'schema_version':1,'development_only':args.without_cores,'build_id':build_id,'files':files,'verification':'not_run'}))
     receipt={'schema_version':1,'build_id':build_id,'development_only':args.without_cores,'resource_files':len(files),'core_ids':[core['id'] for core in cores],'server':'not_started','browser':'not_started','verification':'not_run'}
-    (SOURCE/'assembly-receipt.json').write_bytes(encoded(receipt))
+    receipt_path=SOURCE/'assembly-receipt.json'
+    receipt_bytes=encoded(receipt)
+    if args.check_receipt:
+        if receipt_path.read_bytes()!=receipt_bytes:
+            raise SystemExit('Web assembly receipt differs from this checkout; regenerate it from clean sources')
+    else:
+        receipt_path.write_bytes(receipt_bytes)
     print('Authored an inventoried Web/PWA resource bundle. No server, browser, core or test was started.')
 if __name__=='__main__':main()

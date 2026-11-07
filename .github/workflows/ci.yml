@@ -2,7 +2,7 @@ name: OmniPlay Continuous Integration
 
 on:
   push:
-    branches: [ main ]
+    branches: [main, 'codex/qa-*']
   pull_request:
     branches: [ main ]
   workflow_dispatch:
@@ -33,6 +33,11 @@ jobs:
       - name: Set up Rust
         uses: dtolnay/rust-toolchain@stable
 
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
       - name: Verify Clean Clone Integrity
         run: python tools/verify_clean_clone.py
 
@@ -56,3 +61,52 @@ jobs:
 
       - name: Run Security, Licensing & Release Qualification Suite
         run: python qa/security_license_qualification.py
+
+      - name: Verify Reproducible Development Web Assembly
+        run: python tools/assemble_web.py --without-cores --check-receipt
+
+      - name: Run Chromium Patch Rehearsal Regression
+        run: python qa/browser/upgrade_rehearsal_test.py -v
+
+      - name: Run Browser Module Regression
+        run: node --experimental-vm-modules --test qa/browser/*.test.mjs
+
+      - name: Run Rust Regression
+        run: cargo test --locked -p omniplay-streaming -p omniplay-updater -p omniplay-sync -p omniplay-sync-client -p omniplay-sync-service
+
+  live-remote-play:
+    name: WebRTC Direct and TURN Loopback
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Run Two Browser Peers Against Local TURN
+        shell: bash
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y coturn
+          command -v google-chrome
+          export VLIKEON_QA_TURN_USER=vlikeon-fixture
+          VLIKEON_QA_TURN_PASSWORD="$(openssl rand -hex 24)"
+          export VLIKEON_QA_TURN_PASSWORD
+          turnserver -c /dev/null --listening-ip=127.0.0.1 --relay-ip=127.0.0.1 \
+            --listening-port=5348 --allow-loopback-peers --no-tls --no-dtls --no-cli \
+            --min-port=52000 --max-port=52030 --realm=vlikeon.test --lt-cred-mech \
+            --user="$VLIKEON_QA_TURN_USER:$VLIKEON_QA_TURN_PASSWORD" >"$RUNNER_TEMP/vlikeon-turn.log" 2>&1 &
+          turn_pid=$!
+          trap 'kill "$turn_pid" 2>/dev/null || true' EXIT
+          sleep 2
+          kill -0 "$turn_pid"
+          python3 qa/browser/remote_play_live.py --browser "$(command -v google-chrome)" \
+            --turn-url 'turn:127.0.0.1:5348?transport=udp' --output "$RUNNER_TEMP/vlikeon-remote-play.json"
+
+      - name: Upload WebRTC Evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: remote-play-loopback
+          path: |
+            ${{ runner.temp }}/vlikeon-remote-play.json
+            ${{ runner.temp }}/vlikeon-remote-play.browser.log

@@ -1,11 +1,11 @@
-//! DTLS-SRTP key derivation, certificate fingerprint verification, and session exporter.
-//! Complies with RFC 5764 (DTLS-SRTP) key exporter and RFC 8122 certificate fingerprinting.
-//! Forbids plaintext fallback and prevents key leakage to renderer/logs.
+//! Admit key material from an authenticated DTLS-SRTP handshake.
+//! The transport must negotiate SRTP_AES128_CM_HMAC_SHA1_80 and supply
+//! its RFC 5764 exporter output, using EXTRACTOR-dtls_srtp without a context.
 
 use crate::native_srtp::{NativeSrtpSession, SrtpKeys};
 use omniplay_contracts::{ErrorCode, PlatformError, Result};
 use sha2::{Digest, Sha256};
-use zeroize::{Zeroize, Zeroizing};
+use zeroize::Zeroizing;
 
 fn denied() -> PlatformError {
     PlatformError::new(
@@ -68,103 +68,47 @@ pub enum DtlsRole {
     Server,
 }
 
-/// DTLS-SRTP key material exporter (RFC 5764 section 4.2)
-/// Label: "EXTRACTOR-dtls_srtp"
+/// Key material supplied by the negotiated DTLS transport, never a synthetic PRF.
 pub struct DtlsSrtpExporter {
     role: DtlsRole,
-    master_secret: Zeroizing<Vec<u8>>,
-    client_random: [u8; 32],
-    server_random: [u8; 32],
-    peer_fingerprint: CertificateFingerprint,
-    expected_fingerprint: String,
-    retired: bool,
+    material: Option<Zeroizing<[u8; 60]>>,
 }
 
 impl DtlsSrtpExporter {
-    pub fn new(
+    pub fn from_negotiated_aes128_cm(
         role: DtlsRole,
-        master_secret: &[u8],
-        client_random: [u8; 32],
-        server_random: [u8; 32],
+        exported: &[u8],
         peer_certificate_der: &[u8],
         expected_fingerprint: &str,
     ) -> Result<Self> {
-        let peer_fingerprint = CertificateFingerprint::from_certificate_der(peer_certificate_der);
-        if !peer_fingerprint.verify_matches(expected_fingerprint) {
+        if peer_certificate_der.is_empty()
+            || !CertificateFingerprint::from_certificate_der(peer_certificate_der)
+                .verify_matches(expected_fingerprint)
+        {
             return Err(denied());
         }
-
+        let exported: [u8; 60] = exported.try_into().map_err(|_| denied())?;
         Ok(Self {
             role,
-            master_secret: Zeroizing::new(master_secret.to_vec()),
-            client_random,
-            server_random,
-            peer_fingerprint,
-            expected_fingerprint: expected_fingerprint.to_string(),
-            retired: false,
+            material: Some(Zeroizing::new(exported)),
         })
     }
 
-    /// Derives SRTP keys (master key and master salt for both directions)
-    /// RFC 5764 requires:
-    /// 2 * (SRTP_KEY_LEN + SRTP_SALT_LEN) bytes
-    /// For AES_CM_128_HMAC_SHA1_80: key=16, salt=14 -> total 60 bytes.
     pub fn export_srtp_keys(&self, ssrc: u32) -> Result<NativeSrtpSession> {
-        if self.retired {
-            return Err(unavailable());
-        }
-
-        // PRF / HKDF key derivation
-        // Label: "EXTRACTOR-dtls_srtp"
-        let label = b"EXTRACTOR-dtls_srtp";
-        let mut seed = Vec::with_capacity(label.len() + 64);
-        seed.extend_from_slice(label);
-        seed.extend_from_slice(&self.client_random);
-        seed.extend_from_slice(&self.server_random);
-
-        // Derive 60 bytes using HMAC-SHA256
-        use ring::hmac;
-        let s_key = hmac::Key::new(hmac::HMAC_SHA256, &self.master_secret);
-        let block1 = hmac::sign(&s_key, &seed);
-        let mut seed2 = Vec::with_capacity(32 + seed.len());
-        seed2.extend_from_slice(block1.as_ref());
-        seed2.extend_from_slice(&seed);
-        let block2 = hmac::sign(&s_key, &seed2);
-
-        let mut output = Vec::with_capacity(64);
-        output.extend_from_slice(block1.as_ref());
-        output.extend_from_slice(block2.as_ref());
-
-        // Layout:
-        // client_write_key (16) | server_write_key (16) | client_write_salt (14) | server_write_salt (14)
-        let (rx_key, rx_salt) = match self.role {
-            DtlsRole::Server => {
-                // Server receives on client_write_key and client_write_salt
-                let key = &output[0..16];
-                let salt = &output[32..46];
-                (key, salt)
-            }
-            DtlsRole::Client => {
-                // Client receives on server_write_key and server_write_salt
-                let key = &output[16..32];
-                let salt = &output[46..60];
-                (key, salt)
-            }
+        let output = self.material.as_ref().ok_or_else(unavailable)?;
+        // client_write_key | server_write_key | client_write_salt | server_write_salt
+        let (key, salt) = match self.role {
+            DtlsRole::Server => (&output[..16], &output[32..46]),
+            DtlsRole::Client => (&output[16..32], &output[46..]),
         };
-
-        let keys = SrtpKeys::new(rx_key, rx_salt, ssrc)?;
-        Ok(NativeSrtpSession::new(keys, ssrc))
+        Ok(NativeSrtpSession::new(
+            SrtpKeys::new(key, salt, ssrc)?,
+            ssrc,
+        ))
     }
 
     pub fn retire(&mut self) {
-        self.retired = true;
-        self.master_secret.zeroize();
-    }
-}
-
-impl Drop for DtlsSrtpExporter {
-    fn drop(&mut self) {
-        self.retire();
+        self.material = None;
     }
 }
 
@@ -173,54 +117,38 @@ mod tests {
     use super::*;
 
     #[test]
-    fn dtls_srtp_fingerprint_verification_and_rfc5764_exporter() {
-        let cert_der = b"vlikeon-dtls-peer-certificate-der-fixture";
+    fn admits_negotiated_key_material_only_with_matching_fingerprint() {
+        let cert_der = b"vlikeon-peer-certificate-der-fixture";
         let fp = CertificateFingerprint::from_certificate_der(cert_der);
         let hex_colon = fp.to_hex_string();
-        assert!(fp.verify_matches(&hex_colon));
         assert!(fp.verify_matches(&hex_colon.to_lowercase()));
         assert!(!fp.verify_matches("00:11:22:33"));
 
-        let master_secret = [0x5Au8; 48];
-        let client_random = [0x11u8; 32];
-        let server_random = [0x22u8; 32];
-
-        // Mismatched fingerprint is denied
-        assert!(DtlsSrtpExporter::new(
+        let material = [0x5a; 60];
+        assert!(DtlsSrtpExporter::from_negotiated_aes128_cm(
             DtlsRole::Client,
-            &master_secret,
-            client_random,
-            server_random,
+            &material,
             cert_der,
-            "00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00"
+            "00:11:22:33",
+        )
+        .is_err());
+        assert!(DtlsSrtpExporter::from_negotiated_aes128_cm(
+            DtlsRole::Client,
+            &material[..59],
+            cert_der,
+            &hex_colon,
         )
         .is_err());
 
-        let mut client_exp = DtlsSrtpExporter::new(
+        let mut client = DtlsSrtpExporter::from_negotiated_aes128_cm(
             DtlsRole::Client,
-            &master_secret,
-            client_random,
-            server_random,
+            &material,
             cert_der,
             &hex_colon,
         )
         .unwrap();
-        let server_exp = DtlsSrtpExporter::new(
-            DtlsRole::Server,
-            &master_secret,
-            client_random,
-            server_random,
-            cert_der,
-            &hex_colon,
-        )
-        .unwrap();
-
-        let srtp_client = client_exp.export_srtp_keys(0xABCD_1234).unwrap();
-        let srtp_server = server_exp.export_srtp_keys(0xABCD_1234).unwrap();
-        assert!(!srtp_client.is_retired());
-        assert!(!srtp_server.is_retired());
-
-        client_exp.retire();
-        assert!(client_exp.export_srtp_keys(0xABCD_1234).is_err());
+        assert!(!client.export_srtp_keys(42).unwrap().is_retired());
+        client.retire();
+        assert!(client.export_srtp_keys(42).is_err());
     }
 }

@@ -32,8 +32,6 @@ def test_installer_wizard_unattended():
     import subprocess
     from unittest import mock
     from tools.installer.installer_wizard import InstallerWizard
-    from tools.installer.uninstaller import Uninstaller
-
     with tempfile.TemporaryDirectory() as tmp:
         install_dir = Path(tmp) / "install"
         data_dir = Path(tmp) / "data"
@@ -46,7 +44,7 @@ def test_installer_wizard_unattended():
 
         # 1a. Timeout during process inspection must halt BEFORE creating install_dir or data_dir
         with mock.patch(
-            "tools.installer.installer_wizard.subprocess.check_output",
+            "tools.installer.process_fence.subprocess.check_output",
             side_effect=subprocess.TimeoutExpired(cmd="tasklist", timeout=5),
         ):
             assert not wizard.run(accept_eula=True), "Installer should halt when process query times out"
@@ -55,7 +53,7 @@ def test_installer_wizard_unattended():
 
         # 1b. PermissionError during process inspection must halt BEFORE creating files
         with mock.patch(
-            "tools.installer.installer_wizard.subprocess.check_output",
+            "tools.installer.process_fence.subprocess.check_output",
             side_effect=PermissionError("Access is denied"),
         ):
             assert not wizard.run(accept_eula=True), "Installer should halt on PermissionError"
@@ -64,7 +62,7 @@ def test_installer_wizard_unattended():
 
         # 1c. Unreadable / malformed output from process query must halt BEFORE creating files
         with mock.patch(
-            "tools.installer.installer_wizard.subprocess.check_output",
+            "tools.installer.process_fence.subprocess.check_output",
             return_value="ERROR: Invalid syntax or corrupted output\n",
         ):
             assert not wizard.run(accept_eula=True), "Installer should halt on unreadable process output"
@@ -74,7 +72,7 @@ def test_installer_wizard_unattended():
         # 1d. Active Vlikeon/OmniPlay process detected in SILENT mode must halt BEFORE creating files
         active_csv = '"omniplay-broker.exe","4242","Console","1","18,432 K"\n'
         with mock.patch(
-            "tools.installer.installer_wizard.subprocess.check_output",
+            "tools.installer.process_fence.subprocess.check_output",
             return_value=active_csv,
         ):
             assert not wizard.run(accept_eula=True), "Silent install MUST halt when OmniPlay is running"
@@ -88,22 +86,42 @@ def test_installer_wizard_unattended():
             silent=False,
         )
         with mock.patch(
-            "tools.installer.installer_wizard.subprocess.check_output",
+            "tools.installer.process_fence.subprocess.check_output",
             return_value=active_csv,
         ):
             assert not interactive_wizard.run(accept_eula=True), "Interactive install MUST halt when OmniPlay is running"
             assert not install_dir.exists(), "install_dir must NOT be created when OmniPlay is running in wizard mode"
 
-        # 1f. Without accept_eula, silent mode must fail before writing files
-        assert not wizard.run(accept_eula=False), "Silent install should fail without accept_eula"
+        with mock.patch.object(wizard, "os_type", "windows"), mock.patch(
+            "tools.installer.process_fence.subprocess.check_output", return_value='"notepad.exe","1234"\n',
+        ):
+            assert not wizard.run(accept_eula=True)
+            assert not install_dir.exists() and not data_dir.exists()
+
+        browser_csv = '"chrome.exe","1234","Console","1","12,345 K"\n'
+        with mock.patch.object(wizard, "os_type", "windows"), mock.patch(
+            "tools.installer.process_fence.subprocess.check_output", return_value=browser_csv,
+        ), mock.patch("tools.installer.process_fence._windows_image_path", return_value=install_dir / "chrome.exe"):
+            assert not wizard.run(accept_eula=True)
+            assert not install_dir.exists() and not data_dir.exists()
+
+        # Use a controlled quiet process table for filesystem assertions.
+        with mock.patch.object(wizard, "check_running_processes", return_value=[]):
+            assert not wizard.run(accept_eula=False), "Silent install should fail without accept_eula"
         assert not install_dir.exists(), "install_dir must NOT be created when EULA is rejected"
 
         # 1g. Clean process table + accept_eula -> silent install succeeds
-        success = wizard.run(accept_eula=True)
+        with mock.patch.object(wizard, "os_type", "windows"), mock.patch(
+            "tools.installer.process_fence.subprocess.check_output", return_value=browser_csv,
+        ), mock.patch("tools.installer.process_fence._windows_image_path", return_value=Path(tmp) / "Chrome" / "chrome.exe"):
+            success = wizard.run(accept_eula=True)
         assert success, "Silent install failed with accept_eula and no active processes"
         assert install_dir.exists(), "Target install directory not created"
         assert (install_dir / ".omniplay-install-receipt.json").is_file(), "Install receipt not created"
         assert (install_dir / "LICENSE-EULA.txt").is_file(), "EULA file not staged"
+        assert (install_dir / "bin" / "process_fence.py").is_file(), "Standalone uninstaller guard not staged"
+        subprocess.run([sys.executable, str(install_dir / "bin" / "uninstaller.py"), "--help"],
+                       check=True, capture_output=True)
         assert data_dir.exists(), "Target data directory not created"
 
     print("  PASS: Unattended wizard & process-fencing safety verified (timeout, permission, unreadable, active process, clean).")
@@ -135,7 +153,7 @@ def test_uninstaller_retention_and_fencing():
 
         # 2a. Timeout during process inspection must halt BEFORE deleting install_dir or data_dir
         with mock.patch(
-            "tools.installer.uninstaller.subprocess.check_output",
+            "tools.installer.process_fence.subprocess.check_output",
             side_effect=subprocess.TimeoutExpired(cmd="tasklist", timeout=5),
         ):
             assert not uninst_guarded.run(), "Uninstaller must halt when process query times out"
@@ -150,7 +168,7 @@ def test_uninstaller_retention_and_fencing():
             data_dir=str(data_dir),
         )
         with mock.patch(
-            "tools.installer.uninstaller.subprocess.check_output",
+            "tools.installer.process_fence.subprocess.check_output",
             side_effect=PermissionError("Access is denied"),
         ):
             assert not uninst_force_on_error.run(), "Uninstaller must halt on PermissionError"
@@ -160,12 +178,26 @@ def test_uninstaller_retention_and_fencing():
         # 2c. Active process detected (without force) must halt BEFORE deleting files
         active_csv = '"omniplay-host.exe","7788","Console","1","22,000 K"\n'
         with mock.patch(
-            "tools.installer.uninstaller.subprocess.check_output",
+            "tools.installer.process_fence.subprocess.check_output",
             return_value=active_csv,
         ):
             assert not uninst_guarded.run(), "Uninstaller must halt when OmniPlay process is active"
             assert (install_dir / "omniplay-launcher.exe").is_file(), "install_dir must remain intact when process is active"
             assert (data_dir / "savegame.sav").is_file(), "data_dir must remain intact when process is active"
+
+        for table, image in (
+            ('"notepad.exe","1234"\n', None),
+            ('"chrome.exe","1234","Console","1","12,345 K"\n', PermissionError("cannot query Chrome image")),
+            ('"chrome.exe","1234","Console","1","12,345 K"\n', install_dir / "chrome.exe"),
+        ):
+            uninstaller = uninst_force_on_error if not isinstance(image, Path) else uninst_guarded
+            image_mock = {"side_effect": image} if isinstance(image, OSError) else {"return_value": image}
+            with mock.patch.object(uninstaller, "os_type", "windows"), mock.patch(
+                "tools.installer.process_fence.subprocess.check_output", return_value=table,
+            ), mock.patch("tools.installer.process_fence._windows_image_path", **image_mock):
+                assert not uninstaller.run()
+                assert (install_dir / "omniplay-launcher.exe").is_file()
+                assert (data_dir / "savegame.sav").is_file()
 
         # Scenario A: Clean process table, uninstall preserving user data
         uninst = Uninstaller(
@@ -174,7 +206,8 @@ def test_uninstaller_retention_and_fencing():
             install_dir=str(install_dir),
             data_dir=str(data_dir),
         )
-        assert uninst.run(), "Uninstallation failed when no processes were active"
+        with mock.patch.object(uninst, "check_running_processes", return_value=[]):
+            assert uninst.run(), "Uninstallation failed when no processes were active"
         assert not install_dir.exists(), "Install directory was not removed"
         assert data_dir.exists(), "User data was incorrectly deleted"
         assert (data_dir / "savegame.sav").exists(), "Save game was incorrectly deleted"
@@ -189,7 +222,8 @@ def test_uninstaller_retention_and_fencing():
             install_dir=str(install_dir),
             data_dir=str(data_dir),
         )
-        assert uninst_all.run(), "Uninstallation with wipe failed"
+        with mock.patch.object(uninst_all, "check_running_processes", return_value=[]):
+            assert uninst_all.run(), "Uninstallation with wipe failed"
         assert not install_dir.exists(), "Install dir should be removed"
         assert not data_dir.exists(), "User data dir should be removed"
 

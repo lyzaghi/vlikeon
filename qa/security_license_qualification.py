@@ -80,127 +80,53 @@ def test_spdx_sbom_generation():
 
 def test_security_advisories_and_cves():
     print("Running Test 4: Security Advisories & CVE Freshness Review...")
-    from tools.audit_security_advisories import audit_dependencies, main as audit_main
+    from unittest.mock import patch
+    from tools import audit_security_advisories as auditor
 
-    lock_file = WORKSPACE_ROOT / "Cargo.lock"
-    advisory_db = WORKSPACE_ROOT / "security" / "advisory-database.json"
-    upstream_lock = WORKSPACE_ROOT / "browser" / "upstream.lock.json"
+    stable = {"version": "155.0.8059.85", "revision": "0e66b94549a8bd85f03fbdf189b752d6e7b63c32"}
+    result = {"vulnerabilities": {"list": []}}
+    revision = "a" * 40
+    with tempfile.TemporaryDirectory() as tmp, patch.object(auditor, "fetch_chromium_stable", return_value=stable):
+        root = Path(tmp)
+        args = {"advisory_db_path": root, "advisory_revision": revision, "cargo_audit": Path(sys.executable)}
+        for content in (None, "version = 4\npackage = []\n", "version = 4\npackage = [1]\n"):
+            lock = root / "test.lock"
+            if content is not None:
+                lock.write_text(content, encoding="utf-8")
+            report = auditor.audit_dependencies(lock, **args)
+            assert report["status"] == "UNVERIFIED" and report["inspected_packages"] == 0
+        report = auditor.audit_dependencies()
+        assert report["status"] == "UNVERIFIED"
+        with patch.object(auditor, "inspect_rustsec_snapshot", side_effect=ValueError("RustSec snapshot is stale")):
+            report = auditor.audit_dependencies(**args)
+            assert report["status"] == "UNVERIFIED" and "stale" in report["errors"][0]
+        with patch.object(auditor, "inspect_rustsec_snapshot", return_value={"revision": revision}), patch.object(
+            auditor, "run_cargo_audit", return_value=result
+        ) as run:
+            report = auditor.audit_dependencies(**args)
+            assert report["status"] == "CLEAN"
+            assert report["inspected_packages"] > 0
+            assert report["advisory_database"]["revision"] == revision
 
-    # 4a. Clean scan on workspace Cargo.lock + upstream.lock.json + advisory-database.json
-    report = audit_dependencies(
-        lock_file,
-        advisory_db_path=advisory_db,
-        upstream_lock_path=upstream_lock,
-    )
-    assert report["status"] == "CLEAN", f"Audit failed: {report['status']} ({report.get('errors')})"
-    assert report["cargo_lock_present"] is True
-    assert report["inspected_packages"] == 327, f"Expected 327 packages, got {report['inspected_packages']}"
-    assert len(report["flagged_vulnerabilities"]) == 0, "Vulnerabilities flagged on clean lockfile"
-    assert report["advisory_database"]["present"] is True
-    assert report["advisory_database"]["dataset_version"] == "2026-11-08.1"
-    assert report["advisory_database"]["dataset_date"] == "2026-11-08"
-    assert report["chromium_freshness"]["status"] == "COMPLIANT"
-    assert report["chromium_freshness"]["pinned_version"] == "155.0.8059.85"
+            newer = {"version": "158.0.8127.18", "revision": "b" * 40}
+            with patch.object(auditor, "fetch_chromium_stable", return_value=newer):
+                report = auditor.audit_dependencies(**args)
+                assert report["status"] == "OUTDATED" and report["chromium_freshness"]["status"] == "BEHIND_STABLE"
+            with patch.object(auditor, "fetch_chromium_stable", return_value={**stable, "revision": "b" * 40}):
+                assert auditor.audit_dependencies(**args)["status"] == "UNVERIFIED"
+            with patch.object(auditor, "fetch_chromium_stable", side_effect=OSError("offline")):
+                assert auditor.audit_dependencies(**args)["status"] == "UNVERIFIED"
 
-    with tempfile.TemporaryDirectory() as tmp:
-        tmp_path = Path(tmp)
-        out_json = tmp_path / "out.json"
+            ids = ("RUSTSEC-2023-0034", "RUSTSEC-2022-0090", "RUSTSEC-2023-0071")
+            run.return_value = {"vulnerabilities": {"list": [{"advisory": {"id": item}} for item in ids]}}
+            out = root / "audit.json"
+            rc = auditor.main(["--advisory-db", str(root), "--advisory-revision", revision,
+                               "--cargo-audit", sys.executable, "--output", str(out)])
+            report = json.loads(out.read_text(encoding="utf-8"))
+            assert rc == 1 and report["status"] == "VULNERABLE"
+            assert [item["advisory"]["id"] for item in report["flagged_vulnerabilities"]] == list(ids)
 
-        # 4b. Missing Cargo.lock MUST fail closed (status="UNVERIFIED", exit code 1)
-        missing_lock = tmp_path / "nonexistent-Cargo.lock"
-        rep_missing = audit_dependencies(
-            missing_lock,
-            advisory_db_path=advisory_db,
-            upstream_lock_path=upstream_lock,
-        )
-        assert rep_missing["status"] == "UNVERIFIED", f"Expected UNVERIFIED on missing Cargo.lock, got {rep_missing['status']}"
-        assert rep_missing["inspected_packages"] == 0
-        rc_missing = audit_main(
-            [
-                "--cargo-lock",
-                str(missing_lock),
-                "--advisory-db",
-                str(advisory_db),
-                "--upstream-lock",
-                str(upstream_lock),
-                "--output",
-                str(out_json),
-            ]
-        )
-        assert rc_missing != 0, "CLI must return non-zero exit code when Cargo.lock is missing"
-
-        # 4c. Missing advisory database MUST fail closed (status="UNVERIFIED", exit code 1)
-        missing_db = tmp_path / "nonexistent-advisory-db.json"
-        rep_no_db = audit_dependencies(
-            lock_file,
-            advisory_db_path=missing_db,
-            upstream_lock_path=upstream_lock,
-        )
-        assert rep_no_db["status"] == "UNVERIFIED"
-        rc_no_db = audit_main(
-            [
-                "--cargo-lock",
-                str(lock_file),
-                "--advisory-db",
-                str(missing_db),
-                "--upstream-lock",
-                str(upstream_lock),
-                "--output",
-                str(out_json),
-            ]
-        )
-        assert rc_no_db != 0, "CLI must return non-zero exit code when advisory DB is missing"
-
-        # 4d. Vulnerable crate version in Cargo.lock MUST be detected (status="VULNERABLE", exit code 1)
-        vuln_lock = tmp_path / "vuln-Cargo.lock"
-        vuln_lock.write_text(
-            'version = 4\n\n[[package]]\nname = "time"\nversion = "0.2.16"\nsource = "registry+https://github.com/rust-lang/crates.io-index"\n',
-            encoding="utf-8",
-        )
-        rep_vuln = audit_dependencies(
-            vuln_lock,
-            advisory_db_path=advisory_db,
-            upstream_lock_path=upstream_lock,
-        )
-        assert rep_vuln["status"] == "VULNERABLE", f"Expected VULNERABLE, got {rep_vuln['status']}"
-        flagged_ids = [v["id"] for v in rep_vuln["flagged_vulnerabilities"]]
-        assert "RUSTSEC-2020-0071" in flagged_ids, f"Expected RUSTSEC-2020-0071 in {flagged_ids}"
-        rc_vuln = audit_main(
-            [
-                "--cargo-lock",
-                str(vuln_lock),
-                "--advisory-db",
-                str(advisory_db),
-                "--upstream-lock",
-                str(upstream_lock),
-                "--output",
-                str(out_json),
-            ]
-        )
-        assert rc_vuln != 0, "CLI must return non-zero exit code when vulnerable crate is detected"
-
-        # 4e. Outdated Chromium version in upstream.lock.json MUST be flagged (status="VULNERABLE", exit code 1)
-        stale_upstream = tmp_path / "stale-upstream.lock.json"
-        stale_upstream.write_text(
-            json.dumps(
-                {
-                    "schema_version": 1,
-                    "version": "115.0.5790.170",
-                    "revision": "0e66b94549a8bd85f03fbdf189b752d6e7b63c32",
-                }
-            ),
-            encoding="utf-8",
-        )
-        rep_stale = audit_dependencies(
-            lock_file,
-            advisory_db_path=advisory_db,
-            upstream_lock_path=stale_upstream,
-        )
-        assert rep_stale["status"] == "VULNERABLE"
-        stale_ids = [v["id"] for v in rep_stale["flagged_vulnerabilities"]]
-        assert "CVE-2023-4863" in stale_ids and "CHROMIUM-BASELINE-STALE" in stale_ids
-
-    print("  PASS: Security advisories and CVE freshness auditor verified (clean, missing lock/DB, vulnerable crate, stale Chromium).")
+    print("  PASS: Audit orchestration rejects malformed locks, stale input and Chromium pin mismatches.")
 
 def test_secret_detection_and_hygiene():
     print("Running Test 5: Secret Detection & Repository Hygiene...")

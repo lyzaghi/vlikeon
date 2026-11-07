@@ -21,7 +21,7 @@ REQUIRED_FILES = [
     "Cargo.toml",
     "Cargo.lock",
     "SECURITY.md",
-    "security/advisory-database.json",
+    "tools/audit_security_advisories.py",
     "browser/upstream.lock.json",
     "browser/patches/series.json",
     "docs/handoff/antigravity/2026-10-25/WORK_ITEMS.csv",

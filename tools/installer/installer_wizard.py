@@ -18,10 +18,15 @@ import json
 import hashlib
 import argparse
 import platform
-import subprocess
 import shutil
 from pathlib import Path
 from typing import Optional, List, Dict
+
+if __package__:
+    from .process_fence import ProcessInspectionError, check_running_processes
+else:
+    from process_fence import ProcessInspectionError, check_running_processes
+
 
 ROOT = Path(__file__).resolve().parents[2]
 RECEIPT_NAME = ".omniplay-install-receipt.json"
@@ -37,10 +42,6 @@ By installing or using this software, you agree that:
 4. The software is provided "AS IS", without warranties of any kind.
 ================================================================================
 """
-
-class ProcessInspectionError(RuntimeError):
-    """Raised when the installer cannot reliably query running system processes."""
-
 
 class InstallerWizard:
     def __init__(self, install_dir: Optional[str] = None, data_dir: Optional[str] = None, silent: bool = False):
@@ -72,89 +73,7 @@ class InstallerWizard:
             return Path(xdg_config) / "omniplay"
 
     def check_running_processes(self) -> List[str]:
-        import csv
-        import io
-
-        running: List[str] = []
-        process_names = ("omniplay", "omniplay-launcher", "omniplay-host", "vlikeon")
-        if self.os_type == "windows":
-            try:
-                out = subprocess.check_output(
-                    ["tasklist", "/FO", "CSV", "/NH"],
-                    text=True,
-                    stdin=subprocess.DEVNULL,
-                    stderr=subprocess.PIPE,
-                    timeout=5,
-                )
-            except subprocess.TimeoutExpired as exc:
-                raise ProcessInspectionError("Process query timed out while executing tasklist") from exc
-            except PermissionError as exc:
-                raise ProcessInspectionError(f"Permission denied while querying running processes: {exc}") from exc
-            except subprocess.CalledProcessError as exc:
-                stderr_msg = (exc.stderr or "").strip()
-                raise ProcessInspectionError(
-                    f"tasklist exited with status {exc.returncode}: {stderr_msg or 'unknown error'}"
-                ) from exc
-            except OSError as exc:
-                raise ProcessInspectionError(f"Failed to invoke tasklist for process fencing: {exc}") from exc
-
-            if not isinstance(out, str) or not out.strip():
-                raise ProcessInspectionError("tasklist returned empty or unreadable process table output")
-
-            parsed_rows = 0
-            for raw_line in out.splitlines():
-                line = raw_line.strip()
-                if not line:
-                    continue
-                if line.upper().startswith(("ERROR:", "INFO:")):
-                    raise ProcessInspectionError(f"tasklist did not return a valid CSV process table: {line}")
-                try:
-                    row = next(csv.reader(io.StringIO(line)))
-                except Exception as exc:
-                    raise ProcessInspectionError(f"Unreadable CSV row from tasklist: {line!r}") from exc
-                if len(row) < 2 or not row[0].strip() or not row[1].strip().isdigit():
-                    raise ProcessInspectionError(f"Malformed CSV process entry from tasklist: {line!r}")
-                parsed_rows += 1
-                name = row[0].strip().lower()
-                if any(p in name for p in process_names):
-                    running.append(name)
-
-            if parsed_rows == 0:
-                raise ProcessInspectionError("tasklist output contained zero valid process records")
-        else:
-            try:
-                out = subprocess.check_output(
-                    ["pgrep", "-l", "omniplay"],
-                    text=True,
-                    stdin=subprocess.DEVNULL,
-                    stderr=subprocess.PIPE,
-                    timeout=5,
-                )
-                if not isinstance(out, str) or not out.strip():
-                    raise ProcessInspectionError("pgrep exited 0 but returned empty or unreadable output")
-                for raw_line in out.splitlines():
-                    line = raw_line.strip()
-                    if not line:
-                        continue
-                    parts = line.split(maxsplit=1)
-                    if not parts or not parts[0].isdigit():
-                        raise ProcessInspectionError(f"Malformed pgrep output line: {line!r}")
-                    running.append(line)
-            except subprocess.TimeoutExpired as exc:
-                raise ProcessInspectionError("Process query timed out while executing pgrep") from exc
-            except PermissionError as exc:
-                raise ProcessInspectionError(f"Permission denied while querying running processes: {exc}") from exc
-            except subprocess.CalledProcessError as exc:
-                stderr_msg = (exc.stderr or "").strip()
-                # pgrep exit code 1 with empty stderr indicates no matching processes found
-                if exc.returncode == 1 and not stderr_msg:
-                    return []
-                raise ProcessInspectionError(
-                    f"pgrep failed with status {exc.returncode}: {stderr_msg or 'process inspection failed'}"
-                ) from exc
-            except OSError as exc:
-                raise ProcessInspectionError(f"Failed to invoke pgrep for process fencing: {exc}") from exc
-        return running
+        return check_running_processes(self.os_type, self.install_dir)
 
     def run(self, accept_eula: bool = False) -> bool:
         print("==================================================")
@@ -239,11 +158,11 @@ class InstallerWizard:
                 shutil.copy2(candidate, dest)
                 staged.append(dest.relative_to(self.install_dir).as_posix())
 
-        # Copy uninstaller script so installed product can self-uninstall
-        uninstaller_src = ROOT / "tools" / "installer" / "uninstaller.py"
-        if uninstaller_src.is_file():
-            dest = bin_dir / "uninstaller.py"
-            shutil.copy2(uninstaller_src, dest)
+        # Stage the standalone uninstaller and its process guard together.
+        for filename in ("uninstaller.py", "process_fence.py"):
+            source = ROOT / "tools" / "installer" / filename
+            dest = bin_dir / filename
+            shutil.copy2(source, dest)
             staged.append(dest.relative_to(self.install_dir).as_posix())
 
         return staged

@@ -5,8 +5,10 @@ from datetime import datetime, timezone
 import hashlib
 import json
 import os
+import re
 from pathlib import Path
 import shutil
+import subprocess
 import sys
 import tempfile
 
@@ -17,6 +19,7 @@ if str(REPO_ROOT / "tools") not in sys.path:
 
 import desktop_capture_audio_patch  # noqa: E402
 import generate_browser_patch  # noqa: E402
+from prepare_chromium_upgrade import MAX_FILE, REPOSITORY, blob, git_bytes, version
 from prepare_desktop_browser import ordinary, relative  # noqa: E402
 import source_patch  # noqa: E402
 
@@ -120,92 +123,103 @@ def validate_safe_file_within(file_path: Path, root_dir: Path, context: str) -> 
         raise RuntimeError(f"Unsafe or missing file in {context}: {file_path} ({exc})") from exc
 
 
+def candidate_git_inputs(
+    manifest: dict[str, object], review_dir: Path, checkout: Path, revision: str, lock: dict[str, object],
+) -> tuple[str, dict[str, tuple[bytes, str]]]:
+    if not re.fullmatch(r"[0-9a-f]{40}", revision) or revision == lock["revision"]:
+        raise RuntimeError("Select an explicit candidate revision different from the baseline")
+    if manifest.get("candidate_revision") != revision or manifest.get("baseline_revision") != lock["revision"]:
+        raise RuntimeError("Upgrade review candidate or baseline revision does not match the selected revisions")
+    git = shutil.which("git")
+    if git is None:
+        raise RuntimeError("Git is required to verify an upgrade review")
+    env = {**os.environ, "GIT_NO_LAZY_FETCH": "1", "GIT_NO_REPLACE_OBJECTS": "1", "GIT_OPTIONAL_LOCKS": "0"}
+    try:
+        remote = git_bytes(git, checkout, env, "remote", "get-url", "origin").decode("utf-8").strip()
+        commit = git_bytes(git, checkout, env, "rev-parse", "--verify", revision + "^{commit}").decode("ascii").strip()
+        if remote != REPOSITORY or commit != revision:
+            raise ValueError("Use local objects for the selected official Chromium commit")
+        raw_version, version_blob = blob(git, checkout, env, revision, "chrome/VERSION")
+        candidate_version = version(raw_version)
+        baseline_version = tuple(int(part) for part in str(lock["version"]).split("."))
+        tag = ".".join(map(str, candidate_version))
+        if candidate_version <= baseline_version or manifest.get("candidate_version") != tag:
+            raise ValueError("Candidate VERSION must match the manifest and be newer than the baseline")
+        version_file = validate_safe_file_within(review_dir / "candidate-VERSION", review_dir, "candidate VERSION")
+        if manifest.get("candidate_version_blob") != version_blob or version_file.read_bytes() != raw_version:
+            raise ValueError("Candidate VERSION does not match the selected Chromium Git blob")
+        inputs = {name: blob(git, checkout, env, revision, name) for name in required_integration_paths()}
+    except (ValueError, OSError, subprocess.SubprocessError) as exc:
+        raise RuntimeError(f"Cannot establish Chromium candidate Git provenance: {exc}") from exc
+    return tag, inputs
+
+
 def copy_candidate_inputs(
     candidate_source: Path,
     scratch_tree: Path,
     review_manifest: dict[str, object] | None,
+    git_inputs: dict[str, tuple[bytes, str]] | None = None,
 ) -> list[str]:
     required_paths = required_integration_paths()
     copied: list[str] = []
 
     if review_manifest is not None:
+        if git_inputs is None:
+            raise RuntimeError("An upgrade review requires trusted candidate Git objects")
         raw_sources = review_manifest.get("integration_sources")
-        if raw_sources is None:
-            raw_sources = review_manifest.get("files")
-        if not isinstance(raw_sources, list) or not raw_sources:
-            raise RuntimeError("upgrade-review.json is missing a non-empty integration_sources list")
-
         raw_inventory = review_manifest.get("source_inventory")
-        if not isinstance(raw_inventory, list) or not raw_inventory:
-            raise RuntimeError("upgrade-review.json is missing a non-empty source_inventory list")
+        if not isinstance(raw_sources, list) or not isinstance(raw_inventory, list):
+            raise RuntimeError("Upgrade review requires integration_sources and source_inventory lists")
 
         inventory_by_path: dict[str, dict[str, object]] = {}
-        for inv_item in raw_inventory:
-            if not isinstance(inv_item, dict) or "path" not in inv_item:
+        for item in raw_inventory:
+            if not isinstance(item, dict):
                 raise RuntimeError("Malformed entry in upgrade-review.json source_inventory")
-            inv_rel = validate_safe_relative_path(inv_item["path"], "source_inventory")
-            if inv_rel in inventory_by_path:
-                raise RuntimeError(f"Duplicate source_inventory entry in upgrade-review.json: {inv_rel}")
-            inventory_by_path[inv_rel] = inv_item
+            rel = validate_safe_relative_path(item.get("path"), "source_inventory")
+            if rel in inventory_by_path:
+                raise RuntimeError(f"Duplicate source_inventory entry: {rel}")
+            inventory_by_path[rel] = item
 
-        candidate_root = candidate_source / "source" / "candidate"
-        if not candidate_root.is_dir():
-            raise RuntimeError(f"Candidate source directory is missing: {candidate_root}")
-
-        manifest_paths: dict[str, str] = {}
-        for entry in raw_sources:
-            if not isinstance(entry, dict) or "path" not in entry:
+        source_by_path: dict[str, dict[str, object]] = {}
+        for item in raw_sources:
+            if not isinstance(item, dict):
                 raise RuntimeError("Malformed entry in upgrade-review.json integration_sources")
-            rel = validate_safe_relative_path(entry["path"], "integration_sources")
-            if rel in manifest_paths:
-                raise RuntimeError(f"Duplicate integration_sources entry in upgrade-review.json: {rel}")
+            rel = validate_safe_relative_path(item.get("path"), "integration_sources")
+            if rel in source_by_path:
+                raise RuntimeError(f"Duplicate integration_sources entry: {rel}")
+            source_by_path[rel] = item
+        if set(source_by_path) != set(required_paths):
+            raise RuntimeError("Upgrade review must list exactly the required candidate integration paths")
 
-            cand_rel_raw = entry.get("candidate_copy") or f"source/candidate/{rel}"
-            cand_rel = validate_safe_relative_path(cand_rel_raw, "candidate_copy")
-            if not cand_rel.startswith("source/candidate/"):
-                raise RuntimeError(
-                    f"Candidate input for {rel} must reside under source/candidate/, got {cand_rel!r}"
-                )
-            manifest_paths[rel] = cand_rel
+        for rel in required_paths:
+            candidate_rel = f"source/candidate/{rel}"
+            entry = source_by_path[rel]
+            if "candidate_copy" in entry:
+                declared = validate_safe_relative_path(entry["candidate_copy"], "candidate_copy")
+                if declared != candidate_rel:
+                    raise RuntimeError(f"Candidate file must use its exact integration path: {candidate_rel}")
+            item = inventory_by_path.get(candidate_rel, {})
+            expected_size = item.get("bytes")
+            expected_sha = item.get("sha256")
+            if type(expected_size) is not int or not 0 <= expected_size <= MAX_FILE:
+                raise RuntimeError(f"Missing or invalid candidate byte length for {candidate_rel}")
+            if not isinstance(expected_sha, str) or not re.fullmatch(r"[0-9a-f]{64}", expected_sha):
+                raise RuntimeError(f"Missing or invalid SHA-256 for {candidate_rel}")
 
-        missing_from_manifest = sorted(set(required_paths) - set(manifest_paths.keys()))
-        if missing_from_manifest:
-            raise RuntimeError(
-                f"upgrade-review.json is missing required integration sources: {', '.join(missing_from_manifest)}"
-            )
-
-        for rel in sorted(manifest_paths.keys()):
-            cand_rel = manifest_paths[rel]
-            inv_entry = inventory_by_path.get(cand_rel)
-            if inv_entry is None:
-                raise RuntimeError(f"Missing candidate source_inventory digest entry for {cand_rel}")
-
-            expected_sha = inv_entry.get("sha256")
-            if not isinstance(expected_sha, str) or len(expected_sha) != 64:
-                raise RuntimeError(f"Invalid SHA-256 digest in source_inventory for {cand_rel}")
-
-            expected_bytes = inv_entry.get("bytes")
-            candidate_file = validate_safe_file_within(
-                candidate_source / cand_rel,
-                candidate_root,
-                f"candidate file {cand_rel}",
-            )
-            raw_bytes = candidate_file.read_bytes()
-            if isinstance(expected_bytes, int) and len(raw_bytes) != expected_bytes:
-                raise RuntimeError(
-                    f"Candidate byte length mismatch for {cand_rel}: expected {expected_bytes}, got {len(raw_bytes)}"
-                )
-            actual_sha = sha256_bytes(raw_bytes)
-            if actual_sha.lower() != expected_sha.lower():
-                raise RuntimeError(
-                    f"Candidate SHA-256 mismatch for {cand_rel}: expected {expected_sha}, got {actual_sha}"
-                )
-
+            candidate_file = validate_safe_file_within(candidate_source / candidate_rel, candidate_source, "candidate input")
+            with candidate_file.open("rb") as stream:
+                raw = stream.read(expected_size + 1)
+            if len(raw) != expected_size:
+                raise RuntimeError(f"Candidate byte length mismatch for {candidate_rel}")
+            if sha256_bytes(raw) != expected_sha:
+                raise RuntimeError(f"Candidate SHA-256 mismatch for {candidate_rel}")
+            upstream, identity = git_inputs[rel]
+            if entry.get("candidate_blob") != identity or raw != upstream:
+                raise RuntimeError(f"Candidate file does not match the selected Chromium Git blob: {candidate_rel}")
             dest = scratch_tree / rel
             dest.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copy2(candidate_file, dest)
+            dest.write_bytes(raw)
             copied.append(rel)
-
         return copied
 
     # Direct candidate_root mode (no fallback to baseline snapshots)
@@ -280,11 +294,14 @@ def copy_candidate_inputs(
     return copied
 
 
-def rehearse_upgrade_on_tree(candidate_source: Path, review_manifest: dict[str, object] | None = None) -> dict[str, object]:
+def rehearse_upgrade_on_tree(
+    candidate_source: Path, review_manifest: dict[str, object] | None = None,
+    git_inputs: dict[str, tuple[bytes, str]] | None = None,
+) -> dict[str, object]:
     with tempfile.TemporaryDirectory(prefix="omniplay-upgrade-rehearsal-") as tmp:
         scratch_tree = Path(tmp) / "src"
         scratch_tree.mkdir(parents=True, exist_ok=True)
-        copied_files = copy_candidate_inputs(candidate_source, scratch_tree, review_manifest)
+        copied_files = copy_candidate_inputs(candidate_source, scratch_tree, review_manifest, git_inputs)
 
         sources: dict[str, str] = {}
         for rel in copied_files:
@@ -379,25 +396,44 @@ def verify_upgrade(
     candidate_root: Path | None = None,
     upgrade_review_dir: Path | None = None,
     output_receipt: Path | None = None,
+    candidate_checkout: Path | None = None,
+    expected_candidate_revision: str | None = None,
 ) -> dict[str, object]:
     lock_data = json.loads(LOCK_PATH.read_text(encoding="utf-8"))
     series_data = json.loads(SERIES_PATH.read_text(encoding="utf-8"))
 
     review_manifest = None
-    source_root = candidate_root or SNAPSHOT_ROOT
+    git_inputs = None
+    candidate_version = None
+    source_root = (upgrade_review_dir or candidate_root or SNAPSHOT_ROOT).absolute()
+    try:
+        ordinary(source_root, Path(source_root.anchor), file=False)
+    except ValueError as exc:
+        raise RuntimeError(f"Unsafe Chromium source root: {exc}") from exc
     if upgrade_review_dir is not None:
-        manifest_path = upgrade_review_dir / "upgrade-review.json"
+        if candidate_root is not None or candidate_checkout is None or expected_candidate_revision is None:
+            raise RuntimeError("An upgrade review requires --candidate-checkout and --expected-candidate-revision")
+        manifest_path = validate_safe_file_within(source_root / "upgrade-review.json", source_root, "review manifest")
         review_manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-        source_root = upgrade_review_dir
+        if not isinstance(review_manifest, dict) or review_manifest.get("schema_version") != 1:
+            raise RuntimeError("Invalid Chromium upgrade review manifest schema")
+        candidate_version, git_inputs = candidate_git_inputs(
+            review_manifest, source_root, candidate_checkout, expected_candidate_revision, lock_data,
+        )
+    elif candidate_checkout is not None or expected_candidate_revision is not None:
+        raise RuntimeError("Candidate Git options require --upgrade-review-dir")
 
-    rehearsal = rehearse_upgrade_on_tree(source_root.resolve(), review_manifest)
+    rehearsal = rehearse_upgrade_on_tree(source_root, review_manifest, git_inputs)
     receipt: dict[str, object] = {
         "schema_version": 1,
         "item_id": 7,
         "generated_at_utc": utc_now(),
         "baseline_release_tag": lock_data.get("version") or lock_data.get("release_tag"),
         "baseline_revision": lock_data.get("revision"),
-        "candidate_source": str(source_root.resolve()),
+        "candidate_source": str(source_root),
+        "qualification_scope": "upstream_candidate_patch_rehearsal" if git_inputs else "source_fixture_patch_rehearsal",
+        "candidate_version": candidate_version,
+        "candidate_revision": expected_candidate_revision,
         "series_count": len(series_data.get("patches", series_data.get("series", []))),
         "rehearsal": rehearsal,
         "verified": bool(rehearsal["all_security_invariants_passed"]),
@@ -431,12 +467,16 @@ def main(argv: list[str] | None = None) -> int:
         default=None,
         help="Optional path to write upgrade-verification-receipt.json.",
     )
+    parser.add_argument("--candidate-checkout", type=Path, help="Local Chromium Git objects for the independently selected candidate.")
+    parser.add_argument("--expected-candidate-revision", help="Full Chromium commit ID selected independently of the review bundle.")
     args = parser.parse_args(argv)
 
     receipt = verify_upgrade(
         candidate_root=args.candidate_root,
         upgrade_review_dir=args.upgrade_review_dir,
         output_receipt=args.output_receipt,
+        candidate_checkout=args.candidate_checkout,
+        expected_candidate_revision=args.expected_candidate_revision,
     )
     print(json.dumps(receipt, indent=2, sort_keys=True))
     return 0 if receipt["verified"] else 1

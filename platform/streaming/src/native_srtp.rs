@@ -2,8 +2,12 @@
 //! Strictly forbids plaintext fallback. Enforces RFC 3711 SRTP verification,
 //! RFC 7983 multiplexing (STUN/DTLS/SRTP/SRTCP), and replay window checks.
 
+use aes::{
+    cipher::{BlockEncrypt, KeyInit},
+    Aes128,
+};
 use omniplay_contracts::{ErrorCode, PlatformError, Result};
-use std::time::Instant;
+use ring::hmac;
 use zeroize::{Zeroize, Zeroizing};
 
 fn denied() -> PlatformError {
@@ -119,27 +123,72 @@ impl ReplayWindow {
     }
 }
 
-/// SRTP Cryptographic Keying material
+/// Session keys for SRTP_AES128_CM_HMAC_SHA1_80, with key derivation rate zero.
 pub struct SrtpKeys {
-    pub master_key: Zeroizing<Vec<u8>>,
-    pub master_salt: Zeroizing<Vec<u8>>,
-    pub ssrc: u32,
+    encryption: Aes128,
+    authentication: Zeroizing<[u8; 20]>,
+    salt: Zeroizing<[u8; 14]>,
+    ssrc: u32,
 }
 
 impl SrtpKeys {
     pub fn new(key: &[u8], salt: &[u8], ssrc: u32) -> Result<Self> {
-        if key.len() != 16 && key.len() != 32 {
-            return Err(denied());
-        }
-        if salt.len() != 14 {
-            return Err(denied());
-        }
+        let master = Aes128::new_from_slice(key).map_err(|_| denied())?;
+        let salt: &[u8; 14] = salt.try_into().map_err(|_| denied())?;
+        let encryption: Zeroizing<[u8; 16]> = derive_key(&master, salt, 0x00);
         Ok(Self {
-            master_key: Zeroizing::new(key.to_vec()),
-            master_salt: Zeroizing::new(salt.to_vec()),
+            encryption: Aes128::new_from_slice(encryption.as_ref()).map_err(|_| denied())?,
+            authentication: derive_key(&master, salt, 0x01),
+            salt: derive_key(&master, salt, 0x02),
             ssrc,
         })
     }
+}
+
+fn derive_key<const N: usize>(master: &Aes128, salt: &[u8; 14], label: u8) -> Zeroizing<[u8; N]> {
+    let mut iv = *salt;
+    iv[7] ^= label;
+    let mut key = Zeroizing::new([0; N]);
+    aes_counter_xor(master, &iv, key.as_mut());
+    iv.zeroize();
+    key
+}
+
+fn aes_counter_xor(cipher: &Aes128, iv: &[u8; 14], payload: &mut [u8]) {
+    for (index, chunk) in payload.chunks_mut(16).enumerate() {
+        let mut block = aes::Block::default();
+        block[..14].copy_from_slice(iv);
+        block[14..].copy_from_slice(&(index as u16).to_be_bytes());
+        cipher.encrypt_block(&mut block);
+        for (byte, keystream) in chunk.iter_mut().zip(&block) {
+            *byte ^= keystream;
+        }
+        block.as_mut_slice().zeroize();
+    }
+}
+
+fn packet_iv(salt: &[u8; 14], ssrc: u32, packet_index: u64) -> [u8; 14] {
+    let mut iv = *salt;
+    for (byte, source) in iv[4..8].iter_mut().zip(ssrc.to_be_bytes()) {
+        *byte ^= source;
+    }
+    for (byte, index) in iv[8..].iter_mut().zip(&packet_index.to_be_bytes()[2..]) {
+        *byte ^= index;
+    }
+    iv
+}
+
+fn rtp_header_length(packet: &[u8]) -> Result<usize> {
+    let mut length = 12 + usize::from(packet[0] & 0x0f) * 4;
+    if packet[0] & 0x10 != 0 {
+        let extension = packet.get(length..length + 4).ok_or_else(denied)?;
+        let words = u16::from_be_bytes([extension[2], extension[3]]);
+        length += 4 + usize::from(words) * 4;
+    }
+    if length >= packet.len() {
+        return Err(denied());
+    }
+    Ok(length)
 }
 
 /// Concrete Native SRTP receiver session
@@ -193,87 +242,31 @@ impl NativeSrtpSession {
         let full_seq = self.extend_sequence(seq16);
 
         let keys = self.keys.as_ref().ok_or_else(unavailable)?;
-
-        // SRTP authentication tag is trailing 10 bytes (or 16 for GCM)
-        let tag_len = 10;
-        if datagram.len() <= 12 + tag_len {
+        if keys.ssrc != ssrc || full_seq >= 1 << 48 {
             return Err(denied());
         }
-        let payload_and_header_len = datagram.len() - tag_len;
-        let auth_tag = &datagram[payload_and_header_len..];
 
-        // Derive distinct session encryption key and session authentication key
-        // from (master_key, master_salt) per RFC 3711 key derivation separation.
-        use ring::hmac;
-        let master_prf = hmac::Key::new(hmac::HMAC_SHA256, &keys.master_key);
-
-        let mut auth_kdf_input = Vec::with_capacity(keys.master_salt.len() + 7);
-        auth_kdf_input.extend_from_slice(&keys.master_salt);
-        auth_kdf_input.extend_from_slice(&[0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]);
-        let session_auth_key = hmac::sign(&master_prf, &auth_kdf_input);
-
-        let mut enc_kdf_input = Vec::with_capacity(keys.master_salt.len() + 7);
-        enc_kdf_input.extend_from_slice(&keys.master_salt);
-        enc_kdf_input.extend_from_slice(&[0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]);
-        let session_enc_key = hmac::sign(&master_prf, &enc_kdf_input);
-
-        // Authenticate using HMAC-SHA1-80 over (authenticated portion || ROC) per RFC 3711
+        let (encrypted, tag) = datagram.split_at(datagram.len() - 10);
+        let header_length = rtp_header_length(encrypted)?;
         let roc = (full_seq >> 16) as u32;
-        let s_key = hmac::Key::new(hmac::HMAC_SHA1_FOR_LEGACY_USE_ONLY, session_auth_key.as_ref());
-        let mut auth_ctx = hmac::Context::with_key(&s_key);
-        auth_ctx.update(&datagram[..payload_and_header_len]);
-        auth_ctx.update(&roc.to_be_bytes());
-        let tag_full = auth_ctx.sign();
-        let expected_tag = &tag_full.as_ref()[..tag_len];
-
-        // Constant-time tag verification
-        use ring::constant_time::verify_slices_are_equal;
-        if verify_slices_are_equal(auth_tag, expected_tag).is_err() {
-            return Err(denied());
-        }
-
-        // Update replay window only AFTER cryptographic authentication succeeds!
+        let key = hmac::Key::new(
+            hmac::HMAC_SHA1_FOR_LEGACY_USE_ONLY,
+            keys.authentication.as_ref(),
+        );
+        let mut auth = hmac::Context::with_key(&key);
+        auth.update(encrypted);
+        auth.update(&roc.to_be_bytes());
+        let expected = auth.sign();
+        ring::constant_time::verify_slices_are_equal(tag, &expected.as_ref()[..10])
+            .map_err(|_| denied())?;
         self.replay.check_and_update(full_seq)?;
 
-        // Decrypt payload: header (12 bytes) remains in cleartext, payload is decrypted
-        let header = &datagram[..12];
-        let mut decrypted_packet = Vec::with_capacity(payload_and_header_len);
-        decrypted_packet.extend_from_slice(header);
-
-        // Cryptographic counter-mode keystream generation (32-byte PRF blocks over IV || counter)
-        let ciphertext = &datagram[12..payload_and_header_len];
-        let mut plaintext = ciphertext.to_vec();
-        let stream_prf = hmac::Key::new(hmac::HMAC_SHA256, session_enc_key.as_ref());
-
-        // Construct 14-byte SRTP IV: salt XOR (SSRC at bytes 4..8, packet index at bytes 8..14)
-        let mut iv = [0u8; 14];
-        iv.copy_from_slice(&keys.master_salt[..14]);
-        let ssrc_bytes = ssrc.to_be_bytes();
-        for i in 0..4 {
-            iv[4 + i] ^= ssrc_bytes[i];
-        }
-        let seq_bytes = full_seq.to_be_bytes();
-        for i in 0..6 {
-            iv[8 + i] ^= seq_bytes[2 + i];
-        }
-
-        for (block_idx, chunk) in plaintext.chunks_mut(32).enumerate() {
-            let mut counter_in = [0u8; 16];
-            counter_in[..14].copy_from_slice(&iv);
-            let ctr = (block_idx as u16).to_be_bytes();
-            counter_in[14] = ctr[0];
-            counter_in[15] = ctr[1];
-            let keystream_block = hmac::sign(&stream_prf, &counter_in);
-            let ks = keystream_block.as_ref();
-            for (b, k) in chunk.iter_mut().zip(ks.iter()) {
-                *b ^= *k;
-            }
-        }
-
-        decrypted_packet.extend_from_slice(&plaintext);
+        let mut decrypted = encrypted.to_vec();
+        let mut iv = packet_iv(&keys.salt, ssrc, full_seq);
+        aes_counter_xor(&keys.encryption, &iv, &mut decrypted[header_length..]);
+        iv.zeroize();
         self.packets_processed += 1;
-
-        Ok(decrypted_packet)
+        Ok(decrypted)
     }
 
     fn extend_sequence(&self, seq16: u16) -> u64 {
@@ -297,10 +290,7 @@ impl NativeSrtpSession {
 
     pub fn retire(&mut self) {
         self.retired = true;
-        if let Some(mut keys) = self.keys.take() {
-            keys.master_key.zeroize();
-            keys.master_salt.zeroize();
-        }
+        self.keys = None;
     }
 
     pub fn is_retired(&self) -> bool {
@@ -334,51 +324,95 @@ mod tests {
         header[4..8].copy_from_slice(&90_000u32.to_be_bytes());
         header[8..12].copy_from_slice(&ssrc.to_be_bytes());
 
-        let master_prf = hmac::Key::new(hmac::HMAC_SHA256, master_key);
-        let mut auth_kdf_input = Vec::with_capacity(21);
-        auth_kdf_input.extend_from_slice(master_salt);
-        auth_kdf_input.extend_from_slice(&[0x01, 0, 0, 0, 0, 0, 0]);
-        let session_auth_key = hmac::sign(&master_prf, &auth_kdf_input);
-
-        let mut enc_kdf_input = Vec::with_capacity(21);
-        enc_kdf_input.extend_from_slice(master_salt);
-        enc_kdf_input.extend_from_slice(&[0x00, 0, 0, 0, 0, 0, 0]);
-        let session_enc_key = hmac::sign(&master_prf, &enc_kdf_input);
-
-        let mut iv = [0u8; 14];
-        iv.copy_from_slice(master_salt);
-        for (i, b) in ssrc.to_be_bytes().into_iter().enumerate() {
-            iv[4 + i] ^= b;
-        }
-        let seq_bytes = full_seq.to_be_bytes();
-        for i in 0..6 {
-            iv[8 + i] ^= seq_bytes[2 + i];
-        }
-
-        let stream_prf = hmac::Key::new(hmac::HMAC_SHA256, session_enc_key.as_ref());
+        let keys = SrtpKeys::new(master_key, master_salt, ssrc).unwrap();
         let mut ciphertext = payload.to_vec();
-        for (block_idx, chunk) in ciphertext.chunks_mut(32).enumerate() {
-            let mut counter_in = [0u8; 16];
-            counter_in[..14].copy_from_slice(&iv);
-            counter_in[14..16].copy_from_slice(&(block_idx as u16).to_be_bytes());
-            let ks = hmac::sign(&stream_prf, &counter_in);
-            for (b, k) in chunk.iter_mut().zip(ks.as_ref().iter()) {
-                *b ^= *k;
-            }
-        }
+        let iv = packet_iv(&keys.salt, ssrc, full_seq);
+        aes_counter_xor(&keys.encryption, &iv, &mut ciphertext);
 
         let mut datagram = Vec::with_capacity(12 + ciphertext.len() + 10);
         datagram.extend_from_slice(&header);
         datagram.extend_from_slice(&ciphertext);
 
         let roc = (full_seq >> 16) as u32;
-        let s_key = hmac::Key::new(hmac::HMAC_SHA1_FOR_LEGACY_USE_ONLY, session_auth_key.as_ref());
+        let s_key = hmac::Key::new(
+            hmac::HMAC_SHA1_FOR_LEGACY_USE_ONLY,
+            keys.authentication.as_ref(),
+        );
         let mut auth_ctx = hmac::Context::with_key(&s_key);
         auth_ctx.update(&datagram);
         auth_ctx.update(&roc.to_be_bytes());
         let tag = auth_ctx.sign();
         datagram.extend_from_slice(&tag.as_ref()[..10]);
         datagram
+    }
+
+    #[test]
+    fn rfc3711_aes_cm_key_derivation_matches_published_vector() {
+        let master = Aes128::new_from_slice(&[
+            0xe1, 0xf9, 0x7a, 0x0d, 0x3e, 0x01, 0x8b, 0xe0, 0xd6, 0x4f, 0xa3, 0x2c, 0x06, 0xde,
+            0x41, 0x39,
+        ])
+        .unwrap();
+        let salt = [
+            0x0e, 0xc6, 0x75, 0xad, 0x49, 0x8a, 0xfe, 0xeb, 0xb6, 0x96, 0x0b, 0x3a, 0xab, 0xe6,
+        ];
+        assert_eq!(
+            *derive_key::<16>(&master, &salt, 0),
+            [
+                0xc6, 0x1e, 0x7a, 0x93, 0x74, 0x4f, 0x39, 0xee, 0x10, 0x73, 0x4a, 0xfe, 0x3f, 0xf7,
+                0xa0, 0x87
+            ]
+        );
+        assert_eq!(
+            *derive_key::<20>(&master, &salt, 1),
+            [
+                0xce, 0xbe, 0x32, 0x1f, 0x6f, 0xf7, 0x71, 0x6b, 0x6f, 0xd4, 0xab, 0x49, 0xaf, 0x25,
+                0x6a, 0x15, 0x6d, 0x38, 0xba, 0xa4
+            ]
+        );
+        assert_eq!(
+            *derive_key::<14>(&master, &salt, 2),
+            [0x30, 0xcb, 0xbc, 0x08, 0x86, 0x3d, 0x8c, 0x85, 0xd4, 0x9d, 0xb3, 0x4a, 0x9a, 0xe1]
+        );
+    }
+
+    #[test]
+    fn two_udp_peers_use_production_srtp_and_retire_old_sessions() {
+        use std::net::UdpSocket;
+        use std::time::Duration;
+
+        let sender = UdpSocket::bind("127.0.0.1:0").unwrap();
+        let receiver = UdpSocket::bind("127.0.0.1:0").unwrap();
+        sender.connect(receiver.local_addr().unwrap()).unwrap();
+        receiver.connect(sender.local_addr().unwrap()).unwrap();
+        receiver
+            .set_read_timeout(Some(Duration::from_secs(2)))
+            .unwrap();
+        let mut datagram = [0; 1500];
+        let ssrc = 42;
+        let salt = [0x31; 14];
+        let first_key = [0x40; 16];
+        let fresh_key = [0x50; 16];
+        let mut retired =
+            NativeSrtpSession::new(SrtpKeys::new(&first_key, &salt, ssrc).unwrap(), ssrc);
+        let old_packet = protect_test_srtp_packet(&first_key, &salt, ssrc, 1, 96, b"old");
+        sender.send(&old_packet).unwrap();
+        let size = receiver.recv(&mut datagram).unwrap();
+        assert_eq!(&retired.unprotect(&datagram[..size]).unwrap()[12..], b"old");
+        assert!(retired.unprotect(&datagram[..size]).is_err());
+
+        retired.retire();
+        assert!(retired.unprotect(&datagram[..size]).is_err());
+        let mut reconnect =
+            NativeSrtpSession::new(SrtpKeys::new(&fresh_key, &salt, ssrc).unwrap(), ssrc);
+        assert!(reconnect.unprotect(&datagram[..size]).is_err());
+        let fresh_packet = protect_test_srtp_packet(&fresh_key, &salt, ssrc, 1, 96, b"fresh");
+        sender.send(&fresh_packet).unwrap();
+        let size = receiver.recv(&mut datagram).unwrap();
+        assert_eq!(
+            &reconnect.unprotect(&datagram[..size]).unwrap()[12..],
+            b"fresh"
+        );
     }
 
     #[test]
