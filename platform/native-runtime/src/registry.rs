@@ -338,6 +338,28 @@ mod tests {
     }
 
     #[test]
+    fn parse_catalog_admits_opengl_es_and_vulkan_video_backends_and_enforces_gpu_bounds(){
+        for backend in ["opengl_es","vulkan"]{
+            let mut cat=sample_brokered_catalog();
+            cat["runtimes"][0].as_object_mut().unwrap().remove("presentation");
+            cat["runtimes"][0]["video_backend"]=json!(backend);
+            cat["runtimes"][0]["gpu_max_width"]=json!(1920);
+            cat["runtimes"][0]["gpu_max_height"]=json!(1080);
+            let runtimes=parse_catalog(&serde_json::to_vec(&cat).unwrap()).expect("admit valid GPU backend");
+            assert_eq!(runtimes[0].video_backend.as_str(),backend);
+
+            // Reject GPU dimensions < 16 or > 4096
+            let mut too_small=cat.clone();
+            too_small["runtimes"][0]["gpu_max_width"]=json!(8);
+            assert!(parse_catalog(&serde_json::to_vec(&too_small).unwrap()).is_err());
+
+            let mut too_wide=cat;
+            too_wide["runtimes"][0]["gpu_max_width"]=json!(4097);
+            assert!(parse_catalog(&serde_json::to_vec(&too_wide).unwrap()).is_err());
+        }
+    }
+
+    #[test]
     fn parse_catalog_admits_staged_native_runtimes_catalog(){
         let apps_root=Path::new(env!("CARGO_MANIFEST_DIR")).join("../../apps");
         let catalog_path=apps_root.join("native-runtimes/catalog.json");

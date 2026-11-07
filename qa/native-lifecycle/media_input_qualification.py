@@ -335,7 +335,7 @@ def verify_item45_touch_and_mobile_contracts() -> dict[str, Any]:
 def run_live_worker_smoke(worker: Path, core: Path) -> dict[str, Any]:
     """Optional live worker hello/stop check when explicitly supplied in an authorized QA run."""
     proc = subprocess.Popen(
-        [str(worker), "--core", str(core)],
+        [str(worker), "--stdio-runtime-v1"],
         stdin=subprocess.PIPE,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
@@ -367,6 +367,7 @@ def main() -> int:
     )
     parser.add_argument("--worker", type=Path, help="Optional built native worker binary")
     parser.add_argument("--core", type=Path, help="Optional built fixture/libretro core")
+    parser.add_argument("--cpp-test-binary", type=Path, help="Optional compiled omniplay-media-input-tests binary")
     parser.add_argument("--output", type=Path, required=True, help="Fresh output directory for evidence.json")
     args = parser.parse_args()
     if bool(args.worker) != bool(args.core):
@@ -379,11 +380,16 @@ def main() -> int:
 
     evidence: dict[str, Any] = {
         "schema_version": 1,
-        "verification_level": "source_contract_and_synthetic_protocol",
+        "verification_level": (
+            "native_cpp_runtime_and_synthetic_protocol"
+            if args.cpp_test_binary
+            else "source_contract_and_synthetic_protocol"
+        ),
         "timestamp_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
         "suite": args.suite,
         "items": {},
         "live_worker": {"executed": False},
+        "cpp_media_input_tests": {"executed": False},
     }
 
     failures = []
@@ -413,6 +419,30 @@ def main() -> int:
         except Exception as error:
             evidence["live_worker"] = {"attempted": True, "executed": None, "error_type": type(error).__name__, "error": str(error)}
             failures.append("live_worker")
+
+    if args.cpp_test_binary:
+        try:
+            binary = args.cpp_test_binary.resolve(strict=True)
+            completed = subprocess.run([str(binary)], capture_output=True, text=True, timeout=30, check=False)
+            parsed = json.loads(completed.stdout.strip()) if completed.returncode == 0 and completed.stdout.strip() else {}
+            evidence["cpp_media_input_tests"] = {
+                "executed": True,
+                "binary_sha256": sha256_file(binary),
+                "exit_code": completed.returncode,
+                "passed": completed.returncode == 0 and bool(parsed.get("passed")),
+                "tests": parsed.get("tests", []),
+                "stderr": completed.stderr.strip(),
+            }
+            if not evidence["cpp_media_input_tests"]["passed"]:
+                failures.append("cpp_media_input_tests")
+        except Exception as error:
+            evidence["cpp_media_input_tests"] = {
+                "attempted": True,
+                "executed": None,
+                "error_type": type(error).__name__,
+                "error": str(error),
+            }
+            failures.append("cpp_media_input_tests")
 
     evidence["failed_items"] = failures
     evidence["passed"] = not failures

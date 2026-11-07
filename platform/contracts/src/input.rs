@@ -188,3 +188,113 @@ impl ControllerPortProfile{
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    fn sample_sdl_raw_joystick(guid:&str)->SdlRawJoystickProfile{
+        SdlRawJoystickProfile{
+            guid_hex:guid.to_owned(),
+            axis_count:6,
+            button_count:12,
+            hat_count:1,
+            axes:(0..6u8).map(|i|SdlRawAxisCalibration{
+                source:Some(i),
+                minimum:-32767,
+                center:if i>=4{-16000}else{0},
+                maximum:32767,
+            }).collect(),
+            buttons:(0..16u8).map(|i|match i{
+                4=>SdlRawButtonBinding{kind:SdlRawButtonKind::Hat,index:0,hat_mask:1,threshold_percent:50},
+                5=>SdlRawButtonBinding{kind:SdlRawButtonKind::Hat,index:0,hat_mask:4,threshold_percent:50},
+                6=>SdlRawButtonBinding{kind:SdlRawButtonKind::Hat,index:0,hat_mask:8,threshold_percent:50},
+                7=>SdlRawButtonBinding{kind:SdlRawButtonKind::Hat,index:0,hat_mask:2,threshold_percent:50},
+                12=>SdlRawButtonBinding{kind:SdlRawButtonKind::AxisPositive,index:4,hat_mask:0,threshold_percent:55},
+                13=>SdlRawButtonBinding{kind:SdlRawButtonKind::AxisPositive,index:5,hat_mask:0,threshold_percent:55},
+                14|15=>SdlRawButtonBinding{kind:SdlRawButtonKind::None,index:0,hat_mask:0,threshold_percent:50},
+                b=>SdlRawButtonBinding{kind:SdlRawButtonKind::Button,index:b.min(11),hat_mask:0,threshold_percent:50},
+            }).collect(),
+        }
+    }
+
+    #[test]
+    fn validates_sdl_raw_joystick_pressure_curves_and_controller_port_peripherals(){
+        let mut profile=GameInputProfile::default();
+        profile.pressure_buttons_enabled=true;
+        profile.sdl_raw_joysticks.push(sample_sdl_raw_joystick("030000005e0400008e02000014010000"));
+        profile.controller_ports=vec![
+            ControllerPortProfile{device:ControllerDeviceKind::AnalogJoypad,subclass:1,pressure_curve_percent:150},
+            ControllerPortProfile{device:ControllerDeviceKind::Mouse,subclass:0,pressure_curve_percent:100},
+            ControllerPortProfile{device:ControllerDeviceKind::Lightgun,subclass:2,pressure_curve_percent:80},
+            ControllerPortProfile{device:ControllerDeviceKind::None,subclass:0,pressure_curve_percent:100},
+        ];
+        profile.validate().expect("valid input profile with SDL raw joystick, pressure curves, and port peripherals");
+
+        let encoded=serde_json::to_vec(&profile).expect("serialize GameInputProfile");
+        let decoded:GameInputProfile=serde_json::from_slice(&encoded).expect("deserialize GameInputProfile");
+        decoded.validate().expect("validate round-tripped GameInputProfile");
+        assert!(decoded.pressure_buttons_enabled);
+        assert_eq!(decoded.sdl_raw_joysticks.len(),1);
+        assert_eq!(decoded.controller_ports[0].device,ControllerDeviceKind::AnalogJoypad);
+        assert_eq!(decoded.controller_ports[1].device,ControllerDeviceKind::Mouse);
+        assert_eq!(decoded.controller_ports[2].device,ControllerDeviceKind::Lightgun);
+        assert_eq!(decoded.controller_ports[3].device,ControllerDeviceKind::None);
+
+        // Reject None port with non-zero subclass
+        let mut invalid_none=decoded.clone();
+        invalid_none.controller_ports[3].subclass=1;
+        assert!(invalid_none.validate().is_err());
+
+        // Reject out-of-range pressure curve
+        let mut invalid_curve=decoded.clone();
+        invalid_curve.controller_ports[0].pressure_curve_percent=350;
+        assert!(invalid_curve.validate().is_err());
+
+        // Reject invalid hat mask (must be 1, 2, 4, or 8)
+        let mut invalid_hat=decoded;
+        invalid_hat.sdl_raw_joysticks[0].buttons[4].hat_mask=3;
+        assert!(invalid_hat.validate().is_err());
+    }
+
+    #[test]
+    fn validates_18_control_custom_touch_layout_and_rejects_out_of_bounds(){
+        let controls:Vec<TouchPlacement>=(0..18u8).map(|id|TouchPlacement{
+            id,
+            x:100+u16::from(id)*40,
+            y:200+u16::from(id)*25,
+            size_percent:100,
+            visible:id<16,
+        }).collect();
+        let touch=GameTouchProfile{
+            schema_version:1,
+            visibility:TouchVisibility::Always,
+            layout:TouchLayout::Sticks,
+            left_handed:true,
+            size_percent:120,
+            opacity_percent:85,
+            custom_layout:Some(CustomTouchLayout{height:720,controls}),
+        };
+        touch.validate().expect("valid 18-control custom touch profile");
+        let raw=serde_json::to_vec(&touch).unwrap();
+        let roundtrip:GameTouchProfile=serde_json::from_slice(&raw).unwrap();
+        roundtrip.validate().unwrap();
+
+        // Reject duplicate control IDs
+        let mut dup=roundtrip.clone();
+        dup.custom_layout.as_mut().unwrap().controls[17].id=0;
+        assert!(dup.validate().is_err());
+
+        // Reject out-of-bounds normalized placement (> 1000)
+        let mut oob=roundtrip;
+        oob.custom_layout.as_mut().unwrap().controls[0].x=1001;
+        assert!(oob.validate().is_err());
+    }
+
+    #[test]
+    fn rejects_positional_array_encoding_for_keyed_profiles(){
+        let positional=json!([1, [], [], []]);
+        assert!(serde_json::from_value::<GameInputProfile>(positional).is_err());
+    }
+}
