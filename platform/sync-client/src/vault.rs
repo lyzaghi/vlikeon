@@ -65,3 +65,54 @@ pub fn load(provider:&dyn CredentialStore,profile:Uuid,account:&str)->Result<(De
     Ok((device,cipher))
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use omniplay_sync::AccountIdentity;
+    use std::collections::HashMap;
+    use std::sync::Mutex;
+
+    #[derive(Default)]
+    struct MemoryCredentialStore {
+        entries: Mutex<HashMap<Uuid, Vec<u8>>>,
+    }
+
+    impl CredentialStore for MemoryCredentialStore {
+        fn read(&self, profile: Uuid) -> Result<Zeroizing<Vec<u8>>> {
+            let map = self.entries.lock().unwrap();
+            let bytes = map.get(&profile).ok_or_else(|| vault_error("missing credential"))?;
+            Ok(Zeroizing::new(bytes.clone()))
+        }
+        fn write(&self, profile: Uuid, secret: &[u8]) -> Result<()> {
+            if secret.is_empty() || secret.len() > MAX_CREDENTIAL_BYTES {
+                return Err(vault_error("Credential record exceeds its bound"));
+            }
+            self.entries.lock().unwrap().insert(profile, secret.to_vec());
+            Ok(())
+        }
+        fn remove(&self, profile: Uuid) -> Result<()> {
+            self.entries.lock().unwrap().remove(&profile);
+            Ok(())
+        }
+    }
+
+    #[test]
+    fn credential_vault_store_load_and_remove_roundtrip() {
+        let store_provider = MemoryCredentialStore::default();
+        let profile = Uuid::new_v4();
+        let account = AccountIdentity::generate().expect("generate account");
+        let device = DeviceIdentity::generate().expect("generate device");
+        let cipher = account.save_cipher().expect("save cipher");
+
+        store(&store_provider, profile, &device, &cipher).expect("store credentials");
+        let (loaded_device, loaded_cipher) =
+            load(&store_provider, profile, account.account_id()).expect("load credentials");
+        assert_eq!(loaded_device.id, device.id);
+        assert_eq!(loaded_device.public_key_base64(), device.public_key_base64());
+        assert_eq!(loaded_cipher.account_id(), account.account_id());
+
+        store_provider.remove(profile).expect("remove credentials");
+        assert!(load(&store_provider, profile, account.account_id()).is_err());
+    }
+}
+

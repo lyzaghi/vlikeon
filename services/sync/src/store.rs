@@ -154,3 +154,148 @@ fn consume_nonce(connection:&Connection,account:&str,nonce:Uuid)->ApiResult<()> 
     connection.execute("INSERT INTO nonces(account_id,nonce,expires_at_ms) VALUES(?1,?2,?3)",params![account,nonce.to_string(),now_ms().saturating_add(300_000)]).map_err(|_|ApiError::unauthorized())?;
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use omniplay_contracts::{ContentHash, SaveMetadata};
+    use omniplay_sync::{AccountIdentity, DeviceIdentity, TRANSFER_CHUNK_BYTES};
+    use sha2::{Digest, Sha256};
+
+    fn test_temp_dir(label: &str) -> PathBuf {
+        let dir = std::env::temp_dir().join(format!("omniplay-sync-test-{}-{}", label, Uuid::new_v4()));
+        std::fs::create_dir_all(&dir).expect("create temp dir");
+        dir
+    }
+
+    fn extract_certificate(account: &AccountIdentity, device: &DeviceIdentity, audience: &str) -> DeviceCertificate {
+        let now = now_ms();
+        let doc = account.authorize_device(device, audience, now).expect("authorize");
+        let req = omniplay_sync::SyncRequest {
+            schema_version: 1,
+            account_id: account.account_id().to_string(),
+            device_id: device.id,
+            audience: audience.to_string(),
+            nonce: Uuid::new_v4(),
+            issued_at_ms: now,
+            operation: omniplay_sync::SyncOperation::TransferCapabilities,
+        };
+        let signed = device.sign_request(&req, doc).expect("sign");
+        let (cert, _) = omniplay_sync::verify_device_request(&account.public_key_base64(), &signed, audience, now)
+            .expect("verify");
+        cert
+    }
+
+    #[test]
+    fn resumable_upload_lost_commit_reconciliation_quota_and_revocation() {
+        let root = test_temp_dir("reconcile");
+        // Quota: 2 MiB per account, 10 MiB total
+        let mut store = Store::open(&root, 10 * 1024 * 1024, 8, 2 * 1024 * 1024).expect("open store");
+        let account = AccountIdentity::from_seed([0x77; 32]).expect("account");
+        let device = DeviceIdentity::generate().expect("device");
+        let audience = "https://sync.vlikeon.example.org";
+
+        store
+            .create_account(account.account_id(), &account.public_key_base64(), Uuid::new_v4())
+            .expect("create account");
+        let cert = extract_certificate(&account, &device, audience);
+        store.authorize(&cert, Uuid::new_v4()).expect("authorize device");
+
+        // Build a 2-chunk save (256 KiB + 32 KiB)
+        let payload = vec![0x5a; (TRANSFER_CHUNK_BYTES as usize) + 32 * 1024];
+        let payload_hash = ContentHash(format!("{:x}", Sha256::digest(&payload)));
+        let save_id = Uuid::new_v4();
+        let metadata: SaveMetadata = serde_json::from_value(serde_json::json!({
+            "schema_version": 1,
+            "id": save_id,
+            "game_id": Uuid::new_v4(),
+            "game_content_hash": "c".repeat(64),
+            "kind": "in_game",
+            "slot": 0,
+            "generation": 1,
+            "parent_id": null,
+            "core_id": "sameboy-gb-native",
+            "core_version": "0.2.0",
+            "state_format_version": "sameboy-gb-sram-v1",
+            "platform": "windows-x86_64",
+            "core_config_hash": "d".repeat(64),
+            "payload_hash": payload_hash.0,
+            "payload_bytes": payload.len() as u64,
+            "created_at_ms": now_ms(),
+            "device_id": device.id,
+            "label": null,
+            "conflict": false
+        }))
+        .expect("valid SaveMetadata");
+        let cipher = account.save_cipher().expect("cipher");
+        let (header, ciphertext) = cipher.encrypt_blob(&metadata, &payload).expect("encrypt");
+
+        let transfer_id = Uuid::new_v4();
+        let begin = store
+            .upload_begin(&cert, transfer_id, header.clone())
+            .expect("upload_begin");
+        assert!(!begin.stored);
+        assert_eq!(begin.received_bytes, 0);
+
+        // Upload chunk 0 (256 KiB)
+        let chunk0 = &ciphertext[..TRANSFER_CHUNK_BYTES as usize];
+        let chunk0_sha = format!("{:x}", Sha256::digest(chunk0));
+        let p0 = store
+            .upload_chunk(&cert, transfer_id, 0, &chunk0_sha, chunk0)
+            .expect("upload_chunk 0");
+        assert_eq!(p0.received_bytes, u64::from(TRANSFER_CHUNK_BYTES));
+
+        // Simulate reconnect after partial progress: upload_begin returns received_bytes == 256 KiB
+        let resume = store
+            .upload_begin(&cert, transfer_id, header.clone())
+            .expect("resume upload_begin");
+        assert!(!resume.stored);
+        assert_eq!(resume.received_bytes, u64::from(TRANSFER_CHUNK_BYTES));
+
+        // Upload chunk 1 (remainder)
+        let chunk1 = &ciphertext[TRANSFER_CHUNK_BYTES as usize..];
+        let chunk1_sha = format!("{:x}", Sha256::digest(chunk1));
+        let p1 = store
+            .upload_chunk(
+                &cert,
+                transfer_id,
+                u64::from(TRANSFER_CHUNK_BYTES),
+                &chunk1_sha,
+                chunk1,
+            )
+            .expect("upload_chunk 1");
+        assert_eq!(p1.received_bytes, header.ciphertext_bytes);
+
+        // Commit upload
+        let committed = store
+            .upload_commit(&cert, transfer_id, header.clone())
+            .expect("upload_commit");
+        assert!(committed.stored);
+
+        // Simulate lost commit reply: calling upload_begin again returns stored: true
+        let lost_commit_reconcile = store
+            .upload_begin(&cert, transfer_id, header.clone())
+            .expect("lost commit upload_begin");
+        assert!(lost_commit_reconcile.stored);
+        assert_eq!(lost_commit_reconcile.received_bytes, header.ciphertext_bytes);
+
+        // Verify quota rejection when another upload exceeds 2 MiB (reserve is 2x ciphertext_bytes)
+        let mut big_header = header.clone();
+        big_header.binding.object_id = Uuid::new_v4();
+        big_header.ciphertext_bytes = 1_200_000; // 2x = 2.4 MB > 2 MiB quota
+        let quota_err = store
+            .upload_begin(&cert, Uuid::new_v4(), big_header)
+            .err()
+            .expect("must exceed quota");
+        assert_eq!(quota_err.code, "resource_limit");
+
+        // Revoke device and verify subsequent sync operations are fenced
+        store
+            .revoke(account.account_id(), device.id, Uuid::new_v4())
+            .expect("revoke device");
+        let revoked_err = store.check_device_active(&cert).err().expect("device revoked");
+        assert_eq!(revoked_err.code, "unauthorized");
+
+        let _ = std::fs::remove_dir_all(&root);
+    }
+}

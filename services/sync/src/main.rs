@@ -18,7 +18,7 @@ use uuid::Uuid;
 pub(crate) fn now_ms()->u64 {std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|value|value.as_millis().min(u64::MAX as u128) as u64).unwrap_or(0)}
 pub(crate) type ApiResult<T>=std::result::Result<T,ApiError>;
 
-#[derive(Serialize)]
+#[derive(Debug,Serialize)]
 pub(crate) struct ApiError {#[serde(skip)]status:StatusCode,code:&'static str,message:&'static str}
 impl ApiError {
     fn unauthorized()->Self {Self{status:StatusCode::UNAUTHORIZED,code:"unauthorized",message:"The account authorization is invalid, expired or revoked"}}

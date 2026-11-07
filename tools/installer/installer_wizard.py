@@ -72,7 +72,13 @@ class InstallerWizard:
         process_names = ["omniplay", "omniplay-launcher", "omniplay-host", "OmniPlay"]
         if self.os_type == "windows":
             try:
-                out = subprocess.check_output(["tasklist", "/FO", "CSV", "/NH"], text=True, stderr=subprocess.DEVNULL)
+                out = subprocess.check_output(
+                    ["tasklist", "/FO", "CSV", "/NH"],
+                    text=True,
+                    stdin=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                    timeout=5,
+                )
                 for line in out.splitlines():
                     parts = line.split('","')
                     if parts:
@@ -83,7 +89,13 @@ class InstallerWizard:
                 pass
         else:
             try:
-                out = subprocess.check_output(["pgrep", "-l", "omniplay"], text=True, stderr=subprocess.DEVNULL)
+                out = subprocess.check_output(
+                    ["pgrep", "-l", "omniplay"],
+                    text=True,
+                    stdin=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                    timeout=5,
+                )
                 for line in out.splitlines():
                     if line.strip():
                         running.append(line.strip())
