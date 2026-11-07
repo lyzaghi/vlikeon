@@ -93,7 +93,7 @@ jobs:
           print(text)
           Path(os.environ["RUNNER_TEMP"], "vlikeon-rust-regression.log").write_text(text, encoding="utf-8")
           if result.returncode:
-              tail = text[-12000:].replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A")
+              tail = text[-3500:].replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A")
               print("::error title=Rust regression failed::" + tail)
           sys.exit(result.returncode)
 
