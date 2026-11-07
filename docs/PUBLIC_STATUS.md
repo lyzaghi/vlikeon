@@ -1,4 +1,4 @@
-# Public status — 2026-10-23
+# Public status — 2026-11-07
 
 Vlikeon Browser is the public identity of the source project called OmniPlay
 internally: a Chromium-first gaming browser by Vlike. Internal identifiers and
@@ -6,14 +6,16 @@ wire formats retain `omniplay`; their migration is not complete.
 
 ## Development and task sequence
 
-Development is active. [`OUTSTANDING_WORK.md`](OUTSTANDING_WORK.md) is the
-current 1–109 task list. Task 1 source integration is complete at `35f3271`;
-task 2 alignment is recorded in [`DOCUMENTATION_ALIGNMENT.md`](DOCUMENTATION_ALIGNMENT.md).
-Task 3 [Windows Chromium build](WINDOWS_CHROMIUM_BUILD.md) is accepted for its
-frozen x64 development inputs and output integrity. Task 4 is next in the build
-sequence; parallel source assignments and deferrals remain in the task list.
-Older 1–17 numbers in implementation records refer to product areas and
-historical assignments. No evidence-based completion percentage is available.
+Development is active. [`OUTSTANDING_WORK.md`](OUTSTANDING_WORK.md) and
+[`handoff/antigravity/2026-10-25/WORK_ITEMS.csv`](handoff/antigravity/2026-10-25/WORK_ITEMS.csv)
+track the 1–109 project ledger. Under the 2026-11-07 v2 delegation on branch
+`antigravity/complete-20261107`, Antigravity executed local Windows native/Rust/Python/Node.js
+builds and qualification suites across Batches `W1 -> W2 -> W3 -> W4a -> W4b -> R -> D -> M -> P -> S -> B -> I -> L -> F`:
+- **6 items** retain `PRESERVE_ACCEPTED_EVIDENCE` (original items `1, 2, 3, 50, 51, 52`).
+- **58 items** are `READY_FOR_CODEX_REVIEW` with build/test execution logs under `E:\V10\work\vlikeon-antigravity-implementation-20261107\`.
+- **45 items** are `WAITING_PERMISSION_OR_RESOURCE` (gated on external Linux/macOS hosts, physical mobile/gamepad/display hardware labs, third-party audits, or production signing/server credentials).
+- **0 items** remain `SOURCE_READY_UNVERIFIED`.
+Codex and the project owner review the execution evidence and decide final acceptance (`VERIFIED`/`ACCEPTED`).
 
 ## What exists and what ran
 
