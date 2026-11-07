@@ -44,6 +44,26 @@ class TestWebManifestAndSecurity(unittest.TestCase):
         self.assertIn("require-corp", content)
         self.assertIn("Content-Security-Policy", content)
 
+    def test_assembled_web_bundle_contains_offline_platform_modules(self):
+        """Verifies that out/web/asset-manifest.json and out/web/web/ contain all offline Web/PWA platform modules (Items 73-75, 86)."""
+        asset_manifest_path = ROOT / "out/web/asset-manifest.json"
+        self.assertTrue(asset_manifest_path.exists(), f"Missing {asset_manifest_path}; run tools/assemble_web.py")
+
+        manifest = json.loads(asset_manifest_path.read_text(encoding="utf-8"))
+        paths = {entry["path"]: entry for entry in manifest.get("assets", [])}
+        required_web_modules = [
+            "web/audio-resampler.js",
+            "web/web-gamepad.js",
+            "web/pwa-install.js",
+            "web/quota-manager.js",
+            "web/presentation-timing.js",
+        ]
+        for rel in required_web_modules:
+            self.assertIn(rel, paths, f"Missing offline Web/PWA module in asset-manifest.json: {rel}")
+            self.assertTrue(paths[rel]["precache"], f"Module {rel} must be precached for offline PWA use")
+            built_file = ROOT / "out/web" / rel
+            self.assertTrue(built_file.is_file(), f"Missing assembled file {built_file}")
+
 
 class TestWebGamepadSerialization(unittest.TestCase):
     def test_web_gamepad_report_structure(self):

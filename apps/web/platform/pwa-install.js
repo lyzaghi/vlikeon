@@ -19,6 +19,7 @@ export class PwaLifecycleManager {
   }
 
   init() {
+    if (typeof window === 'undefined') return;
     window.addEventListener('beforeinstallprompt', (e) => {
       e.preventDefault();
       this.deferredPrompt = e;
@@ -33,7 +34,7 @@ export class PwaLifecycleManager {
       this.notify();
     });
 
-    if ('serviceWorker' in navigator) {
+    if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator && navigator.serviceWorker?.ready) {
       navigator.serviceWorker.ready.then((registration) => {
         registration.addEventListener('updatefound', () => {
           const installing = registration.installing;
