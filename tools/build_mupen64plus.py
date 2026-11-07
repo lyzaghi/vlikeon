@@ -69,8 +69,11 @@ def prepare(original,source,profile='software',materialized=False):
     replace(recomp,'PROT_READ | PROT_WRITE | PROT_EXEC','PROT_READ | PROT_WRITE')
     # Preserve the full build inputs; do not resolve compiler runtimes via PATH in
     # the installed contained process. There is no emulator process launch here.
+    if gpu:
+        replace(source/'Makefile.common','\tSOURCES_C += $(RSPDIR_PARALLEL)/win32/mman/sys/mman.c\n\tINCFLAGS += -I$(RSPDIR_PARALLEL)/win32/mman','\tSOURCES_C += $(ROOT_DIR)/custom/mman-win32/mman.c\n\tINCFLAGS += -I$(ROOT_DIR)/custom/mman-win32')
     makefile=source/'Makefile'
-    with makefile.open('a',encoding='utf-8') as output:output.write('\n# OmniPlay standalone runtime and deterministic CPU math.\nLDFLAGS += -static -static-libgcc -static-libstdc++\noverride CFLAGS += -fno-fast-math -fno-unsafe-math-optimizations -ffp-contract=off\noverride CXXFLAGS += -fno-fast-math -fno-unsafe-math-optimizations -ffp-contract=off\n')
+    replace(makefile,'   LDFLAGS += -shared -static-libgcc -static-libstdc++ -Wl,--version-script=$(LIBRETRO_DIR)/link.T','   LDFLAGS += -shared -static-libgcc -static-libstdc++')
+    with makefile.open('a',encoding='utf-8') as output:output.write('\n# OmniPlay standalone runtime and deterministic CPU math.\nLDFLAGS += -static -static-libgcc -static-libstdc++\noverride CFLAGS += -DNO_ASM -fno-fast-math -fno-unsafe-math-optimizations -ffp-contract=off\noverride CXXFLAGS += -DNO_ASM -fno-fast-math -fno-unsafe-math-optimizations -ffp-contract=off\n')
     changes=(['opengl_core_gliden64_rdp','hle_rsp','cached_interpreter_cpu_configuration','restricted_angrylion_and_cxd4_source_excluded'] if gpu else ['software_angrylion_rdp','interpreter_cxd4_rsp','pure_interpreter_cpu_configuration'])+['no_dynarec_or_parallel_backends','windows_fibers_with_float_state_without_executable_heap','private_scratch_configuration','non_executable_cached_instruction_storage','bounded_exact_size_snapshot_input','truthful_snapshot_load_result','pre_start_snapshot_job_initialization','static_windows_compiler_runtime','cpu_fast_math_disabled']
     (source/'OMNIPLAY_ADAPTATIONS.json').write_text(json.dumps({'schema_version':1,'upstream_revision':PIN,'core_version':version,'profile':profile,'changes':changes,'excluded_source_directories':excluded,'initial_platform':'windows-x86_64','compiled':False,'verification':'not_run','distribution_review':'compiled_licenses_and_corresponding_source_pending' if gpu else 'research_only_not_release_eligible'},indent=2)+'\n',encoding='utf-8')
     return changes

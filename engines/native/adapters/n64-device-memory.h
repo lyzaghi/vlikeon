@@ -2,6 +2,9 @@
 #define OMNIPLAY_N64_DEVICE_MEMORY_H
 #include <stddef.h>
 #include <stdint.h>
+#ifndef DD_BM_STATUS_MICRO
+#define DD_BM_STATUS_MICRO UINT32_C(0x02000000)
+#endif
 static inline int om_n64_device_range(size_t bytes,uint32_t offset,uint32_t count)
 {return offset<=bytes && count<=bytes-offset;}
 /* SI uses the low 24 address bits and word alignment, then transfers 64 bytes.

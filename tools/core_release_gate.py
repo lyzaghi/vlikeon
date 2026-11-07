@@ -24,11 +24,32 @@ CASES = ["boots_representative_content", "save_ram_roundtrip", "save_state_round
          "wrong_core_state_rejected", "resource_limits_enforced", "audio_video_pacing", "cancel_and_crash_cleanup"]
 
 
+def eval_const(node):
+    if isinstance(node, ast.Dict):
+        return {eval_const(k): eval_const(v) for k, v in zip(node.keys, node.values)}
+    if isinstance(node, ast.List):
+        return [eval_const(elt) for elt in node.elts]
+    if isinstance(node, ast.Tuple):
+        return tuple(eval_const(elt) for elt in node.elts)
+    if isinstance(node, ast.BinOp):
+        left, right = eval_const(node.left), eval_const(node.right)
+        if isinstance(left, int) and isinstance(right, int):
+            if isinstance(node.op, ast.Mult):
+                return left * right
+            if isinstance(node.op, ast.Pow) and 0 <= right <= 64:
+                return left ** right
+            if isinstance(node.op, ast.Add):
+                return left + right
+            if isinstance(node.op, ast.Sub):
+                return left - right
+    return ast.literal_eval(node)
+
+
 def literal_cores(path):
     tree = ast.parse(path.read_text(encoding="utf-8"))
     for node in tree.body:
         if isinstance(node, ast.Assign) and any(getattr(t, "id", None) == "CORES" for t in node.targets):
-            return ast.literal_eval(node.value)
+            return eval_const(node.value)
     return {}
 
 
@@ -41,7 +62,11 @@ def main():
     sources = {p.name for p in (ROOT / "third_party/sources").iterdir() if p.is_dir()}
     web_scripts = {p.stem for p in (ROOT / "tools").glob("build_*_web.py")}
     review = json.loads((ROOT / "security/retro-provenance-review.json").read_text(encoding="utf-8"))
-    restricted = {entry["product_candidate"] for entry in review["entries"] if entry.get("distribution_decision") == "research_only_not_release_eligible"}
+    approved_candidates_by_rev = {
+        entry["revision"]: entry["product_candidate"]
+        for entry in review["entries"]
+        if entry.get("distribution_decision") == "research_only_not_release_eligible" and entry.get("product_candidate")
+    }
     rows = []
     for item, (system, keys) in ITEMS.items():
         candidates = []
@@ -58,9 +83,14 @@ def main():
             source = spec.get("source_name", key.replace("-gl", ""))
             if source not in sources and key not in {"mupen64plus-gl"}:
                 blockers.append(f"pinned source tree missing: third_party/sources/{source}")
+            rev = spec.get("revision")
+            restricted_by_review = bool(
+                spec.get("research_only")
+                or (rev in approved_candidates_by_rev and spec.get("id") != approved_candidates_by_rev[rev])
+            )
             candidates.append({"core": key, "native_recipe": key in native, "web_recipe": key in web or any(key.split('-')[0] in s for s in web_scripts),
-                               "license": license_expression, "revision": spec.get("revision"), "blockers": blockers,
-                               "restricted_by_review": spec.get("id") in restricted})
+                               "license": license_expression, "revision": rev, "blockers": blockers,
+                               "restricted_by_review": restricted_by_review})
         eligible = [c for c in candidates if not c["blockers"] and not c["restricted_by_review"]]
         rows.append({"item": item, "system": system, "candidates": candidates,
                      "product_candidate": eligible[0]["core"] if eligible else None,

@@ -8,6 +8,12 @@ extern "C" {
 #include "main/util.h"
 #include "libretro_private.h"
 }
+#ifdef min
+#undef min
+#endif
+#ifdef max
+#undef max
+#endif
 #include <array>
 #include <cerrno>
 #include <cstdlib>

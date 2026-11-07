@@ -84,6 +84,10 @@ def prepare(original,source,libretro_header=None):
     # Keep framebuffer delivery on the libretro calling thread. It must not call
     # the host's SDL renderer from ares's optional video worker thread.
     replace(source/'ares/ares/ares.hpp','static constexpr bool Threaded = true;','static constexpr bool Threaded = false;')
+    replace(source/'nall/nall/windows/windows.hpp','#include <windows.h>','#define boolean WindowsBoolean\n#include <windows.h>\n#undef boolean\n#undef IN\n#undef OUT\n#undef interface\n#undef far\n#undef near')
+    replace(source/'nall/nall/path.cpp','  #include <shlobj.h>','  #define boolean WindowsBoolean\n  #include <shlobj.h>\n  #undef boolean\n  #undef IN\n  #undef OUT\n  #undef interface\n  #undef far\n  #undef near')
+    replace(source/'nall/nall/terminal.cpp','bool _escapable = false;','inline bool _escapable = false;')
+    replace(source/'nall/nall/string.hpp','  template<typename... P> auto append(const nall::string_format&, P&&...) -> type&;','  template<typename... P> auto append(const nall::string_format&, P&&...) -> type&;\n  template<typename T> auto operator+=(const T& value) -> type& { return append(value); }\n  auto operator+=(const nall::string_format& value) -> type& { return append(value); }')
     (source/'thirdparty/sljit.h').write_text('#pragma once\n// No Sljit backend is linked by this software-only adapter.\n',encoding='utf-8')
     (source/'nall/nall/recompiler/generic/generic.hpp').write_text('#pragma once\nnamespace nall::recompiler { struct generic { static constexpr bool supported = false; }; }\n',encoding='utf-8')
     sh2=source/'ares/component/processor/sh2/sh2.hpp';sh2_text=sh2.read_text(encoding='utf-8')
@@ -143,7 +147,7 @@ auto FixedAllocator::get() -> bump_allocator& { static FixedAllocator value; ret
     # Preserve the upstream mapper/storage/region analysis, without its file IO,
     # original UI or embedded SVP firmware fallback. No byte array is transplanted.
     raw=(original/'mia/medium/mega-drive.cpp').read_text(encoding='utf-8')
-    declaration=raw[:raw.index('\nauto MegaDrive::load(')].replace('struct MegaDrive : Cartridge {','struct MegaDrive {')
+    declaration=raw[:raw.index('\nauto MegaDrive::load(')].replace('struct MegaDrive : Cartridge {','struct MegaDrive {\n  string location;')
     declaration,count=re.subn(r'^  auto (?:name|extensions|load|save)\([^\n]*\n','',declaration,flags=re.MULTILINE)
     if count!=4:raise ValueError('Pinned ares cartridge analysis declaration changed')
     analysis=raw[raw.index('auto MegaDrive::analyze(std::vector<u8>& rom)'):].replace('Medium::name(location)','string{"Game"}')

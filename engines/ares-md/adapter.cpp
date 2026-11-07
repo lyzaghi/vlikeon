@@ -26,7 +26,7 @@ using namespace ares;
 constexpr size_t kMaximumRom=64*1024*1024,kMaximumState=64*1024*1024;
 constexpr double kSampleRate=48000.0;
 constexpr char kVersion[]="0.3.0+ares.9408cb43d494";
-struct Host final:Platform {
+struct Host final:ares::Platform {
   retro_environment_t environment=nullptr;retro_video_refresh_t video_callback=nullptr;
   retro_audio_sample_t sample_callback=nullptr;retro_audio_sample_batch_t batch_callback=nullptr;
   retro_input_poll_t poll_callback=nullptr;retro_input_state_t input_callback=nullptr;

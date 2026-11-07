@@ -9,6 +9,9 @@
 #include <stdexcept>
 #include <string>
 #include <vector>
+#ifdef interface
+#undef interface
+#endif
 
 namespace omni {
 struct MemoryFileEntry{std::string name;std::span<const std::uint8_t> payload;bool directory;};

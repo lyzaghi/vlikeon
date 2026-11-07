@@ -18,8 +18,8 @@ int om_ps1_files_install(const struct OmniWritableFilesV1* value)
    {
       memset(&om_ps1_files,0,sizeof(om_ps1_files));
       om_ps1_files_ready=0;
-      retro_atomic_store_release(&om_ps1_read_failure,0);
-      retro_atomic_store_release(&om_ps1_write_failure,0);
+      retro_atomic_store_release_int(&om_ps1_read_failure,0);
+      retro_atomic_store_release_int(&om_ps1_write_failure,0);
       return 1;
    }
    if (value->version!=1 || value->struct_bytes!=sizeof(*value) || !value->context ||
@@ -29,8 +29,8 @@ int om_ps1_files_install(const struct OmniWritableFilesV1* value)
       return 0;
    om_ps1_files=*value;
    om_ps1_files_ready=1;
-   retro_atomic_store_release(&om_ps1_read_failure,0);
-   retro_atomic_store_release(&om_ps1_write_failure,0);
+   retro_atomic_store_release_int(&om_ps1_read_failure,0);
+   retro_atomic_store_release_int(&om_ps1_write_failure,0);
    return 1;
 }
 int om_ps1_files_installed(void) {return om_ps1_files_ready;}
@@ -55,14 +55,14 @@ static int om_ps1_path(const char* raw,char path[OM_PS1_PATH_BYTES])
 
 static int om_ps1_failed_read(void)
 {
-   retro_atomic_store_release(&om_ps1_read_failure,1);
+   retro_atomic_store_release_int(&om_ps1_read_failure,1);
    return -1;
 }
-int om_ps1_card_read_failed(void) {return retro_atomic_load_acquire(&om_ps1_read_failure)!=0;}
-void om_ps1_card_read_begin(void) {retro_atomic_store_release(&om_ps1_read_failure,0);}
-int om_ps1_card_write_failed(void) {return retro_atomic_load_acquire(&om_ps1_write_failure)!=0;}
-void om_ps1_card_write_begin(void) {retro_atomic_store_release(&om_ps1_write_failure,0);}
-static int om_ps1_failed_write(void) {retro_atomic_store_release(&om_ps1_write_failure,1);return 0;}
+int om_ps1_card_read_failed(void) {return retro_atomic_load_acquire_int(&om_ps1_read_failure)!=0;}
+void om_ps1_card_read_begin(void) {retro_atomic_store_release_int(&om_ps1_read_failure,0);}
+int om_ps1_card_write_failed(void) {return retro_atomic_load_acquire_int(&om_ps1_write_failure)!=0;}
+void om_ps1_card_write_begin(void) {retro_atomic_store_release_int(&om_ps1_write_failure,0);}
+static int om_ps1_failed_write(void) {retro_atomic_store_release_int(&om_ps1_write_failure,1);return 0;}
 
 int om_ps1_read_card(const char* raw,uint8_t* output,uint32_t bytes)
 {

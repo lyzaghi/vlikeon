@@ -191,6 +191,42 @@ def run(command, cwd=None):
     subprocess.run([str(value) for value in command], cwd=cwd, check=True)
 
 
+def adapt_mgba(source):
+    cmake = source / "CMakeLists.txt"
+    raw = cmake.read_text(encoding="utf-8")
+    for old, new in [
+        ("cmake_minimum_required(VERSION 3.12)", "cmake_minimum_required(VERSION 3.25)"),
+        ("list(APPEND OS_LIB ws2_32 shlwapi)", ""),
+        ("file(GLOB OS_SRC ${CMAKE_CURRENT_SOURCE_DIR}/src/platform/windows/*.c)",
+         "set(OS_SRC ${CMAKE_CURRENT_SOURCE_DIR}/src/platform/windows/memory.c)"),
+    ]:
+        if raw.count(old) != 1:
+            raise ValueError("The pinned mGBA CMake configuration changed")
+        raw = raw.replace(old, new, 1)
+    cmake.write_text(raw, encoding="utf-8", newline="\n")
+    config = source / "src/core/config.c"
+    raw_cfg = config.read_text(encoding="utf-8")
+    for old, new in [
+        ("#ifdef _WIN32\n\tWCHAR wpath[MAX_PATH];", "#if defined(_WIN32) && !defined(MINIMAL_CORE)\n\tWCHAR wpath[MAX_PATH];"),
+        ("#elif defined(PSP2)\n\tsnprintf(out, outLength, \"ux0:data/%s\", projectName);",
+         "#elif defined(MINIMAL_CORE)\n\tUNUSED(outLength);\n\tout[0] = '\\0';\n#elif defined(PSP2)\n\tsnprintf(out, outLength, \"ux0:data/%s\", projectName);"),
+        ("#ifdef _WIN32\n\twchar_t wpath[MAX_PATH];", "#if defined(_WIN32) && !defined(MINIMAL_CORE)\n\twchar_t wpath[MAX_PATH];"),
+        ("#elif defined(PSP2) || defined(GEKKO) || defined(__SWITCH__) || defined(__3DS__)",
+         "#elif defined(PSP2) || defined(GEKKO) || defined(__SWITCH__) || defined(__3DS__) || defined(MINIMAL_CORE)"),
+    ]:
+        if raw_cfg.count(old) != 1:
+            raise ValueError("The pinned mGBA config path helper changed")
+        raw_cfg = raw_cfg.replace(old, new, 1)
+    config.write_text(raw_cfg, encoding="utf-8", newline="\n")
+    vfs = source / "src/util/vfs.c"
+    raw_vfs = vfs.read_text(encoding="utf-8")
+    old_vfs = "\tWCHAR wpath[PATH_MAX];\n\tMultiByteToWideChar(CP_UTF8, 0, path, -1, wpath, PATH_MAX);\n\treturn !PathIsRelativeW(wpath);"
+    new_vfs = "\treturn path && (path[0] == '/' || path[0] == '\\\\' || (((path[0] >= 'A' && path[0] <= 'Z') || (path[0] >= 'a' && path[0] <= 'z')) && path[1] == ':' && (path[2] == '/' || path[2] == '\\\\')));"
+    if raw_vfs.count(old_vfs) != 1:
+        raise ValueError("The pinned mGBA VFS path check changed")
+    vfs.write_text(raw_vfs.replace(old_vfs, new_vfs, 1), encoding="utf-8", newline="\n")
+
+
 def adapt_bsnes(source):
     resources = source / "bsnes/target-libretro/resources.hpp"
     raw = resources.read_text(encoding="utf-8")
@@ -213,6 +249,14 @@ def adapt_bsnes(source):
     shutil.copy2(ROOT / 'engines/native/adapters/LICENSE.libco', source / 'libco/LICENSE.omniplay')
     libco.write_text('#if defined(_WIN32)\n#include "omniplay-windows-fibers.c"\n#else\n' + raw + '\n#endif\n',
                      encoding="utf-8", newline="\n")
+    traits = source / "nall/traits.hpp"
+    raw_traits = traits.read_text(encoding="utf-8")
+    old_traits = "  using std::is_signed;\n  using std::is_signed_v;\n  using std::is_unsigned;\n  using std::is_unsigned_v;"
+    new_traits = "  template<typename T> struct is_signed : std::is_signed<T> {};\n  template<typename T> struct is_unsigned : std::is_unsigned<T> {};\n  template<typename T> inline constexpr bool is_signed_v = is_signed<T>::value;\n  template<typename T> inline constexpr bool is_unsigned_v = is_unsigned<T>::value;\n#if INTMAX_BITS >= 128\n  template<> struct is_signed<int128_t> : std::true_type {};\n  template<> struct is_unsigned<uint128_t> : std::true_type {};\n#endif"
+    old_std_spec = "namespace std {\n  #if INTMAX_BITS >= 128\n  template<> struct is_signed<int128_t> : true_type {};\n  template<> struct is_unsigned<uint128_t> : true_type {};\n  #endif\n}"
+    if raw_traits.count(old_traits) != 1 or raw_traits.count(old_std_spec) != 1:
+        raise ValueError("The pinned bsnes traits declaration changed")
+    traits.write_text(raw_traits.replace(old_traits, new_traits, 1).replace(old_std_spec, "", 1), encoding="utf-8", newline="\n")
     # Retain complete adapted corresponding source and a transformation description.
     # Do not put the removed manufacturer byte array into an exported patch file.
     (source / "OMNIPLAY_ADAPTATIONS.json").write_text(json.dumps({"schema_version": 1,
@@ -233,11 +277,14 @@ set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 add_library(bsnes_libretro SHARED
 ''' + listing + ''')
 target_include_directories(bsnes_libretro PRIVATE . bsnes bsnes/gb bsnes/sfc)
-target_compile_definitions(bsnes_libretro PRIVATE STDC_HEADERS __STDC_LIMIT_MACROS __LIBRETRO__ SFC_LAGFIX GB_INTERNAL DISABLE_DEBUGGER NOMINMAX _CRT_SECURE_NO_WARNINGS)
+target_compile_definitions(bsnes_libretro PRIVATE STDC_HEADERS __STDC_LIMIT_MACROS __LIBRETRO__ SFC_LAGFIX GB_INTERNAL DISABLE_DEBUGGER NOMINMAX _GNU_SOURCE _USE_MATH_DEFINES _CRT_SECURE_NO_WARNINGS)
 set_target_properties(bsnes_libretro PROPERTIES PREFIX "" WINDOWS_EXPORT_ALL_SYMBOLS ON)
 if(MSVC)
   target_compile_options(bsnes_libretro PRIVATE /O2 /GS /EHsc /utf-8)
   target_link_options(bsnes_libretro PRIVATE /DYNAMICBASE /NXCOMPAT)
+elseif(WIN32)
+  target_compile_options(bsnes_libretro PRIVATE -O3)
+  target_link_options(bsnes_libretro PRIVATE -static -static-libgcc -static-libstdc++)
 else()
   target_compile_options(bsnes_libretro PRIVATE -O3 -fPIC)
 endif()
@@ -276,6 +323,8 @@ def main():
         adapt_sameboy(source, args.rgbasm, args.rgbgfx, args.rgblink)
     elif args.core == "fceumm":
         adapt_fceumm(source)
+    elif args.core == "mgba":
+        adapt_mgba(source)
     build = output / "build"
     configure = [args.cmake, "-S", source, "-B", build, "-G", args.generator,
                  "-DCMAKE_BUILD_TYPE=Release", "-DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded"]

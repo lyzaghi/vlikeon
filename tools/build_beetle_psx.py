@@ -30,7 +30,9 @@ def prepare(output,platform,git):
     if version.count(anchor)!=1:raise ValueError("The pinned PS1 version anchor changed")
     options.write_text(version.replace(anchor,'#define MEDNAFEN_CORE_SETVERSION "'+VERSION+'"'),encoding="utf-8",newline="\n")
     makefile=source/"Makefile";raw=makefile.read_text(encoding="utf-8")
-    if platform=="win":raw+="\n# OmniPlay: fixed GNU runtime dependencies, no PATH-resolved helper DLL.\nLDFLAGS += -static -static-libgcc -static-libstdc++\n"
+    if platform=="win":
+        raw=raw.replace("   SHARED  := -shared -Wl,--no-undefined -Wl,--version-script=link.T\n   LDFLAGS += -static-libgcc -static-libstdc++ -lwinmm","   SHARED  := -shared -Wl,--no-undefined\n   LDFLAGS += -static-libgcc -static-libstdc++")
+        raw+="\n# OmniPlay: fixed GNU runtime dependencies, no PATH-resolved helper DLL.\nLDFLAGS += -static -static-libgcc -static-libstdc++\n"
     makefile.write_text(raw,encoding="utf-8",newline="\n")
     adaptations={"schema_version":1,"revision":PIN,"version":VERSION,"platform":platform,
       "changes":["software_renderer","no_lightrec_or_dynamic_code","no_direct_cdrom_device","static_gnu_runtime_on_windows","snapshots_always_include_memory_card_bytes","pause_joins_card_writer_and_lazy_frame_restart","checked_all_card_barrier","combined_memory_file_progress_and_disc_snapshots","bounded_frontend_memory_card_table","no_file_card_os_write_fallback","read_failure_retains_card_bytes","card_swap_joins_older_queued_writes"],

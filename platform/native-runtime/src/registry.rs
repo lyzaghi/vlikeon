@@ -336,4 +336,25 @@ mod tests {
         gpu_mismatch["runtimes"][0]["gpu_max_height"]=json!(480);
         assert!(parse_catalog(&serde_json::to_vec(&gpu_mismatch).unwrap()).is_err());
     }
+
+    #[test]
+    fn parse_catalog_admits_staged_native_runtimes_catalog(){
+        let apps_root=Path::new(env!("CARGO_MANIFEST_DIR")).join("../../apps");
+        let catalog_path=apps_root.join("native-runtimes/catalog.json");
+        if !catalog_path.is_file(){
+            return;
+        }
+        let raw=std::fs::read(&catalog_path).expect("read staged catalog.json");
+        let runtimes=parse_catalog(&raw).expect("admit staged native-runtimes/catalog.json");
+        assert!(!runtimes.is_empty());
+        for package in &runtimes{
+            assert!(!package.manifest.security_revoked);
+            let mut approved_manifest=package.manifest.clone();
+            approved_manifest.distribution_approved=true;
+            approved_manifest.validate().expect("validate runtime manifest shape");
+            for file in &package.files{
+                let _verified=approved_file(&apps_root,&file.path,None,Some(file)).expect("verify staged runtime file hash and size");
+            }
+        }
+    }
 }

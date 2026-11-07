@@ -77,6 +77,10 @@ static OmniN64File* open_memory_file(const char* raw,const char* requested,bool 
     if(write){
       if(serial==std::numeric_limits<std::uint64_t>::max()){errno=EMFILE;return nullptr;}
       const auto parent=name.substr(0,name.rfind('/'));result=files.mkdir(files.context,parent.c_str(),1);if(result){failure(result);return nullptr;}
+      OmniFilesStatV1 dest_shape{};result=files.stat(files.context,name.c_str(),&dest_shape);
+      if(result==OMNI_FILES_NOT_FOUND)result=0;
+      else if(!result&&dest_shape.kind==OMNI_FILES_DIRECTORY)result=OMNI_FILES_IS_DIRECTORY;
+      if(result){failure(result);return nullptr;}
       // Temporary spelling is independent of the requested leaf length. The
       // store bounds names and counters; exclusive creation never adopts data.
       stream->temporary=parent+"/.omn64-"+std::to_string(serial++);

@@ -69,7 +69,8 @@ def prepare_project(work):
         else:
             sources[entry['name']] = fonts_from_commit(entry, owned(source / 'omniplay-font-sources' / entry['name']))
             records[entry['name']] = {'revision': entry['revision'], 'committed_inventory': entry['inventory']}
-    replace(source / 'CMakeLists.txt', 'target_link_libraries(AtlasTool ${CMAKE_THREAD_LIBS_INIT} freetype)', 'target_link_libraries(AtlasTool ${CMAKE_THREAD_LIBS_INIT} freetype Common zstd)')
+    replace(source / 'CMakeLists.txt', 'target_link_libraries(AtlasTool ${CMAKE_THREAD_LIBS_INIT} freetype)', 'target_link_libraries(AtlasTool ${CMAKE_THREAD_LIBS_INIT} freetype Common)')
+    replace(source / 'CMakeLists.txt', 'if(NOT ANDROID)\n\tfile(INSTALL ${BigFontAssets} DESTINATION assets)\n\tfile(INSTALL ${NativeAssets} DESTINATION assets)\n\tfile(INSTALL ${UIImages} DESTINATION assets/ui_images)\n\tfile(INSTALL assets/flash0 DESTINATION assets)\nendif()', 'if(NOT ANDROID AND NOT ATLAS_TOOL)\n\tfile(INSTALL ${BigFontAssets} DESTINATION assets)\n\tfile(INSTALL ${NativeAssets} DESTINATION assets)\n\tfile(INSTALL ${UIImages} DESTINATION assets/ui_images)\n\tfile(INSTALL assets/flash0 DESTINATION assets)\nendif()')
     fonts = source / 'omniplay-fonts'; fonts.mkdir(); inputs = []; script = ['2048']
     for name, relative, ranges in FONT_INPUTS:
         target = fonts / Path(relative).name; shutil.copy2(sources[name] / relative, target)

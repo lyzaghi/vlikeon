@@ -1,6 +1,9 @@
 /* Actual C2 processing: reject sector subtraction underflow and admit the
  * entire byte-swapped output extent before modifying any buffer byte. */
 #include "n64-core-owner.h"
+#ifndef DD_BM_STATUS_MICRO
+#define DD_BM_STATUS_MICRO UINT32_C(0x02000000)
+#endif
 static void read_C2(struct dd_controller* dd)
 {
     size_t length,offset,i;unsigned int sector;
