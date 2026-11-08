@@ -97,6 +97,10 @@ def main() -> int:
     args = parser.parse_args()
     report = run(args.browser.absolute(), args.output.absolute(), args.turn_url)
     print(json.dumps(report, indent=2))
+    if not report["passed"] and os.environ.get("GITHUB_ACTIONS"):
+        message = str(report.get("error", "Browser qualification failed"))[:3000]
+        message = message.replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A")
+        print("::error title=WebRTC qualification failed::" + message)
     return 0 if report["passed"] else 1
 
 

@@ -149,8 +149,10 @@ impl InstalledGames {
         for (id,game) in &mut self.running {
             #[cfg(not(any(windows, target_os = "linux", target_os = "macos")))]
             let status=game.child.try_wait().map_err(storage_error)?.map(|value|Some(value.success()));
-            #[cfg(any(windows, target_os = "linux", target_os = "macos"))]
+            #[cfg(windows)]
             let status=game.child.poll_exit()?;
+            #[cfg(any(target_os = "linux", target_os = "macos"))]
+            let status=game.child.poll_exit()?.map(Some);
             if let Some(success)=status {
                 if game.info.running{game.info.running=false;game.info.exited_at_ms=Some(now_ms());game.info.exit_success=success;}exited.push(*id);
             }

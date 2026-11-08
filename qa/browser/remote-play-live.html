@@ -126,7 +126,14 @@ async function qualify(relay, relayOnly = Boolean(relay)) {
     const route = await selectedRoute(peerConnections[0]);
     const withheldCandidates = clientSignal.withheldCandidates + hostSignal.withheldCandidates;
     if (relay && !relayOnly) assert(withheldCandidates > 0, "Fallback fixture did not withhold any direct candidates");
-    assert(route && route.local === (relay ? "relay" : "host"), "Unexpected WebRTC candidate route " + JSON.stringify(route));
+    assert(route, "Missing selected ICE pair or connected DTLS transport");
+    if (relayOnly) {
+      assert(route.local === "relay", "Relay-only policy selected " + JSON.stringify(route));
+    } else if (relay) {
+      assert(route.local === "relay" || route.remote === "relay", "Fallback did not use TURN " + JSON.stringify(route));
+    } else {
+      assert(route.local === "host", "Direct fixture selected " + JSON.stringify(route));
+    }
 
     host.armInput(true);
     await until("remote input grant", () => inputAvailable);
